@@ -1040,7 +1040,7 @@ function StubsContent() {
         )}
 
         <div
-          className="grid gap-4"
+          className="grid gap-2.5 sm:gap-3"
           style={{
             gridTemplateColumns: `repeat(${columnsPerPage}, minmax(0, 1fr))`,
           }}
@@ -1125,7 +1125,7 @@ function StubsContent() {
       {/* Dedicated Print Container (Hidden on Screen, Visible only in @media print) */}
       <div className="print-only hidden">
         <div
-          className="grid gap-4"
+          className="grid gap-1.5"
           style={{
             gridTemplateColumns: `repeat(${columnsPerPage}, minmax(0, 1fr))`,
           }}
