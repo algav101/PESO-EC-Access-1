@@ -43,6 +43,9 @@ export async function POST(request: Request, { params }: { params: { id: string 
   try {
     const user = await getCurrentUser();
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    if (user.role !== "PESO_ADMIN") {
+      return NextResponse.json({ error: "Forbidden: Only PESO Admins can add work plan activities" }, { status: 403 });
+    }
 
     const body = await request.json();
     const { workProgramId, dayNumber, specificActivities, area, maleCount, femaleCount, scPwdMaleCount, scPwdFemaleCount, totalCount } = body;
@@ -84,6 +87,9 @@ export async function PUT(request: Request, { params }: { params: { id: string }
   try {
     const user = await getCurrentUser();
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    if (user.role !== "PESO_ADMIN") {
+      return NextResponse.json({ error: "Forbidden: Only PESO Admins can edit work plan activities" }, { status: 403 });
+    }
 
     const body = await request.json();
     const { id, specificActivities, area, maleCount, femaleCount, scPwdMaleCount, scPwdFemaleCount, totalCount } = body;
@@ -116,6 +122,9 @@ export async function DELETE(request: Request) {
   try {
     const user = await getCurrentUser();
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    if (user.role !== "PESO_ADMIN") {
+      return NextResponse.json({ error: "Forbidden: Only PESO Admins can delete work plan activities" }, { status: 403 });
+    }
 
     const { searchParams } = new URL(request.url);
     const itemId = searchParams.get("itemId");

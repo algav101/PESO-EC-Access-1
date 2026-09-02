@@ -10,6 +10,9 @@ export async function POST(request: Request, { params }: { params: { id: string 
     if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
+    if (user.role !== "PESO_ADMIN") {
+      return NextResponse.json({ error: "Forbidden: Only PESO Admins can upload and commit work programs" }, { status: 403 });
+    }
 
     const { programs } = (await request.json()) as { programs: ParsedBarangayWorkProgram[] };
 

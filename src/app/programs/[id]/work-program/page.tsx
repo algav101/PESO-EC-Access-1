@@ -32,6 +32,7 @@ export default function WorkProgramManagementPage() {
   const params = useParams();
   const router = useRouter();
   const { user } = useAuth();
+  const isAdmin = user?.role === "PESO_ADMIN";
 
   const [program, setProgram] = useState<any>(null);
   const [workPrograms, setWorkPrograms] = useState<any[]>([]);
@@ -253,17 +254,19 @@ export default function WorkProgramManagementPage() {
             <span>Template (.XLSX)</span>
           </a>
 
-          <button
-            onClick={() => {
-              setIsUploadModalOpen(true);
-              setPreview(null);
-              setFile(null);
-            }}
-            className="px-3.5 py-2 bg-gov-blue hover:bg-gov-light text-white font-bold text-xs rounded-lg transition shadow flex items-center space-x-1.5"
-          >
-            <UploadCloud className="w-4 h-4 text-gov-goldLight" />
-            <span>Upload Work Program</span>
-          </button>
+          {isAdmin && (
+            <button
+              onClick={() => {
+                setIsUploadModalOpen(true);
+                setPreview(null);
+                setFile(null);
+              }}
+              className="px-3.5 py-2 bg-gov-blue hover:bg-gov-light text-white font-bold text-xs rounded-lg transition shadow flex items-center space-x-1.5"
+            >
+              <UploadCloud className="w-4 h-4 text-gov-goldLight" />
+              <span>Upload Work Program</span>
+            </button>
+          )}
 
           <a
             href={`/api/v1/reports/export?type=WORK_PROGRAM&programId=${params.id}`}
@@ -535,28 +538,30 @@ export default function WorkProgramManagementPage() {
                   </p>
                 </div>
 
-                <div className="flex items-center space-x-2">
-                  <button
-                    onClick={() => {
-                      setEditingItem(null);
-                      setActivityForm({
-                        dayNumber: 1,
-                        specificActivities: "",
-                        area: "",
-                        maleCount: 0,
-                        femaleCount: 0,
-                        scPwdMaleCount: 0,
-                        scPwdFemaleCount: 0,
-                        totalCount: 0,
-                      });
-                      setIsActivityModalOpen(true);
-                    }}
-                    className="px-3.5 py-2 bg-gov-blue hover:bg-gov-light text-white font-bold text-xs rounded-lg shadow flex items-center space-x-1"
-                  >
-                    <PlusCircle className="w-3.5 h-3.5 text-gov-goldLight" />
-                    <span>Add Activity</span>
-                  </button>
-                </div>
+                {isAdmin && (
+                  <div className="flex items-center space-x-2">
+                    <button
+                      onClick={() => {
+                        setEditingItem(null);
+                        setActivityForm({
+                          dayNumber: 1,
+                          specificActivities: "",
+                          area: "",
+                          maleCount: 0,
+                          femaleCount: 0,
+                          scPwdMaleCount: 0,
+                          scPwdFemaleCount: 0,
+                          totalCount: 0,
+                        });
+                        setIsActivityModalOpen(true);
+                      }}
+                      className="px-3.5 py-2 bg-gov-blue hover:bg-gov-light text-white font-bold text-xs rounded-lg shadow flex items-center space-x-1"
+                    >
+                      <PlusCircle className="w-3.5 h-3.5 text-gov-goldLight" />
+                      <span>Add Activity</span>
+                    </button>
+                  </div>
+                )}
               </div>
 
               {/* Day Filter Pills */}
@@ -600,13 +605,13 @@ export default function WorkProgramManagementPage() {
                         <th className="px-4 py-3 text-center">Female</th>
                         <th className="px-4 py-3 text-center">SC/PWD</th>
                         <th className="px-4 py-3 text-center">Total</th>
-                        <th className="px-4 py-3 text-right">Actions</th>
+                        {isAdmin && <th className="px-4 py-3 text-right">Actions</th>}
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
                       {filteredItems.length === 0 ? (
                         <tr>
-                          <td colSpan={8} className="px-4 py-8 text-center text-xs text-slate-400">
+                          <td colSpan={isAdmin ? 8 : 7} className="px-4 py-8 text-center text-xs text-slate-400">
                             No activities scheduled for this day filter.
                           </td>
                         </tr>
@@ -639,35 +644,37 @@ export default function WorkProgramManagementPage() {
                                 {it.totalCount || it.maleCount + it.femaleCount} Pax
                               </span>
                             </td>
-                            <td className="px-4 py-3 text-right space-x-1">
-                              <button
-                                onClick={() => {
-                                  setEditingItem(it);
-                                  setActivityForm({
-                                    dayNumber: it.dayNumber,
-                                    specificActivities: it.specificActivities,
-                                    area: it.area,
-                                    maleCount: it.maleCount || 0,
-                                    femaleCount: it.femaleCount || 0,
-                                    scPwdMaleCount: it.scPwdMaleCount || 0,
-                                    scPwdFemaleCount: it.scPwdFemaleCount || 0,
-                                    totalCount: it.totalCount || 0,
-                                  });
-                                  setIsActivityModalOpen(true);
-                                }}
-                                className="p-1 text-slate-500 hover:text-gov-blue rounded"
-                                title="Edit activity"
-                              >
-                                <Edit2 className="w-3.5 h-3.5" />
-                              </button>
-                              <button
-                                onClick={() => handleDeleteActivity(it.id)}
-                                className="p-1 text-slate-500 hover:text-rose-600 rounded"
-                                title="Delete activity"
-                              >
-                                <Trash2 className="w-3.5 h-3.5" />
-                              </button>
-                            </td>
+                            {isAdmin && (
+                              <td className="px-4 py-3 text-right space-x-1">
+                                <button
+                                  onClick={() => {
+                                    setEditingItem(it);
+                                    setActivityForm({
+                                      dayNumber: it.dayNumber,
+                                      specificActivities: it.specificActivities,
+                                      area: it.area,
+                                      maleCount: it.maleCount || 0,
+                                      femaleCount: it.femaleCount || 0,
+                                      scPwdMaleCount: it.scPwdMaleCount || 0,
+                                      scPwdFemaleCount: it.scPwdFemaleCount || 0,
+                                      totalCount: it.totalCount || 0,
+                                    });
+                                    setIsActivityModalOpen(true);
+                                  }}
+                                  className="p-1 text-slate-500 hover:text-gov-blue rounded"
+                                  title="Edit activity"
+                                >
+                                  <Edit2 className="w-3.5 h-3.5" />
+                                </button>
+                                <button
+                                  onClick={() => handleDeleteActivity(it.id)}
+                                  className="p-1 text-slate-500 hover:text-rose-600 rounded"
+                                  title="Delete activity"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              </td>
+                            )}
                           </tr>
                         ))
                       )}

@@ -47,6 +47,9 @@ export async function POST(request: Request) {
     if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
+    if (user.role !== "PESO_ADMIN") {
+      return NextResponse.json({ error: "Forbidden: Only PESO Admins can upload restriction masterlists" }, { status: 403 });
+    }
 
     let rawRows: any[] = [];
     const contentType = request.headers.get("content-type") || "";

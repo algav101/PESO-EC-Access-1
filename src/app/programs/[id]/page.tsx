@@ -28,6 +28,7 @@ import {
 import { StatusBadge } from "@/components/common/StatusBadge";
 import { formatDate, formatTime } from "@/lib/utils";
 import { useOffline } from "@/context/OfflineContext";
+import { useAuth } from "@/context/AuthContext";
 import { TableAssignmentModal } from "@/components/tables/TableAssignmentModal";
 import { EditProgramModal } from "@/components/programs/EditProgramModal";
 import { DeleteProgramModal } from "@/components/programs/DeleteProgramModal";
@@ -36,6 +37,8 @@ import { EditBeneficiaryModal } from "@/components/beneficiaries/EditBeneficiary
 export default function ProgramDetailsHub() {
   const params = useParams();
   const router = useRouter();
+  const { user } = useAuth();
+  const isAdmin = user?.role === "PESO_ADMIN";
   const { cacheProgramData } = useOffline();
 
   const [program, setProgram] = useState<any>(null);
@@ -201,20 +204,22 @@ export default function ProgramDetailsHub() {
           <a
             href={`/programs/${program.id}/work-program`}
             className="px-3 py-2 bg-gov-blue hover:bg-gov-light text-white font-bold text-xs rounded-lg transition shadow flex items-center space-x-1.5"
-            title="Upload and manage 10-day TUPAD Work Program schedule and work areas"
+            title="View 10-day TUPAD Work Program schedule and work areas"
           >
             <CalendarCheck className="w-3.5 h-3.5 text-gov-goldLight" />
             <span>TUPAD Work Program</span>
           </a>
 
-          <button
-            onClick={() => setIsEditModalOpen(true)}
-            className="px-3 py-2 bg-white hover:bg-slate-50 text-slate-700 font-bold text-xs rounded-lg transition shadow-xs border border-slate-300 flex items-center space-x-1.5"
-            title="Edit program details, parameters, schedule, and barangays"
-          >
-            <Edit2 className="w-3.5 h-3.5 text-gov-blue" />
-            <span>Edit Program</span>
-          </button>
+          {isAdmin && (
+            <button
+              onClick={() => setIsEditModalOpen(true)}
+              className="px-3 py-2 bg-white hover:bg-slate-50 text-slate-700 font-bold text-xs rounded-lg transition shadow-xs border border-slate-300 flex items-center space-x-1.5"
+              title="Edit program details, parameters, schedule, and barangays"
+            >
+              <Edit2 className="w-3.5 h-3.5 text-gov-blue" />
+              <span>Edit Program</span>
+            </button>
+          )}
 
           <button
             onClick={handleCacheOffline}
@@ -225,13 +230,15 @@ export default function ProgramDetailsHub() {
             <span>Cache Offline</span>
           </button>
 
-          <a
-            href={`/programs/${program.id}/import`}
-            className="px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-xs rounded-lg transition shadow-xs border border-slate-300 flex items-center space-x-1.5"
-          >
-            <PlusCircle className="w-3.5 h-3.5 text-gov-blue" />
-            <span>Upload Roster</span>
-          </a>
+          {isAdmin && (
+            <a
+              href={`/programs/${program.id}/import`}
+              className="px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-xs rounded-lg transition shadow-xs border border-slate-300 flex items-center space-x-1.5"
+            >
+              <PlusCircle className="w-3.5 h-3.5 text-gov-blue" />
+              <span>Upload Roster</span>
+            </a>
+          )}
 
           <a
             href={`/stubs?programId=${program.id}`}
@@ -241,14 +248,16 @@ export default function ProgramDetailsHub() {
             <span>Print Stubs</span>
           </a>
 
-          <button
-            onClick={() => setIsDeleteModalOpen(true)}
-            className="px-2.5 py-2 bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold text-xs rounded-lg transition border border-rose-200 flex items-center space-x-1"
-            title="Permanently delete program and all associated records"
-          >
-            <Trash2 className="w-3.5 h-3.5" />
-            <span>Delete</span>
-          </button>
+          {isAdmin && (
+            <button
+              onClick={() => setIsDeleteModalOpen(true)}
+              className="px-2.5 py-2 bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold text-xs rounded-lg transition border border-rose-200 flex items-center space-x-1"
+              title="Permanently delete program and all associated records"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+              <span>Delete</span>
+            </button>
+          )}
         </div>
       </div>
 
@@ -427,20 +436,22 @@ export default function ProgramDetailsHub() {
             <h2 className="text-xs font-bold text-slate-800 uppercase tracking-wider">
               Enrolled Beneficiaries ({beneficiaries.length})
             </h2>
-            <div className="flex space-x-2">
-              <button
-                onClick={handleGenerateQrs}
-                className="px-3 py-1.5 bg-slate-800 hover:bg-slate-900 text-white font-bold text-xs rounded-lg transition"
-              >
-                Generate Missing QRs
-              </button>
-              <a
-                href={`/programs/${program.id}/import`}
-                className="px-3 py-1.5 bg-gov-blue hover:bg-gov-light text-white font-bold text-xs rounded-lg transition"
-              >
-                Upload Excel Masterlist
-              </a>
-            </div>
+            {isAdmin && (
+              <div className="flex space-x-2">
+                <button
+                  onClick={handleGenerateQrs}
+                  className="px-3 py-1.5 bg-slate-800 hover:bg-slate-900 text-white font-bold text-xs rounded-lg transition"
+                >
+                  Generate Missing QRs
+                </button>
+                <a
+                  href={`/programs/${program.id}/import`}
+                  className="px-3 py-1.5 bg-gov-blue hover:bg-gov-light text-white font-bold text-xs rounded-lg transition"
+                >
+                  Upload Excel Masterlist
+                </a>
+              </div>
+            )}
           </div>
 
           <div className="gov-card overflow-hidden">
@@ -486,50 +497,54 @@ export default function ProgramDetailsHub() {
                           <td className="px-4 py-3 text-slate-600 font-mono">
                             {pb.beneficiary.birthday}
                           </td>
-                        <td className="px-4 py-3 text-slate-700">
-                          {pb.beneficiary.barangay}
-                        </td>
-                        <td className="px-4 py-3 font-semibold text-slate-800">
-                          {pb.tableNumber || "-"}
-                        </td>
-                        <td className="px-4 py-3 text-[11px] text-slate-500">
-                          {pb.slotGroup || "Main"}
-                        </td>
-                        <td className="px-4 py-3 font-mono text-[10px] text-slate-500 truncate max-w-[120px]">
-                          {activeQr ? activeQr.publicToken : <span className="text-amber-600 font-bold">Pending</span>}
-                        </td>
-                        <td className="px-4 py-3">
-                          <StatusBadge status={pb.participationStatus} />
-                        </td>
-                        <td className="px-4 py-3 text-right space-x-1.5 whitespace-nowrap">
-                          <button
-                            onClick={() => setBeneficiaryToEdit(pb)}
-                            className="px-2 py-1 text-[11px] font-bold text-slate-700 hover:text-white bg-slate-100 hover:bg-slate-800 border border-slate-300 rounded transition inline-flex items-center space-x-1"
-                            title="Edit Beneficiary Details & Status"
-                          >
-                            <Edit2 className="w-3 h-3" />
-                            <span>Edit</span>
-                          </button>
-                          <a
-                            href={`/beneficiaries/${pb.beneficiary.id}`}
-                            className="px-2 py-1 text-[11px] font-bold text-slate-700 hover:text-gov-blue bg-slate-100 hover:bg-slate-200 rounded transition inline-flex items-center space-x-0.5"
-                            title="View Full Profile"
-                          >
-                            <span>Profile</span>
-                          </a>
-                          <button
-                            onClick={() => setBeneficiaryToDelete(pb)}
-                            className="px-2 py-1 text-[11px] font-bold text-rose-700 hover:text-white bg-rose-50 hover:bg-rose-600 border border-rose-200 hover:border-rose-600 rounded transition inline-flex items-center space-x-1"
-                            title="Delete Entry from Program"
-                          >
-                            <Trash2 className="w-3 h-3" />
-                            <span>Delete</span>
-                          </button>
-                        </td>
-                      </tr>
-                    );
-                  })
-                )}
+                          <td className="px-4 py-3 text-slate-700">
+                            {pb.beneficiary.barangay}
+                          </td>
+                          <td className="px-4 py-3 font-semibold text-slate-800">
+                            {pb.tableNumber || "-"}
+                          </td>
+                          <td className="px-4 py-3 text-[11px] text-slate-500">
+                            {pb.slotGroup || "Main"}
+                          </td>
+                          <td className="px-4 py-3 font-mono text-[10px] text-slate-500 truncate max-w-[120px]">
+                            {activeQr ? activeQr.publicToken : <span className="text-amber-600 font-bold">Pending</span>}
+                          </td>
+                          <td className="px-4 py-3">
+                            <StatusBadge status={pb.participationStatus} />
+                          </td>
+                          <td className="px-4 py-3 text-right space-x-1.5 whitespace-nowrap">
+                            {isAdmin && (
+                              <button
+                                onClick={() => setBeneficiaryToEdit(pb)}
+                                className="px-2 py-1 text-[11px] font-bold text-slate-700 hover:text-white bg-slate-100 hover:bg-slate-800 border border-slate-300 rounded transition inline-flex items-center space-x-1"
+                                title="Edit Beneficiary Details & Status"
+                              >
+                                <Edit2 className="w-3 h-3" />
+                                <span>Edit</span>
+                              </button>
+                            )}
+                            <a
+                              href={`/beneficiaries/${pb.beneficiary.id}`}
+                              className="px-2 py-1 text-[11px] font-bold text-slate-700 hover:text-gov-blue bg-slate-100 hover:bg-slate-200 rounded transition inline-flex items-center space-x-0.5"
+                              title="View Full Profile"
+                            >
+                              <span>Profile</span>
+                            </a>
+                            {isAdmin && (
+                              <button
+                                onClick={() => setBeneficiaryToDelete(pb)}
+                                className="px-2 py-1 text-[11px] font-bold text-rose-700 hover:text-white bg-rose-50 hover:bg-rose-600 border border-rose-200 hover:border-rose-600 rounded transition inline-flex items-center space-x-1"
+                                title="Delete Entry from Program"
+                              >
+                                <Trash2 className="w-3 h-3" />
+                                <span>Delete</span>
+                              </button>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })
+                  )}
                 </tbody>
               </table>
             </div>
@@ -549,15 +564,17 @@ export default function ProgramDetailsHub() {
                 Define beneficiary designated number ranges mapped to table numbers with calculated equivalent beneficiary capacities.
               </p>
             </div>
-            <div className="flex items-center space-x-2">
-              <button
-                onClick={() => setIsAddingRule(true)}
-                className="px-3.5 py-1.5 bg-slate-800 hover:bg-slate-900 text-gov-goldLight font-bold text-xs rounded-lg shadow flex items-center space-x-1 border border-gov-gold/30"
-              >
-                <TableIcon className="w-3.5 h-3.5 text-gov-gold" />
-                <span>Configure Table Ranges</span>
-              </button>
-            </div>
+            {isAdmin && (
+              <div className="flex items-center space-x-2">
+                <button
+                  onClick={() => setIsAddingRule(true)}
+                  className="px-3.5 py-1.5 bg-slate-800 hover:bg-slate-900 text-gov-goldLight font-bold text-xs rounded-lg shadow flex items-center space-x-1 border border-gov-gold/30"
+                >
+                  <TableIcon className="w-3.5 h-3.5 text-gov-gold" />
+                  <span>Configure Table Ranges</span>
+                </button>
+              </div>
+            )}
           </div>
 
           <div className="gov-card overflow-hidden shadow">

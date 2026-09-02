@@ -16,10 +16,13 @@ import {
   RefreshCw,
 } from "lucide-react";
 import { StatusBadge } from "@/components/common/StatusBadge";
-import { formatDate } from "@/lib/utils";
+import { formatDistanceToNow, parseISO, isAfter } from "date-fns";
 import * as XLSX from "xlsx";
+import { useAuth } from "@/context/AuthContext";
 
 export default function RestrictionsPage() {
+  const { user } = useAuth();
+  const isAdmin = user?.role === "PESO_ADMIN";
   const [restrictions, setRestrictions] = useState<any[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [loading, setLoading] = useState(true);
@@ -159,13 +162,15 @@ export default function RestrictionsPage() {
         </div>
 
         <div className="flex flex-wrap items-center gap-2 self-start sm:self-auto">
-          <button
-            onClick={() => setIsUploadModalOpen(true)}
-            className="px-4 py-2 bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-xs rounded-xl shadow flex items-center space-x-1.5 transition"
-          >
-            <UploadCloud className="w-4 h-4 text-emerald-200" />
-            <span>Upload Restriction Masterlist</span>
-          </button>
+          {isAdmin && (
+            <button
+              onClick={() => setIsUploadModalOpen(true)}
+              className="px-4 py-2 bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-xs rounded-xl shadow flex items-center space-x-1.5 transition"
+            >
+              <UploadCloud className="w-4 h-4 text-emerald-200" />
+              <span>Upload Restriction Masterlist</span>
+            </button>
+          )}
 
           <a
             href="/restrictions/checker"

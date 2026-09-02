@@ -22,10 +22,14 @@ import { generateQrDataUrl } from "@/lib/qr";
 
 import { DeleteBeneficiaryModal } from "@/components/beneficiaries/DeleteBeneficiaryModal";
 import { EditBeneficiaryButton } from "@/components/beneficiaries/EditBeneficiaryButton";
+import { getCurrentUser } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
 export default async function BeneficiaryProfilePage({ params }: { params: { id: string } }) {
+  const currentUser = await getCurrentUser();
+  const isAdmin = currentUser?.role === "PESO_ADMIN";
+
   const beneficiary = await prisma.beneficiary.findUnique({
     where: { id: params.id },
     include: {
@@ -70,18 +74,20 @@ export default async function BeneficiaryProfilePage({ params }: { params: { id:
           <span>Back to Beneficiaries Masterlist</span>
         </a>
 
-        <div className="flex items-center space-x-2">
-          <EditBeneficiaryButton
-            beneficiary={beneficiary}
-            programBeneficiary={latestProgramEnrollment}
-          />
-          <DeleteBeneficiaryModal
-            beneficiaryId={beneficiary.id}
-            fullName={beneficiary.fullName}
-            beneficiaryNumber={beneficiary.beneficiaryNumber}
-            barangay={beneficiary.barangay || undefined}
-          />
-        </div>
+        {isAdmin && (
+          <div className="flex items-center space-x-2">
+            <EditBeneficiaryButton
+              beneficiary={beneficiary}
+              programBeneficiary={latestProgramEnrollment}
+            />
+            <DeleteBeneficiaryModal
+              beneficiaryId={beneficiary.id}
+              fullName={beneficiary.fullName}
+              beneficiaryNumber={beneficiary.beneficiaryNumber}
+              barangay={beneficiary.barangay || undefined}
+            />
+          </div>
+        )}
       </div>
 
       {/* Profile Header */}

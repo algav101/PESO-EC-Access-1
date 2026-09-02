@@ -19,7 +19,12 @@ import { formatDate } from "@/lib/utils";
 import { EditProgramModal } from "@/components/programs/EditProgramModal";
 import { DeleteProgramModal } from "@/components/programs/DeleteProgramModal";
 
+import { useAuth } from "@/context/AuthContext";
+
 export default function ProgramsPage() {
+  const { user } = useAuth();
+  const isAdmin = user?.role === "PESO_ADMIN";
+
   const [programs, setPrograms] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
@@ -65,17 +70,21 @@ export default function ProgramsPage() {
             <span>TUPAD Work Programs</span>
           </h1>
           <p className="text-xs text-slate-500">
-            Create, edit parameters, schedule work days, and monitor emergency employment programs
+            {isAdmin
+              ? "Create, edit parameters, schedule work days, and monitor emergency employment programs"
+              : "View active work programs, barangay quotas, and operational schedules"}
           </p>
         </div>
 
-        <a
-          href="/programs/new"
-          className="px-4 py-2.5 bg-gov-blue hover:bg-gov-light text-white font-bold text-xs rounded-xl shadow transition flex items-center space-x-2 self-start sm:self-auto"
-        >
-          <PlusCircle className="w-4 h-4 text-gov-goldLight" />
-          <span>Create New Program</span>
-        </a>
+        {isAdmin && (
+          <a
+            href="/programs/new"
+            className="px-4 py-2.5 bg-gov-blue hover:bg-gov-light text-white font-bold text-xs rounded-xl shadow transition flex items-center space-x-2 self-start sm:self-auto"
+          >
+            <PlusCircle className="w-4 h-4 text-gov-goldLight" />
+            <span>Create New Program</span>
+          </a>
+        )}
       </div>
 
       {/* Filters */}
@@ -142,20 +151,24 @@ export default function ProgramsPage() {
                   </div>
                   <div className="flex items-center space-x-1.5">
                     <StatusBadge status={prog.status} />
-                    <button
-                      onClick={() => setEditProgram(prog)}
-                      className="p-1 text-slate-400 hover:text-gov-blue hover:bg-slate-100 rounded-lg transition"
-                      title="Edit Program Details"
-                    >
-                      <Edit2 className="w-3.5 h-3.5" />
-                    </button>
-                    <button
-                      onClick={() => setDeleteProgram(prog)}
-                      className="p-1 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition"
-                      title="Delete Program"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
+                    {isAdmin && (
+                      <>
+                        <button
+                          onClick={() => setEditProgram(prog)}
+                          className="p-1 text-slate-400 hover:text-gov-blue hover:bg-slate-100 rounded-lg transition"
+                          title="Edit Program Details"
+                        >
+                          <Edit2 className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          onClick={() => setDeleteProgram(prog)}
+                          className="p-1 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition"
+                          title="Delete Program"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </>
+                    )}
                   </div>
                 </div>
 
@@ -188,12 +201,14 @@ export default function ProgramsPage() {
 
               <div className="pt-3 border-t border-slate-100 flex items-center justify-between">
                 <div className="flex space-x-2">
-                  <a
-                    href={`/programs/${prog.id}/import`}
-                    className="px-2.5 py-1.5 text-xs font-bold bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg transition"
-                  >
-                    Import Masterlist
-                  </a>
+                  {isAdmin && (
+                    <a
+                      href={`/programs/${prog.id}/import`}
+                      className="px-2.5 py-1.5 text-xs font-bold bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg transition"
+                    >
+                      Import Masterlist
+                    </a>
+                  )}
                   <a
                     href={`/stubs?programId=${prog.id}`}
                     className="px-2.5 py-1.5 text-xs font-bold bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg transition"
