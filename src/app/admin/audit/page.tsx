@@ -1,18 +1,24 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import { History, Search, Filter, ShieldCheck, User, Calendar, FileText } from "lucide-react";
+import { History, Search, Filter, ShieldCheck, User, Calendar, FileText, ShieldAlert, ArrowLeft } from "lucide-react";
 import { formatDate } from "@/lib/utils";
+import { useAuth } from "@/context/AuthContext";
 
 export default function AuditLogsPage() {
+  const { user, loading: authLoading } = useAuth();
   const [logs, setLogs] = useState<any[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [actionFilter, setActionFilter] = useState("ALL");
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetchLogs();
-  }, []);
+    if (!authLoading && user?.role === "PESO_ADMIN") {
+      fetchLogs();
+    } else if (!authLoading && user && user.role !== "PESO_ADMIN") {
+      setLoading(false);
+    }
+  }, [user, authLoading]);
 
   const fetchLogs = async () => {
     try {
@@ -27,6 +33,34 @@ export default function AuditLogsPage() {
       setLoading(false);
     }
   };
+
+  // Role Gate: Only PESO_ADMIN can view this page
+  if (!authLoading && user && user.role !== "PESO_ADMIN") {
+    return (
+      <div className="max-w-2xl mx-auto py-12 px-4">
+        <div className="gov-card p-8 text-center space-y-4 border-t-4 border-t-rose-600 bg-white shadow-xl">
+          <div className="w-14 h-14 rounded-full bg-rose-50 text-rose-600 flex items-center justify-center mx-auto">
+            <ShieldAlert className="w-8 h-8" />
+          </div>
+          <div className="space-y-1">
+            <h1 className="text-lg font-black text-slate-900 tracking-tight">Access Restricted</h1>
+            <p className="text-xs text-slate-600 max-w-md mx-auto">
+              The Immutable System Audit Trail contains privileged government operational event records and is strictly restricted to <strong className="text-slate-900">PESO Dingalan Admin Officers</strong>.
+            </p>
+          </div>
+          <div className="pt-3">
+            <a
+              href="/dashboard"
+              className="inline-flex items-center space-x-2 px-4 py-2 bg-gov-blue hover:bg-gov-dark text-white rounded-xl text-xs font-bold transition shadow"
+            >
+              <ArrowLeft className="w-4 h-4" />
+              <span>Return to Dashboard</span>
+            </a>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   const filtered = logs.filter((l) => {
     const q = searchQuery.toLowerCase();

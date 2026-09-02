@@ -5,7 +5,17 @@ import { getCurrentUser } from "@/lib/auth";
 export async function GET(request: Request) {
   try {
     const user = await getCurrentUser();
-    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    if (!user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    // Strict Authorization: Only PESO_ADMIN can view audit logs
+    if (user.role !== "PESO_ADMIN") {
+      return NextResponse.json(
+        { error: "Forbidden. System audit trail viewing is strictly restricted to PESO Dingalan Admin Officers." },
+        { status: 403 }
+      );
+    }
 
     const { searchParams } = new URL(request.url);
     const action = searchParams.get("action");
