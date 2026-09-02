@@ -25,31 +25,52 @@ async function main() {
     },
   });
 
-  const coordUser = await prisma.user.upsert({
-    where: { username: 'coordinator' },
-    update: {},
-    create: {
-      username: 'coordinator',
-      fullName: 'Dingalan TUPAD Field Coordinator',
-      email: 'coordinator@dingalan.gov.ph',
-      passwordHash: coordPass,
-      role: 'TUPAD_COORDINATOR',
-      status: 'ACTIVE',
-    },
-  });
+  // Dingalan 11-Barangay Coordinators & DOLE Roster
+  const coordinatorRoster = [
+    { fullName: 'NEDDIE', username: 'peso_umiray1', role: 'TUPAD_COORDINATOR', brgy: 'Umiray', pass: 'UMIRAY123' },
+    { fullName: 'SHIELA', username: 'peso_umiray2', role: 'TUPAD_COORDINATOR', brgy: 'Umiray', pass: 'UMIRAY123' },
+    { fullName: 'MARIAN', username: 'peso_umiray3', role: 'TUPAD_COORDINATOR', brgy: 'Umiray', pass: 'UMIRAY123' },
+    { fullName: 'NALYN', username: 'peso_umiray4', role: 'TUPAD_COORDINATOR', brgy: 'Umiray', pass: 'UMIRAY123' },
+    { fullName: 'GRACE', username: 'peso_ibona1', role: 'TUPAD_COORDINATOR', brgy: 'Ibona', pass: 'IBONA123' },
+    { fullName: 'VENGEL', username: 'peso_ibona2', role: 'TUPAD_COORDINATOR', brgy: 'Ibona', pass: 'IBONA123' },
+    { fullName: 'MAY', username: 'peso_matawe1', role: 'TUPAD_COORDINATOR', brgy: 'Matawe', pass: 'MATAWE123' },
+    { fullName: 'ANNALYN', username: 'peso_matawe_2', role: 'TUPAD_COORDINATOR', brgy: 'Matawe', pass: 'MATAWE123' },
+    { fullName: 'ENA', username: 'peso_bnb', role: 'TUPAD_COORDINATOR', brgy: 'Butas na Bato', pass: 'BUTAS NA BATO123' },
+    { fullName: 'JONA', username: 'peso_aplaya2', role: 'TUPAD_COORDINATOR', brgy: 'Aplaya', pass: 'APLAYA123' },
+    { fullName: 'MOLLY', username: 'peso_poblacion_1', role: 'TUPAD_COORDINATOR', brgy: 'Poblacion', pass: 'POBLACION123' },
+    { fullName: 'IKOY', username: 'peso_poblacion_2', role: 'TUPAD_COORDINATOR', brgy: 'Poblacion', pass: 'POBLACION123' },
+    { fullName: 'NEMZ', username: 'peso_davildavilan1', role: 'TUPAD_COORDINATOR', brgy: 'Davildavilan', pass: 'DAVILDAVILAN123' },
+    { fullName: 'GLO', username: 'peso_davildavilan2', role: 'TUPAD_COORDINATOR', brgy: 'Davildavilan', pass: 'DAVILDAVILAN123' },
+    { fullName: 'TESSIE', username: 'peso_caragsacan_1', role: 'TUPAD_COORDINATOR', brgy: 'Caragsacan', pass: 'CARAGSACAN123' },
+    { fullName: 'BEBANG', username: 'peso_caragsacan2', role: 'TUPAD_COORDINATOR', brgy: 'Caragsacan', pass: 'CARAGSACAN123' },
+    { fullName: 'MARICEL', username: 'peso_tanawan1', role: 'TUPAD_COORDINATOR', brgy: 'Tanawan', pass: 'TANAWAN123' },
+    { fullName: 'JESSICA', username: 'peso_tanawan2', role: 'TUPAD_COORDINATOR', brgy: 'Tanawan', pass: 'TANAWAN123' },
+    { fullName: 'TERE C.', username: 'peso_dika', role: 'TUPAD_COORDINATOR', brgy: 'Dikapanikian', pass: 'DIKAPANIKIAN123' },
+    { fullName: 'RAMONITA', username: 'peso_paltic', role: 'TUPAD_COORDINATOR', brgy: 'Paltic', pass: 'PALTIC123' },
+    { fullName: 'MARK', username: 'dolefoaurora_1', role: 'DOLE_COORDINATOR', brgy: null, pass: 'ALL BARANGAY123' },
+    { fullName: 'ANGELO', username: 'dolefoaurora_2', role: 'DOLE_COORDINATOR', brgy: null, pass: 'ALL BARANGAY123' },
+  ];
 
-  const doleUser = await prisma.user.upsert({
-    where: { username: 'dole' },
-    update: {},
-    create: {
-      username: 'dole',
-      fullName: 'DOLE Aurora Field Officer',
-      email: 'dole.aurora@dole.gov.ph',
-      passwordHash: dolePass,
-      role: 'DOLE_COORDINATOR',
-      status: 'ACTIVE',
-    },
-  });
+  for (const c of coordinatorRoster) {
+    const hashedPass = await bcrypt.hash(c.pass, 10);
+    await prisma.user.upsert({
+      where: { username: c.username },
+      update: {
+        fullName: c.fullName,
+        role: c.role,
+        assignedBarangay: c.brgy,
+        passwordHash: hashedPass,
+      },
+      create: {
+        username: c.username,
+        fullName: c.fullName,
+        role: c.role,
+        assignedBarangay: c.brgy,
+        passwordHash: hashedPass,
+        status: 'ACTIVE',
+      },
+    });
+  }
 
   // System Settings
   const settings = [

@@ -1,7 +1,22 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import { Users, UserPlus, Shield, CheckCircle2, XCircle, Edit, MapPin, RefreshCw, Key } from "lucide-react";
+import {
+  Users,
+  UserPlus,
+  Shield,
+  CheckCircle2,
+  XCircle,
+  Edit,
+  MapPin,
+  RefreshCw,
+  Key,
+  FileSpreadsheet,
+  UploadCloud,
+  Download,
+  AlertCircle,
+  FileText,
+} from "lucide-react";
 import { StatusBadge } from "@/components/common/StatusBadge";
 import { formatDate } from "@/lib/utils";
 
@@ -19,11 +34,42 @@ const DINGALAN_BARANGAYS = [
   "Umiray",
 ];
 
+const SAMPLE_CSV = `FULL NAME,USERNAME,ASSIGNED ROLE,ASSIGNED SCOPE/BARANGAY,PASSWORD,EMAIL ADDRESS
+NEDDIE,PESO UMIRAY1,TUPAD COORDINATOR,UMIRAY,UMIRAY123,
+SHIELA,PESO UMIRAY2,TUPAD COORDINATOR,UMIRAY,UMIRAY123,
+MARIAN,PESO UMIRAY3,TUPAD COORDINATOR,UMIRAY,UMIRAY123,
+NALYN,PESO UMIRAY4,TUPAD COORDINATOR,UMIRAY,UMIRAY123,
+GRACE,PESO IBONA1,TUPAD COORDINATOR,IBONA,IBONA123,
+VENGEL,PESO IBONA2,TUPAD COORDINATOR,IBONA,IBONA123,
+MAY,PESO MATAWE1,TUPAD COORDINATOR,MATAWE,MATAWE123,
+ANNALYN,PESO MATAWE 2,TUPAD COORDINATOR,MATAWE,MATAWE123,
+ENA,PESO BNB,TUPAD COORDINATOR,BUTAS NA BATO,BUTAS NA BATO123,
+JONA,PESO APLAYA2,TUPAD COORDINATOR,APLAYA,APLAYA123,
+MOLLY,PESO POBLACION 1,TUPAD COORDINATOR,POBLACION,POBLACION123,
+IKOY,PESO POBLACION 2,TUPAD COORDINATOR,POBLACION,POBLACION123,
+NEMZ,PESO DAVILDAVILAN1,TUPAD COORDINATOR,DAVILDAVILAN,DAVILDAVILAN123,
+GLO,PESO DAVILDAVILAN2,TUPAD COORDINATOR,DAVILDAVILAN,DAVILDAVILAN123,
+TESSIE,PESO CARAGSACAN 1,TUPAD COORDINATOR,CARAGSACAN,CARAGSACAN123,
+BEBANG,PESO CARAGSACAN2,TUPAD COORDINATOR,CARAGSACAN,CARAGSACAN123,
+MARICEL,PESO TANAWAN1,TUPAD COORDINATOR,TANAWAN,TANAWAN123,
+JESSICA,PESO TANAWAN2,TUPAD COORDINATOR,TANAWAN,TANAWAN123,
+TERE C.,PESO DIKA,TUPAD COORDINATOR,DIKAPANIKIAN,DIKAPANIKIAN123,
+RAMONITA,PESO PALTIC,TUPAD COORDINATOR,PALTIC,PALTIC123,
+MARK,DOLEFOAURORA_1,DOLE COORDINATOR,ALL BARANGAY,ALL BARANGAY123,
+ANGELO,DOLEFOAURORA_2,DOLE COORDINATOR,ALL BARANGAY,ALL BARANGAY123,`;
+
 export default function UserManagementPage() {
   const [users, setUsers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [editUser, setEditUser] = useState<any | null>(null);
+
+  // CSV Import State
+  const [isImportOpen, setIsImportOpen] = useState(false);
+  const [csvContent, setCsvContent] = useState(SAMPLE_CSV);
+  const [previewRows, setPreviewRows] = useState<any[]>([]);
+  const [importing, setImporting] = useState(false);
+  const [parsingPreview, setParsingPreview] = useState(false);
 
   // Create Form State
   const [username, setUsername] = useState("");
@@ -138,6 +184,82 @@ export default function UserManagementPage() {
     }
   };
 
+  // CSV Import Handlers
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      const file = e.target.files[0];
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        const text = ev.target?.result as string;
+        setCsvContent(text);
+        handlePreviewCSV(text);
+      };
+      reader.readAsText(file);
+    }
+  };
+
+  const handlePreviewCSV = async (contentToPreview?: string) => {
+    setParsingPreview(true);
+    try {
+      const res = await fetch("/api/v1/users/import", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          csvContent: contentToPreview || csvContent,
+          preview: true,
+        }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setPreviewRows(data.users || []);
+      } else {
+        alert(data.error || "Failed to parse CSV");
+      }
+    } catch (e) {
+      alert("Error parsing CSV");
+    } finally {
+      setParsingPreview(false);
+    }
+  };
+
+  const handleCommitImport = async () => {
+    setImporting(true);
+    try {
+      const res = await fetch("/api/v1/users/import", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          csvContent,
+          preview: false,
+        }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        alert(`Successfully imported ${data.importedCount || 0} user accounts!`);
+        setIsImportOpen(false);
+        setPreviewRows([]);
+        fetchUsers();
+      } else {
+        alert(data.error || "Failed to import users");
+      }
+    } catch (e) {
+      alert("Error importing users");
+    } finally {
+      setImporting(false);
+    }
+  };
+
+  const downloadSampleCsv = () => {
+    const blob = new Blob([SAMPLE_CSV], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.setAttribute("href", url);
+    link.setAttribute("download", "tupad_coordinators_template.csv");
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -152,13 +274,27 @@ export default function UserManagementPage() {
           </p>
         </div>
 
-        <button
-          onClick={() => setIsCreateOpen(true)}
-          className="px-4 py-2 bg-gov-blue hover:bg-gov-light text-white font-bold text-xs rounded-xl shadow flex items-center space-x-1.5 transition self-start sm:self-auto"
-        >
-          <UserPlus className="w-4 h-4 text-gov-goldLight" />
-          <span>Add System User</span>
-        </button>
+        <div className="flex flex-wrap items-center gap-2 self-start sm:self-auto">
+          {/* Batch CSV Import Button */}
+          <button
+            onClick={() => {
+              setIsImportOpen(true);
+              handlePreviewCSV(csvContent);
+            }}
+            className="px-3.5 py-2 bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-xs rounded-xl shadow flex items-center space-x-1.5 transition"
+          >
+            <FileSpreadsheet className="w-4 h-4 text-emerald-200" />
+            <span>Import Users from CSV</span>
+          </button>
+
+          <button
+            onClick={() => setIsCreateOpen(true)}
+            className="px-4 py-2 bg-gov-blue hover:bg-gov-light text-white font-bold text-xs rounded-xl shadow flex items-center space-x-1.5 transition"
+          >
+            <UserPlus className="w-4 h-4 text-gov-goldLight" />
+            <span>Add Single User</span>
+          </button>
+        </div>
       </div>
 
       {/* Users Table */}
@@ -233,7 +369,156 @@ export default function UserManagementPage() {
         </div>
       </div>
 
-      {/* Create User Modal */}
+      {/* CSV Batch Import Modal */}
+      {isImportOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-4 overflow-y-auto">
+          <div className="bg-white rounded-2xl max-w-4xl w-full p-6 space-y-4 shadow-2xl animate-fadeIn my-8">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b pb-3">
+              <div>
+                <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider flex items-center space-x-2">
+                  <FileSpreadsheet className="w-5 h-5 text-emerald-700" />
+                  <span>Batch Import User Accounts from CSV</span>
+                </h3>
+                <p className="text-[11px] text-slate-500">
+                  Upload a CSV or paste CSV text with headers: <code>FULL NAME, USERNAME, ASSIGNED ROLE, ASSIGNED SCOPE/BARANGAY, PASSWORD, EMAIL ADDRESS</code>
+                </p>
+              </div>
+
+              <button
+                onClick={downloadSampleCsv}
+                className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-lg border flex items-center space-x-1 transition self-start sm:self-auto"
+              >
+                <Download className="w-3.5 h-3.5" />
+                <span>Download Sample CSV</span>
+              </button>
+            </div>
+
+            {/* File Upload Input & Text Area */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <label className="block text-xs font-bold text-slate-700 uppercase">
+                  1. Upload .CSV File
+                </label>
+                <label className="flex flex-col items-center justify-center border-2 border-dashed border-slate-300 rounded-xl p-4 bg-slate-50 hover:bg-emerald-50/50 hover:border-emerald-400 cursor-pointer transition">
+                  <UploadCloud className="w-7 h-7 text-emerald-600 mb-1" />
+                  <span className="text-xs font-bold text-slate-700">Choose CSV file from computer</span>
+                  <span className="text-[10px] text-slate-400">Supports standard comma-separated files</span>
+                  <input
+                    type="file"
+                    accept=".csv,.txt"
+                    onChange={handleFileUpload}
+                    className="hidden"
+                  />
+                </label>
+              </div>
+
+              <div className="space-y-2">
+                <div className="flex justify-between items-center">
+                  <label className="block text-xs font-bold text-slate-700 uppercase">
+                    2. Or Paste Raw CSV Data
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => handlePreviewCSV(csvContent)}
+                    className="text-[11px] font-bold text-gov-blue hover:underline"
+                  >
+                    Refresh Preview ↺
+                  </button>
+                </div>
+                <textarea
+                  rows={4}
+                  value={csvContent}
+                  onChange={(e) => {
+                    setCsvContent(e.target.value);
+                  }}
+                  className="w-full p-2 text-[11px] font-mono border rounded-xl bg-slate-900 text-emerald-400 focus:outline-none"
+                  placeholder="Paste CSV text with header..."
+                />
+              </div>
+            </div>
+
+            {/* Parsed Preview Table */}
+            <div className="space-y-2">
+              <div className="flex justify-between items-center">
+                <span className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center space-x-1.5">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                  <span>Parsed Accounts Preview ({previewRows.length} Rows Detected)</span>
+                </span>
+                {parsingPreview && (
+                  <span className="text-xs text-slate-500 font-semibold animate-pulse">
+                    Parsing rows...
+                  </span>
+                )}
+              </div>
+
+              <div className="border rounded-xl max-h-56 overflow-y-auto bg-slate-50">
+                <table className="w-full text-left text-[11px]">
+                  <thead className="bg-slate-200/80 text-slate-700 font-bold uppercase text-[10px] sticky top-0 border-b">
+                    <tr>
+                      <th className="px-3 py-2">Full Name</th>
+                      <th className="px-3 py-2">Username</th>
+                      <th className="px-3 py-2">Role</th>
+                      <th className="px-3 py-2">Assigned Barangay</th>
+                      <th className="px-3 py-2">Password</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-200">
+                    {previewRows.map((r, idx) => (
+                      <tr key={idx} className="hover:bg-white">
+                        <td className="px-3 py-2 font-bold text-slate-900">{r.fullName}</td>
+                        <td className="px-3 py-2 font-mono text-gov-blue">@{r.username}</td>
+                        <td className="px-3 py-2 font-semibold">
+                          <span className="px-2 py-0.5 bg-blue-50 text-blue-700 rounded text-[10px]">
+                            {r.role}
+                          </span>
+                        </td>
+                        <td className="px-3 py-2">
+                          {r.assignedBarangay ? (
+                            <span className="px-2 py-0.5 bg-amber-50 text-amber-900 border border-amber-200 rounded font-bold text-[10px]">
+                              Brgy. {r.assignedBarangay}
+                            </span>
+                          ) : (
+                            <span className="text-slate-400">All (Municipality)</span>
+                          )}
+                        </td>
+                        <td className="px-3 py-2 font-mono text-slate-500">{r.password}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            {/* Actions */}
+            <div className="flex justify-between items-center pt-2 border-t">
+              <span className="text-[11px] text-slate-500">
+                Passwords will be securely hashed with <strong>bcrypt (10 rounds)</strong>.
+              </span>
+
+              <div className="flex space-x-2">
+                <button
+                  type="button"
+                  onClick={() => setIsImportOpen(false)}
+                  className="px-4 py-2 text-xs font-bold border rounded-lg hover:bg-slate-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleCommitImport}
+                  disabled={importing || previewRows.length === 0}
+                  className="px-5 py-2 bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-xs rounded-lg shadow transition flex items-center space-x-1.5 disabled:opacity-50"
+                >
+                  <CheckCircle2 className="w-4 h-4" />
+                  <span>{importing ? "Importing Accounts..." : `Commit & Create ${previewRows.length} Accounts`}</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Create Single User Modal */}
       {isCreateOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
           <form onSubmit={handleCreateUser} className="bg-white rounded-2xl max-w-md w-full p-6 space-y-4 shadow-2xl">
