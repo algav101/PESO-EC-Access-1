@@ -25,101 +25,107 @@ export async function POST(request: Request, { params }: { params: { id: string 
       return NextResponse.json({ error: "Program not found" }, { status: 404 });
     }
 
-    // Execute in transaction
     let totalItemsSaved = 0;
-    await prisma.$transaction(async (tx) => {
-      for (const wp of programs) {
-        // 1. Upsert TupadWorkProgram
-        const existingWp = await tx.tupadWorkProgram.findUnique({
-          where: {
-            programId_barangay: {
-              programId: params.id,
-              barangay: wp.barangay,
-            },
-          },
-        });
 
-        let workProgramId: string;
-        if (existingWp) {
-          workProgramId = existingWp.id;
-          await tx.tupadWorkProgram.update({
-            where: { id: existingWp.id },
-            data: {
-              projectLocation: wp.projectLocation || wp.barangay,
-              beneficiaryCount: wp.beneficiaryCount,
-              natureOfWork: wp.natureOfWork,
-              workingHours: wp.workingHours,
+    // Execute in transaction with extended timeout (60s) and batch createMany
+    await prisma.$transaction(
+      async (tx) => {
+        for (const wp of programs) {
+          // 1. Upsert TupadWorkProgram
+          const existingWp = await tx.tupadWorkProgram.findUnique({
+            where: {
+              programId_barangay: {
+                programId: params.id,
+                barangay: wp.barangay,
+              },
             },
           });
-          // Delete old items to replace with newly uploaded schedule
-          await tx.tupadWorkProgramItem.deleteMany({
-            where: { workProgramId: existingWp.id },
-          });
-        } else {
-          const created = await tx.tupadWorkProgram.create({
-            data: {
-              programId: params.id,
-              barangay: wp.barangay,
-              projectLocation: wp.projectLocation || wp.barangay,
-              beneficiaryCount: wp.beneficiaryCount,
-              natureOfWork: wp.natureOfWork,
-              workingHours: wp.workingHours,
-            },
-          });
-          workProgramId = created.id;
-        }
 
-        // 2. Insert items
-        if (wp.items && wp.items.length > 0) {
-          for (let i = 0; i < wp.items.length; i++) {
-            const it = wp.items[i];
-            await tx.tupadWorkProgramItem.create({
+          let workProgramId: string;
+          if (existingWp) {
+            workProgramId = existingWp.id;
+            await tx.tupadWorkProgram.update({
+              where: { id: existingWp.id },
               data: {
-                workProgramId,
-                dayNumber: it.dayNumber,
-                specificActivities: it.specificActivities,
-                area: it.area,
-                maleCount: it.maleCount || 0,
-                femaleCount: it.femaleCount || 0,
-                scPwdMaleCount: it.scPwdMaleCount || 0,
-                scPwdFemaleCount: it.scPwdFemaleCount || 0,
-                totalCount: it.totalCount || it.maleCount + it.femaleCount || 0,
-                orderIndex: it.orderIndex !== undefined ? it.orderIndex : i,
+                projectLocation: wp.projectLocation || wp.barangay,
+                beneficiaryCount: wp.beneficiaryCount,
+                natureOfWork: wp.natureOfWork,
+                workingHours: wp.workingHours,
               },
             });
-            totalItemsSaved++;
+            // Delete old items to replace with newly uploaded schedule
+            await tx.tupadWorkProgramItem.deleteMany({
+              where: { workProgramId: existingWp.id },
+            });
+          } else {
+            const created = await tx.tupadWorkProgram.create({
+              data: {
+                programId: params.id,
+                barangay: wp.barangay,
+                projectLocation: wp.projectLocation || wp.barangay,
+                beneficiaryCount: wp.beneficiaryCount,
+                natureOfWork: wp.natureOfWork,
+                workingHours: wp.workingHours,
+              },
+            });
+            workProgramId = created.id;
           }
-        }
 
-        // 3. Sync ProgramBarangay target
-        await tx.programBarangay.upsert({
-          where: {
-            programId_barangayName: {
+          // 2. High-speed batch insert items using createMany
+          if (wp.items && wp.items.length > 0) {
+            const itemsToInsert = wp.items.map((it, i) => ({
+              workProgramId,
+              dayNumber: it.dayNumber,
+              specificActivities: it.specificActivities,
+              area: it.area,
+              maleCount: it.maleCount || 0,
+              femaleCount: it.femaleCount || 0,
+              scPwdMaleCount: it.scPwdMaleCount || 0,
+              scPwdFemaleCount: it.scPwdFemaleCount || 0,
+              totalCount: it.totalCount || (it.maleCount || 0) + (it.femaleCount || 0) || 0,
+              orderIndex: it.orderIndex !== undefined ? it.orderIndex : i,
+            }));
+
+            await tx.tupadWorkProgramItem.createMany({
+              data: itemsToInsert,
+            });
+            totalItemsSaved += itemsToInsert.length;
+          }
+
+          // 3. Sync ProgramBarangay target
+          await tx.programBarangay.upsert({
+            where: {
+              programId_barangayName: {
+                programId: params.id,
+                barangayName: wp.barangay,
+              },
+            },
+            update: {
+              beneficiaryTarget: wp.beneficiaryCount,
+              projectLocation: wp.projectLocation || wp.barangay,
+            },
+            create: {
               programId: params.id,
               barangayName: wp.barangay,
+              beneficiaryTarget: wp.beneficiaryCount,
+              projectLocation: wp.projectLocation || wp.barangay,
             },
-          },
-          update: {
-            beneficiaryTarget: wp.beneficiaryCount,
-            projectLocation: wp.projectLocation || wp.barangay,
-          },
-          create: {
-            programId: params.id,
-            barangayName: wp.barangay,
-            beneficiaryTarget: wp.beneficiaryCount,
-            projectLocation: wp.projectLocation || wp.barangay,
-          },
-        });
-      }
+          });
+        }
 
-      // Update program natureOfWork if currently empty
-      if (!program.natureOfWork && programs[0]?.natureOfWork) {
-        await tx.program.update({
-          where: { id: params.id },
-          data: { natureOfWork: programs[0].natureOfWork },
-        });
+        // Update program natureOfWork if currently empty
+        if (!program.natureOfWork && programs[0]?.natureOfWork) {
+          await tx.program.update({
+            where: { id: params.id },
+            data: { natureOfWork: programs[0].natureOfWork },
+          });
+        }
+      },
+      {
+        timeout: 60000,
+        maxWait: 20000,
       }
-    });
+    );
 
     await logAudit({
       userId: user.id,

@@ -134,6 +134,9 @@ export async function POST(request: Request, { params }: { params: { id: string 
         where: { id: params.id },
         data: { beneficiaryCount: { increment: importedCount } },
       });
+    }, {
+      timeout: 60000,
+      maxWait: 20000,
     });
 
     await logAudit({
