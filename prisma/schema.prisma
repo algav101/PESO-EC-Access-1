@@ -1,0 +1,478 @@
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model User {
+  id            String    @id @default(uuid())
+  username      String    @unique
+  passwordHash  String
+  fullName      String
+  email         String?
+  role          String    @default("PESO_ADMIN") // PESO_ADMIN, TUPAD_COORDINATOR, DOLE_COORDINATOR
+  status        String    @default("ACTIVE")
+  lastLoginAt   DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  createdPrograms        Program[]              @relation("ProgramCreator")
+  qrPrintBatches         QrPrintBatch[]
+  qrPrintLogs            QrPrintLog[]
+  stubDistributions      StubDistribution[]
+  orientationAttendances OrientationAttendance[]
+  replacementsInitiated  BeneficiaryReplacement[] @relation("ReplacementInitiator")
+  replacementsApproved   BeneficiaryReplacement[] @relation("ReplacementApprover")
+  attendanceRecords      AttendanceRecord[]
+  accomplishmentPhotos   AccomplishmentPhoto[]    @relation("PhotoUploader")
+  approvedPhotos         AccomplishmentPhoto[]    @relation("PhotoApprover")
+  payoutsVerified        Payout[]
+  auditLogs              AuditLog[]
+}
+
+model Program {
+  id                  String   @id @default(uuid())
+  programCode         String   @unique
+  batchNumber         String?
+  programName         String
+  municipality        String   @default("Dingalan")
+  province            String   @default("Aurora")
+  doleOffice          String?  @default("DOLE Aurora Field Office")
+  projectLocation     String?
+  natureOfWork        String?
+  beneficiaryCount    Int      @default(0)
+  requiredWorkDays    Int      @default(10)
+  dailyHours          Float    @default(8.0)
+  morningStart        String?  @default("08:00")
+  morningEnd          String?  @default("12:00")
+  afternoonStart      String?  @default("13:00")
+  afternoonEnd        String?  @default("17:00")
+  orientationDate     String?
+  orientationTime     String?
+  orientationVenue    String?
+  payoutDate          String?
+  payoutTime          String?
+  payoutVenue         String?
+  startDate           String?
+  endDate             String?
+  status              String   @default("DRAFT") // DRAFT, ACTIVE, COMPLETED, CLOSED
+  createdById         String?
+  createdBy           User?    @relation("ProgramCreator", fields: [createdById], references: [id])
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  programBarangays    ProgramBarangay[]
+  programBeneficiaries ProgramBeneficiary[]
+  workDays            WorkDay[]
+  qrCodes             QrCode[]
+  qrPrintBatches      QrPrintBatch[]
+  tableRules          TableAssignmentRule[]
+  orientationAttendance OrientationAttendance[]
+  beneficiaryReplacements BeneficiaryReplacement[]
+  attendanceRecords   AttendanceRecord[]
+  accomplishmentPhotos AccomplishmentPhoto[]
+  photoConfig         PhotoConfiguration?
+  payouts             Payout[]
+  restrictions        BeneficiaryRestriction[]
+  tupadWorkPrograms   TupadWorkProgram[]
+}
+
+model ProgramBarangay {
+  id                String   @id @default(uuid())
+  programId         String
+  program           Program  @relation(fields: [programId], references: [id], onDelete: Cascade)
+  barangayName      String
+  projectLocation   String?
+  beneficiaryTarget Int      @default(0)
+  createdAt         DateTime @default(now())
+
+  @@unique([programId, barangayName])
+}
+
+model Beneficiary {
+  id                String   @id @default(uuid())
+  beneficiaryNumber String
+  fullName          String
+  lastName          String?
+  firstName         String?
+  middleName        String?
+  extensionName     String?
+  birthday          String   // YYYY-MM-DD or MM-DD-YYYY
+  sex               String?  // MALE, FEMALE
+  civilStatus       String?
+  age               Int?
+  monthlyIncome     Float?
+  typeOfBeneficiary String?
+  occupation        String?
+  idType            String?
+  idNumber          String?
+  sitio             String?
+  barangay          String?
+  municipality      String   @default("Dingalan")
+  province          String   @default("Aurora")
+  contactNumber     String?
+  isSenior          Boolean  @default(false)
+  isPwd             Boolean  @default(false)
+  is4Ps             Boolean  @default(false)
+  isIp              Boolean  @default(false)
+  skillsTraining    String?
+  status            String   @default("ACTIVE")
+  sourceImportId    String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  programBeneficiaries ProgramBeneficiary[]
+  dependents           Dependent[]
+  documents            BeneficiaryDocument[]
+  restrictions         BeneficiaryRestriction[]
+}
+
+model ProgramBeneficiary {
+  id                   String      @id @default(uuid())
+  programId            String
+  program              Program     @relation(fields: [programId], references: [id], onDelete: Cascade)
+  beneficiaryId        String
+  beneficiary          Beneficiary @relation(fields: [beneficiaryId], references: [id], onDelete: Cascade)
+  designatedNumber     String      // e.g. 1, 2, 3...
+  participationStatus  String      @default("ACTIVE") // ACTIVE, REPLACED, WITHDRAWN, DISQUALIFIED
+  originalBeneficiary  Boolean     @default(true)
+  tableNumber          String?
+  slotGroup            String?     // e.g. "Main", "DepEd Slot"
+  joinedAt             DateTime    @default(now())
+
+  qrCodes              QrCode[]
+  stubDistributions    StubDistribution[]
+  orientationAttendance OrientationAttendance[]
+  originalReplacements BeneficiaryReplacement[] @relation("OriginalBeneficiary")
+  newReplacements      BeneficiaryReplacement[] @relation("ReplacementBeneficiary")
+  attendanceRecords    AttendanceRecord[]
+  payouts              Payout[]
+
+  @@index([programId, designatedNumber])
+}
+
+model Dependent {
+  id            String      @id @default(uuid())
+  beneficiaryId String
+  beneficiary   Beneficiary @relation(fields: [beneficiaryId], references: [id], onDelete: Cascade)
+  firstName     String?
+  middleName    String?
+  lastName      String?
+  extensionName String?
+  fullName      String
+  birthday      String?
+  age           Int?
+  relationship  String?
+  createdAt     DateTime    @default(now())
+  restrictions  BeneficiaryRestriction[]
+}
+
+model BeneficiaryDocument {
+  id                 String      @id @default(uuid())
+  beneficiaryId      String
+  beneficiary        Beneficiary @relation(fields: [beneficiaryId], references: [id], onDelete: Cascade)
+  documentType       String      // ID_FRONT, ID_BACK, DEPENDENT_DOC, OTHER
+  fileKey            String
+  fileName           String
+  fileSize           Int
+  mimeType           String
+  uploadedById       String?
+  verificationStatus String      @default("PENDING")
+  uploadedAt         DateTime    @default(now())
+}
+
+model QrCode {
+  id                   String             @id @default(uuid())
+  programId            String
+  program              Program            @relation(fields: [programId], references: [id], onDelete: Cascade)
+  programBeneficiaryId String
+  programBeneficiary   ProgramBeneficiary @relation(fields: [programBeneficiaryId], references: [id], onDelete: Cascade)
+  publicToken          String             @unique
+  tokenHash            String             @unique
+  status               String             @default("ACTIVE") // ACTIVE, REPRINTED, REPLACED, INVALIDATED
+  generatedAt          DateTime           @default(now())
+  generatedById        String?
+  invalidatedAt        DateTime?
+  invalidatedById      String?
+
+  printLogs            QrPrintLog[]
+  stubDistributions    StubDistribution[]
+}
+
+model QrPrintBatch {
+  id              String       @id @default(uuid())
+  programId       String
+  program         Program      @relation(fields: [programId], references: [id], onDelete: Cascade)
+  batchName       String
+  paperSize       String       @default("A4") // A4, LETTER, LEGAL, CUSTOM
+  stubWidth       Float        @default(90.0) // mm
+  stubHeight      Float        @default(55.0) // mm
+  rowsPerPage     Int          @default(4)
+  columnsPerPage  Int          @default(2)
+  reminderText    String?
+  printedById     String?
+  printedBy       User?        @relation(fields: [printedById], references: [id])
+  printedAt       DateTime?
+  printStatus     String       @default("PREVIEW")
+  createdAt       DateTime     @default(now())
+
+  printLogs       QrPrintLog[]
+}
+
+model QrPrintLog {
+  id           String        @id @default(uuid())
+  qrId         String
+  qr           QrCode        @relation(fields: [qrId], references: [id], onDelete: Cascade)
+  printBatchId String?
+  printBatch   QrPrintBatch? @relation(fields: [printBatchId], references: [id], onDelete: SetNull)
+  printType    String        // INITIAL, REPRINT, REPLACEMENT, ADDITIONAL
+  reason       String?
+  printedById  String?
+  printedBy    User?         @relation(fields: [printedById], references: [id])
+  printedAt    DateTime      @default(now())
+}
+
+model TableAssignmentRule {
+  id          String   @id @default(uuid())
+  programId   String
+  program     Program  @relation(fields: [programId], references: [id], onDelete: Cascade)
+  startNumber Int
+  endNumber   Int
+  tableNumber String
+  slotGroup   String?
+  priority    Int      @default(0)
+  createdAt   DateTime @default(now())
+}
+
+model StubDistribution {
+  id                   String             @id @default(uuid())
+  qrId                 String
+  qr                   QrCode             @relation(fields: [qrId], references: [id], onDelete: Cascade)
+  programBeneficiaryId String
+  programBeneficiary   ProgramBeneficiary @relation(fields: [programBeneficiaryId], references: [id], onDelete: Cascade)
+  distributedById      String?
+  distributedBy        User?              @relation(fields: [distributedById], references: [id])
+  distributedAt        DateTime           @default(now())
+  verificationMethod   String             @default("BIRTHDAY_PIN")
+  status               String             @default("DISTRIBUTED")
+  remarks              String?
+  latitude             Float?
+  longitude            Float?
+  deviceId             String?
+}
+
+model OrientationAttendance {
+  id                   String             @id @default(uuid())
+  programId            String
+  program              Program            @relation(fields: [programId], references: [id], onDelete: Cascade)
+  programBeneficiaryId String
+  programBeneficiary   ProgramBeneficiary @relation(fields: [programBeneficiaryId], references: [id], onDelete: Cascade)
+  status               String             @default("PRESENT") // PRESENT, ABSENT, REPLACED
+  scannedById          String?
+  scannedBy            User?              @relation(fields: [scannedById], references: [id])
+  scannedAt            DateTime           @default(now())
+  deviceId             String?
+  syncStatus           String             @default("SYNCED")
+
+  @@unique([programId, programBeneficiaryId])
+}
+
+model BeneficiaryReplacement {
+  id                              String             @id @default(uuid())
+  programId                       String
+  program                         Program            @relation(fields: [programId], references: [id], onDelete: Cascade)
+  originalProgramBeneficiaryId    String
+  originalProgramBeneficiary      ProgramBeneficiary @relation("OriginalBeneficiary", fields: [originalProgramBeneficiaryId], references: [id], onDelete: Cascade)
+  replacementProgramBeneficiaryId String?
+  replacementProgramBeneficiary   ProgramBeneficiary? @relation("ReplacementBeneficiary", fields: [replacementProgramBeneficiaryId], references: [id], onDelete: SetNull)
+  reason                          String
+  initiatedById                   String?
+  initiatedBy                     User?              @relation("ReplacementInitiator", fields: [initiatedById], references: [id])
+  approvedById                    String?
+  approvedBy                      User?              @relation("ReplacementApprover", fields: [approvedById], references: [id])
+  initiatedAt                     DateTime           @default(now())
+  approvedAt                      DateTime?
+  status                          String             @default("PENDING") // PENDING, APPROVED, REJECTED
+}
+
+model WorkDay {
+  id          String   @id @default(uuid())
+  programId   String
+  program     Program  @relation(fields: [programId], references: [id], onDelete: Cascade)
+  dayNumber   Int      // 1, 2, ... 10
+  workDate    String   // YYYY-MM-DD
+  description String?
+  status      String   @default("SCHEDULED") // SCHEDULED, ACTIVE, COMPLETED, CANCELLED
+
+  attendanceRecords    AttendanceRecord[]
+  accomplishmentPhotos AccomplishmentPhoto[]
+
+  @@unique([programId, dayNumber])
+  @@unique([programId, workDate])
+}
+
+model AttendanceRecord {
+  id                   String             @id @default(uuid())
+  programId            String
+  program              Program            @relation(fields: [programId], references: [id], onDelete: Cascade)
+  workDayId            String
+  workDay              WorkDay            @relation(fields: [workDayId], references: [id], onDelete: Cascade)
+  programBeneficiaryId String
+  programBeneficiary   ProgramBeneficiary @relation(fields: [programBeneficiaryId], references: [id], onDelete: Cascade)
+  attendanceDate       String             // YYYY-MM-DD
+  morningTimeIn        DateTime?
+  morningTimeOut       DateTime?
+  afternoonTimeIn      DateTime?
+  afternoonTimeOut     DateTime?
+  status               String             @default("PRESENT") // PRESENT, INCOMPLETE, ABSENT
+  source               String             @default("QR_SCAN")
+  scannedById          String?
+  scannedBy            User?              @relation(fields: [scannedById], references: [id])
+  deviceId             String?
+  syncStatus           String             @default("SYNCED")
+  workProgramItemId    String?
+  workProgramItem      TupadWorkProgramItem? @relation(fields: [workProgramItemId], references: [id], onDelete: SetNull)
+  workArea             String?
+  activityName         String?
+  createdAt            DateTime           @default(now())
+  updatedAt            DateTime           @updatedAt
+
+  @@unique([programId, workDayId, programBeneficiaryId])
+}
+
+model AccomplishmentPhoto {
+  id                String                @id @default(uuid())
+  programId         String
+  program           Program               @relation(fields: [programId], references: [id], onDelete: Cascade)
+  workDayId         String?
+  workDay           WorkDay?              @relation(fields: [workDayId], references: [id], onDelete: SetNull)
+  workProgramItemId String?
+  workProgramItem   TupadWorkProgramItem? @relation(fields: [workProgramItemId], references: [id], onDelete: SetNull)
+  barangay          String?
+  sitio             String?
+  workArea          String?
+  specificActivity  String?
+  fileKey           String
+  fileName          String
+  latitude          Float?
+  longitude         Float?
+  capturedAt        DateTime?
+  uploadedAt        DateTime              @default(now())
+  uploadedById      String?
+  uploadedBy        User?                 @relation("PhotoUploader", fields: [uploadedById], references: [id])
+  status            String                @default("FOR_REVIEW") // FOR_REVIEW, APPROVED, REJECTED
+  approvedById      String?
+  approvedBy        User?                 @relation("PhotoApprover", fields: [approvedById], references: [id])
+  approvedAt        DateTime?
+  rejectionReason   String?
+}
+
+model PhotoConfiguration {
+  id               String   @id @default(uuid())
+  programId        String   @unique
+  program          Program  @relation(fields: [programId], references: [id], onDelete: Cascade)
+  showGps          Boolean  @default(true)
+  showDate         Boolean  @default(true)
+  showTime         Boolean  @default(true)
+  showBarangay     Boolean  @default(true)
+  showProgramName  Boolean  @default(true)
+  dateFormat       String   @default("MMMM DD, YYYY")
+  gpsFormat        String   @default("DECIMAL")
+  overlayPosition  String   @default("BOTTOM")
+  updatedAt        DateTime @default(now())
+}
+
+model Payout {
+  id                   String             @id @default(uuid())
+  programId            String
+  program              Program            @relation(fields: [programId], references: [id], onDelete: Cascade)
+  programBeneficiaryId String
+  programBeneficiary   ProgramBeneficiary @relation(fields: [programBeneficiaryId], references: [id], onDelete: Cascade)
+  status               String             // PAID, PRESENT_NOT_PAID, ABSENT, PENDING
+  payoutDate           String?            // YYYY-MM-DD
+  verifiedAt           DateTime?
+  verifiedById         String?
+  verifiedBy           User?              @relation(fields: [verifiedById], references: [id])
+  remarks              String?
+  createdAt            DateTime           @default(now())
+
+  @@unique([programId, programBeneficiaryId])
+}
+
+model BeneficiaryRestriction {
+  id               String       @id @default(uuid())
+  beneficiaryId    String?
+  beneficiary      Beneficiary? @relation(fields: [beneficiaryId], references: [id], onDelete: Cascade)
+  dependentId      String?
+  dependent        Dependent?   @relation(fields: [dependentId], references: [id], onDelete: SetNull)
+  sourceProgramId  String?
+  sourceProgram    Program?     @relation(fields: [sourceProgramId], references: [id], onDelete: SetNull)
+  payoutDate       String       // YYYY-MM-DD
+  restrictionStart String       // YYYY-MM-DD
+  restrictionEnd   String       // YYYY-MM-DD (+365 days)
+  reason           String       @default("365-day TUPAD payout restriction")
+  status           String       @default("ACTIVE") // ACTIVE, OVERRIDDEN, EXPIRED
+  createdAt        DateTime     @default(now())
+}
+
+model AuditLog {
+  id         String   @id @default(uuid())
+  userId     String?
+  user       User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  action     String
+  entityType String?
+  entityId   String?
+  oldData    String?  // JSON string
+  newData    String?  // JSON string
+  metadata   String?  // JSON string
+  ipAddress  String?
+  deviceId   String?
+  createdAt  DateTime @default(now())
+}
+
+model SystemSetting {
+  key         String   @id
+  value       String
+  description String?
+  updatedAt   DateTime @default(now())
+}
+
+model TupadWorkProgram {
+  id               String                 @id @default(uuid())
+  programId        String
+  program          Program                @relation(fields: [programId], references: [id], onDelete: Cascade)
+  barangay         String
+  projectLocation  String?
+  beneficiaryCount Int                    @default(0)
+  natureOfWork     String?
+  workingHours     String?                @default("Not Exceed Eight (8) Hours a day (8:00 AM–12:00 NN; 1:00 PM–5:00 PM)")
+  createdAt        DateTime               @default(now())
+  updatedAt        DateTime               @updatedAt
+
+  items            TupadWorkProgramItem[]
+
+  @@unique([programId, barangay])
+}
+
+model TupadWorkProgramItem {
+  id                  String                 @id @default(uuid())
+  workProgramId       String
+  workProgram         TupadWorkProgram       @relation(fields: [workProgramId], references: [id], onDelete: Cascade)
+  dayNumber           Int                    // 1 to 10
+  specificActivities  String
+  area                String                 // e.g. "Purok Mulawin to Ipil-ipil"
+  maleCount           Int                    @default(0)
+  femaleCount         Int                    @default(0)
+  scPwdMaleCount      Int                    @default(0)
+  scPwdFemaleCount    Int                    @default(0)
+  totalCount          Int                    @default(0)
+  orderIndex          Int                    @default(0)
+  createdAt           DateTime               @default(now())
+  updatedAt           DateTime               @updatedAt
+
+  attendanceRecords   AttendanceRecord[]
+  accomplishmentPhotos AccomplishmentPhoto[]
+}
