@@ -14,7 +14,13 @@ export async function GET(request: Request) {
 
     const whereClause: any = {};
     if (programId) whereClause.programId = programId;
-    if (barangay) whereClause.barangay = barangay;
+
+    // Enforce coordinator barangay scope
+    if (user.role === "TUPAD_COORDINATOR" && user.assignedBarangay) {
+      whereClause.barangay = user.assignedBarangay;
+    } else if (barangay && barangay !== "ALL") {
+      whereClause.barangay = barangay;
+    }
 
     // DOLE coordinator sees only approved photos
     if (user.role === "DOLE_COORDINATOR") {
@@ -63,19 +69,22 @@ export async function POST(request: Request) {
       capturedAt,
     } = body;
 
-    if (!programId || !barangay) {
+    const actualBarangay =
+      user.role === "TUPAD_COORDINATOR" && user.assignedBarangay ? user.assignedBarangay : barangay;
+
+    if (!programId || !actualBarangay) {
       return NextResponse.json({ error: "Program and Barangay are required" }, { status: 400 });
     }
 
     const photo = await prisma.accomplishmentPhoto.create({
       data: {
         programId,
-        workDayId,
-        workProgramItemId,
-        barangay,
-        sitio,
-        workArea: workArea || sitio,
-        specificActivity,
+        workDayId: workDayId || null,
+        workProgramItemId: workProgramItemId || null,
+        barangay: actualBarangay,
+        sitio: sitio || null,
+        workArea: workArea || sitio || null,
+        specificActivity: specificActivity || null,
         fileKey,
         fileName,
         latitude: latitude ? Number(latitude) : 15.3941,
@@ -93,7 +102,7 @@ export async function POST(request: Request) {
       action: "PHOTO_UPLOADED",
       entityType: "ACCOMPLISHMENT_PHOTO",
       entityId: photo.id,
-      metadata: { barangay, latitude, longitude },
+      metadata: { barangay: actualBarangay, latitude, longitude },
     });
 
     return NextResponse.json({ success: true, photo }, { status: 201 });
@@ -110,33 +119,111 @@ export async function PATCH(request: Request) {
       return NextResponse.json({ error: "Forbidden: insufficient permissions" }, { status: 403 });
     }
 
-    const { id, status, rejectionReason } = await request.json();
+    const { id, status, rejectionReason, isExported } = await request.json();
 
-    if (!id || !["APPROVED", "REJECTED", "FOR_REVIEW"].includes(status)) {
-      return NextResponse.json({ error: "Valid photo ID and status are required" }, { status: 400 });
+    if (!id) {
+      return NextResponse.json({ error: "Valid photo ID is required" }, { status: 400 });
+    }
+
+    const updateData: any = {};
+    if (status) {
+      if (!["APPROVED", "REJECTED", "FOR_REVIEW"].includes(status)) {
+        return NextResponse.json({ error: "Invalid status" }, { status: 400 });
+      }
+      updateData.status = status;
+      updateData.rejectionReason = status === "REJECTED" ? rejectionReason : null;
+      updateData.approvedById = status === "APPROVED" ? user.id : null;
+      updateData.approvedAt = status === "APPROVED" ? new Date() : null;
+    }
+    if (isExported !== undefined) {
+      updateData.isExported = Boolean(isExported);
     }
 
     const photo = await prisma.accomplishmentPhoto.update({
       where: { id },
-      data: {
-        status,
-        rejectionReason: status === "REJECTED" ? rejectionReason : null,
-        approvedById: status === "APPROVED" ? user.id : null,
-        approvedAt: status === "APPROVED" ? new Date() : null,
-      },
+      data: updateData,
     });
 
     await logAudit({
       userId: user.id,
-      action: status === "APPROVED" ? "PHOTO_APPROVED" : "PHOTO_REJECTED",
+      action: status === "APPROVED" ? "PHOTO_APPROVED" : "PHOTO_UPDATED",
       entityType: "ACCOMPLISHMENT_PHOTO",
       entityId: photo.id,
-      metadata: { status, rejectionReason },
+      metadata: { status, rejectionReason, isExported },
     });
 
     return NextResponse.json({ success: true, photo });
   } catch (error: any) {
     console.error("PATCH photos error:", error);
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+}
+
+export async function DELETE(request: Request) {
+  try {
+    const user = await getCurrentUser();
+    if (!user || user.role !== "PESO_ADMIN") {
+      return NextResponse.json({ error: "Forbidden: Only PESO Admins can purge photo data" }, { status: 403 });
+    }
+
+    const { searchParams } = new URL(request.url);
+    const id = searchParams.get("id");
+    const idsParam = searchParams.get("ids");
+    const programId = searchParams.get("programId");
+    const barangay = searchParams.get("barangay");
+    const status = searchParams.get("status");
+
+    let deletedCount = 0;
+
+    if (id) {
+      const photo = await prisma.accomplishmentPhoto.delete({
+        where: { id },
+      });
+      deletedCount = 1;
+
+      await logAudit({
+        userId: user.id,
+        action: "PHOTO_PURGED",
+        entityType: "ACCOMPLISHMENT_PHOTO",
+        entityId: id,
+        metadata: { photoId: id, fileName: photo.fileName, barangay: photo.barangay },
+      });
+    } else if (idsParam) {
+      const ids = idsParam.split(",").map((s) => s.trim()).filter(Boolean);
+      const result = await prisma.accomplishmentPhoto.deleteMany({
+        where: { id: { in: ids } },
+      });
+      deletedCount = result.count;
+
+      await logAudit({
+        userId: user.id,
+        action: "PHOTO_BATCH_PURGED",
+        entityType: "ACCOMPLISHMENT_PHOTO",
+        metadata: { count: deletedCount, idsCount: ids.length },
+      });
+    } else if (programId) {
+      const whereClause: any = { programId };
+      if (barangay && barangay !== "ALL") whereClause.barangay = barangay;
+      if (status && status !== "ALL") whereClause.status = status;
+
+      const result = await prisma.accomplishmentPhoto.deleteMany({
+        where: whereClause,
+      });
+      deletedCount = result.count;
+
+      await logAudit({
+        userId: user.id,
+        action: "PHOTO_PROGRAM_PURGED",
+        entityType: "ACCOMPLISHMENT_PHOTO",
+        metadata: { count: deletedCount, programId, barangay, status },
+      });
+    } else {
+      return NextResponse.json({ error: "Missing required parameters (id, ids, or programId)" }, { status: 400 });
+    }
+
+    return NextResponse.json({ success: true, count: deletedCount });
+  } catch (error: any) {
+    console.error("DELETE photos error:", error);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }

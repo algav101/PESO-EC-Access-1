@@ -26,10 +26,12 @@ import {
 } from "lucide-react";
 import { StatusBadge } from "@/components/common/StatusBadge";
 import { ParsedBarangayWorkProgram, WorkProgramPreviewResult } from "@/lib/work-program-parser";
+import { useAuth } from "@/context/AuthContext";
 
 export default function WorkProgramManagementPage() {
   const params = useParams();
   const router = useRouter();
+  const { user } = useAuth();
 
   const [program, setProgram] = useState<any>(null);
   const [workPrograms, setWorkPrograms] = useState<any[]>([]);
@@ -79,7 +81,9 @@ export default function WorkProgramManagementPage() {
         const data = await resWp.json();
         const wps = data.workPrograms || [];
         setWorkPrograms(wps);
-        if (wps.length > 0 && !selectedBarangay) {
+        if (user?.role === "TUPAD_COORDINATOR" && user.assignedBarangay) {
+          setSelectedBarangay(user.assignedBarangay);
+        } else if (wps.length > 0 && !selectedBarangay) {
           setSelectedBarangay(wps[0].barangay);
         }
       }

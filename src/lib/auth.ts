@@ -15,6 +15,7 @@ export function signToken(user: AuthUser): string {
       fullName: user.fullName,
       email: user.email,
       role: user.role,
+      assignedBarangay: user.assignedBarangay || null,
     },
     AUTH_SECRET,
     { expiresIn: "7d" }

@@ -15,7 +15,14 @@ export async function GET(request: Request, { params }: { params: { id: string }
 
     const whereClause: any = { programId: params.id };
     if (status) whereClause.participationStatus = status;
-    if (barangay) whereClause.beneficiary = { barangay };
+
+    // Enforce coordinator barangay-level isolation
+    if (user.role === "TUPAD_COORDINATOR" && user.assignedBarangay) {
+      whereClause.beneficiary = { barangay: user.assignedBarangay };
+    } else if (barangay) {
+      whereClause.beneficiary = { barangay };
+    }
+
     if (query) {
       whereClause.OR = [
         { designatedNumber: { contains: query } },

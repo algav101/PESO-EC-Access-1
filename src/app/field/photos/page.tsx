@@ -14,6 +14,10 @@ import {
   AlertCircle,
   Eye,
   Sparkles,
+  Trash2,
+  HardDrive,
+  Download,
+  AlertTriangle,
 } from "lucide-react";
 import { StatusBadge } from "@/components/common/StatusBadge";
 import { formatDate } from "@/lib/utils";
@@ -25,6 +29,12 @@ export default function PhotosPage() {
   const [selectedProgramId, setSelectedProgramId] = useState<string>("");
   const [photos, setPhotos] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+
+  // Multi-select for storage cleanup & batch actions
+  const [selectedPhotoIds, setSelectedPhotoIds] = useState<string[]>([]);
+  const [isPurgeModalOpen, setIsPurgeModalOpen] = useState(false);
+  const [purgeType, setPurgeType] = useState<"SELECTED" | "ALL_APPROVED">("SELECTED");
+  const [purging, setPurging] = useState(false);
 
   // Upload modal state
   const [isUploadOpen, setIsUploadOpen] = useState(false);
@@ -44,7 +54,14 @@ export default function PhotosPage() {
   }, []);
 
   useEffect(() => {
+    if (user?.role === "TUPAD_COORDINATOR" && user.assignedBarangay) {
+      setUploadBarangay(user.assignedBarangay);
+    }
+  }, [user]);
+
+  useEffect(() => {
     if (selectedProgramId) {
+      setSelectedPhotoIds([]);
       fetchPhotos(selectedProgramId);
       fetchWorkPrograms(selectedProgramId);
     }
@@ -92,14 +109,6 @@ export default function PhotosPage() {
     }
   };
 
-  // Filter activities for active upload modal Barangay + Day
-  const activeWp = workPrograms.find(
-    (w) => w.barangay.toUpperCase() === uploadBarangay.toUpperCase()
-  );
-  const availableActivitiesForModal = (activeWp?.items || []).filter(
-    (it: any) => it.dayNumber === uploadWorkDayNumber
-  );
-
   const handleCapturePhoto = async (e: React.FormEvent) => {
     e.preventDefault();
     setSubmitting(true);
@@ -124,7 +133,7 @@ export default function PhotosPage() {
           programId: selectedProgramId,
           workDayId: uploadWorkDayId || undefined,
           workProgramItemId: uploadWorkProgramItemId || undefined,
-          barangay: uploadBarangay,
+          barangay: user?.role === "TUPAD_COORDINATOR" && user.assignedBarangay ? user.assignedBarangay : uploadBarangay,
           sitio: uploadSitio,
           workArea: uploadWorkArea || uploadSitio,
           specificActivity: uploadSpecificActivity,
@@ -167,8 +176,61 @@ export default function PhotosPage() {
     }
   };
 
+  // Delete / Purge Photo Storage Handler
+  const handlePurgePhotos = async () => {
+    setPurging(true);
+    try {
+      let url = "/api/v1/photos";
+      if (purgeType === "SELECTED") {
+        if (selectedPhotoIds.length === 0) return;
+        url += `?ids=${selectedPhotoIds.join(",")}`;
+      } else {
+        url += `?programId=${selectedProgramId}&status=APPROVED`;
+      }
+
+      const res = await fetch(url, { method: "DELETE" });
+      const data = await res.json();
+
+      if (res.ok) {
+        setIsPurgeModalOpen(false);
+        setSelectedPhotoIds([]);
+        fetchPhotos(selectedProgramId);
+        alert(`Successfully deleted ${data.count || 0} photo file(s) from database storage.`);
+      } else {
+        alert(data.error || "Failed to purge photos");
+      }
+    } catch (e) {
+      alert("Error purging photos");
+    } finally {
+      setPurging(false);
+    }
+  };
+
+  const toggleSelectPhoto = (id: string) => {
+    setSelectedPhotoIds((prev) =>
+      prev.includes(id) ? prev.filter((pId) => pId !== id) : [...prev, id]
+    );
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedPhotoIds.length === photos.length) {
+      setSelectedPhotoIds([]);
+    } else {
+      setSelectedPhotoIds(photos.map((p) => p.id));
+    }
+  };
+
   const currentProgram = programs.find((p) => p.id === selectedProgramId);
   const isDole = user?.role === "DOLE_COORDINATOR";
+  const isAdmin = user?.role === "PESO_ADMIN";
+
+  // Filter activities for active upload modal Barangay + Day
+  const activeWp = workPrograms.find(
+    (w) => w.barangay.toUpperCase() === uploadBarangay.toUpperCase()
+  );
+  const availableActivitiesForModal = (activeWp?.items || []).filter(
+    (it: any) => it.dayNumber === uploadWorkDayNumber
+  );
 
   return (
     <div className="space-y-6">
@@ -180,81 +242,153 @@ export default function PhotosPage() {
             <span>Accomplishment Photo Documentation</span>
           </h1>
           <p className="text-xs text-slate-500">
-            {isDole
-              ? "DOLE View: Verified & approved accomplishment photo gallery"
-              : "Geotagged field photo capture, GPS timestamp overlay, and TUPAD Work Program activity tagging"}
+            Geotagged daily field proof with GPS timestamp overlays & storage optimization tools
           </p>
         </div>
 
-        {!isDole && can("photo.upload") && (
-          <button
-            onClick={() => setIsUploadOpen(true)}
-            className="px-4 py-2 bg-gov-blue hover:bg-gov-light text-white font-bold text-xs rounded-xl shadow flex items-center space-x-1.5 transition"
-          >
-            <Camera className="w-4 h-4 text-gov-goldLight" />
-            <span>Capture / Upload Photo</span>
-          </button>
-        )}
+        <div className="flex flex-wrap items-center gap-2 self-start sm:self-auto">
+          {/* Admin Storage Optimization Button */}
+          {isAdmin && (
+            <button
+              onClick={() => {
+                setPurgeType("SELECTED");
+                setIsPurgeModalOpen(true);
+              }}
+              disabled={photos.length === 0}
+              className="px-3.5 py-2 bg-slate-100 hover:bg-rose-50 text-slate-700 hover:text-rose-700 font-bold text-xs rounded-xl border border-slate-300 hover:border-rose-300 shadow-sm flex items-center space-x-1.5 transition disabled:opacity-50"
+            >
+              <HardDrive className="w-4 h-4 text-rose-600" />
+              <span>Prune / Delete Photos ({selectedPhotoIds.length || "All"})</span>
+            </button>
+          )}
+
+          {!isDole && can("photo.upload") && (
+            <button
+              onClick={() => setIsUploadOpen(true)}
+              className="px-4 py-2 bg-gov-blue hover:bg-gov-light text-white font-bold text-xs rounded-xl shadow flex items-center space-x-1.5 transition"
+            >
+              <UploadCloud className="w-4 h-4 text-gov-goldLight" />
+              <span>Upload Geotagged Photo</span>
+            </button>
+          )}
+        </div>
       </div>
 
-      {/* Program Selector */}
-      <div className="gov-card p-4 flex items-center space-x-3">
-        <span className="text-xs font-bold text-slate-700">Program:</span>
-        <select
-          value={selectedProgramId}
-          onChange={(e) => setSelectedProgramId(e.target.value)}
-          className="flex-1 px-3 py-1.5 text-xs border border-slate-300 rounded-lg bg-slate-50 font-bold focus:outline-none focus:border-gov-blue"
-        >
-          {programs.map((p) => (
-            <option key={p.id} value={p.id}>
-              {p.programCode} - {p.programName}
-            </option>
-          ))}
-        </select>
+      {/* Program Selector & Stats Bar */}
+      <div className="gov-card p-4 flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+          <label className="text-xs font-bold text-slate-700 uppercase">Select Program:</label>
+          <select
+            value={selectedProgramId}
+            onChange={(e) => setSelectedProgramId(e.target.value)}
+            className="px-3 py-1.5 text-xs font-bold border rounded-lg bg-slate-50 min-w-[280px]"
+          >
+            {programs.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.programCode} - {p.programName}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        {/* Storage Metrics & Multi-Select bar */}
+        <div className="flex items-center space-x-3 text-xs">
+          {isAdmin && photos.length > 0 && (
+            <button
+              onClick={toggleSelectAll}
+              className="text-gov-blue font-bold hover:underline"
+            >
+              {selectedPhotoIds.length === photos.length ? "Deselect All" : "Select All"}
+            </button>
+          )}
+          <span className="px-2.5 py-1 bg-slate-100 text-slate-700 font-semibold rounded-lg">
+            Total Photos: <strong>{photos.length}</strong>
+          </span>
+          {selectedPhotoIds.length > 0 && (
+            <span className="px-2.5 py-1 bg-rose-50 text-rose-700 font-bold border border-rose-200 rounded-lg">
+              {selectedPhotoIds.length} Selected
+            </span>
+          )}
+        </div>
       </div>
+
+      {/* Coordinator Scoped Scope Banner */}
+      {user?.role === "TUPAD_COORDINATOR" && user.assignedBarangay && (
+        <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl flex items-center justify-between text-xs text-amber-900 font-bold">
+          <div className="flex items-center space-x-2">
+            <MapPin className="w-4 h-4 text-amber-600" />
+            <span>Assigned Coordinator Scope: Showing photos for <strong>Barangay {user.assignedBarangay}</strong> only.</span>
+          </div>
+          <span className="text-[10px] px-2 py-0.5 bg-amber-200 text-amber-950 rounded uppercase tracking-wider">
+            Barangay Restricted
+          </span>
+        </div>
+      )}
 
       {/* Photo Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
         {photos.map((photo) => (
-          <div key={photo.id} className="gov-card overflow-hidden flex flex-col justify-between space-y-3 shadow-md">
-            {/* Simulated Rendered Geotagged Photo Frame */}
-            <div className="h-60 bg-slate-950 relative flex flex-col justify-between p-3 text-white border-b">
-              {/* Top Tag */}
-              <div className="flex justify-between items-start">
-                <span className="bg-black/60 backdrop-blur-sm text-gov-goldLight px-2 py-0.5 rounded text-[9px] font-bold border border-white/20">
-                  DOLE-TUPAD Dingalan
-                </span>
+          <div
+            key={photo.id}
+            className={`gov-card overflow-hidden shadow group hover:shadow-lg transition flex flex-col justify-between ${
+              selectedPhotoIds.includes(photo.id) ? "ring-2 ring-rose-500 bg-rose-50/20" : ""
+            }`}
+          >
+            {/* Image Box */}
+            <div className="relative aspect-video bg-slate-900 overflow-hidden">
+              {/* Checkbox for Admin selection */}
+              {isAdmin && (
+                <div className="absolute top-2 left-2 z-20">
+                  <input
+                    type="checkbox"
+                    checked={selectedPhotoIds.includes(photo.id)}
+                    onChange={() => toggleSelectPhoto(photo.id)}
+                    className="w-4 h-4 text-rose-600 rounded bg-white/90 cursor-pointer shadow"
+                  />
+                </div>
+              )}
+
+              {/* Status Badge Overlay */}
+              <div className="absolute top-2 right-2 z-20">
                 <StatusBadge status={photo.status} />
               </div>
 
-              <div className="flex items-center justify-center">
-                <Camera className="w-10 h-10 text-slate-600" />
+              {/* Mock Photo Display */}
+              <div className="w-full h-full flex flex-col items-center justify-center text-slate-600 bg-gradient-to-br from-slate-800 to-slate-950">
+                <Camera className="w-8 h-8 text-slate-500 mb-1 opacity-60" />
+                <span className="text-[10px] font-mono text-slate-400">
+                  {photo.specificActivity ? photo.specificActivity.slice(0, 30) + "..." : "Field Work Documentation"}
+                </span>
+                <span className="text-[9px] text-slate-500 font-mono mt-0.5">
+                  📍 {photo.workArea || photo.sitio || photo.barangay}
+                </span>
               </div>
 
-              {/* Bottom Geotag Overlay */}
-              <div className="bg-black/85 backdrop-blur-md p-2.5 rounded-lg border border-white/20 text-[10px] space-y-0.5">
-                <div className="flex items-center space-x-1 text-gov-goldLight font-bold">
-                  <MapPin className="w-3 h-3 text-gov-gold flex-shrink-0" />
-                  <span className="truncate">Brgy. {photo.barangay}{photo.workArea ? ` • ${photo.workArea}` : ""}</span>
+              {/* GPS Metadata Overlay */}
+              <div className="absolute bottom-0 inset-x-0 bg-black/85 text-white p-2.5 text-[9px] font-mono leading-tight space-y-0.5">
+                <div className="flex justify-between text-gov-goldLight font-bold">
+                  <span>LGU DINGALAN • TUPAD</span>
+                  <span>{photo.barangay}</span>
                 </div>
-                {photo.specificActivity && (
-                  <p className="text-slate-200 text-[9px] line-clamp-1 italic">
-                    "{photo.specificActivity}"
-                  </p>
-                )}
-                <div className="flex justify-between text-slate-300 font-mono text-[9px] pt-0.5">
-                  <span>GPS: {photo.latitude?.toFixed(5)}°N, {photo.longitude?.toFixed(5)}°E</span>
-                  <span>{formatDate(photo.capturedAt, "yyyy-MM-dd HH:mm")}</span>
+                <div className="flex justify-between text-slate-300">
+                  <span>GPS: {photo.latitude.toFixed(5)}°N, {photo.longitude.toFixed(5)}°E</span>
+                  <span>{formatDate(photo.capturedAt, "MM/dd/yy HH:mm")}</span>
                 </div>
               </div>
             </div>
 
             {/* Admin Controls / Info */}
-            <div className="p-4 pt-0 space-y-2 text-xs">
+            <div className="p-4 space-y-2 text-xs">
               <div className="flex justify-between text-slate-600 text-[11px]">
                 <span className="font-bold text-gov-blue">Work Day {photo.workDay?.dayNumber || 1}</span>
-                <span>Uploaded by {photo.uploadedBy?.fullName || "Field Coordinator"}</span>
+                <span>By: {photo.uploadedBy?.fullName || "Field Coordinator"}</span>
               </div>
+
+              {photo.specificActivity && (
+                <p className="text-[11px] text-slate-700 font-medium line-clamp-2">
+                  <strong>Activity:</strong> {photo.specificActivity}
+                </p>
+              )}
 
               {/* Approval Buttons for PESO ADMIN */}
               {!isDole && can("photo.approve") && photo.status === "FOR_REVIEW" && (
@@ -286,6 +420,78 @@ export default function PhotosPage() {
         </div>
       )}
 
+      {/* Storage Cleanup & Purge Modal (For PESO ADMIN) */}
+      {isPurgeModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 space-y-4 shadow-2xl animate-fadeIn">
+            <div className="flex items-center space-x-2 text-rose-700">
+              <AlertTriangle className="w-6 h-6 flex-shrink-0" />
+              <h3 className="text-sm font-bold uppercase tracking-wider">
+                Purge Accomplishment Photos (Storage Optimization)
+              </h3>
+            </div>
+
+            <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-xs text-rose-900 space-y-2">
+              <p className="font-bold">
+                ⚠️ Warning: Permanently removes photo records from the system database.
+              </p>
+              <p className="text-[11px] leading-relaxed">
+                Make sure you have already generated and exported your <strong>Accomplishment Report (.XLSX)</strong> before proceeding.
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <label className="block text-xs font-bold text-slate-700 uppercase">Select Purge Scope:</label>
+              <div className="space-y-2">
+                <label className="flex items-center space-x-2 p-2.5 border rounded-lg hover:bg-slate-50 cursor-pointer">
+                  <input
+                    type="radio"
+                    name="purgeScope"
+                    checked={purgeType === "SELECTED"}
+                    onChange={() => setPurgeType("SELECTED")}
+                    disabled={selectedPhotoIds.length === 0}
+                  />
+                  <span className="text-xs font-semibold text-slate-800">
+                    Delete Only Selected Photos ({selectedPhotoIds.length})
+                  </span>
+                </label>
+
+                <label className="flex items-center space-x-2 p-2.5 border rounded-lg hover:bg-slate-50 cursor-pointer">
+                  <input
+                    type="radio"
+                    name="purgeScope"
+                    checked={purgeType === "ALL_APPROVED"}
+                    onChange={() => setPurgeType("ALL_APPROVED")}
+                  />
+                  <span className="text-xs font-semibold text-slate-800">
+                    Purge All Approved Photos for this Program ({photos.filter((p) => p.status === "APPROVED").length})
+                  </span>
+                </label>
+              </div>
+            </div>
+
+            <div className="flex justify-end space-x-2 pt-3">
+              <button
+                type="button"
+                onClick={() => setIsPurgeModalOpen(false)}
+                className="px-4 py-2 text-xs font-bold border rounded-lg hover:bg-slate-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handlePurgePhotos}
+                disabled={purging || (purgeType === "SELECTED" && selectedPhotoIds.length === 0)}
+                className="px-4 py-2 bg-rose-700 hover:bg-rose-800 text-white font-bold text-xs rounded-lg shadow transition flex items-center space-x-1.5 disabled:opacity-50"
+              >
+                <Trash2 className="w-4 h-4" />
+                <span>{purging ? "Purging..." : "Confirm & Free Storage"}</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Upload Photo Modal */}
       {isUploadOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 overflow-y-auto">
@@ -312,8 +518,9 @@ export default function PhotosPage() {
                 <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Barangay (Project Location) *</label>
                 <select
                   value={uploadBarangay}
+                  disabled={user?.role === "TUPAD_COORDINATOR" && !!user.assignedBarangay}
                   onChange={(e) => setUploadBarangay(e.target.value)}
-                  className="w-full px-3 py-2 text-xs border rounded-lg bg-slate-50 font-bold"
+                  className="w-full px-3 py-2 text-xs border rounded-lg bg-slate-50 font-bold disabled:bg-slate-100"
                 >
                   {[
                     "Aplaya", "Butas na Bato", "Caragsacan", "Davildavilan",

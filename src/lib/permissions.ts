@@ -4,6 +4,7 @@ export interface AuthUser {
   fullName: string;
   email?: string | null;
   role: "PESO_ADMIN" | "TUPAD_COORDINATOR" | "DOLE_COORDINATOR";
+  assignedBarangay?: string | null;
 }
 
 export const PERMISSIONS = {

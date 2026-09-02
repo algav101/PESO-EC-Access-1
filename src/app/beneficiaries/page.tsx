@@ -20,8 +20,10 @@ import {
 import { StatusBadge } from "@/components/common/StatusBadge";
 import { formatDate } from "@/lib/utils";
 import { EditBeneficiaryModal } from "@/components/beneficiaries/EditBeneficiaryModal";
+import { useAuth } from "@/context/AuthContext";
 
 export default function BeneficiariesMasterlistPage() {
+  const { user } = useAuth();
   const [beneficiaries, setBeneficiaries] = useState<any[]>([]);
   const [programs, setPrograms] = useState<any[]>([]);
   const [selectedProgram, setSelectedProgram] = useState<string>("");
@@ -29,6 +31,13 @@ export default function BeneficiariesMasterlistPage() {
   const [selectedSitio, setSelectedSitio] = useState<string>("ALL");
   const [searchQuery, setSearchQuery] = useState("");
   const [loading, setLoading] = useState(true);
+
+  // Set assigned barangay on load for TUPAD Coordinators
+  useEffect(() => {
+    if (user?.role === "TUPAD_COORDINATOR" && user.assignedBarangay) {
+      setSelectedBarangay(user.assignedBarangay);
+    }
+  }, [user]);
 
   // Sorting State
   const [sortBy, setSortBy] = useState<string>("designatedNumber");
@@ -236,6 +245,19 @@ export default function BeneficiariesMasterlistPage() {
         )}
       </div>
 
+      {/* Coordinator Scoped Scope Banner */}
+      {user?.role === "TUPAD_COORDINATOR" && user.assignedBarangay && (
+        <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl flex items-center justify-between text-xs text-amber-900 font-bold">
+          <div className="flex items-center space-x-2">
+            <MapPin className="w-4 h-4 text-amber-600" />
+            <span>Assigned Coordinator Scope: Showing Beneficiaries for <strong>Barangay {user.assignedBarangay}</strong> only.</span>
+          </div>
+          <span className="text-[10px] px-2 py-0.5 bg-amber-200 text-amber-950 rounded uppercase tracking-wider">
+            Barangay Restricted
+          </span>
+        </div>
+      )}
+
       {/* Filter & Sort Bar */}
       <div className="gov-card p-4 space-y-3">
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
@@ -260,18 +282,23 @@ export default function BeneficiariesMasterlistPage() {
             <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Filter Barangay</label>
             <select
               value={selectedBarangay}
+              disabled={user?.role === "TUPAD_COORDINATOR" && !!user.assignedBarangay}
               onChange={(e) => {
                 setSelectedBarangay(e.target.value);
                 setSelectedSitio("ALL");
               }}
-              className="w-full px-3 py-1.5 text-xs border border-slate-300 rounded-lg bg-slate-50 focus:outline-none focus:border-gov-blue font-semibold"
+              className="w-full px-3 py-1.5 text-xs border border-slate-300 rounded-lg bg-slate-50 focus:outline-none focus:border-gov-blue font-semibold disabled:bg-slate-100 disabled:text-slate-500"
             >
-              <option value="ALL">All Barangays</option>
-              {barangays.map((b) => (
-                <option key={b} value={b}>
-                  {b}
-                </option>
-              ))}
+              {!(user?.role === "TUPAD_COORDINATOR" && user.assignedBarangay) && (
+                <option value="ALL">All Barangays</option>
+              )}
+              {barangays
+                .filter((b) => !(user?.role === "TUPAD_COORDINATOR" && user.assignedBarangay) || b === user.assignedBarangay)
+                .map((b) => (
+                  <option key={b} value={b}>
+                    {b}
+                  </option>
+                ))}
             </select>
           </div>
 

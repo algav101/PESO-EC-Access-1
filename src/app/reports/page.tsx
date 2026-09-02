@@ -185,6 +185,25 @@ export default function ReportCenterPage() {
           );
         })}
       </div>
+
+      {/* Storage Optimization Tip */}
+      <div className="p-4 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-2xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs">
+        <div className="space-y-0.5">
+          <span className="font-bold text-slate-900 flex items-center space-x-1.5">
+            <Sparkles className="w-4 h-4 text-gov-goldLight" />
+            <span>Storage Optimization Tip for Admins</span>
+          </span>
+          <p className="text-slate-600 text-[11px]">
+            Once you have downloaded your official Accomplishment Reports (.XLSX) and saved field photos locally, you can safely purge stored photo records to free up database storage and keep the cloud database fast.
+          </p>
+        </div>
+        <a
+          href="/field/photos"
+          className="px-3.5 py-2 bg-white hover:bg-slate-50 text-gov-blue font-bold text-xs rounded-xl border border-blue-200 shadow-sm transition whitespace-nowrap self-end sm:self-auto"
+        >
+          Manage & Prune Photos →
+        </a>
+      </div>
     </div>
   );
 }

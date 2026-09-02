@@ -93,6 +93,7 @@ export async function POST(request: Request) {
       fullName: user.fullName,
       email: user.email,
       role: user.role as any,
+      assignedBarangay: user.assignedBarangay,
     });
 
     await logAudit({
@@ -110,6 +111,7 @@ export async function POST(request: Request) {
         fullName: user.fullName,
         email: user.email,
         role: user.role,
+        assignedBarangay: user.assignedBarangay,
       },
     });
 

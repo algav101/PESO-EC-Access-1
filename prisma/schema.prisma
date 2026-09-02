@@ -16,6 +16,7 @@ model User {
   email         String?
   role          String    @default("PESO_ADMIN") // PESO_ADMIN, TUPAD_COORDINATOR, DOLE_COORDINATOR
   status        String    @default("ACTIVE")
+  assignedBarangay String? // Assigned Barangay for TUPAD_COORDINATOR (e.g. Paltic, Aplaya)
   lastLoginAt   DateTime?
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
@@ -365,6 +366,8 @@ model AccomplishmentPhoto {
   uploadedById      String?
   uploadedBy        User?                 @relation("PhotoUploader", fields: [uploadedById], references: [id])
   status            String                @default("FOR_REVIEW") // FOR_REVIEW, APPROVED, REJECTED
+  isExported        Boolean               @default(false)
+  isPurged          Boolean               @default(false)
   approvedById      String?
   approvedBy        User?                 @relation("PhotoApprover", fields: [approvedById], references: [id])
   approvedAt        DateTime?
