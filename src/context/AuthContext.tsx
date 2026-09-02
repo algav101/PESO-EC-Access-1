@@ -21,7 +21,19 @@ const AuthContext = createContext<AuthContextType>({
 });
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<AuthUser | null>(null);
+  const [user, setUser] = useState<AuthUser | null>(() => {
+    if (typeof window !== "undefined") {
+      const cached = localStorage.getItem("peso_cached_user");
+      if (cached) {
+        try {
+          return JSON.parse(cached);
+        } catch (e) {
+          return null;
+        }
+      }
+    }
+    return null;
+  });
   const [loading, setLoading] = useState(true);
   const router = useRouter();
   const pathname = usePathname();
@@ -34,14 +46,31 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           const data = await res.json();
           if (data.authenticated) {
             setUser(data.user);
+            localStorage.setItem("peso_cached_user", JSON.stringify(data.user));
           } else {
             setUser(null);
+            localStorage.removeItem("peso_cached_user");
           }
-        } else {
+        } else if (res.status === 401) {
           setUser(null);
+          localStorage.removeItem("peso_cached_user");
+        } else {
+          // Fallback to cached session when offline or server unreachable
+          const cached = localStorage.getItem("peso_cached_user");
+          if (cached) {
+            try {
+              setUser(JSON.parse(cached));
+            } catch (e) {}
+          }
         }
       } catch (err) {
-        setUser(null);
+        // Network failure / completely offline: use cached session
+        const cached = localStorage.getItem("peso_cached_user");
+        if (cached) {
+          try {
+            setUser(JSON.parse(cached));
+          } catch (e) {}
+        }
       } finally {
         setLoading(false);
       }
@@ -51,6 +80,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const login = (u: AuthUser) => {
     setUser(u);
+    if (typeof window !== "undefined") {
+      localStorage.setItem("peso_cached_user", JSON.stringify(u));
+    }
   };
 
   const logout = async () => {
@@ -58,6 +90,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       await fetch("/api/v1/auth/logout", { method: "POST" });
     } catch (e) {}
     setUser(null);
+    if (typeof window !== "undefined") {
+      localStorage.removeItem("peso_cached_user");
+    }
     router.push("/login");
   };
 

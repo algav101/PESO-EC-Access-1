@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Offline Mode - PESO TUPAD Dingalan</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    }
+    body {
+      background-color: #0f172a;
+      color: #f8fafc;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 1.5rem;
+      text-align: center;
+    }
+    .card {
+      background-color: #1e293b;
+      border: 1px solid #334155;
+      border-radius: 1.25rem;
+      padding: 2rem 1.5rem;
+      max-width: 480px;
+      width: 100%;
+      box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5), 0 8px 10px -6px rgba(0, 0, 0, 0.5);
+    }
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+      background-color: rgba(245, 158, 11, 0.15);
+      color: #fbbf24;
+      border: 1px solid rgba(245, 158, 11, 0.3);
+      padding: 0.35rem 0.75rem;
+      border-radius: 9999px;
+      font-size: 0.75rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 1.25rem;
+    }
+    .pulse-dot {
+      width: 8px;
+      height: 8px;
+      background-color: #fbbf24;
+      border-radius: 50%;
+      display: inline-block;
+      animation: pulse 2s infinite;
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.4; transform: scale(0.85); }
+    }
+    h1 {
+      font-size: 1.35rem;
+      font-weight: 900;
+      color: #ffffff;
+      margin-bottom: 0.5rem;
+      letter-spacing: -0.025em;
+    }
+    p {
+      font-size: 0.825rem;
+      color: #94a3b8;
+      line-height: 1.5;
+      margin-bottom: 1.5rem;
+    }
+    .btn-group {
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+    }
+    .btn {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+      width: 100%;
+      padding: 0.85rem 1rem;
+      border-radius: 0.75rem;
+      font-size: 0.85rem;
+      font-weight: 700;
+      text-decoration: none;
+      transition: all 0.2s;
+      cursor: pointer;
+      border: none;
+    }
+    .btn-primary {
+      background: linear-gradient(135deg, #1e40af, #2563eb);
+      color: #ffffff;
+      box-shadow: 0 4px 6px -1px rgba(37, 99, 235, 0.3);
+    }
+    .btn-primary:hover {
+      background: linear-gradient(135deg, #1d4ed8, #3b82f6);
+    }
+    .btn-secondary {
+      background-color: #334155;
+      color: #f1f5f9;
+      border: 1px solid #475569;
+    }
+    .btn-secondary:hover {
+      background-color: #475569;
+    }
+    .footer-note {
+      margin-top: 1.5rem;
+      font-size: 0.7rem;
+      color: #64748b;
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="badge">
+      <span class="pulse-dot"></span>
+      <span>Offline Field Mode Active</span>
+    </div>
+
+    <h1>TUPAD Dingalan EC Hub</h1>
+    <p>
+      You are currently disconnected from the internet. All cached records, QR scanning, AM/PM attendance, and photo uploads continue to work locally and will automatically synchronize when connection is restored.
+    </p>
+
+    <div class="btn-group">
+      <a href="/field/attendance" class="btn btn-primary">
+        <span>⏱ Open Daily Attendance Scanner</span>
+      </a>
+      <a href="/field/stub-distribution" class="btn btn-secondary">
+        <span>🎫 Open Stub Distribution Scanner</span>
+      </a>
+      <a href="/dashboard" class="btn btn-secondary">
+        <span>📊 Open System Dashboard</span>
+      </a>
+      <button onclick="window.location.reload()" class="btn btn-secondary" style="border-style: dashed;">
+        <span>🔄 Retry Online Connection</span>
+      </button>
+    </div>
+
+    <div class="footer-note">
+      PESO Dingalan • DOLE Aurora • Offline Engine v1.0
+    </div>
+  </div>
+
+  <script>
+    window.addEventListener("online", () => {
+      window.location.reload();
+    });
+  </script>
+</body>
+</html>
