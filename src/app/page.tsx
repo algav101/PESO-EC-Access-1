@@ -24,19 +24,28 @@ import {
 export const dynamic = "force-dynamic";
 
 export default async function LandingPage() {
-  const activePrograms = await prisma.program.findMany({
-    where: { status: "ACTIVE" },
-    include: {
-      _count: { select: { programBeneficiaries: true, workDays: true } },
-      programBarangays: true,
-    },
-    orderBy: { createdAt: "desc" },
-    take: 4,
-  });
+  let activePrograms: any[] = [];
+  let totalBeneficiaries = 0;
+  let totalAttendances = 0;
+  let totalPaid = 0;
 
-  const totalBeneficiaries = await prisma.programBeneficiary.count();
-  const totalAttendances = await prisma.attendanceRecord.count();
-  const totalPaid = await prisma.payout.count({ where: { status: "PAID" } });
+  try {
+    activePrograms = await prisma.program.findMany({
+      where: { status: "ACTIVE" },
+      include: {
+        _count: { select: { programBeneficiaries: true, workDays: true } },
+        programBarangays: true,
+      },
+      orderBy: { createdAt: "desc" },
+      take: 4,
+    });
+
+    totalBeneficiaries = await prisma.programBeneficiary.count();
+    totalAttendances = await prisma.attendanceRecord.count();
+    totalPaid = await prisma.payout.count({ where: { status: "PAID" } });
+  } catch (error) {
+    console.error("Landing page queries fallback:", error);
+  }
 
   return (
     <div className="bg-slate-50 min-h-screen flex flex-col selection:bg-gov-blue selection:text-white">

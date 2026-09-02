@@ -313,7 +313,7 @@ async function main() {
             afternoonTimeOut: new Date(`${wd.workDate}T17:05:00+08:00`),
             status: 'PRESENT',
             source: 'QR_SCAN',
-            scannedById: coordUser.id,
+            scannedById: adminUser.id,
           },
         });
       }

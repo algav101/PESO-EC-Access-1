@@ -3,6 +3,7 @@
 import React from "react";
 import { usePathname } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
+import { PesoLogo } from "./PesoLogo";
 import {
   LayoutDashboard,
   FolderKanban,
@@ -20,11 +21,19 @@ import {
   History,
   RefreshCw,
   Search,
+  X,
+  LogOut,
+  User as UserIcon,
 } from "lucide-react";
 
-export function Sidebar() {
+interface SidebarProps {
+  isMobile?: boolean;
+  onClose?: () => void;
+}
+
+export function Sidebar({ isMobile = false, onClose }: SidebarProps) {
   const pathname = usePathname();
-  const { user, can } = useAuth();
+  const { user, can, logout } = useAuth();
 
   const navSections = [
     {
@@ -39,7 +48,7 @@ export function Sidebar() {
     {
       title: "Field Scanner Hub",
       items: [
-        { label: "Stub Distribution", href: "/field/stub-distribution", icon: QrCode, permission: "stub.distribution.scan" },
+        { label: "Stub Distribution & Affirmation", href: "/field/stub-distribution", icon: QrCode, permission: "stub.distribution.scan" },
         { label: "Orientation Verification", href: "/field/orientation", icon: CalendarCheck, permission: "orientation.scan" },
         { label: "Daily Attendance (AM/PM)", href: "/field/attendance", icon: Clock, permission: "attendance.scan" },
         { label: "Accomplishment Photos", href: "/field/photos", icon: Camera, permission: "photo.upload" },
@@ -80,7 +89,50 @@ export function Sidebar() {
   ];
 
   return (
-    <aside className="w-64 bg-slate-900 text-slate-300 flex-shrink-0 hidden lg:flex flex-col min-h-[calc(100vh-4rem)] border-r border-slate-800">
+    <aside
+      className={`bg-slate-900 text-slate-300 flex-shrink-0 flex flex-col ${
+        isMobile
+          ? "w-full h-full min-h-screen overflow-y-auto"
+          : "w-64 hidden lg:flex min-h-[calc(100vh-4rem)] border-r border-slate-800"
+      }`}
+    >
+      {/* Mobile Drawer Top Header */}
+      {isMobile && (
+        <div className="p-4 border-b border-slate-800 flex items-center justify-between bg-slate-950/80 sticky top-0 z-20 backdrop-blur-md">
+          <div className="flex items-center space-x-2.5">
+            <PesoLogo className="h-8 w-8" size={32} />
+            <div>
+              <h2 className="text-xs font-black text-white tracking-tight leading-tight">PESO DINGALAN</h2>
+              <p className="text-[10px] text-gov-goldLight font-bold uppercase">Navigation Menu</p>
+            </div>
+          </div>
+
+          <button
+            onClick={onClose}
+            className="p-2 rounded-xl bg-slate-800 text-slate-400 hover:text-white hover:bg-slate-700 transition focus:outline-none"
+            aria-label="Close mobile sidebar"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+      )}
+
+      {/* User Info Badge in Mobile Drawer */}
+      {isMobile && user && (
+        <div className="p-4 bg-slate-950/40 border-b border-slate-800/80 space-y-1">
+          <div className="flex items-center space-x-2">
+            <div className="w-7 h-7 rounded-full bg-gov-blue text-gov-goldLight flex items-center justify-center font-bold text-xs">
+              <UserIcon className="w-3.5 h-3.5" />
+            </div>
+            <div className="overflow-hidden">
+              <p className="text-xs font-bold text-white truncate">{user.fullName || user.username}</p>
+              <p className="text-[10px] text-gov-gold font-mono uppercase">{user.role?.replace(/_/g, " ")}</p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Navigation Sections */}
       <div className="p-4 space-y-6 flex-1 overflow-y-auto">
         {navSections.map((section, idx) => {
           const visibleItems = section.items.filter((item) => !item.permission || can(item.permission));
@@ -100,14 +152,19 @@ export function Sidebar() {
                     <a
                       key={item.href}
                       href={item.href}
-                      className={`flex items-center space-x-3 px-3 py-2 rounded-lg text-xs font-semibold transition ${
+                      onClick={() => {
+                        if (isMobile && onClose) {
+                          onClose();
+                        }
+                      }}
+                      className={`flex items-center space-x-3 px-3 py-2.5 rounded-xl text-xs font-semibold transition ${
                         isActive
-                          ? "bg-gov-blue text-white shadow-sm font-bold border border-blue-400/30"
-                          : "text-slate-400 hover:text-slate-100 hover:bg-slate-800/80"
+                          ? "bg-gov-blue text-white shadow-md font-bold border border-blue-400/30"
+                          : "text-slate-400 hover:text-slate-100 hover:bg-slate-800/80 active:bg-slate-800"
                       }`}
                     >
-                      <Icon className={`w-4 h-4 ${isActive ? "text-gov-goldLight" : "text-slate-400"}`} />
-                      <span>{item.label}</span>
+                      <Icon className={`w-4 h-4 flex-shrink-0 ${isActive ? "text-gov-goldLight" : "text-slate-400"}`} />
+                      <span className="truncate">{item.label}</span>
                     </a>
                   );
                 })}
@@ -117,10 +174,24 @@ export function Sidebar() {
         })}
       </div>
 
-      {/* Footer Info */}
-      <div className="p-4 border-t border-slate-800 text-[11px] text-slate-500">
-        <p className="font-semibold text-slate-400">PESO Dingalan • DOLE Aurora</p>
-        <p className="text-[10px]">TUPAD Beneficiary Engine v1.0</p>
+      {/* Footer Info & Mobile Logout */}
+      <div className="p-4 border-t border-slate-800 text-[11px] text-slate-500 space-y-3 bg-slate-950/50">
+        {isMobile && user && (
+          <button
+            onClick={() => {
+              if (onClose) onClose();
+              logout();
+            }}
+            className="w-full py-2 px-3 bg-rose-900/30 hover:bg-rose-900/50 border border-rose-800/40 text-rose-300 rounded-xl font-bold text-xs flex items-center justify-center space-x-2 transition"
+          >
+            <LogOut className="w-3.5 h-3.5" />
+            <span>Sign Out</span>
+          </button>
+        )}
+        <div className="text-center sm:text-left">
+          <p className="font-semibold text-slate-400">PESO Dingalan • DOLE Aurora</p>
+          <p className="text-[10px]">TUPAD EC Management Platform v1.0</p>
+        </div>
       </div>
     </aside>
   );
