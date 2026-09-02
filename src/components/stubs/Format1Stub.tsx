@@ -16,11 +16,7 @@ export interface Format1StubProps {
 
 /**
  * 100% Vector Proportional "Format 1: TUPAD Beneficiary Verification Stub"
- * Calibrated strictly to the user's Hierarchy of Visibility:
- * 1. Header (Top Tier: LGU Title & Designated #)
- * 2. Beneficiary Demographics (Full Name, Barangay, Table Assignment & QR Code)
- * 3. Orientation Date & Venue
- * 4. Reminder (Paalala Advisory)
+ * Features an expanded, stretched header banner and significantly increased Beneficiary Name typography.
  */
 export const Format1Stub = memo(function Format1Stub({
   designatedNumber,
@@ -38,25 +34,25 @@ export const Format1Stub = memo(function Format1Stub({
   const cleanTable = String(tableNumber).replace(/^Table\s*/i, "").replace(/^#/, "");
   const effectiveQr = qrDataUrl || (token ? getCachedQrSync(token) : undefined);
 
-  // Hierarchy Tier 2: Proportional typography based on name length
+  // Scaled-up Beneficiary Name Typography
   const nameLen = fullName.length;
   const nameFontSize =
     nameLen <= 18
-      ? "4.8cqw"
+      ? "6.0cqw"
       : nameLen <= 26
-      ? "4.0cqw"
+      ? "5.2cqw"
       : nameLen <= 34
-      ? "3.4cqw"
-      : "2.9cqw";
+      ? "4.5cqw"
+      : "3.8cqw";
 
-  // Hierarchy Tier 2: Proportional typography based on barangay length
+  // Scaled-up Barangay Typography
   const brgyLen = barangay.length;
   const brgyFontSize =
     brgyLen <= 8
-      ? "4.2cqw"
+      ? "4.6cqw"
       : brgyLen <= 14
-      ? "3.6cqw"
-      : "3.0cqw";
+      ? "4.0cqw"
+      : "3.4cqw";
 
   // Clean orientation details text
   const cleanOrientation = orientationDetails
@@ -71,13 +67,13 @@ export const Format1Stub = memo(function Format1Stub({
     .replace(/\s+/g, " ")
     .trim();
 
-  // Hierarchy Tier 1: Header designated number size
+  // Stretched Header Designated Number Size
   const numFontSize =
     numStr.length <= 2
-      ? "8.2cqw"
+      ? "8.8cqw"
       : numStr.length === 3
-      ? "6.8cqw"
-      : "5.6cqw";
+      ? "7.4cqw"
+      : "6.0cqw";
 
   return (
     <div
@@ -94,45 +90,45 @@ export const Format1Stub = memo(function Format1Stub({
       }}
     >
       {/* ========================================================================= */}
-      {/* 1. HIERARCHY TIER 1: HEADER & DESIGNATED # (Top Visibility)               */}
+      {/* 1. STRETCHED HEADER & DESIGNATED # (Top Tier)                            */}
       {/* ========================================================================= */}
       <div
         className="flex items-center justify-between min-w-0 shrink-0"
         style={{
-          borderBottom: "0.35cqw solid #004b93",
+          borderBottom: "0.4cqw solid #004b93",
           paddingBottom: "1.2cqw",
         }}
       >
-        {/* Left: PESO Logo & Header Titles */}
-        <div className="flex items-center min-w-0 flex-1" style={{ gap: "2.0cqw" }}>
+        {/* Left: PESO Logo & Stretched Header Titles */}
+        <div className="flex items-center min-w-0 flex-1" style={{ gap: "2.4cqw" }}>
           <img
             src="/peso-logo.png"
             alt="PESO Logo"
             style={{
-              height: "8.5cqw",
+              height: "9.2cqw",
               width: "auto",
-              maxHeight: "8.5cqw",
+              maxHeight: "9.2cqw",
               objectFit: "contain",
               flexShrink: 0,
             }}
           />
           <div className="flex flex-col min-w-0 flex-1 justify-center">
             <h2
-              className="text-[#004b93] font-black uppercase tracking-tight leading-none truncate"
+              className="text-[#004b93] font-black uppercase tracking-wide leading-none truncate"
               style={{
-                fontSize: "5.2cqw",
-                letterSpacing: "0.02em",
+                fontSize: "6.0cqw",
+                letterSpacing: "0.04em",
               }}
               title={stubHeader}
             >
               {stubHeader || "LGU-DINGALAN"}
             </h2>
             <p
-              className="text-[#132e57] font-extrabold uppercase tracking-wide leading-tight truncate"
+              className="text-[#132e57] font-extrabold uppercase tracking-widest leading-tight truncate"
               style={{
-                fontSize: "2.3cqw",
-                marginTop: "0.3cqw",
-                letterSpacing: "0.01em",
+                fontSize: "2.5cqw",
+                marginTop: "0.4cqw",
+                letterSpacing: "0.04em",
               }}
               title={stubSubHeader}
             >
@@ -142,7 +138,7 @@ export const Format1Stub = memo(function Format1Stub({
         </div>
 
         {/* Right: Big Designated Number */}
-        <div className="shrink-0 text-right" style={{ paddingLeft: "1.5cqw" }}>
+        <div className="shrink-0 text-right" style={{ paddingLeft: "1.8cqw" }}>
           <span
             className="text-[#132e57] font-black tracking-tight leading-none select-all"
             style={{
@@ -155,7 +151,7 @@ export const Format1Stub = memo(function Format1Stub({
       </div>
 
       {/* ========================================================================= */}
-      {/* 2. HIERARCHY TIER 2: BENEFICIARY NAME, BARANGAY & TABLE ASSIGNMENT        */}
+      {/* 2. CORE DEMOGRAPHICS: MAXIMIZED BENEFICIARY NAME, BARANGAY & TABLE       */}
       {/* ========================================================================= */}
       <div
         className="flex items-center flex-1 min-h-0"
@@ -193,13 +189,13 @@ export const Format1Stub = memo(function Format1Stub({
           )}
         </div>
 
-        {/* Right: Core Demographics Block */}
+        {/* Right: Maximized Demographics Block */}
         <div className="flex-1 flex flex-col justify-between h-full min-w-0 py-0.5">
-          {/* Beneficiary Name */}
+          {/* Beneficiary Name (Increased font size & commanding presence) */}
           <div className="min-w-0">
             <span
               className="block font-extrabold text-[#132e57] uppercase tracking-wider"
-              style={{ fontSize: "2.1cqw", marginBottom: "0.2cqw", lineHeight: "1" }}
+              style={{ fontSize: "2.2cqw", marginBottom: "0.2cqw", lineHeight: "1" }}
             >
               BENEFICIARY NAME:
             </span>
@@ -207,8 +203,8 @@ export const Format1Stub = memo(function Format1Stub({
               className="block text-[#004b93] font-black uppercase tracking-tight select-all break-words"
               style={{
                 fontSize: nameFontSize,
-                lineHeight: "1.06",
-                letterSpacing: "0.01em",
+                lineHeight: "1.04",
+                letterSpacing: "0.015em",
               }}
               title={fullName}
             >
@@ -222,7 +218,7 @@ export const Format1Stub = memo(function Format1Stub({
             style={{
               borderTop: "0.22cqw solid #cbd5e1",
               paddingTop: "1.0cqw",
-              marginTop: "0.5cqw",
+              marginTop: "0.4cqw",
               gap: "1.5cqw",
             }}
           >
@@ -230,7 +226,7 @@ export const Format1Stub = memo(function Format1Stub({
             <div className="min-w-0">
               <span
                 className="block font-extrabold text-[#132e57] uppercase tracking-wider"
-                style={{ fontSize: "1.9cqw", marginBottom: "0.15cqw", lineHeight: "1" }}
+                style={{ fontSize: "2.0cqw", marginBottom: "0.15cqw", lineHeight: "1" }}
               >
                 BARANGAY:
               </span>
@@ -238,7 +234,7 @@ export const Format1Stub = memo(function Format1Stub({
                 className="block text-[#004b93] font-black uppercase tracking-tight select-all break-words"
                 style={{
                   fontSize: brgyFontSize,
-                  lineHeight: "1.06",
+                  lineHeight: "1.05",
                 }}
                 title={barangay}
               >
@@ -256,14 +252,14 @@ export const Format1Stub = memo(function Format1Stub({
             >
               <span
                 className="block font-extrabold text-[#132e57] uppercase tracking-wider"
-                style={{ fontSize: "1.9cqw", marginBottom: "0.15cqw", lineHeight: "1" }}
+                style={{ fontSize: "2.0cqw", marginBottom: "0.15cqw", lineHeight: "1" }}
               >
                 TABLE ASSIGNMENT:
               </span>
               <span
                 className="block text-[#004b93] font-black tracking-tight select-all"
                 style={{
-                  fontSize: "4.4cqw",
+                  fontSize: "4.8cqw",
                   lineHeight: "1.0",
                 }}
               >
@@ -275,8 +271,7 @@ export const Format1Stub = memo(function Format1Stub({
       </div>
 
       {/* ========================================================================= */}
-      {/* 3. HIERARCHY TIER 3: ORIENTATION DATE & VENUE                             */}
-      {/* 4. HIERARCHY TIER 4: REMINDER / PAALALA ADVISORY NOTICE                   */}
+      {/* 3. FOOTER SECTION: ORIENTATION DATE & VENUE + PAALALA ADVISORY             */}
       {/* ========================================================================= */}
       <div
         className="flex flex-col min-w-0 shrink-0"
