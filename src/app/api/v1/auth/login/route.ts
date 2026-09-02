@@ -12,9 +12,54 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Username and password are required" }, { status: 400 });
     }
 
-    const user = await prisma.user.findUnique({
-      where: { username: username.trim().toLowerCase() },
+    const cleanUsername = username.trim().toLowerCase();
+
+    let user = await prisma.user.findUnique({
+      where: { username: cleanUsername },
     });
+
+    // Auto-seed default accounts on fresh deployment if database has 0 users
+    if (!user) {
+      const userCount = await prisma.user.count();
+      if (userCount === 0) {
+        const adminPass = await bcrypt.hash("admin123", 10);
+        const coordPass = await bcrypt.hash("coord123", 10);
+        const dolePass = await bcrypt.hash("dole123", 10);
+
+        await prisma.user.createMany({
+          data: [
+            {
+              username: "admin",
+              fullName: "PESO Dingalan Admin Officer",
+              email: "peso.dingalan@aurora.gov.ph",
+              passwordHash: adminPass,
+              role: "PESO_ADMIN",
+              status: "ACTIVE",
+            },
+            {
+              username: "coordinator",
+              fullName: "Dingalan TUPAD Field Coordinator",
+              email: "coordinator@dingalan.gov.ph",
+              passwordHash: coordPass,
+              role: "TUPAD_COORDINATOR",
+              status: "ACTIVE",
+            },
+            {
+              username: "dole",
+              fullName: "DOLE Aurora Field Officer",
+              email: "dole.aurora@dole.gov.ph",
+              passwordHash: dolePass,
+              role: "DOLE_COORDINATOR",
+              status: "ACTIVE",
+            },
+          ],
+        });
+
+        user = await prisma.user.findUnique({
+          where: { username: cleanUsername },
+        });
+      }
+    }
 
     if (!user || user.status !== "ACTIVE") {
       await logAudit({
