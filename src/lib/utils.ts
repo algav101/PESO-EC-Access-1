@@ -31,7 +31,6 @@ export function formatBirthdayPin(birthdayStr?: string | null): string {
   try {
     const d = new Date(birthdayStr);
     if (isNaN(d.getTime())) {
-      // If string is YYYY-MM-DD
       const parts = birthdayStr.split("-");
       if (parts.length === 3 && parts[0].length === 4) {
         return `${parts[1]}-${parts[2]}-${parts[0]}`;
