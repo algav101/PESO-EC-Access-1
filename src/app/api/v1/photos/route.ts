@@ -57,12 +57,14 @@ export async function POST(request: Request) {
     const {
       programId,
       workDayId,
+      workDayNumber,
       workProgramItemId,
       barangay,
       sitio,
       workArea,
       specificActivity,
-      fileKey = `photo_${Date.now()}`,
+      photoData,
+      fileKey,
       fileName = "accomplishment_photo.jpg",
       latitude,
       longitude,
@@ -76,16 +78,27 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Program and Barangay are required" }, { status: 400 });
     }
 
+    // If workDayId is not given but workDayNumber is provided, resolve workDay
+    let resolvedWorkDayId = workDayId || null;
+    if (!resolvedWorkDayId && workDayNumber) {
+      const wd = await prisma.workDay.findFirst({
+        where: { programId, dayNumber: Number(workDayNumber) },
+      });
+      if (wd) resolvedWorkDayId = wd.id;
+    }
+
+    const finalFileKey = photoData || fileKey || `photo_${Date.now()}`;
+
     const photo = await prisma.accomplishmentPhoto.create({
       data: {
         programId,
-        workDayId: workDayId || null,
+        workDayId: resolvedWorkDayId,
         workProgramItemId: workProgramItemId || null,
         barangay: actualBarangay,
         sitio: sitio || null,
         workArea: workArea || sitio || null,
         specificActivity: specificActivity || null,
-        fileKey,
+        fileKey: finalFileKey,
         fileName,
         latitude: latitude ? Number(latitude) : 15.3941,
         longitude: longitude ? Number(longitude) : 121.3965,
@@ -102,7 +115,7 @@ export async function POST(request: Request) {
       action: "PHOTO_UPLOADED",
       entityType: "ACCOMPLISHMENT_PHOTO",
       entityId: photo.id,
-      metadata: { barangay: actualBarangay, latitude, longitude },
+      metadata: { barangay: actualBarangay, latitude, longitude, specificActivity },
     });
 
     return NextResponse.json({ success: true, photo }, { status: 201 });
@@ -141,7 +154,6 @@ export async function PATCH(request: Request) {
 
     const photo = await prisma.accomplishmentPhoto.update({
       where: { id },
-      data: updateData,
     });
 
     await logAudit({
