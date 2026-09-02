@@ -35,17 +35,52 @@ export async function GET(request: Request, { params }: { params: { id: string }
       where: whereClause,
       include: {
         beneficiary: {
-          include: {
-            restrictions: { where: { status: "ACTIVE" } },
-            dependents: true,
-            documents: true,
+          select: {
+            id: true,
+            beneficiaryNumber: true,
+            fullName: true,
+            lastName: true,
+            firstName: true,
+            middleName: true,
+            extensionName: true,
+            birthday: true,
+            sex: true,
+            civilStatus: true,
+            contactNumber: true,
+            barangay: true,
+            sitio: true,
+            municipality: true,
+            province: true,
+            occupation: true,
+            idType: true,
+            idNumber: true,
+            isSenior: true,
+            isPwd: true,
+            is4Ps: true,
+            isIp: true,
+            status: true,
+            restrictions: {
+              where: { status: "ACTIVE" },
+              select: { id: true, status: true, restrictionEnd: true, reason: true },
+            },
           },
         },
-        qrCodes: true,
-        stubDistributions: true,
-        orientationAttendance: true,
-        attendanceRecords: true,
-        payouts: true,
+        qrCodes: {
+          where: { status: "ACTIVE" },
+          select: { id: true, publicToken: true, status: true },
+        },
+        stubDistributions: {
+          select: { id: true, status: true, distributedAt: true },
+        },
+        orientationAttendance: {
+          select: { id: true, status: true, scannedAt: true },
+        },
+        attendanceRecords: {
+          select: { id: true, workDayId: true, timeInAm: true, timeOutAm: true, timeInPm: true, timeOutPm: true },
+        },
+        payouts: {
+          select: { id: true, status: true, amount: true, paidAt: true },
+        },
       },
     });
 
