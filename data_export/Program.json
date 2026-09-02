@@ -1,0 +1,32 @@
+[
+  {
+    "id": "13f05f2a-8421-4e79-93eb-c0d3075fcaac",
+    "programCode": "TUPAD-DGL-2026-09",
+    "batchNumber": "Batch 2026-09-522",
+    "programName": "10-Day TUPAD Emergency Community Employment Program",
+    "municipality": "Dingalan",
+    "province": "Aurora",
+    "doleOffice": "DOLE Regional Office III - Aurora Field Office",
+    "projectLocation": "Municipality of Dingalan (11 Barangays)",
+    "natureOfWork": "Community clean-up, coastal rehabilitation, drainage declogging, and public facilities greening.",
+    "beneficiaryCount": 1020,
+    "requiredWorkDays": 10,
+    "dailyHours": 8,
+    "morningStart": "06:00",
+    "morningEnd": "22:00",
+    "afternoonStart": "13:00",
+    "afternoonEnd": "17:00",
+    "orientationDate": "2026-09-04",
+    "orientationTime": "08:00",
+    "orientationVenue": "Municipal Gymnasium",
+    "payoutDate": "2026-09-18",
+    "payoutTime": "09:00",
+    "payoutVenue": "Dingalan Municipal Gymnasium",
+    "startDate": "2026-09-09",
+    "endDate": "2026-09-22",
+    "status": "DRAFT",
+    "createdById": "eb80515e-8ac9-4863-b198-69dab4e266d8",
+    "createdAt": 1788302228911,
+    "updatedAt": 1788316951725
+  }
+]

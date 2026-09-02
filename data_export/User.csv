@@ -1,0 +1,4 @@
+id,username,passwordHash,fullName,email,role,status,lastLoginAt,createdAt,updatedAt
+eb80515e-8ac9-4863-b198-69dab4e266d8,admin,$2a$10$FbhE97QE7bkgdXECyV8y/OTfbbQKohCB82fMGsyquO.y2/7i9o0pu,PESO Dingalan Admin Officer,peso.dingalan@aurora.gov.ph,PESO_ADMIN,ACTIVE,1788304975028,1788238607481,1788304975031
+7f3ccd18-9a4b-410a-9639-c92e49e97d28,coordinator,$2a$10$oPudFqAUgkn4f/C.vd8yzuejzshhlnyhBTS2W7EUr1VjyFOHTJ1jm,Dingalan TUPAD Field Coordinator,coordinator@dingalan.gov.ph,TUPAD_COORDINATOR,ACTIVE,1788264806980,1788238607489,1788264806983
+c26374bf-99c3-42df-a9b6-b747bba3930e,dole,$2a$10$KpBskbaV6GTxxINKO2lWd.oTellX5lQqdLXqgy4KgBWZ.7oPdEWy.,DOLE Aurora Field Officer,dole.aurora@dole.gov.ph,DOLE_COORDINATOR,ACTIVE,,1788238607495,1788238607495

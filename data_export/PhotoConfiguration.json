@@ -1,0 +1,15 @@
+[
+  {
+    "id": "476bc5d4-f3d6-4979-a438-769c04e4cada",
+    "programId": "13f05f2a-8421-4e79-93eb-c0d3075fcaac",
+    "showGps": 1,
+    "showDate": 1,
+    "showTime": 1,
+    "showBarangay": 1,
+    "showProgramName": 1,
+    "dateFormat": "MMMM DD, YYYY",
+    "gpsFormat": "DECIMAL",
+    "overlayPosition": "BOTTOM",
+    "updatedAt": 1788302228918
+  }
+]

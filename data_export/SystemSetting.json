@@ -1,0 +1,56 @@
+[
+  {
+    "key": "MUNICIPALITY",
+    "value": "Dingalan",
+    "description": "Municipality Name",
+    "updatedAt": 1788238607500
+  },
+  {
+    "key": "PROVINCE",
+    "value": "Aurora",
+    "description": "Province Name",
+    "updatedAt": 1788238607504
+  },
+  {
+    "key": "LGU_NAME",
+    "value": "Municipality of Dingalan",
+    "description": "Official LGU Header",
+    "updatedAt": 1788238607507
+  },
+  {
+    "key": "PESO_NAME",
+    "value": "Public Employment Service Office (PESO) Dingalan",
+    "description": "PESO Office",
+    "updatedAt": 1788238607512
+  },
+  {
+    "key": "DOLE_OFFICE",
+    "value": "DOLE Regional Office III - Aurora Field Office",
+    "description": "DOLE Partner Office",
+    "updatedAt": 1788238607515
+  },
+  {
+    "key": "DEFAULT_WORK_DAYS",
+    "value": "10",
+    "description": "Standard TUPAD Work Days",
+    "updatedAt": 1788238607519
+  },
+  {
+    "key": "DEFAULT_DAILY_HOURS",
+    "value": "8",
+    "description": "Standard Daily Work Hours",
+    "updatedAt": 1788238607523
+  },
+  {
+    "key": "DATE_FORMAT",
+    "value": "MMMM DD, YYYY",
+    "description": "Standard Date Display Format",
+    "updatedAt": 1788238607527
+  },
+  {
+    "key": "BARANGAYS",
+    "value": "[\"Aplaya\",\"Butas na Bato\",\"Caragsacan\",\"Davildavilan\",\"Dikapanikian\",\"Ibona\",\"Matawe\",\"Paltic\",\"Poblacion\",\"Tanawan\",\"Umiray\"]",
+    "description": "Dingalan Barangays List",
+    "updatedAt": 1788238607531
+  }
+]

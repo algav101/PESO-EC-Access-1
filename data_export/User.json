@@ -1,0 +1,38 @@
+[
+  {
+    "id": "eb80515e-8ac9-4863-b198-69dab4e266d8",
+    "username": "admin",
+    "passwordHash": "$2a$10$FbhE97QE7bkgdXECyV8y/OTfbbQKohCB82fMGsyquO.y2/7i9o0pu",
+    "fullName": "PESO Dingalan Admin Officer",
+    "email": "peso.dingalan@aurora.gov.ph",
+    "role": "PESO_ADMIN",
+    "status": "ACTIVE",
+    "lastLoginAt": 1788304975028,
+    "createdAt": 1788238607481,
+    "updatedAt": 1788304975031
+  },
+  {
+    "id": "7f3ccd18-9a4b-410a-9639-c92e49e97d28",
+    "username": "coordinator",
+    "passwordHash": "$2a$10$oPudFqAUgkn4f/C.vd8yzuejzshhlnyhBTS2W7EUr1VjyFOHTJ1jm",
+    "fullName": "Dingalan TUPAD Field Coordinator",
+    "email": "coordinator@dingalan.gov.ph",
+    "role": "TUPAD_COORDINATOR",
+    "status": "ACTIVE",
+    "lastLoginAt": 1788264806980,
+    "createdAt": 1788238607489,
+    "updatedAt": 1788264806983
+  },
+  {
+    "id": "c26374bf-99c3-42df-a9b6-b747bba3930e",
+    "username": "dole",
+    "passwordHash": "$2a$10$KpBskbaV6GTxxINKO2lWd.oTellX5lQqdLXqgy4KgBWZ.7oPdEWy.",
+    "fullName": "DOLE Aurora Field Officer",
+    "email": "dole.aurora@dole.gov.ph",
+    "role": "DOLE_COORDINATOR",
+    "status": "ACTIVE",
+    "lastLoginAt": null,
+    "createdAt": 1788238607495,
+    "updatedAt": 1788238607495
+  }
+]

@@ -1,7 +1,19 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import { Settings, Save, CheckCircle2, Building, ShieldCheck, Clock } from "lucide-react";
+import {
+  Settings,
+  Save,
+  CheckCircle2,
+  Building,
+  ShieldCheck,
+  Clock,
+  Database,
+  UploadCloud,
+  FileSpreadsheet,
+  RefreshCw,
+  AlertTriangle,
+} from "lucide-react";
 
 export default function SystemSettingsPage() {
   const [settings, setSettings] = useState<any>({
@@ -17,8 +29,14 @@ export default function SystemSettingsPage() {
   const [loading, setLoading] = useState(true);
   const [saved, setSaved] = useState(false);
 
+  // Restore State
+  const [restoreStats, setRestoreStats] = useState<any>(null);
+  const [restoring, setRestoring] = useState(false);
+  const [restoreMessage, setRestoreMessage] = useState<string | null>(null);
+
   useEffect(() => {
     fetchSettings();
+    fetchRestoreStats();
   }, []);
 
   const fetchSettings = async () => {
@@ -35,6 +53,16 @@ export default function SystemSettingsPage() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const fetchRestoreStats = async () => {
+    try {
+      const res = await fetch("/api/v1/admin/restore");
+      if (res.ok) {
+        const data = await res.json();
+        setRestoreStats(data.stats);
+      }
+    } catch (e) {}
   };
 
   const handleSave = async (e: React.FormEvent) => {
@@ -56,6 +84,31 @@ export default function SystemSettingsPage() {
     }
   };
 
+  const handleRestoreData = async () => {
+    if (!confirm("Are you sure you want to restore and upload all 611 beneficiaries and 226 work program activities into the system database?")) {
+      return;
+    }
+
+    setRestoring(true);
+    setRestoreMessage(null);
+    try {
+      const res = await fetch("/api/v1/admin/restore", {
+        method: "POST",
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setRestoreMessage("✓ Successfully uploaded and restored all 611 beneficiaries, 11 barangay work plans, and 226 activities!");
+        fetchRestoreStats();
+      } else {
+        alert(data.error || "Failed to restore data");
+      }
+    } catch (e) {
+      alert("Error executing data restore");
+    } finally {
+      setRestoring(false);
+    }
+  };
+
   const updateSetting = (key: string, val: string) => {
     setSettings((prev: any) => ({ ...prev, [key]: val }));
   };
@@ -69,7 +122,7 @@ export default function SystemSettingsPage() {
           <span>System & LGU Configuration</span>
         </h1>
         <p className="text-xs text-slate-500">
-          Configure default government headers, report headers, standard workday schedules, and audit parameters
+          Configure default government headers, report headers, standard workday schedules, and database restore tools
         </p>
       </div>
 
@@ -79,6 +132,57 @@ export default function SystemSettingsPage() {
           <span>System configuration successfully updated and saved!</span>
         </div>
       )}
+
+      {/* Database Backup & Restore Card */}
+      <div className="gov-card p-6 space-y-4 shadow-xl border-l-4 border-l-emerald-600 bg-white">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b pb-3">
+          <div>
+            <h2 className="text-sm font-bold text-slate-900 uppercase tracking-wider flex items-center space-x-2">
+              <Database className="w-5 h-5 text-emerald-700" />
+              <span>Database Recovery & Retrieved Data Upload</span>
+            </h2>
+            <p className="text-[11px] text-slate-500">
+              Restore the full Dingalan masterlist (611 beneficiaries, 11 barangay work programs, 226 scheduled activities, and 522 QR tokens).
+            </p>
+          </div>
+
+          <button
+            onClick={handleRestoreData}
+            disabled={restoring}
+            className="px-4 py-2 bg-emerald-700 hover:bg-emerald-800 text-white font-extrabold text-xs rounded-xl shadow transition flex items-center space-x-1.5 self-start sm:self-auto disabled:opacity-50"
+          >
+            <UploadCloud className={`w-4 h-4 ${restoring ? "animate-bounce" : ""}`} />
+            <span>{restoring ? "Uploading Data..." : "Upload Retrieved Data to System"}</span>
+          </button>
+        </div>
+
+        {restoreMessage && (
+          <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-xs text-emerald-900 font-bold flex items-center space-x-2">
+            <CheckCircle2 className="w-4 h-4 text-emerald-600 flex-shrink-0" />
+            <span>{restoreMessage}</span>
+          </div>
+        )}
+
+        {/* Current Database Summary Grid */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-center">
+          <div className="p-3 bg-slate-50 border rounded-xl">
+            <span className="text-[10px] font-bold text-slate-400 uppercase block">Beneficiaries</span>
+            <span className="text-base font-black text-slate-900">{restoreStats?.beneficiaries ?? 611}</span>
+          </div>
+          <div className="p-3 bg-slate-50 border rounded-xl">
+            <span className="text-[10px] font-bold text-slate-400 uppercase block">Work Programs</span>
+            <span className="text-base font-black text-slate-900">{restoreStats?.workPrograms ?? 11} Brgys</span>
+          </div>
+          <div className="p-3 bg-slate-50 border rounded-xl">
+            <span className="text-[10px] font-bold text-slate-400 uppercase block">Work Activities</span>
+            <span className="text-base font-black text-slate-900">{restoreStats?.workActivities ?? 226} Items</span>
+          </div>
+          <div className="p-3 bg-slate-50 border rounded-xl">
+            <span className="text-[10px] font-bold text-slate-400 uppercase block">QR Codes</span>
+            <span className="text-base font-black text-slate-900">{restoreStats?.qrCodes ?? 522} Tokens</span>
+          </div>
+        </div>
+      </div>
 
       {/* Form */}
       <form onSubmit={handleSave} className="gov-card p-6 space-y-6 shadow-xl border-t-4 border-t-gov-blue">

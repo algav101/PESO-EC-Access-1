@@ -1,0 +1,26 @@
+[
+  {
+    "id": "c08593f4-86aa-4c0c-b81e-393a6e0742be",
+    "beneficiaryId": "2e9d7ffc-9150-46ba-bffb-e2f881a24c5d",
+    "documentType": "ID_FRONT",
+    "fileKey": "id_front_2e9d7ffc-9150-46ba-bffb-e2f881a24c5d",
+    "fileName": "id_front.jpg",
+    "fileSize": 2048,
+    "mimeType": "image/jpeg",
+    "uploadedById": "eb80515e-8ac9-4863-b198-69dab4e266d8",
+    "verificationStatus": "VERIFIED",
+    "uploadedAt": 1788249508840
+  },
+  {
+    "id": "ec4639da-fd65-46b6-a82c-89fb9fcbaced",
+    "beneficiaryId": "2e9d7ffc-9150-46ba-bffb-e2f881a24c5d",
+    "documentType": "ID_BACK",
+    "fileKey": "id_back_2e9d7ffc-9150-46ba-bffb-e2f881a24c5d",
+    "fileName": "id_back.jpg",
+    "fileSize": 2048,
+    "mimeType": "image/jpeg",
+    "uploadedById": "eb80515e-8ac9-4863-b198-69dab4e266d8",
+    "verificationStatus": "VERIFIED",
+    "uploadedAt": 1788249508842
+  }
+]

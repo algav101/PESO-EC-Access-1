@@ -1,0 +1,82 @@
+[
+  {
+    "id": "d4decbbc-cdfb-4d6e-ab09-987cb8fd6894",
+    "programId": "13f05f2a-8421-4e79-93eb-c0d3075fcaac",
+    "dayNumber": 1,
+    "workDate": "2026-09-09",
+    "description": "Day 1 Community Work Activities",
+    "status": "SCHEDULED"
+  },
+  {
+    "id": "f050fd47-3736-4fa6-9371-cff1c9834816",
+    "programId": "13f05f2a-8421-4e79-93eb-c0d3075fcaac",
+    "dayNumber": 2,
+    "workDate": "2026-09-10",
+    "description": "Day 2 Community Work Activities",
+    "status": "SCHEDULED"
+  },
+  {
+    "id": "a1575174-6518-43c9-adda-f0256db81886",
+    "programId": "13f05f2a-8421-4e79-93eb-c0d3075fcaac",
+    "dayNumber": 3,
+    "workDate": "2026-09-11",
+    "description": "Day 3 Community Work Activities",
+    "status": "SCHEDULED"
+  },
+  {
+    "id": "f5e48db8-862b-481f-b30f-5b4313594f2d",
+    "programId": "13f05f2a-8421-4e79-93eb-c0d3075fcaac",
+    "dayNumber": 4,
+    "workDate": "2026-09-12",
+    "description": "Day 4 Community Work Activities",
+    "status": "SCHEDULED"
+  },
+  {
+    "id": "0f45fc37-4b8c-4066-8db0-b5075e2664f2",
+    "programId": "13f05f2a-8421-4e79-93eb-c0d3075fcaac",
+    "dayNumber": 5,
+    "workDate": "2026-09-14",
+    "description": "Day 5 Community Work Activities",
+    "status": "SCHEDULED"
+  },
+  {
+    "id": "56b60e4e-6414-42ca-898b-01724bf56c7d",
+    "programId": "13f05f2a-8421-4e79-93eb-c0d3075fcaac",
+    "dayNumber": 6,
+    "workDate": "2026-09-15",
+    "description": "Day 6 Community Work Activities",
+    "status": "SCHEDULED"
+  },
+  {
+    "id": "db747cf4-2035-4497-a337-0d443c3f2944",
+    "programId": "13f05f2a-8421-4e79-93eb-c0d3075fcaac",
+    "dayNumber": 7,
+    "workDate": "2026-09-16",
+    "description": "Day 7 Community Work Activities",
+    "status": "SCHEDULED"
+  },
+  {
+    "id": "eedc88f1-b22a-49b9-a946-4a94d782fa4e",
+    "programId": "13f05f2a-8421-4e79-93eb-c0d3075fcaac",
+    "dayNumber": 8,
+    "workDate": "2026-09-17",
+    "description": "Day 8 Community Work Activities",
+    "status": "SCHEDULED"
+  },
+  {
+    "id": "177db6eb-f0e5-4221-95e0-6d73369464f2",
+    "programId": "13f05f2a-8421-4e79-93eb-c0d3075fcaac",
+    "dayNumber": 9,
+    "workDate": "2026-09-18",
+    "description": "Day 9 Community Work Activities",
+    "status": "SCHEDULED"
+  },
+  {
+    "id": "12f8404d-5fa6-4c2f-b4ec-30d04f072935",
+    "programId": "13f05f2a-8421-4e79-93eb-c0d3075fcaac",
+    "dayNumber": 10,
+    "workDate": "2026-09-19",
+    "description": "Day 10 Community Work Activities",
+    "status": "SCHEDULED"
+  }
+]

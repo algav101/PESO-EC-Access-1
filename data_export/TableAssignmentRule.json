@@ -1,0 +1,52 @@
+[
+  {
+    "id": "19d01760-fb6d-42e0-92d0-b17aab3a6d92",
+    "programId": "13f05f2a-8421-4e79-93eb-c0d3075fcaac",
+    "startNumber": 1,
+    "endNumber": 100,
+    "tableNumber": "Table 1",
+    "slotGroup": "Slot Group 1 (1-100)",
+    "priority": 0,
+    "createdAt": 1788303369564
+  },
+  {
+    "id": "13f356db-0db2-4542-9e94-e5c0a2c4a99b",
+    "programId": "13f05f2a-8421-4e79-93eb-c0d3075fcaac",
+    "startNumber": 101,
+    "endNumber": 200,
+    "tableNumber": "Table 2",
+    "slotGroup": "Slot Group 2 (101-200)",
+    "priority": 1,
+    "createdAt": 1788303369566
+  },
+  {
+    "id": "acba3dad-714e-4a17-98e6-9efef452a926",
+    "programId": "13f05f2a-8421-4e79-93eb-c0d3075fcaac",
+    "startNumber": 201,
+    "endNumber": 300,
+    "tableNumber": "Table 3",
+    "slotGroup": "Slot Group 3 (201-300)",
+    "priority": 2,
+    "createdAt": 1788303369567
+  },
+  {
+    "id": "c283dfd8-ac99-439d-b10c-a5d5c4611ad8",
+    "programId": "13f05f2a-8421-4e79-93eb-c0d3075fcaac",
+    "startNumber": 301,
+    "endNumber": 400,
+    "tableNumber": "Table 4",
+    "slotGroup": "Slot Group 4 (301-400)",
+    "priority": 3,
+    "createdAt": 1788303369568
+  },
+  {
+    "id": "5ae0bb36-282c-41be-82be-e5771f02cb12",
+    "programId": "13f05f2a-8421-4e79-93eb-c0d3075fcaac",
+    "startNumber": 401,
+    "endNumber": 522,
+    "tableNumber": "Table 5",
+    "slotGroup": "Slot Group 5 (401-500)",
+    "priority": 4,
+    "createdAt": 1788303369570
+  }
+]
