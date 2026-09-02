@@ -46,11 +46,6 @@ export default function LoginPage() {
     }
   };
 
-  const handleQuickLogin = (u: string, p: string) => {
-    setUsername(u);
-    setPassword(p);
-  };
-
   return (
     <div className="min-h-[calc(100vh-4rem)] flex items-center justify-center p-4 sm:p-6 lg:p-8 bg-slate-100">
       <div className="w-full max-w-md space-y-6">
@@ -129,39 +124,6 @@ export default function LoginPage() {
               )}
             </button>
           </form>
-
-          {/* Demo Account Switcher */}
-          <div className="mt-6 pt-4 border-t border-slate-100">
-            <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400 text-center mb-2">
-              Demo Credentials (1-Click Fill)
-            </p>
-            <div className="grid grid-cols-3 gap-2">
-              <button
-                type="button"
-                onClick={() => handleQuickLogin("admin", "admin123")}
-                className="p-2 text-center rounded-lg border border-slate-200 hover:border-gov-blue bg-slate-50 hover:bg-blue-50 text-[11px] font-semibold text-slate-700 transition"
-              >
-                <div className="font-bold text-gov-blue">PESO Admin</div>
-                <div className="text-[10px] text-slate-400">admin123</div>
-              </button>
-              <button
-                type="button"
-                onClick={() => handleQuickLogin("coordinator", "coord123")}
-                className="p-2 text-center rounded-lg border border-slate-200 hover:border-gov-blue bg-slate-50 hover:bg-blue-50 text-[11px] font-semibold text-slate-700 transition"
-              >
-                <div className="font-bold text-emerald-700">Field Coord</div>
-                <div className="text-[10px] text-slate-400">coord123</div>
-              </button>
-              <button
-                type="button"
-                onClick={() => handleQuickLogin("dole", "dole123")}
-                className="p-2 text-center rounded-lg border border-slate-200 hover:border-gov-blue bg-slate-50 hover:bg-blue-50 text-[11px] font-semibold text-slate-700 transition"
-              >
-                <div className="font-bold text-purple-700">DOLE Coord</div>
-                <div className="text-[10px] text-slate-400">dole123</div>
-              </button>
-            </div>
-          </div>
         </div>
 
         {/* Security Notice */}
