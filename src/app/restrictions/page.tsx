@@ -14,11 +14,13 @@ import {
   X,
   AlertTriangle,
   RefreshCw,
+  Building,
+  UserCheck,
 } from "lucide-react";
 import { StatusBadge } from "@/components/common/StatusBadge";
-import { formatDistanceToNow, parseISO, isAfter } from "date-fns";
 import * as XLSX from "xlsx";
 import { useAuth } from "@/context/AuthContext";
+import Link from "next/link";
 
 export default function RestrictionsPage() {
   const { user } = useAuth();
@@ -69,34 +71,28 @@ export default function RestrictionsPage() {
         const ws = wb.Sheets[wb.SheetNames[0]];
         const data: any[] = XLSX.utils.sheet_to_json(ws, { defval: "" });
 
-        const previewRows = data.slice(0, 10).map((row, idx) => {
+        const previewRows = data.slice(0, 8).map((row, idx) => {
           const name =
+            row["NAME OF BENEFICIARIES"] ||
+            row["NAME OF BENEFICIARY"] ||
             row["FULL NAME"] ||
             row["BENEFICIARY NAME"] ||
             row["NAME"] ||
-            row["fullname"] ||
-            (row["FIRST NAME"] && row["LAST NAME"] ? `${row["LAST NAME"]}, ${row["FIRST NAME"]}` : `Row ${idx + 1}`);
+            `Row ${idx + 1}`;
 
-          const bday = row["BIRTHDAY (YYYY-MM-DD)"] || row["BIRTHDAY"] || row["DOB"] || row["DATE OF BIRTH"] || "1990-01-01";
-          const payout = row["PAYOUT DATE (YYYY-MM-DD)"] || row["PAYOUT DATE"] || row["DATE OF PAYOUT"] || new Date().toISOString().split("T")[0];
-          const program = row["SOURCE PROGRAM NAME"] || row["PROGRAM"] || "Historical TUPAD Batch";
-
-          let lockoutEnd = "";
-          try {
-            const d = new Date(payout);
-            d.setFullYear(d.getFullYear() + 1);
-            lockoutEnd = d.toISOString().split("T")[0];
-          } catch {
-            lockoutEnd = "1 Year Lockout";
-          }
+          const adl = row["ADL NO."] || row["ADL NO"] || row["BARANGAY APPOINTIVE POSITION"] || "HISTORICAL_BATCH";
+          const workDate = row["WORK DATE"] || row["WORK DURATION DATE"] || "N/A";
+          const payout = row["PAYOUT DATE"] || row["PAYOUT DATE (YYYY-MM-DD)"] || "N/A";
+          const brgy = row["Barangay"] || row["BARANGAY"] || "BUHANGIN";
+          const city = row["City/ Municipality"] || row["MUNICIPALITY"] || "BALER";
 
           return {
             name: String(name).toUpperCase(),
-            birthday: String(bday),
-            payoutDate: String(payout),
-            lockoutEnd,
-            program: String(program),
-            status: name && bday ? "VALID" : "INCOMPLETE",
+            adl: String(adl),
+            workDate: String(workDate),
+            payout: String(payout),
+            barangay: String(brgy),
+            city: String(city),
           };
         });
 
@@ -144,7 +140,10 @@ export default function RestrictionsPage() {
 
   const filtered = restrictions.filter((r) => {
     const name = r.beneficiary?.fullName?.toLowerCase() || "";
-    return name.includes(searchQuery.toLowerCase());
+    const adl = r.adlNo?.toLowerCase() || "";
+    const brgy = (r.barangay || r.beneficiary?.barangay || "").toLowerCase();
+    const query = searchQuery.toLowerCase();
+    return name.includes(query) || adl.includes(query) || brgy.includes(query);
   });
 
   return (
@@ -153,53 +152,64 @@ export default function RestrictionsPage() {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight flex items-center space-x-2">
-            <ShieldAlert className="w-6 h-6 text-rose-600" />
-            <span>365-Day Restriction Compliance Database</span>
+            <ShieldAlert className="w-6 h-6 text-gov-blue" />
+            <span>TUPAD 320-Day & Appointive Restriction Registry</span>
           </h1>
           <p className="text-xs text-slate-500">
-            Automated registry of beneficiaries who received TUPAD payouts within the statutory 365-day lockout window
+            Enforces the 320-day payout interval & Barangay Appointive Personnel disqualification policies
           </p>
         </div>
 
         <div className="flex flex-wrap items-center gap-2 self-start sm:self-auto">
+          <Link
+            href="/restrictions/checker"
+            className="px-4 py-2 bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-xs rounded-xl shadow transition flex items-center space-x-1.5"
+          >
+            <UserCheck className="w-4 h-4 text-emerald-200" />
+            <span>Open Eligibility Checker</span>
+          </Link>
+
+          <a
+            href="/api/v1/restrictions/template"
+            className="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl border border-slate-300 shadow-xs flex items-center space-x-1.5 transition"
+          >
+            <Download className="w-4 h-4 text-slate-600" />
+            <span>Excel Template</span>
+          </a>
+
           {isAdmin && (
             <button
               onClick={() => setIsUploadModalOpen(true)}
-              className="px-4 py-2 bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-xs rounded-xl shadow flex items-center space-x-1.5 transition"
+              className="px-4 py-2 bg-gov-blue hover:bg-gov-dark text-white font-bold text-xs rounded-xl shadow flex items-center space-x-1.5 transition"
             >
-              <UploadCloud className="w-4 h-4 text-emerald-200" />
-              <span>Upload Restriction Masterlist</span>
+              <UploadCloud className="w-4 h-4 text-gov-goldLight" />
+              <span>Upload Reference List</span>
             </button>
           )}
-
-          <a
-            href="/restrictions/checker"
-            className="px-4 py-2 bg-gov-blue hover:bg-gov-light text-white font-bold text-xs rounded-xl shadow flex items-center space-x-1.5 transition"
-          >
-            <Search className="w-4 h-4 text-gov-goldLight" />
-            <span>Real-Time Eligibility Checker</span>
-          </a>
         </div>
       </div>
 
-      {/* Search Bar & Stats */}
-      <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
-        <div className="sm:col-span-3 gov-card p-3 flex items-center">
-          <div className="relative w-full">
-            <Search className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search restricted beneficiaries by full name..."
-              className="w-full pl-9 pr-3 py-1.5 text-xs border border-slate-300 rounded-lg focus:outline-none focus:border-gov-blue bg-white"
-            />
-          </div>
+      {/* Quick Search & Summary Stats */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="gov-card p-3 md:col-span-2 flex items-center space-x-2">
+          <Search className="w-4 h-4 text-slate-400" />
+          <input
+            type="text"
+            placeholder="Search by Beneficiary Name, ADL No., or Barangay..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full text-xs font-bold focus:outline-none bg-transparent"
+          />
+          {searchQuery && (
+            <button onClick={() => setSearchQuery("")} className="text-slate-400 hover:text-slate-600 text-xs">
+              ✕
+            </button>
+          )}
         </div>
 
         <div className="gov-card p-3 flex items-center justify-between bg-rose-50/50 border border-rose-200">
           <div>
-            <span className="text-[10px] font-bold text-rose-700 uppercase block">Active Restrictions</span>
+            <span className="text-[10px] font-bold text-rose-700 uppercase block">Registered Lockouts</span>
             <span className="text-base font-black text-rose-900">{restrictions.length} Individuals</span>
           </div>
           <ShieldCheck className="w-6 h-6 text-rose-600 opacity-80" />
@@ -210,7 +220,7 @@ export default function RestrictionsPage() {
       <div className="gov-card overflow-hidden">
         <div className="p-4 bg-slate-50 border-b flex items-center justify-between">
           <span className="text-xs font-bold text-slate-800 uppercase tracking-wider">
-            Restricted Individuals ({filtered.length})
+            Disqualified / Restricted Beneficiaries ({filtered.length})
           </span>
           <button
             onClick={() => fetchRestrictions()}
@@ -231,10 +241,10 @@ export default function RestrictionsPage() {
               <thead className="bg-slate-100 text-slate-700 font-bold uppercase text-[10px] border-b">
                 <tr>
                   <th className="px-4 py-3">Beneficiary Name</th>
-                  <th className="px-4 py-3">Birthday</th>
-                  <th className="px-4 py-3">Source Program</th>
+                  <th className="px-4 py-3">ADL No. / Appointive Position</th>
+                  <th className="px-4 py-3">Work Duration Date</th>
                   <th className="px-4 py-3">Payout Date</th>
-                  <th className="px-4 py-3">Lockout Start</th>
+                  <th className="px-4 py-3">Location</th>
                   <th className="px-4 py-3">Eligible Again On</th>
                   <th className="px-4 py-3">Status</th>
                 </tr>
@@ -243,13 +253,17 @@ export default function RestrictionsPage() {
                 {filtered.map((r) => (
                   <tr key={r.id} className="hover:bg-slate-50">
                     <td className="px-4 py-3 font-bold text-slate-900">{r.beneficiary?.fullName}</td>
-                    <td className="px-4 py-3 font-mono text-slate-600">{r.beneficiary?.birthday}</td>
-                    <td className="px-4 py-3 text-slate-700">
-                      {r.sourceProgram?.programName || r.reason || "Historical TUPAD Batch"}
+                    <td className="px-4 py-3 font-mono text-[11px] text-gov-blue font-semibold">
+                      {r.adlNo || "Batch Reference"}
                     </td>
-                    <td className="px-4 py-3 font-mono text-slate-600">{formatDate(r.payoutDate, "yyyy-MM-dd")}</td>
-                    <td className="px-4 py-3 font-mono text-slate-600">{r.restrictionStart}</td>
-                    <td className="px-4 py-3 font-mono font-bold text-rose-700">{r.restrictionEnd}</td>
+                    <td className="px-4 py-3 text-slate-700">{r.workDate || "10-Day Work"}</td>
+                    <td className="px-4 py-3 font-mono text-slate-700">{r.payoutDate}</td>
+                    <td className="px-4 py-3 text-slate-600">
+                      {r.barangay || r.beneficiary?.barangay}, {r.municipality || r.beneficiary?.municipality}
+                    </td>
+                    <td className="px-4 py-3 font-mono font-bold text-rose-700">
+                      {r.isAppointivePersonnel ? "Permanent (Barangay Appointive)" : r.restrictionEnd}
+                    </td>
                     <td className="px-4 py-3">
                       <StatusBadge status={r.status} />
                     </td>
@@ -268,7 +282,7 @@ export default function RestrictionsPage() {
             <div className="flex items-center justify-between border-b pb-3">
               <div className="flex items-center space-x-2">
                 <FileSpreadsheet className="w-5 h-5 text-emerald-700" />
-                <h2 className="text-base font-black text-slate-900">Upload 365-Day Restriction Masterlist</h2>
+                <h2 className="text-base font-black text-slate-900">Upload Disqualified Reference Masterlist</h2>
               </div>
               <button
                 onClick={() => setIsUploadModalOpen(false)}
@@ -287,14 +301,16 @@ export default function RestrictionsPage() {
               <div className="space-y-4 text-xs">
                 <p className="text-slate-600">
                   Upload historical payout records or prior batch masterlists (.XLSX / .CSV) to automatically register
-                  statutory 365-day lockout periods and prevent double compensation during upcoming program intakes.
+                  statutory 320-day payout lockouts and Barangay Appointive Personnel restrictions.
                 </p>
 
                 {/* Template Download Box */}
                 <div className="p-3 bg-blue-50 border border-blue-200 rounded-xl flex items-center justify-between">
                   <div className="space-y-0.5">
-                    <span className="font-bold text-gov-blue block">Official Restriction Template</span>
-                    <span className="text-[11px] text-slate-500">Includes Full Name, Birthday, Barangay, and Payout Date headers.</span>
+                    <span className="font-bold text-gov-blue block">Official Reference Template</span>
+                    <span className="text-[11px] text-slate-500 font-mono">
+                      [A] NAME OF BENEFICIARIES • [B] ADL NO. • [C] ORIENTATION DATE • [D] WORK DATE • [E] PAYOUT DATE • [F] Barangay • [G] City/ Municipality
+                    </span>
                   </div>
                   <a
                     href="/api/v1/restrictions/template"
@@ -339,18 +355,20 @@ export default function RestrictionsPage() {
                         <thead className="bg-slate-100 text-slate-700 font-bold border-b sticky top-0">
                           <tr>
                             <th className="p-2">Name</th>
-                            <th className="p-2">Birthday</th>
+                            <th className="p-2">ADL No. / Position</th>
+                            <th className="p-2">Work Date</th>
                             <th className="p-2">Payout Date</th>
-                            <th className="p-2">Lockout Expiration</th>
+                            <th className="p-2">Location</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100">
                           {parsedPreview.map((r, i) => (
                             <tr key={i}>
                               <td className="p-2 font-bold text-slate-900">{r.name}</td>
-                              <td className="p-2 font-mono text-slate-600">{r.birthday}</td>
-                              <td className="p-2 font-mono text-slate-600">{r.payoutDate}</td>
-                              <td className="p-2 font-mono font-bold text-rose-700">{r.lockoutEnd}</td>
+                              <td className="p-2 font-mono text-slate-600">{r.adl}</td>
+                              <td className="p-2 text-slate-600">{r.workDate}</td>
+                              <td className="p-2 font-mono text-slate-600">{r.payout}</td>
+                              <td className="p-2 text-slate-600">{r.barangay}, {r.city}</td>
                             </tr>
                           ))}
                         </tbody>
@@ -381,7 +399,7 @@ export default function RestrictionsPage() {
                     ) : (
                       <>
                         <CheckCircle className="w-4 h-4" />
-                        <span>Commit Restrictions to Database</span>
+                        <span>Commit Records to Database</span>
                       </>
                     )}
                   </button>

@@ -2,19 +2,73 @@ import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth";
 
+function parsePayoutDateToTimestamp(payoutDateStr: string): number {
+  if (!payoutDateStr) return 0;
+  const parsed = new Date(payoutDateStr);
+  if (!isNaN(parsed.getTime())) return parsed.getTime();
+
+  // Try parsing formats like "September 13, 2025" or "Sept. 13, 2025"
+  const clean = payoutDateStr.replace(/Sept\./i, "Sep").replace(/Aug\./i, "Aug");
+  const p2 = new Date(clean);
+  if (!isNaN(p2.getTime())) return p2.getTime();
+
+  return 0;
+}
+
 export async function GET(request: Request) {
   try {
-    const user = await getCurrentUser();
-    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-
     const { searchParams } = new URL(request.url);
-    const query = searchParams.get("q");
+    const query = searchParams.get("q")?.trim();
+    const isSuggestions = searchParams.get("suggestions") === "1" || searchParams.get("type") === "suggestions";
+
+    if (isSuggestions && query) {
+      const qUpper = query.toUpperCase();
+
+      // Find at least 5 matching suggestions across Beneficiary and Restrictions
+      const restrictions = await prisma.beneficiaryRestriction.findMany({
+        where: {
+          OR: [
+            { beneficiary: { fullName: { contains: qUpper, mode: "insensitive" } } },
+            { beneficiary: { lastName: { contains: qUpper, mode: "insensitive" } } },
+            { beneficiary: { firstName: { contains: qUpper, mode: "insensitive" } } },
+            { adlNo: { contains: qUpper, mode: "insensitive" } },
+          ],
+        },
+        include: {
+          beneficiary: true,
+        },
+        take: 10,
+        orderBy: { createdAt: "desc" },
+      });
+
+      const suggestions = restrictions.map((r) => {
+        const b = r.beneficiary;
+        return {
+          id: r.id,
+          fullName: b?.fullName || "",
+          firstName: b?.firstName || "",
+          middleName: b?.middleName || "",
+          lastName: b?.lastName || "",
+          extensionName: b?.extensionName || "",
+          adlNo: r.adlNo || "",
+          workDate: r.workDate || "",
+          payoutDate: r.payoutDate || "",
+          barangay: r.barangay || b?.barangay || "",
+          municipality: r.municipality || b?.municipality || "Dingalan",
+          isAppointive: r.isAppointivePersonnel,
+        };
+      });
+
+      return NextResponse.json({ suggestions });
+    }
 
     const whereClause: any = {};
     if (query) {
-      whereClause.beneficiary = {
-        fullName: { contains: query },
-      };
+      whereClause.OR = [
+        { beneficiary: { fullName: { contains: query, mode: "insensitive" } } },
+        { adlNo: { contains: query, mode: "insensitive" } },
+        { barangay: { contains: query, mode: "insensitive" } },
+      ];
     }
 
     const restrictions = await prisma.beneficiaryRestriction.findMany({
@@ -23,7 +77,8 @@ export async function GET(request: Request) {
         beneficiary: true,
         sourceProgram: true,
       },
-      orderBy: { restrictionEnd: "desc" },
+      orderBy: { createdAt: "desc" },
+      take: 100,
     });
 
     return NextResponse.json({ restrictions });
@@ -35,41 +90,150 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
-    const { fullName, birthday } = await request.json();
+    const body = await request.json();
+    const { firstName = "", middleName = "", lastName = "", extensionName = "", fullName: rawFullName = "" } = body;
 
-    if (!fullName || !birthday) {
-      return NextResponse.json({ error: "Full name and birthday are required" }, { status: 400 });
+    const fName = firstName.trim().toUpperCase();
+    const mName = middleName.trim().toUpperCase();
+    const lName = lastName.trim().toUpperCase();
+    const extName = extensionName.trim().toUpperCase();
+
+    let combinedTargetName = rawFullName.trim().toUpperCase();
+
+    if (!combinedTargetName) {
+      if (lName && fName) {
+        const middlePart = mName ? ` ${mName}` : "";
+        const extPart = extName ? ` ${extName}` : "";
+        combinedTargetName = `${lName}, ${fName}${middlePart}${extPart}`;
+      } else if (fName) {
+        combinedTargetName = fName;
+      }
     }
 
-    const todayStr = new Date().toISOString().split("T")[0];
-    const restriction = await prisma.beneficiaryRestriction.findFirst({
-      where: {
-        beneficiary: {
-          fullName: fullName.trim().toUpperCase(),
-          birthday,
-        },
-        status: "ACTIVE",
-        restrictionEnd: { gte: todayStr },
-      },
-      include: {
-        sourceProgram: true,
-      },
-    });
+    if (!combinedTargetName && !lName && !fName) {
+      return NextResponse.json(
+        { error: "Please provide at least a First Name or Last Name to evaluate eligibility." },
+        { status: 400 }
+      );
+    }
 
-    if (restriction) {
-      return NextResponse.json({
-        eligible: false,
-        restricted: true,
-        restrictionEnd: restriction.restrictionEnd,
-        reason: restriction.reason,
-        programName: restriction.sourceProgram?.programName,
+    // Build flexible search conditions
+    const orConditions: any[] = [];
+
+    if (combinedTargetName) {
+      orConditions.push({ beneficiary: { fullName: { contains: combinedTargetName, mode: "insensitive" } } });
+      // Also try inverted "FIRSTNAME LASTNAME"
+      if (lName && fName) {
+        orConditions.push({ beneficiary: { fullName: { contains: `${fName} ${lName}`, mode: "insensitive" } } });
+        orConditions.push({ beneficiary: { fullName: { contains: `${lName}, ${fName}`, mode: "insensitive" } } });
+      }
+    }
+
+    if (lName && fName) {
+      orConditions.push({
+        AND: [
+          { beneficiary: { fullName: { contains: lName, mode: "insensitive" } } },
+          { beneficiary: { fullName: { contains: fName, mode: "insensitive" } } },
+        ],
+      });
+      orConditions.push({
+        AND: [
+          { beneficiary: { lastName: { contains: lName, mode: "insensitive" } } },
+          { beneficiary: { firstName: { contains: fName, mode: "insensitive" } } },
+        ],
       });
     }
 
+    const restriction = await prisma.beneficiaryRestriction.findFirst({
+      where: {
+        OR: orConditions.length > 0 ? orConditions : [{ beneficiary: { fullName: { contains: fName } } }],
+      },
+      include: {
+        beneficiary: true,
+        sourceProgram: true,
+      },
+      orderBy: { createdAt: "desc" },
+    });
+
+    const now = new Date();
+    const presentDateStr = now.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" });
+
+    if (restriction) {
+      const beneName = restriction.beneficiary?.fullName || combinedTargetName;
+      const payoutDateStr = restriction.payoutDate;
+      const payoutTimestamp = parsePayoutDateToTimestamp(payoutDateStr);
+
+      let isDisqualified = false;
+      let daysElapsed = 0;
+      let daysRemaining = 0;
+      let eligibilityDateFormatted = "";
+      let disqualificationReason = "";
+
+      // Check Appointive Personnel Rule
+      const isAppointive = restriction.isAppointivePersonnel || (restriction.adlNo && /BHW|TANOD|OFFICIAL|TREASURER|SECRETARY|COUNCIL|STAFF|APPOINTIVE/i.test(restriction.adlNo));
+
+      if (isAppointive) {
+        isDisqualified = true;
+        disqualificationReason = `Disqualified: Active Barangay Appointive Personnel / Government Employee (${restriction.adlNo || "Appointive Position"}). Government and Barangay personnel are strictly barred from TUPAD emergency employment under DOLE guidelines.`;
+      } else if (payoutTimestamp > 0) {
+        // Check 320 Days Rule
+        daysElapsed = Math.floor((now.getTime() - payoutTimestamp) / (1000 * 60 * 60 * 24));
+
+        if (daysElapsed < 320) {
+          isDisqualified = true;
+          daysRemaining = 320 - daysElapsed;
+          const eligibleTimestamp = payoutTimestamp + 320 * 24 * 60 * 60 * 1000;
+          const eligibleDate = new Date(eligibleTimestamp);
+          eligibilityDateFormatted = eligibleDate.toLocaleDateString("en-US", {
+            month: "long",
+            day: "numeric",
+            year: "numeric",
+          });
+
+          disqualificationReason = `Disqualified: Received TUPAD payout on ${payoutDateStr} (${daysElapsed} days ago). DOLE guidelines require a minimum 320-day interval between TUPAD availments. Eligible on ${eligibilityDateFormatted} (${daysRemaining} days remaining).`;
+        } else {
+          isDisqualified = false;
+          disqualificationReason = `Eligible: Previous TUPAD payout was on ${payoutDateStr} (${daysElapsed} days ago, exceeding the mandatory 320-day interval).`;
+        }
+      } else {
+        // Restriction without timestamp
+        isDisqualified = restriction.status === "ACTIVE";
+        disqualificationReason = restriction.reason || "Active restriction recorded in compliance database.";
+      }
+
+      return NextResponse.json({
+        eligible: !isDisqualified,
+        disqualified: isDisqualified,
+        name: beneName,
+        workDurationDate: restriction.workDate || "10-Day Work Program",
+        payoutDate: restriction.payoutDate || "N/A",
+        orientationDate: restriction.orientationDate || "N/A",
+        adlNo: restriction.adlNo || "HISTORICAL_BATCH",
+        barangay: restriction.barangay || restriction.beneficiary?.barangay || "BUHANGIN",
+        municipality: restriction.municipality || restriction.beneficiary?.municipality || "BALER",
+        reason: disqualificationReason,
+        daysElapsed,
+        daysRemaining,
+        eligibilityDate: eligibilityDateFormatted || restriction.restrictionEnd || "N/A",
+        isAppointivePersonnel: Boolean(isAppointive),
+        presentDate: presentDateStr,
+        sourceProgram: restriction.sourceProgram?.programName,
+      });
+    }
+
+    // No disqualifying record found
+    const displayedName = combinedTargetName || `${fName} ${lName}`;
     return NextResponse.json({
       eligible: true,
-      restricted: false,
-      message: "Beneficiary is eligible for TUPAD participation.",
+      disqualified: false,
+      name: displayedName,
+      workDurationDate: "None Recorded",
+      payoutDate: "No Previous Payout Lockout",
+      adlNo: "None (Clean Registry)",
+      barangay: "Verified Clean",
+      municipality: "Dingalan / Baler",
+      reason: "Eligible: No active 320-day payout lockout or Barangay Appointive Personnel disqualification found in the registry.",
+      presentDate: presentDateStr,
     });
   } catch (error: any) {
     console.error("POST restrictions check error:", error);

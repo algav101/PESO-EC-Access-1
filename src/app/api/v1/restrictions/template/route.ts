@@ -5,51 +5,73 @@ export async function GET() {
   try {
     const sampleData = [
       {
-        "FULL NAME": "DELA CRUZ, JUAN M.",
-        "BIRTHDAY (YYYY-MM-DD)": "1985-04-12",
-        "BARANGAY": "PALTIC",
-        "PAYOUT DATE (YYYY-MM-DD)": "2026-03-15",
-        "SOURCE PROGRAM NAME": "TUPAD Batch 2026-01 Emergency Employment",
-        "RESTRICTION REASON": "365-Day Statutory Double Compensation Lockout",
+        "NAME OF BENEFICIARIES": "ALCANTARA, VILMA SANTILESES",
+        "ADL NO.": "2025_03_0318_RO3_LAWAATBINHI",
+        "ORIENTATION DATE": "July 22, 2025",
+        "WORK DATE": "Aug. 4-Sept. 5, 2025",
+        "PAYOUT DATE": "September 13, 2025",
+        "Barangay": "BUHANGIN",
+        "City/ Municipality": "BALER",
       },
       {
-        "FULL NAME": "SANTOS, MARIA L.",
-        "BIRTHDAY (YYYY-MM-DD)": "1990-08-23",
-        "BARANGAY": "POBLACION",
-        "PAYOUT DATE (YYYY-MM-DD)": "2026-05-20",
-        "SOURCE PROGRAM NAME": "TUPAD Batch 2026-02 Agro-Forestry Project",
-        "RESTRICTION REASON": "Received 10-Day Payout in 2026",
+        "NAME OF BENEFICIARIES": "BASQUIÑA, LARA QUEEN DOSAYEN",
+        "ADL NO.": "2025_03_0318_RO3_LAWAATBINHI",
+        "ORIENTATION DATE": "July 22, 2025",
+        "WORK DATE": "Aug. 4-Sept. 5, 2025",
+        "PAYOUT DATE": "September 13, 2025",
+        "Barangay": "BUHANGIN",
+        "City/ Municipality": "BALER",
       },
       {
-        "FULL NAME": "REYES, PEDRO S.",
-        "BIRTHDAY (YYYY-MM-DD)": "1978-11-05",
-        "BARANGAY": "APLAYA",
-        "PAYOUT DATE (YYYY-MM-DD)": "2026-06-10",
-        "SOURCE PROGRAM NAME": "TUPAD Batch 2026-03 Coastal Clean-up",
-        "RESTRICTION REASON": "Statutory 365-Day Lockout",
+        "NAME OF BENEFICIARIES": "CEREZO, MA. THERESA PEROLINA",
+        "ADL NO.": "2025_03_0318_RO3_LAWAATBINHI",
+        "ORIENTATION DATE": "July 22, 2025",
+        "WORK DATE": "Aug. 4-Sept. 5, 2025",
+        "PAYOUT DATE": "September 13, 2025",
+        "Barangay": "BUHANGIN",
+        "City/ Municipality": "BALER",
+      },
+      {
+        "NAME OF BENEFICIARIES": "DEL CORO, MA. CRISTINA AMOR",
+        "ADL NO.": "Barangay Appointive Personnel - BHW",
+        "ORIENTATION DATE": "July 22, 2025",
+        "WORK DATE": "Aug. 4-Sept. 5, 2025",
+        "PAYOUT DATE": "September 13, 2025",
+        "Barangay": "BUHANGIN",
+        "City/ Municipality": "BALER",
+      },
+      {
+        "NAME OF BENEFICIARIES": "LUMBAN, ERNESTO MANABAT JR.",
+        "ADL NO.": "Barangay Appointive Personnel - Tanod",
+        "ORIENTATION DATE": "August 01, 2025",
+        "WORK DATE": "Aug. 10-Aug. 25, 2025",
+        "PAYOUT DATE": "September 05, 2025",
+        "Barangay": "PALTIC",
+        "City/ Municipality": "DINGALAN",
       },
     ];
 
     const wb = XLSX.utils.book_new();
     const ws = XLSX.utils.json_to_sheet(sampleData);
 
-    // Set column widths
+    // Column widths matching reference
     ws["!cols"] = [
-      { wch: 28 }, // Full Name
-      { wch: 24 }, // Birthday
+      { wch: 34 }, // NAME OF BENEFICIARIES
+      { wch: 36 }, // ADL NO.
+      { wch: 20 }, // ORIENTATION DATE
+      { wch: 24 }, // WORK DATE
+      { wch: 22 }, // PAYOUT DATE
       { wch: 18 }, // Barangay
-      { wch: 26 }, // Payout Date
-      { wch: 45 }, // Source Program
-      { wch: 45 }, // Reason
+      { wch: 22 }, // City/ Municipality
     ];
 
-    XLSX.utils.book_append_sheet(wb, ws, "365_Day_Restrictions_Template");
+    XLSX.utils.book_append_sheet(wb, ws, "Disqualified_Beneficiaries");
     const buf = XLSX.write(wb, { type: "buffer", bookType: "xlsx" });
 
     return new NextResponse(buf, {
       status: 200,
       headers: {
-        "Content-Disposition": 'attachment; filename="TUPAD_365_Day_Restriction_Database_Template.xlsx"',
+        "Content-Disposition": 'attachment; filename="TUPAD_Disqualified_Beneficiaries_Reference_Template.xlsx"',
         "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
       },
     });

@@ -414,10 +414,16 @@ model BeneficiaryRestriction {
   dependent        Dependent?   @relation(fields: [dependentId], references: [id], onDelete: SetNull)
   sourceProgramId  String?
   sourceProgram    Program?     @relation(fields: [sourceProgramId], references: [id], onDelete: SetNull)
-  payoutDate       String       // YYYY-MM-DD
-  restrictionStart String       // YYYY-MM-DD
-  restrictionEnd   String       // YYYY-MM-DD (+365 days)
-  reason           String       @default("365-day TUPAD payout restriction")
+  payoutDate       String       // YYYY-MM-DD or formatted date
+  restrictionStart String?      // YYYY-MM-DD
+  restrictionEnd   String?      // YYYY-MM-DD (+320/365 days)
+  adlNo            String?      // ADL No. or Barangay Appointive Position (e.g. 2025_03_0318_RO3_LAWAATBINHI, BHW, Tanod)
+  workDate         String?      // Work duration date (e.g. Aug. 4-Sept. 5, 2025)
+  orientationDate  String?      // Orientation date (e.g. July 22, 2025)
+  barangay         String?      // Barangay (e.g. BUHANGIN, Paltic)
+  municipality     String?      // City/Municipality (e.g. BALER, Dingalan)
+  isAppointivePersonnel Boolean @default(false)
+  reason           String       @default("320-day TUPAD payout restriction")
   status           String       @default("ACTIVE") // ACTIVE, OVERRIDDEN, EXPIRED
   createdAt        DateTime     @default(now())
 }
