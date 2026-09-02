@@ -163,6 +163,29 @@ export async function POST(request: Request) {
             conflicts.push(clientTransactionId);
             continue;
           }
+        } else if (entityType === "PHOTO") {
+          const { programId, workDayId, workProgramItemId, barangay, sitio, workArea, specificActivity, fileKey, fileName, latitude, longitude, capturedAt } = payload;
+          await prisma.accomplishmentPhoto.create({
+            data: {
+              programId,
+              workDayId: workDayId || null,
+              workProgramItemId: workProgramItemId || null,
+              barangay: barangay || "Paltic",
+              sitio: sitio || null,
+              workArea: workArea || sitio || null,
+              specificActivity: specificActivity || null,
+              fileKey: fileKey || `photo_offline_${Date.now()}`,
+              fileName: fileName || "accomplishment_photo.jpg",
+              latitude: latitude ? Number(latitude) : 15.3941,
+              longitude: longitude ? Number(longitude) : 121.3965,
+              capturedAt: capturedAt ? new Date(capturedAt) : new Date(),
+              uploadedById: user?.id || (await prisma.user.findFirst())?.id || "",
+              status: user?.role === "PESO_ADMIN" ? "APPROVED" : "FOR_REVIEW",
+              approvedById: user?.role === "PESO_ADMIN" ? user.id : null,
+              approvedAt: user?.role === "PESO_ADMIN" ? new Date() : null,
+            },
+          });
+          accepted.push(clientTransactionId);
         } else {
           failed.push(clientTransactionId);
           continue;

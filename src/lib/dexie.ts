@@ -95,7 +95,11 @@ export async function queueOfflineTransaction(
 
 export async function getPendingQueueCount(): Promise<number> {
   if (typeof window === "undefined") return 0;
-  return await offlineDb.offlineQueue.where("status").equals("PENDING").count();
+  try {
+    return await offlineDb.offlineQueue.where("status").equals("PENDING").count();
+  } catch (e) {
+    return 0;
+  }
 }
 
 export async function pushSyncQueue() {
@@ -132,5 +136,99 @@ export async function pushSyncQueue() {
   } catch (error: any) {
     console.error("Sync push error:", error);
     return { accepted: 0, failed: pending.length, error: error.message };
+  }
+}
+
+/**
+ * Automatically initializes and caches the active programs and the user's
+ * assigned barangay beneficiaries into IndexedDB.
+ */
+export async function initializeUserOfflineCache(user?: {
+  id?: string;
+  role?: string;
+  assignedBarangay?: string | null;
+}) {
+  if (typeof window === "undefined") return;
+
+  try {
+    const progRes = await fetch("/api/v1/programs");
+    if (!progRes.ok) return;
+    const { programs } = await progRes.json();
+    if (!programs || programs.length === 0) return;
+
+    for (const prog of programs) {
+      await offlineDb.cachedPrograms.put({
+        id: prog.id,
+        programCode: prog.programCode,
+        programName: prog.programName,
+        municipality: prog.municipality || "Dingalan",
+        province: prog.province || "Aurora",
+        status: prog.status,
+        requiredWorkDays: prog.requiredWorkDays || 10,
+        morningStart: prog.morningStart,
+        morningEnd: prog.morningEnd,
+        afternoonStart: prog.afternoonStart,
+        afternoonEnd: prog.afternoonEnd,
+        orientationDate: prog.orientationDate,
+        payoutDate: prog.payoutDate,
+      });
+
+      // Work Days
+      for (const wd of prog.workDays || []) {
+        await offlineDb.cachedWorkDays.put({
+          id: wd.id,
+          programId: prog.id,
+          dayNumber: wd.dayNumber,
+          workDate: wd.workDate,
+          status: wd.status,
+        });
+      }
+
+      // Fetch Beneficiaries (scoped if coordinator)
+      let beneUrl = `/api/v1/programs/${prog.id}/beneficiaries`;
+      if (user?.role === "TUPAD_COORDINATOR" && user.assignedBarangay) {
+        beneUrl += `?barangay=${encodeURIComponent(user.assignedBarangay)}`;
+      }
+
+      const beneRes = await fetch(beneUrl);
+      if (beneRes.ok) {
+        const { beneficiaries } = await beneRes.json();
+        for (const pb of beneficiaries || []) {
+          const activeQr = pb.qrCodes?.find((q: any) => q.status === "ACTIVE");
+          let birthdayPin = pb.beneficiary?.birthday || "";
+          if (birthdayPin) {
+            const parts = birthdayPin.split("-");
+            if (parts.length === 3 && parts[0].length === 4) {
+              birthdayPin = `${parts[1]}-${parts[2]}-${parts[0]}`;
+            }
+          }
+
+          await offlineDb.cachedBeneficiaries.put({
+            id: pb.id,
+            programId: prog.id,
+            beneficiaryId: pb.beneficiaryId,
+            designatedNumber: pb.designatedNumber,
+            fullName: pb.beneficiary?.fullName || "",
+            birthday: pb.beneficiary?.birthday || "",
+            birthdayPin,
+            barangay: pb.beneficiary?.barangay || "",
+            sitio: pb.beneficiary?.sitio || "",
+            tableNumber: pb.tableNumber || "",
+            qrToken: activeQr?.publicToken || "",
+            status: pb.participationStatus || "ACTIVE",
+          });
+        }
+      }
+    }
+
+    localStorage.setItem("tupad_last_offline_sync", new Date().toISOString());
+    localStorage.setItem(
+      "tupad_offline_scope",
+      user?.role === "TUPAD_COORDINATOR" && user.assignedBarangay
+        ? `Barangay ${user.assignedBarangay}`
+        : "Municipality-wide"
+    );
+  } catch (e) {
+    console.warn("Offline cache initialization warning:", e);
   }
 }

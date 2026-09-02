@@ -1,138 +1,170 @@
 "use client";
 
-import React, { createContext, useContext, useEffect, useState } from "react";
-import { offlineDb, pushSyncQueue, getPendingQueueCount } from "@/lib/dexie";
+import React, { createContext, useContext, useEffect, useState, useCallback } from "react";
+import {
+  offlineDb,
+  pushSyncQueue,
+  getPendingQueueCount,
+  initializeUserOfflineCache,
+} from "@/lib/dexie";
+import { useAuth } from "./AuthContext";
 
 interface OfflineContextType {
   isOnline: boolean;
   pendingCount: number;
   isSyncing: boolean;
+  lastSyncTime: string | null;
+  syncNotice: string | null;
   syncNow: () => Promise<any>;
   cacheProgramData: (programId: string) => Promise<void>;
+  refreshOfflineCache: () => Promise<void>;
+  dismissNotice: () => void;
 }
 
 const OfflineContext = createContext<OfflineContextType>({
   isOnline: true,
   pendingCount: 0,
   isSyncing: false,
+  lastSyncTime: null,
+  syncNotice: null,
   syncNow: async () => {},
   cacheProgramData: async () => {},
+  refreshOfflineCache: async () => {},
+  dismissNotice: () => {},
 });
 
 export function OfflineProvider({ children }: { children: React.ReactNode }) {
+  const { user } = useAuth();
   const [isOnline, setIsOnline] = useState<boolean>(true);
   const [pendingCount, setPendingCount] = useState<number>(0);
   const [isSyncing, setIsSyncing] = useState<boolean>(false);
+  const [lastSyncTime, setLastSyncTime] = useState<string | null>(null);
+  const [syncNotice, setSyncNotice] = useState<string | null>(null);
 
-  const refreshPending = async () => {
+  const refreshPending = useCallback(async () => {
     try {
       const count = await getPendingQueueCount();
       setPendingCount(count);
     } catch (e) {}
-  };
-
-  useEffect(() => {
-    setIsOnline(typeof navigator !== "undefined" ? navigator.onLine : true);
-
-    const handleOnline = () => {
-      setIsOnline(true);
-      syncNow();
-    };
-    const handleOffline = () => setIsOnline(false);
-
-    window.addEventListener("online", handleOnline);
-    window.addEventListener("offline", handleOffline);
-
-    refreshPending();
-    const interval = setInterval(refreshPending, 5000);
-
-    return () => {
-      window.removeEventListener("online", handleOnline);
-      window.removeEventListener("offline", handleOffline);
-      clearInterval(interval);
-    };
   }, []);
 
-  const syncNow = async () => {
-    if (!isOnline || isSyncing) return;
+  const dismissNotice = () => setSyncNotice(null);
+
+  // Auto-sync function: Pushes pending mutations and refreshes local IndexedDB
+  const executeAutoSync = useCallback(async () => {
+    if (isSyncing) return;
     setIsSyncing(true);
     try {
+      // 1. Push pending offline mutations
       const res = await pushSyncQueue();
       await refreshPending();
+
+      // 2. Refresh local offline cache with newest server data
+      if (user) {
+        await initializeUserOfflineCache(user);
+      }
+
+      const now = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+      setLastSyncTime(now);
+
+      if (res.accepted && res.accepted > 0) {
+        setSyncNotice(`Auto-synced ${res.accepted} offline record(s) to server successfully at ${now}.`);
+        setTimeout(() => setSyncNotice(null), 7000);
+      }
       return res;
     } catch (error) {
-      console.error("Manual sync failed:", error);
+      console.error("Auto-sync error:", error);
     } finally {
       setIsSyncing(false);
+    }
+  }, [isSyncing, refreshPending, user]);
+
+  const syncNow = async () => {
+    return await executeAutoSync();
+  };
+
+  const refreshOfflineCache = async () => {
+    if (user) {
+      setIsSyncing(true);
+      try {
+        await initializeUserOfflineCache(user);
+        const now = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+        setLastSyncTime(now);
+        setSyncNotice(`Offline cache refreshed for ${user.fullName} (${user.assignedBarangay ? 'Brgy. ' + user.assignedBarangay : 'Municipality-wide'}).`);
+        setTimeout(() => setSyncNotice(null), 5000);
+      } finally {
+        setIsSyncing(false);
+      }
     }
   };
 
   const cacheProgramData = async (programId: string) => {
-    try {
-      const res = await fetch(`/api/v1/programs/${programId}`);
-      if (!res.ok) return;
-      const { program } = await res.json();
-
-      await offlineDb.cachedPrograms.put({
-        id: program.id,
-        programCode: program.programCode,
-        programName: program.programName,
-        municipality: program.municipality,
-        province: program.province,
-        status: program.status,
-        requiredWorkDays: program.requiredWorkDays,
-        morningStart: program.morningStart,
-        morningEnd: program.morningEnd,
-        afternoonStart: program.afternoonStart,
-        afternoonEnd: program.afternoonEnd,
-        orientationDate: program.orientationDate,
-        payoutDate: program.payoutDate,
-      });
-
-      // Cache work days
-      for (const wd of program.workDays || []) {
-        await offlineDb.cachedWorkDays.put({
-          id: wd.id,
-          programId: program.id,
-          dayNumber: wd.dayNumber,
-          workDate: wd.workDate,
-          status: wd.status,
-        });
-      }
-
-      // Fetch beneficiaries for caching
-      const beneRes = await fetch(`/api/v1/programs/${programId}/beneficiaries`);
-      if (beneRes.ok) {
-        const { beneficiaries } = await beneRes.json();
-        for (const pb of beneficiaries || []) {
-          const activeQr = pb.qrCodes?.find((q: any) => q.status === "ACTIVE");
-          // calculate birthday pin
-          const bdayParts = pb.beneficiary.birthday.split("-");
-          const birthdayPin = bdayParts.length === 3 && bdayParts[0].length === 4
-            ? `${bdayParts[1]}-${bdayParts[2]}-${bdayParts[0]}`
-            : pb.beneficiary.birthday;
-
-          await offlineDb.cachedBeneficiaries.put({
-            id: pb.id,
-            programId: program.id,
-            beneficiaryId: pb.beneficiaryId,
-            designatedNumber: pb.designatedNumber,
-            fullName: pb.beneficiary.fullName,
-            birthday: pb.beneficiary.birthday,
-            birthdayPin,
-            barangay: pb.beneficiary.barangay || "",
-            sitio: pb.beneficiary.sitio || "",
-            tableNumber: pb.tableNumber || "",
-            qrToken: activeQr?.publicToken,
-            status: pb.participationStatus,
-          });
-        }
-      }
-      console.log(`Program ${program.programCode} cached offline successfully!`);
-    } catch (err) {
-      console.error("Failed to cache program data:", err);
+    if (user) {
+      await initializeUserOfflineCache(user);
     }
   };
+
+  // Initial user cache bootstrap when user logs in
+  useEffect(() => {
+    if (user && isOnline) {
+      initializeUserOfflineCache(user).then(() => {
+        refreshPending();
+      });
+    }
+  }, [user, isOnline, refreshPending]);
+
+  // Online / Offline & Polling Heartbeat
+  useEffect(() => {
+    setIsOnline(typeof navigator !== "undefined" ? navigator.onLine : true);
+
+    const handleOnlineEvent = () => {
+      setIsOnline(true);
+      executeAutoSync();
+    };
+
+    const handleOfflineEvent = () => {
+      setIsOnline(false);
+      setSyncNotice("Device is now Offline. Changes will be saved locally and auto-synced when connection returns.");
+      setTimeout(() => setSyncNotice(null), 6000);
+    };
+
+    window.addEventListener("online", handleOnlineEvent);
+    window.addEventListener("offline", handleOfflineEvent);
+
+    // Periodic heartbeat (every 20s) to test real connectivity and auto-sync
+    const heartbeatInterval = setInterval(async () => {
+      if (typeof navigator === "undefined") return;
+
+      try {
+        const pingRes = await fetch("/api/v1/health", { method: "GET", cache: "no-store" });
+        if (pingRes.ok) {
+          if (!isOnline) {
+            setIsOnline(true);
+            executeAutoSync();
+          } else {
+            // If already online and has pending queue, auto-flush
+            const pending = await getPendingQueueCount();
+            setPendingCount(pending);
+            if (pending > 0 && !isSyncing) {
+              executeAutoSync();
+            }
+          }
+        } else {
+          setIsOnline(false);
+        }
+      } catch (err) {
+        setIsOnline(false);
+      }
+    }, 20000);
+
+    refreshPending();
+
+    return () => {
+      window.removeEventListener("online", handleOnlineEvent);
+      window.removeEventListener("offline", handleOfflineEvent);
+      clearInterval(heartbeatInterval);
+    };
+  }, [executeAutoSync, isOnline, isSyncing, refreshPending]);
 
   return (
     <OfflineContext.Provider
@@ -140,10 +172,30 @@ export function OfflineProvider({ children }: { children: React.ReactNode }) {
         isOnline,
         pendingCount,
         isSyncing,
+        lastSyncTime,
+        syncNotice,
         syncNow,
         cacheProgramData,
+        refreshOfflineCache,
+        dismissNotice,
       }}
     >
+      {/* Global Sync Notification Banner */}
+      {syncNotice && (
+        <div className="fixed bottom-4 right-4 z-50 max-w-sm bg-slate-900 text-white p-3.5 rounded-2xl shadow-2xl border border-slate-700 text-xs flex items-start justify-between space-x-3 animate-fadeIn">
+          <div className="flex items-center space-x-2">
+            <span className={`w-2.5 h-2.5 rounded-full ${isOnline ? "bg-emerald-400 animate-pulse" : "bg-amber-400"}`} />
+            <p className="font-medium leading-tight">{syncNotice}</p>
+          </div>
+          <button
+            onClick={dismissNotice}
+            className="text-slate-400 hover:text-white font-bold text-xs"
+          >
+            ✕
+          </button>
+        </div>
+      )}
+
       {children}
     </OfflineContext.Provider>
   );
