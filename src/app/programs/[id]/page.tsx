@@ -53,6 +53,7 @@ export default function ProgramDetailsHub() {
   const [beneficiaryToEdit, setBeneficiaryToEdit] = useState<any | null>(null);
   const [beneficiaryToDelete, setBeneficiaryToDelete] = useState<any | null>(null);
   const [isDeletingBene, setIsDeletingBene] = useState(false);
+  const [loadingBene, setLoadingBene] = useState(true);
 
   useEffect(() => {
     fetchProgramDetails();
@@ -60,36 +61,36 @@ export default function ProgramDetailsHub() {
 
   const fetchProgramDetails = async () => {
     try {
+      // 1. Fetch main program details and render immediately
       const res = await fetch(`/api/v1/programs/${params.id}`);
       if (res.ok) {
         const data = await res.json();
         setProgram(data.program);
-        setTableRules(data.program.tableRules || []);
+        setTableRules(data.program?.tableRules || []);
+        setLoading(false); // Render UI immediately!
+      } else {
+        setLoading(false);
       }
 
-      // Fetch beneficiaries
-      const beneRes = await fetch(`/api/v1/programs/${params.id}/beneficiaries`);
-      if (beneRes.ok) {
-        const data = await beneRes.json();
-        setBeneficiaries(data.beneficiaries || []);
-      }
-
-      // Fetch replacements
-      const repRes = await fetch(`/api/v1/replacements?programId=${params.id}`);
-      if (repRes.ok) {
-        const data = await repRes.json();
-        setReplacements(data.replacements || []);
-      }
-
-      // Fetch photos
-      const photoRes = await fetch(`/api/v1/photos?programId=${params.id}`);
-      if (photoRes.ok) {
-        const data = await photoRes.json();
-        setPhotos(data.photos || []);
-      }
+      // 2. Fetch secondary lists in parallel (non-blocking)
+      Promise.allSettled([
+        fetch(`/api/v1/programs/${params.id}/beneficiaries`).then((r) => (r.ok ? r.json() : null)),
+        fetch(`/api/v1/replacements?programId=${params.id}`).then((r) => (r.ok ? r.json() : null)),
+        fetch(`/api/v1/photos?programId=${params.id}`).then((r) => (r.ok ? r.json() : null)),
+      ]).then(([beneRes, repRes, photoRes]) => {
+        if (beneRes.status === "fulfilled" && beneRes.value?.beneficiaries) {
+          setBeneficiaries(beneRes.value.beneficiaries);
+        }
+        if (repRes.status === "fulfilled" && repRes.value?.replacements) {
+          setReplacements(repRes.value.replacements);
+        }
+        if (photoRes.status === "fulfilled" && photoRes.value?.photos) {
+          setPhotos(photoRes.value.photos);
+        }
+        setLoadingBene(false);
+      });
     } catch (e) {
       console.error(e);
-    } finally {
       setLoading(false);
     }
   };
@@ -131,7 +132,6 @@ export default function ProgramDetailsHub() {
     }
   };
 
-
   const handleCacheOffline = async () => {
     if (!program) return;
     await cacheProgramData(program.id);
@@ -139,11 +139,32 @@ export default function ProgramDetailsHub() {
   };
 
   if (loading) {
-    return <div className="py-20 text-center text-xs text-slate-400">Loading Program Details Hub...</div>;
+    return (
+      <div className="space-y-6 animate-pulse">
+        <div className="h-32 bg-slate-100 rounded-2xl border" />
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+          <div className="h-20 bg-slate-100 rounded-xl" />
+          <div className="h-20 bg-slate-100 rounded-xl" />
+          <div className="h-20 bg-slate-100 rounded-xl" />
+          <div className="h-20 bg-slate-100 rounded-xl" />
+        </div>
+        <div className="h-64 bg-slate-100 rounded-2xl border" />
+      </div>
+    );
   }
 
   if (!program) {
-    return <div className="py-20 text-center text-xs text-red-500 font-bold">Program not found.</div>;
+    return (
+      <div className="gov-card p-12 text-center space-y-3">
+        <p className="text-sm font-bold text-slate-800">Program details could not be loaded.</p>
+        <button
+          onClick={() => fetchProgramDetails()}
+          className="px-4 py-2 bg-gov-blue text-white font-bold text-xs rounded-xl shadow"
+        >
+          Retry Connection ↺
+        </button>
+      </div>
+    );
   }
 
   const tabs = [
@@ -439,19 +460,32 @@ export default function ProgramDetailsHub() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
-                  {beneficiaries.map((pb) => {
-                    const activeQr = pb.qrCodes?.find((q: any) => q.status === "ACTIVE");
-                    return (
-                      <tr key={pb.id} className="hover:bg-slate-50">
-                        <td className="px-4 py-3 font-mono font-bold text-gov-blue">
-                          {pb.designatedNumber}
-                        </td>
-                        <td className="px-4 py-3 font-bold text-slate-900">
-                          {pb.beneficiary.fullName}
-                        </td>
-                        <td className="px-4 py-3 text-slate-600 font-mono">
-                          {pb.beneficiary.birthday}
-                        </td>
+                  {loadingBene && beneficiaries.length === 0 ? (
+                    <tr>
+                      <td colSpan={9} className="px-4 py-8 text-center text-xs text-slate-400">
+                        <span className="inline-block animate-spin mr-2">⟳</span> Loading enrolled beneficiaries...
+                      </td>
+                    </tr>
+                  ) : beneficiaries.length === 0 ? (
+                    <tr>
+                      <td colSpan={9} className="px-4 py-8 text-center text-xs text-slate-400">
+                        No beneficiaries enrolled yet in this program batch.
+                      </td>
+                    </tr>
+                  ) : (
+                    beneficiaries.map((pb) => {
+                      const activeQr = pb.qrCodes?.find((q: any) => q.status === "ACTIVE");
+                      return (
+                        <tr key={pb.id} className="hover:bg-slate-50">
+                          <td className="px-4 py-3 font-mono font-bold text-gov-blue">
+                            {pb.designatedNumber}
+                          </td>
+                          <td className="px-4 py-3 font-bold text-slate-900">
+                            {pb.beneficiary.fullName}
+                          </td>
+                          <td className="px-4 py-3 text-slate-600 font-mono">
+                            {pb.beneficiary.birthday}
+                          </td>
                         <td className="px-4 py-3 text-slate-700">
                           {pb.beneficiary.barangay}
                         </td>
@@ -494,7 +528,8 @@ export default function ProgramDetailsHub() {
                         </td>
                       </tr>
                     );
-                  })}
+                  })
+                )}
                 </tbody>
               </table>
             </div>
