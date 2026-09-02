@@ -20,6 +20,7 @@ import {
   ChevronRight,
   Info,
   X,
+  Zap,
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 
@@ -47,6 +48,7 @@ export default function EligibilityCheckerPage() {
   const [uploading, setUploading] = useState(false);
   const [uploadFile, setUploadFile] = useState<File | null>(null);
   const [uploadMessage, setUploadMessage] = useState<string | null>(null);
+  const [uploadSuccess, setUploadSuccess] = useState(false);
 
   // Debounced suggestion fetcher
   useEffect(() => {
@@ -73,7 +75,7 @@ export default function EligibilityCheckerPage() {
       } finally {
         setFetchingSuggestions(false);
       }
-    }, 250);
+    }, 200);
 
     return () => clearTimeout(timer);
   }, [firstName, middleName, lastName]);
@@ -158,6 +160,7 @@ export default function EligibilityCheckerPage() {
 
     setUploading(true);
     setUploadMessage(null);
+    setUploadSuccess(false);
 
     try {
       const formData = new FormData();
@@ -170,8 +173,14 @@ export default function EligibilityCheckerPage() {
 
       const data = await res.json();
       if (res.ok) {
+        setUploadSuccess(true);
         setUploadMessage(`✓ ${data.message}`);
         setUploadFile(null);
+        setTimeout(() => {
+          setIsUploadOpen(false);
+          setUploadMessage(null);
+          setUploadSuccess(false);
+        }, 2200);
       } else {
         alert(data.error || "Upload failed");
       }
@@ -210,6 +219,7 @@ export default function EligibilityCheckerPage() {
               onClick={() => {
                 setIsUploadOpen(true);
                 setUploadMessage(null);
+                setUploadSuccess(false);
               }}
               className="px-4 py-2 bg-gov-blue hover:bg-gov-dark text-white rounded-xl text-xs font-bold transition flex items-center space-x-1.5 shadow"
             >
@@ -489,15 +499,15 @@ export default function EligibilityCheckerPage() {
         </div>
       )}
 
-      {/* Upload Reference Modal */}
+      {/* High-Speed Upload Reference Modal */}
       {isUploadOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-4 overflow-y-auto">
           <div className="bg-white rounded-2xl max-w-lg w-full p-6 space-y-4 shadow-2xl animate-fadeIn">
             <div className="flex items-center justify-between border-b pb-3">
               <div className="flex items-center space-x-2">
-                <FileSpreadsheet className="w-5 h-5 text-gov-blue" />
+                <Zap className="w-5 h-5 text-amber-500" />
                 <h3 className="text-sm font-black text-slate-900 uppercase tracking-wider">
-                  Upload Reference File (Disqualified Beneficiaries)
+                  Fast Upload Reference File (Disqualified Masterlist)
                 </h3>
               </div>
               <button
@@ -510,8 +520,11 @@ export default function EligibilityCheckerPage() {
             </div>
 
             <div className="p-3.5 bg-blue-50 border border-blue-200 rounded-xl text-xs space-y-1 text-blue-950">
-              <p className="font-bold">Required 7-Column Excel Layout:</p>
-              <p className="text-[11px] text-blue-900 font-mono">
+              <p className="font-bold flex items-center space-x-1">
+                <FileSpreadsheet className="w-3.5 h-3.5 text-blue-700" />
+                <span>Required 7-Column Excel Layout:</span>
+              </p>
+              <p className="text-[11px] text-blue-900 font-mono leading-tight">
                 [A] NAME OF BENEFICIARIES • [B] ADL NO. • [C] ORIENTATION DATE • [D] WORK DATE • [E] PAYOUT DATE • [F] Barangay • [G] City/ Municipality
               </p>
             </div>
@@ -524,15 +537,33 @@ export default function EligibilityCheckerPage() {
                 <input
                   type="file"
                   accept=".xlsx, .xls, .csv"
-                  onChange={(e) => setUploadFile(e.target.files?.[0] || null)}
+                  onChange={(e) => {
+                    const f = e.target.files?.[0] || null;
+                    setUploadFile(f);
+                    setUploadMessage(null);
+                  }}
                   className="w-full text-xs file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-gov-blue file:text-white hover:file:bg-gov-dark cursor-pointer border rounded-xl p-2 bg-slate-50"
                   required
                 />
               </div>
 
+              {uploading && (
+                <div className="p-3 bg-amber-50 border border-amber-200 text-amber-900 rounded-xl text-xs font-bold flex items-center space-x-2 animate-pulse">
+                  <RefreshCw className="w-4 h-4 animate-spin text-amber-600 flex-shrink-0" />
+                  <span>⚡ Fast Importing & Syncing Records to Database...</span>
+                </div>
+              )}
+
               {uploadMessage && (
-                <div className="p-3 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-xl text-xs font-bold">
-                  {uploadMessage}
+                <div
+                  className={`p-3 rounded-xl text-xs font-bold flex items-center space-x-2 ${
+                    uploadSuccess
+                      ? "bg-emerald-50 border border-emerald-200 text-emerald-800"
+                      : "bg-rose-50 border border-rose-200 text-rose-800"
+                  }`}
+                >
+                  <CheckCircle2 className="w-4 h-4 text-emerald-600 flex-shrink-0" />
+                  <span>{uploadMessage}</span>
                 </div>
               )}
 
@@ -547,7 +578,7 @@ export default function EligibilityCheckerPage() {
                 <button
                   type="submit"
                   disabled={uploading || !uploadFile}
-                  className="px-4 py-2 bg-gov-blue hover:bg-gov-dark text-white font-bold text-xs rounded-lg shadow disabled:opacity-50 flex items-center space-x-1.5"
+                  className="px-4 py-2 bg-gov-blue hover:bg-gov-dark text-white font-bold text-xs rounded-lg shadow disabled:opacity-50 flex items-center space-x-1.5 transition"
                 >
                   <UploadCloud className="w-4 h-4" />
                   <span>{uploading ? "Importing Records..." : "Upload & Sync Database"}</span>
