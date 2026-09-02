@@ -79,8 +79,9 @@ body {
   .page-break {
     page-break-after: always;
   }
-  .stub-card {
-    page-break-inside: avoid;
-    break-inside: avoid;
+  .stub-card,
+  .format1-stub-card {
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
   }
 }

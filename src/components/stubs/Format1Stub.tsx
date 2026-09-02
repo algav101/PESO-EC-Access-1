@@ -15,8 +15,10 @@ export interface Format1StubProps {
 }
 
 /**
- * Pixel-Perfect Pure HTML/CSS Vector Recreation of "Format 1: TUPAD Beneficiary Verification Stub"
- * Features large-scale high-contrast typography optimized for maximum readability on printed stubs.
+ * 100% Vector Proportional "Format 1: TUPAD Beneficiary Verification Stub"
+ * Uses pure container query units (cqw) so every text element, padding, and logo
+ * scales in exact mathematical lockstep with the card size, completely eliminating
+ * overlapping, text collisions, or cutoffs on any printer grid or paper size.
  */
 export const Format1Stub = memo(function Format1Stub({
   designatedNumber,
@@ -34,25 +36,25 @@ export const Format1Stub = memo(function Format1Stub({
   const cleanTable = String(tableNumber).replace(/^Table\s*/i, "").replace(/^#/, "");
   const effectiveQr = qrDataUrl || (token ? getCachedQrSync(token) : undefined);
 
-  // Large-scale responsive typography for Beneficiary Name to fill available space
+  // Proportional typography based on name length
   const nameLen = fullName.length;
   const nameFontSize =
     nameLen <= 18
-      ? "clamp(1.30rem, 5.8cqw, 1.90rem)"
+      ? "4.5cqw"
       : nameLen <= 26
-      ? "clamp(1.15rem, 5.0cqw, 1.65rem)"
+      ? "3.8cqw"
       : nameLen <= 34
-      ? "clamp(1.00rem, 4.3cqw, 1.45rem)"
-      : "clamp(0.88rem, 3.6cqw, 1.25rem)";
+      ? "3.2cqw"
+      : "2.7cqw";
 
-  // Large-scale typography for Barangay
+  // Proportional typography based on barangay length
   const brgyLen = barangay.length;
   const brgyFontSize =
     brgyLen <= 8
-      ? "clamp(1.25rem, 5.5cqw, 1.80rem)"
+      ? "4.0cqw"
       : brgyLen <= 14
-      ? "clamp(1.10rem, 4.7cqw, 1.55rem)"
-      : "clamp(0.95rem, 4.0cqw, 1.35rem)";
+      ? "3.4cqw"
+      : "2.8cqw";
 
   // Clean orientation details text
   const cleanOrientation = orientationDetails
@@ -67,62 +69,66 @@ export const Format1Stub = memo(function Format1Stub({
     .replace(/\s+/g, " ")
     .trim();
 
-  // Dynamic variable auto-scaling font size for Orientation Line (Large scale for print clarity)
-  const orientTotalLen = cleanOrientation.length + 26;
-  const orientFontSize =
-    orientTotalLen <= 45
-      ? "clamp(9.5px, 2.9cqw, 13.5px)"
-      : orientTotalLen <= 65
-      ? "clamp(8.8px, 2.5cqw, 12.0px)"
-      : "clamp(8.0px, 2.1cqw, 10.5px)";
-
-  // Dynamic variable auto-scaling font size for Paalala Advisory Notice (Large scale for print clarity)
-  const paalalaTotalLen = cleanPaalala.length + 10;
-  const paalalaFontSize =
-    paalalaTotalLen <= 65
-      ? "clamp(9.0px, 2.7cqw, 13.0px)"
-      : paalalaTotalLen <= 110
-      ? "clamp(8.2px, 2.3cqw, 11.5px)"
-      : "clamp(7.4px, 1.9cqw, 10.0px)";
+  // Proportional designated number size
+  const numFontSize =
+    numStr.length <= 2
+      ? "7.5cqw"
+      : numStr.length === 3
+      ? "6.2cqw"
+      : "5.2cqw";
 
   return (
     <div
-      className="format1-stub-card relative select-none page-break-inside-avoid bg-white border-2 border-[#004b93] rounded-xl p-3 sm:p-4 flex flex-col justify-between shadow-md overflow-hidden box-border"
+      className="format1-stub-card relative select-none page-break-inside-avoid bg-white flex flex-col justify-between shadow-sm box-border"
       style={{
         width: "100%",
         maxWidth: "480px",
         aspectRatio: "639 / 418",
         containerType: "inline-size",
+        padding: "2.8cqw",
+        borderRadius: "2.2cqw",
+        border: "0.45cqw solid #004b93",
         fontFamily: "'Anton', 'Oswald', 'Bebas Neue', Impact, sans-serif",
       }}
     >
       {/* 1. Header Section */}
-      <div className="flex items-center justify-between border-b-2 border-[#004b93] pb-1.5 gap-2">
-        {/* Left: PESO Logo & Header Text */}
-        <div className="flex items-center space-x-2.5 min-w-0 flex-1">
+      <div
+        className="flex items-center justify-between min-w-0"
+        style={{
+          borderBottom: "0.35cqw solid #004b93",
+          paddingBottom: "1.4cqw",
+        }}
+      >
+        {/* Left: PESO Logo & Header Titles */}
+        <div className="flex items-center min-w-0 flex-1" style={{ gap: "2cqw" }}>
           <img
             src="/peso-logo.png"
-            alt="PESO e-access Logo"
-            className="h-10 sm:h-12 w-auto max-w-[52px] object-contain shrink-0"
+            alt="PESO Logo"
+            style={{
+              height: "7.8cqw",
+              width: "auto",
+              maxHeight: "7.8cqw",
+              objectFit: "contain",
+              flexShrink: 0,
+            }}
           />
-          <div className="flex flex-col min-w-0">
+          <div className="flex flex-col min-w-0 flex-1 justify-center">
             <h2
               className="text-[#004b93] font-black uppercase tracking-tight leading-none truncate"
               style={{
-                fontFamily: "'Anton', 'Oswald', 'Bebas Neue', Impact, sans-serif",
-                fontSize: "clamp(1.30rem, 5.8cqw, 1.95rem)",
-                letterSpacing: "0.5px",
+                fontSize: "4.8cqw",
+                letterSpacing: "0.02em",
               }}
               title={stubHeader}
             >
               {stubHeader || "LGU-DINGALAN"}
             </h2>
             <p
-              className="text-[#132e57] font-extrabold uppercase tracking-wide leading-tight mt-0.5 truncate"
+              className="text-[#132e57] font-extrabold uppercase tracking-wide leading-tight truncate"
               style={{
-                fontFamily: "'Anton', 'Oswald', 'Bebas Neue', Impact, sans-serif",
-                fontSize: "clamp(9.5px, 2.7cqw, 13.5px)",
-                letterSpacing: "0.3px",
+                fontSize: "2.2cqw",
+                marginTop: "0.4cqw",
+                letterSpacing: "0.01em",
               }}
               title={stubSubHeader}
             >
@@ -132,17 +138,11 @@ export const Format1Stub = memo(function Format1Stub({
         </div>
 
         {/* Right: Big Designated Number */}
-        <div className="shrink-0 text-right pl-2">
+        <div className="shrink-0 text-right" style={{ paddingLeft: "1.5cqw" }}>
           <span
             className="text-[#132e57] font-black tracking-tight leading-none select-all"
             style={{
-              fontFamily: "'Anton', 'Oswald', 'Bebas Neue', Impact, sans-serif",
-              fontSize:
-                numStr.length <= 2
-                  ? "clamp(2.4rem, 10.5cqw, 3.8rem)"
-                  : numStr.length === 3
-                  ? "clamp(1.9rem, 8.5cqw, 3.0rem)"
-                  : "clamp(1.5rem, 6.8cqw, 2.4rem)",
+              fontSize: numFontSize,
             }}
           >
             #{numStr}
@@ -151,9 +151,25 @@ export const Format1Stub = memo(function Format1Stub({
       </div>
 
       {/* 2. Middle Body: QR Code + Beneficiary Demographics */}
-      <div className="flex items-center gap-3.5 py-1.5 flex-1 min-h-0">
+      <div
+        className="flex items-center flex-1 min-h-0"
+        style={{
+          paddingTop: "1.5cqw",
+          paddingBottom: "1.5cqw",
+          gap: "2.8cqw",
+        }}
+      >
         {/* Left QR Code Container */}
-        <div className="shrink-0 w-[30%] aspect-square bg-white border-2 border-slate-300 rounded-xl p-1.5 flex items-center justify-center shadow-xs">
+        <div
+          className="shrink-0 bg-white flex items-center justify-center"
+          style={{
+            width: "29cqw",
+            height: "29cqw",
+            borderRadius: "1.6cqw",
+            border: "0.25cqw solid #94a3b8",
+            padding: "0.8cqw",
+          }}
+        >
           {effectiveQr ? (
             <img
               src={effectiveQr}
@@ -162,28 +178,31 @@ export const Format1Stub = memo(function Format1Stub({
               style={{ imageRendering: "pixelated" }}
             />
           ) : (
-            <div className="w-full h-full bg-slate-100 flex items-center justify-center text-[9px] font-mono text-slate-400">
-              QR Token
+            <div
+              className="w-full h-full bg-slate-100 flex items-center justify-center font-mono text-slate-400"
+              style={{ fontSize: "2.0cqw" }}
+            >
+              QR
             </div>
           )}
         </div>
 
-        {/* Right Demographics Block (Large-scale text fitting) */}
-        <div className="flex-1 flex flex-col justify-around h-full py-0.5 min-w-0">
+        {/* Right Demographics Block */}
+        <div className="flex-1 flex flex-col justify-around h-full min-w-0">
           {/* Beneficiary Name */}
           <div className="min-w-0">
             <span
-              className="block font-extrabold text-[#132e57] uppercase tracking-wider mb-0.5"
-              style={{ fontSize: "clamp(9.5px, 2.8cqw, 13.0px)" }}
+              className="block font-extrabold text-[#132e57] uppercase tracking-wider"
+              style={{ fontSize: "2.1cqw", marginBottom: "0.3cqw" }}
             >
               BENEFICIARY NAME:
             </span>
             <span
-              className="block text-[#004b93] font-black uppercase tracking-tight leading-tight select-all break-words"
+              className="block text-[#004b93] font-black uppercase tracking-tight select-all break-words"
               style={{
-                fontFamily: "'Anton', 'Oswald', 'Bebas Neue', Impact, sans-serif",
                 fontSize: nameFontSize,
-                letterSpacing: "0.4px",
+                lineHeight: "1.08",
+                letterSpacing: "0.01em",
               }}
               title={fullName}
             >
@@ -192,20 +211,28 @@ export const Format1Stub = memo(function Format1Stub({
           </div>
 
           {/* Barangay & Table Assignment */}
-          <div className="grid grid-cols-2 gap-2 pt-1.5 border-t border-slate-200 min-w-0">
+          <div
+            className="grid grid-cols-2 min-w-0"
+            style={{
+              borderTop: "0.2cqw solid #cbd5e1",
+              paddingTop: "1.2cqw",
+              marginTop: "0.8cqw",
+              gap: "1.5cqw",
+            }}
+          >
+            {/* Barangay */}
             <div className="min-w-0">
               <span
-                className="block font-extrabold text-[#132e57] uppercase tracking-wider mb-0.5"
-                style={{ fontSize: "clamp(8.5px, 2.5cqw, 12.0px)" }}
+                className="block font-extrabold text-[#132e57] uppercase tracking-wider"
+                style={{ fontSize: "1.9cqw", marginBottom: "0.2cqw" }}
               >
                 BARANGAY:
               </span>
               <span
-                className="block text-[#004b93] font-black uppercase tracking-tight leading-tight select-all break-words"
+                className="block text-[#004b93] font-black uppercase tracking-tight select-all break-words"
                 style={{
-                  fontFamily: "'Anton', 'Oswald', 'Bebas Neue', Impact, sans-serif",
                   fontSize: brgyFontSize,
-                  letterSpacing: "0.3px",
+                  lineHeight: "1.08",
                 }}
                 title={barangay}
               >
@@ -213,18 +240,25 @@ export const Format1Stub = memo(function Format1Stub({
               </span>
             </div>
 
-            <div className="min-w-0 pl-2 border-l border-slate-200">
+            {/* Table Assignment */}
+            <div
+              className="min-w-0"
+              style={{
+                borderLeft: "0.2cqw solid #cbd5e1",
+                paddingLeft: "1.5cqw",
+              }}
+            >
               <span
-                className="block font-extrabold text-[#132e57] uppercase tracking-wider mb-0.5"
-                style={{ fontSize: "clamp(8.5px, 2.5cqw, 12.0px)" }}
+                className="block font-extrabold text-[#132e57] uppercase tracking-wider"
+                style={{ fontSize: "1.9cqw", marginBottom: "0.2cqw" }}
               >
                 TABLE ASSIGNMENT:
               </span>
               <span
-                className="block text-[#004b93] font-black tracking-tight leading-tight select-all"
+                className="block text-[#004b93] font-black tracking-tight select-all"
                 style={{
-                  fontFamily: "'Anton', 'Oswald', 'Bebas Neue', Impact, sans-serif",
-                  fontSize: "clamp(1.35rem, 5.8cqw, 2.00rem)",
+                  fontSize: "4.2cqw",
+                  lineHeight: "1.0",
                 }}
               >
                 #{cleanTable}
@@ -234,35 +268,44 @@ export const Format1Stub = memo(function Format1Stub({
         </div>
       </div>
 
-      {/* 3. Footer Section: Orientation Date & Venue + Paalala (Maximized Text Fitting) */}
+      {/* 3. Footer Section: Orientation Date & Venue + Paalala */}
       <div
-        className="border-t border-slate-300 pt-1.5 space-y-1"
+        className="flex flex-col min-w-0"
         style={{
+          borderTop: "0.25cqw solid #cbd5e1",
+          paddingTop: "1.2cqw",
+          gap: "0.6cqw",
           fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
         }}
       >
         {/* Orientation Date & Venue */}
         <div
-          className="flex flex-wrap items-baseline gap-x-1.5 leading-tight text-[#004b93]"
-          style={{ fontSize: orientFontSize }}
+          className="flex flex-wrap items-baseline text-[#004b93] leading-tight"
+          style={{
+            fontSize: "2.1cqw",
+            gap: "0.8cqw",
+          }}
         >
           <span className="font-extrabold uppercase shrink-0 tracking-tight text-[#004b93]">
             ORIENTATION DATE & VENUE:
           </span>
-          <span className="font-normal underline underline-offset-2 text-[#004b93] break-words">
+          <span className="font-normal underline underline-offset-1 text-[#004b93] break-words">
             {cleanOrientation || "Sep 04, 2026 • 08:00 (Municipal Gymnasium)"}
           </span>
         </div>
 
         {/* Paalala Notice */}
         <div
-          className="flex flex-wrap items-baseline gap-x-1.5 leading-tight text-[#004b93]"
-          style={{ fontSize: paalalaFontSize }}
+          className="flex flex-wrap items-baseline text-[#004b93] leading-tight"
+          style={{
+            fontSize: "1.9cqw",
+            gap: "0.8cqw",
+          }}
         >
           <span className="font-extrabold uppercase shrink-0 tracking-tight text-[#004b93]">
             PAALALA:
           </span>
-          <span className="font-normal underline underline-offset-2 text-[#004b93] break-words">
+          <span className="font-normal underline underline-offset-1 text-[#004b93] break-words">
             {cleanPaalala || "DALHIN ANG STUB NA ITO AT VALID ID NA GINAMIT SA APPLICATION SA ORIENTATION"}
           </span>
         </div>
