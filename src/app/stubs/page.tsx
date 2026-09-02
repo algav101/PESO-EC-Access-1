@@ -30,6 +30,11 @@ import {
   ChevronDown,
   ChevronUp,
   MapPin,
+  Type,
+  Maximize2,
+  AlignLeft,
+  AlignCenter,
+  Move,
 } from "lucide-react";
 import { formatDate } from "@/lib/utils";
 import { TableAssignmentModal } from "@/components/tables/TableAssignmentModal";
@@ -65,14 +70,37 @@ function StubsContent() {
     "IMPORTANT: Bring this original QR stub and 1 Valid Government ID to Orientation and all 10 Daily Attendance sessions."
   );
 
+  // =========================================================================
   // Editable Stub Text Customizer (Header, Orientation Date & Venue, Paalala)
+  // =========================================================================
   const [stubHeader, setStubHeader] = useState("LGU-DINGALAN");
   const [stubSubHeader, setStubSubHeader] = useState("BENEFICIARY VERIFICATION STUB NO.");
   const [customOrientation, setCustomOrientation] = useState("Sep 04, 2026 • 08:00 (Municipal Gymnasium)");
   const [customPaalala, setCustomPaalala] = useState(
     "DALHIN ANG STUB NA ITO AT VALID ID NA GINAMIT SA APPLICATION SA ORIENTATION"
   );
-  const [isTextEditorOpen, setIsTextEditorOpen] = useState(false);
+  const [isTextEditorOpen, setIsTextEditorOpen] = useState(true);
+  const [designTab, setDesignTab] = useState<"TEXT" | "FONTS" | "POSITIONING">("FONTS");
+
+  // =========================================================================
+  // Manual Font Sizing & Typography Controls (Live Sliders & Steppers)
+  // =========================================================================
+  const [headerFontSize, setHeaderFontSize] = useState<number>(6.0);
+  const [subHeaderFontSize, setSubHeaderFontSize] = useState<number>(2.5);
+  const [desigNumFontSize, setDesigNumFontSize] = useState<number>(8.8);
+  const [nameFontSizeScale, setNameFontSizeScale] = useState<number>(1.0);
+  const [brgyFontSizeScale, setBrgyFontSizeScale] = useState<number>(1.0);
+  const [tableFontSize, setTableFontSize] = useState<number>(4.8);
+  const [orientationFontSize, setOrientationFontSize] = useState<number>(2.3);
+  const [paalalaFontSize, setPaalalaFontSize] = useState<number>(2.0);
+  const [labelsFontSize, setLabelsFontSize] = useState<number>(2.0);
+
+  // =========================================================================
+  // Manual Positioning & Dimensions Controls
+  // =========================================================================
+  const [qrSizePercent, setQrSizePercent] = useState<number>(28);
+  const [cardPadding, setCardPadding] = useState<number>(2.4);
+  const [nameAlignment, setNameAlignment] = useState<"left" | "center">("left");
 
   // Filters & Ranges (with Purok / Sitio filtering and sorting)
   const [selectedBarangay, setSelectedBarangay] = useState("ALL");
@@ -350,14 +378,6 @@ function StubsContent() {
     }
   };
 
-  const handleQuickRange = (start: number, end: number) => {
-    setRangeStart(start.toString());
-    setRangeEnd(end.toString());
-    setFilterTable("ALL");
-    setSelectedSitio("ALL");
-    setPreviewSheetPage(1);
-  };
-
   const handleClearRange = () => {
     setRangeStart("");
     setRangeEnd("");
@@ -384,6 +404,20 @@ function StubsContent() {
       setCustomOrientation("Sep 04, 2026 • 08:00 (Municipal Gymnasium)");
     }
     setCustomPaalala("DALHIN ANG STUB NA ITO AT VALID ID NA GINAMIT SA APPLICATION SA ORIENTATION");
+
+    // Reset Font Sizing & Dimensions
+    setHeaderFontSize(6.0);
+    setSubHeaderFontSize(2.5);
+    setDesigNumFontSize(8.8);
+    setNameFontSizeScale(1.0);
+    setBrgyFontSizeScale(1.0);
+    setTableFontSize(4.8);
+    setOrientationFontSize(2.3);
+    setPaalalaFontSize(2.0);
+    setLabelsFontSize(2.0);
+    setQrSizePercent(28);
+    setCardPadding(2.4);
+    setNameAlignment("left");
   };
 
   return (
@@ -398,7 +432,7 @@ function StubsContent() {
               <span>QR Stub & Dedicated Unique QR Card Printing Engine</span>
             </h1>
             <p className="text-xs text-slate-500">
-              Numerically arranged or Purok/Sitio sorted printing, manual row & column controls, and ultra-fast sheet navigation
+              Numerically arranged or Purok/Sitio sorted printing, manual font sizing, spacing customizer, and ultra-fast sheet navigation
             </p>
           </div>
 
@@ -474,7 +508,7 @@ function StubsContent() {
           </button>
         </div>
 
-        {/* Feature: Manual Stub Text Customizer (Header, Orientation Date & Venue, Paalala) */}
+        {/* Feature: Multi-Tab Stub Text, Font Sizing & Positioning Customizer Panel */}
         <div className="gov-card border-2 border-gov-blue/30 overflow-hidden bg-white shadow-md">
           <div
             onClick={() => setIsTextEditorOpen(!isTextEditorOpen)}
@@ -482,17 +516,17 @@ function StubsContent() {
           >
             <div className="flex items-center space-x-2.5">
               <div className="p-1.5 bg-gov-blue text-gov-goldLight rounded-lg">
-                <Edit3 className="w-4 h-4" />
+                <Sliders className="w-4 h-4" />
               </div>
               <div>
                 <h3 className="text-xs font-black text-slate-900 tracking-tight flex items-center space-x-2">
-                  <span>Custom Stub Text, Orientation & Paalala Editor</span>
+                  <span>Custom Stub Text, Font Sizes & Positioning Studio</span>
                   <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-blue-100 text-gov-blue border border-blue-200">
-                    Live Preview Active
+                    Live Real-Time Tuning
                   </span>
                 </h3>
                 <p className="text-[11px] text-slate-500 font-medium">
-                  Manually edit the Top Header Title, Subheader, Orientation Date & Venue line, and Paalala notice text.
+                  Manually adjust text content, live font sizes (Header, Name, Barangay, Table), QR size, and card spacing.
                 </p>
               </div>
             </div>
@@ -505,10 +539,10 @@ function StubsContent() {
                   handleResetStubTexts();
                 }}
                 className="px-2.5 py-1 text-[11px] font-bold text-slate-600 hover:text-gov-blue hover:bg-white rounded-lg border border-slate-200 shadow-2xs flex items-center space-x-1"
-                title="Reset all stub texts to default"
+                title="Reset all design settings to default"
               >
                 <RotateCcw className="w-3 h-3" />
-                <span>Reset</span>
+                <span>Reset Defaults</span>
               </button>
               <div className="text-slate-400">
                 {isTextEditorOpen ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
@@ -517,106 +551,391 @@ function StubsContent() {
           </div>
 
           {isTextEditorOpen && (
-            <div className="p-5 border-t border-slate-200/80 bg-white space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-12 gap-4">
-                {/* 1. Stub Header Main Title */}
-                <div className="md:col-span-4 space-y-1">
-                  <label className="block text-[11px] font-extrabold text-slate-700 uppercase">
-                    1. Stub Header Title
-                  </label>
-                  <input
-                    type="text"
-                    value={stubHeader}
-                    onChange={(e) => setStubHeader(e.target.value)}
-                    placeholder="e.g. LGU-DINGALAN"
-                    className="w-full px-3 py-2 text-xs font-bold border border-slate-300 rounded-xl bg-slate-50/70 focus:bg-white focus:outline-none focus:border-gov-blue focus:ring-1 focus:ring-gov-blue"
-                  />
-                  <span className="text-[10px] text-slate-400">Top blue header title</span>
-                </div>
+            <div className="border-t border-slate-200/80 bg-white">
+              {/* Studio Sub-Navigation Tabs */}
+              <div className="flex items-center border-b border-slate-200 bg-slate-50 px-4 pt-2 gap-2 text-xs">
+                <button
+                  type="button"
+                  onClick={() => setDesignTab("FONTS")}
+                  className={`py-2 px-3 font-extrabold flex items-center space-x-1.5 border-b-2 transition ${
+                    designTab === "FONTS"
+                      ? "border-gov-blue text-gov-blue bg-white rounded-t-lg shadow-2xs"
+                      : "border-transparent text-slate-500 hover:text-slate-900"
+                  }`}
+                >
+                  <Type className="w-3.5 h-3.5" />
+                  <span>1. Font Sizes & Scales</span>
+                </button>
 
-                {/* 2. Stub Sub-Header */}
-                <div className="md:col-span-4 space-y-1">
-                  <label className="block text-[11px] font-extrabold text-slate-700 uppercase">
-                    2. Stub Sub-Header
-                  </label>
-                  <input
-                    type="text"
-                    value={stubSubHeader}
-                    onChange={(e) => setStubSubHeader(e.target.value)}
-                    placeholder="e.g. BENEFICIARY VERIFICATION STUB NO."
-                    className="w-full px-3 py-2 text-xs font-bold border border-slate-300 rounded-xl bg-slate-50/70 focus:bg-white focus:outline-none focus:border-gov-blue focus:ring-1 focus:ring-gov-blue"
-                  />
-                  <span className="text-[10px] text-slate-400">Subtitle below header</span>
-                </div>
+                <button
+                  type="button"
+                  onClick={() => setDesignTab("POSITIONING")}
+                  className={`py-2 px-3 font-extrabold flex items-center space-x-1.5 border-b-2 transition ${
+                    designTab === "POSITIONING"
+                      ? "border-gov-blue text-gov-blue bg-white rounded-t-lg shadow-2xs"
+                      : "border-transparent text-slate-500 hover:text-slate-900"
+                  }`}
+                >
+                  <Move className="w-3.5 h-3.5" />
+                  <span>2. Positioning & QR Scale</span>
+                </button>
 
-                {/* 3. Orientation Date & Venue */}
-                <div className="md:col-span-4 space-y-1">
-                  <label className="block text-[11px] font-extrabold text-slate-700 uppercase">
-                    3. Orientation Date & Venue
-                  </label>
-                  <input
-                    type="text"
-                    value={customOrientation}
-                    onChange={(e) => setCustomOrientation(e.target.value)}
-                    placeholder="e.g. Sep 04, 2026 • 08:00 (Municipal Gymnasium)"
-                    className="w-full px-3 py-2 text-xs font-bold border border-slate-300 rounded-xl bg-slate-50/70 focus:bg-white focus:outline-none focus:border-gov-blue focus:ring-1 focus:ring-gov-blue"
-                  />
-                  <span className="text-[10px] text-slate-400">Sitting above footer underline</span>
-                </div>
+                <button
+                  type="button"
+                  onClick={() => setDesignTab("TEXT")}
+                  className={`py-2 px-3 font-extrabold flex items-center space-x-1.5 border-b-2 transition ${
+                    designTab === "TEXT"
+                      ? "border-gov-blue text-gov-blue bg-white rounded-t-lg shadow-2xs"
+                      : "border-transparent text-slate-500 hover:text-slate-900"
+                  }`}
+                >
+                  <Edit3 className="w-3.5 h-3.5" />
+                  <span>3. Text Content & Wording</span>
+                </button>
+              </div>
 
-                {/* 4. Paalala / Advisory Notice */}
-                <div className="md:col-span-12 space-y-1">
-                  <label className="block text-[11px] font-extrabold text-slate-700 uppercase">
-                    4. Paalala / Advisory Notice Text
-                  </label>
-                  <textarea
-                    rows={2}
-                    value={customPaalala}
-                    onChange={(e) => setCustomPaalala(e.target.value)}
-                    placeholder="e.g. DALHIN ANG STUB NA ITO AT VALID ID NA GINAMIT SA APPLICATION SA ORIENTATION"
-                    className="w-full px-3 py-2 text-xs font-bold border border-slate-300 rounded-xl bg-slate-50/70 focus:bg-white focus:outline-none focus:border-gov-blue focus:ring-1 focus:ring-gov-blue"
-                  />
-                  <div className="flex flex-wrap items-center justify-between gap-2 pt-1 text-[11px]">
-                    <span className="text-slate-400">
-                      Bottom advisory line rendered on all printed verification stubs.
-                    </span>
+              {/* TAB 1: FONT SIZES & SCALES */}
+              {designTab === "FONTS" && (
+                <div className="p-5 space-y-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {/* Header Title Size */}
+                    <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 space-y-1.5">
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="font-extrabold text-slate-700">Header Title Size</span>
+                        <span className="font-mono font-bold text-gov-blue bg-white px-2 py-0.5 rounded border border-slate-200">
+                          {headerFontSize.toFixed(1)} cqw
+                        </span>
+                      </div>
+                      <input
+                        type="range"
+                        min="4.0"
+                        max="8.5"
+                        step="0.1"
+                        value={headerFontSize}
+                        onChange={(e) => setHeaderFontSize(parseFloat(e.target.value))}
+                        className="w-full h-1.5 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-gov-blue"
+                      />
+                      <div className="flex justify-between text-[10px] text-slate-400">
+                        <span>Compact (4.0)</span>
+                        <span>Stretched (8.5)</span>
+                      </div>
+                    </div>
 
-                    {/* Quick Preset Buttons */}
-                    <div className="flex flex-wrap items-center gap-1.5">
-                      <span className="text-[10px] font-bold text-slate-500 uppercase">Quick Presets:</span>
-                      <button
-                        type="button"
-                        onClick={() =>
-                          setCustomOrientation("Sep 04, 2026 • 08:00 (Municipal Gymnasium)")
-                        }
-                        className="px-2 py-0.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-[10px] font-bold rounded-md border border-slate-200"
-                      >
-                        Municipal Gym • 8:00 AM
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() =>
-                          setCustomOrientation("Sep 05, 2026 • 09:00 (Barangay Multi-Purpose Hall)")
-                        }
-                        className="px-2 py-0.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-[10px] font-bold rounded-md border border-slate-200"
-                      >
-                        Barangay Hall • 9:00 AM
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() =>
-                          setCustomPaalala(
-                            "DALHIN ANG STUB NA ITO AT VALID ID NA GINAMIT SA APPLICATION SA ORIENTATION"
-                          )
-                        }
-                        className="px-2 py-0.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-[10px] font-bold rounded-md border border-slate-200"
-                      >
-                        Standard DOLE Paalala
-                      </button>
+                    {/* Beneficiary Name Font Scale */}
+                    <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 space-y-1.5">
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="font-extrabold text-slate-700">Beneficiary Name Size</span>
+                        <span className="font-mono font-bold text-gov-blue bg-white px-2 py-0.5 rounded border border-slate-200">
+                          {(nameFontSizeScale * 100).toFixed(0)}%
+                        </span>
+                      </div>
+                      <input
+                        type="range"
+                        min="0.75"
+                        max="1.45"
+                        step="0.05"
+                        value={nameFontSizeScale}
+                        onChange={(e) => setNameFontSizeScale(parseFloat(e.target.value))}
+                        className="w-full h-1.5 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-gov-blue"
+                      />
+                      <div className="flex justify-between text-[10px] text-slate-400">
+                        <span>Standard (75%)</span>
+                        <span>Extra Large (145%)</span>
+                      </div>
+                    </div>
+
+                    {/* Barangay Font Scale */}
+                    <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 space-y-1.5">
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="font-extrabold text-slate-700">Barangay Font Size</span>
+                        <span className="font-mono font-bold text-gov-blue bg-white px-2 py-0.5 rounded border border-slate-200">
+                          {(brgyFontSizeScale * 100).toFixed(0)}%
+                        </span>
+                      </div>
+                      <input
+                        type="range"
+                        min="0.75"
+                        max="1.40"
+                        step="0.05"
+                        value={brgyFontSizeScale}
+                        onChange={(e) => setBrgyFontSizeScale(parseFloat(e.target.value))}
+                        className="w-full h-1.5 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-gov-blue"
+                      />
+                      <div className="flex justify-between text-[10px] text-slate-400">
+                        <span>Compact (75%)</span>
+                        <span>Bold (140%)</span>
+                      </div>
+                    </div>
+
+                    {/* Table Assignment Size */}
+                    <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 space-y-1.5">
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="font-extrabold text-slate-700">Table Number Size</span>
+                        <span className="font-mono font-bold text-gov-blue bg-white px-2 py-0.5 rounded border border-slate-200">
+                          {tableFontSize.toFixed(1)} cqw
+                        </span>
+                      </div>
+                      <input
+                        type="range"
+                        min="3.0"
+                        max="7.0"
+                        step="0.2"
+                        value={tableFontSize}
+                        onChange={(e) => setTableFontSize(parseFloat(e.target.value))}
+                        className="w-full h-1.5 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-gov-blue"
+                      />
+                      <div className="flex justify-between text-[10px] text-slate-400">
+                        <span>Small (3.0)</span>
+                        <span>Large (7.0)</span>
+                      </div>
+                    </div>
+
+                    {/* Designated Number (#1) Size */}
+                    <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 space-y-1.5">
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="font-extrabold text-slate-700"># Designated Number Size</span>
+                        <span className="font-mono font-bold text-gov-blue bg-white px-2 py-0.5 rounded border border-slate-200">
+                          {desigNumFontSize.toFixed(1)} cqw
+                        </span>
+                      </div>
+                      <input
+                        type="range"
+                        min="6.0"
+                        max="12.0"
+                        step="0.2"
+                        value={desigNumFontSize}
+                        onChange={(e) => setDesigNumFontSize(parseFloat(e.target.value))}
+                        className="w-full h-1.5 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-gov-blue"
+                      />
+                      <div className="flex justify-between text-[10px] text-slate-400">
+                        <span>Standard (6.0)</span>
+                        <span>Huge (12.0)</span>
+                      </div>
+                    </div>
+
+                    {/* Footer Schedule & Paalala Size */}
+                    <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 space-y-1.5">
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="font-extrabold text-slate-700">Orientation & Paalala Size</span>
+                        <span className="font-mono font-bold text-gov-blue bg-white px-2 py-0.5 rounded border border-slate-200">
+                          {orientationFontSize.toFixed(1)} / {paalalaFontSize.toFixed(1)}
+                        </span>
+                      </div>
+                      <input
+                        type="range"
+                        min="1.6"
+                        max="3.2"
+                        step="0.1"
+                        value={orientationFontSize}
+                        onChange={(e) => {
+                          const v = parseFloat(e.target.value);
+                          setOrientationFontSize(v);
+                          setPaalalaFontSize(Math.max(1.4, v - 0.3));
+                        }}
+                        className="w-full h-1.5 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-gov-blue"
+                      />
+                      <div className="flex justify-between text-[10px] text-slate-400">
+                        <span>Compact (1.6)</span>
+                        <span>Large (3.2)</span>
+                      </div>
                     </div>
                   </div>
                 </div>
-              </div>
+              )}
+
+              {/* TAB 2: POSITIONING & QR SCALE */}
+              {designTab === "POSITIONING" && (
+                <div className="p-5 space-y-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {/* QR Box Size */}
+                    <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 space-y-1.5">
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="font-extrabold text-slate-700">QR Code Box Size</span>
+                        <span className="font-mono font-bold text-gov-blue bg-white px-2 py-0.5 rounded border border-slate-200">
+                          {qrSizePercent}%
+                        </span>
+                      </div>
+                      <input
+                        type="range"
+                        min="22"
+                        max="36"
+                        step="1"
+                        value={qrSizePercent}
+                        onChange={(e) => setQrSizePercent(parseInt(e.target.value, 10))}
+                        className="w-full h-1.5 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-gov-blue"
+                      />
+                      <div className="flex justify-between text-[10px] text-slate-400">
+                        <span>Compact (22%)</span>
+                        <span>Large (36%)</span>
+                      </div>
+                    </div>
+
+                    {/* Card Outer Margin / Padding */}
+                    <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 space-y-1.5">
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="font-extrabold text-slate-700">Card Outer Padding</span>
+                        <span className="font-mono font-bold text-gov-blue bg-white px-2 py-0.5 rounded border border-slate-200">
+                          {cardPadding.toFixed(1)} cqw
+                        </span>
+                      </div>
+                      <input
+                        type="range"
+                        min="1.4"
+                        max="3.6"
+                        step="0.2"
+                        value={cardPadding}
+                        onChange={(e) => setCardPadding(parseFloat(e.target.value))}
+                        className="w-full h-1.5 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-gov-blue"
+                      />
+                      <div className="flex justify-between text-[10px] text-slate-400">
+                        <span>Tight Border (1.4)</span>
+                        <span>Spacious (3.6)</span>
+                      </div>
+                    </div>
+
+                    {/* Beneficiary Name Alignment */}
+                    <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 space-y-1.5">
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="font-extrabold text-slate-700">Name Text Alignment</span>
+                        <span className="font-mono font-bold text-gov-blue bg-white px-2 py-0.5 rounded border border-slate-200 uppercase">
+                          {nameAlignment}
+                        </span>
+                      </div>
+                      <div className="flex items-center space-x-2 pt-1">
+                        <button
+                          type="button"
+                          onClick={() => setNameAlignment("left")}
+                          className={`flex-1 py-1.5 px-3 rounded-lg text-xs font-extrabold border transition flex items-center justify-center space-x-1.5 ${
+                            nameAlignment === "left"
+                              ? "bg-gov-blue text-white border-gov-blue shadow-xs"
+                              : "bg-white text-slate-700 hover:bg-slate-100 border-slate-200"
+                          }`}
+                        >
+                          <AlignLeft className="w-3.5 h-3.5" />
+                          <span>Left Aligned</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setNameAlignment("center")}
+                          className={`flex-1 py-1.5 px-3 rounded-lg text-xs font-extrabold border transition flex items-center justify-center space-x-1.5 ${
+                            nameAlignment === "center"
+                              ? "bg-gov-blue text-white border-gov-blue shadow-xs"
+                              : "bg-white text-slate-700 hover:bg-slate-100 border-slate-200"
+                          }`}
+                        >
+                          <AlignCenter className="w-3.5 h-3.5" />
+                          <span>Center Aligned</span>
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* TAB 3: TEXT CONTENT & WORDING */}
+              {designTab === "TEXT" && (
+                <div className="p-5 space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-12 gap-4">
+                    {/* 1. Stub Header Main Title */}
+                    <div className="md:col-span-4 space-y-1">
+                      <label className="block text-[11px] font-extrabold text-slate-700 uppercase">
+                        1. Stub Header Title
+                      </label>
+                      <input
+                        type="text"
+                        value={stubHeader}
+                        onChange={(e) => setStubHeader(e.target.value)}
+                        placeholder="e.g. LGU-DINGALAN"
+                        className="w-full px-3 py-2 text-xs font-bold border border-slate-300 rounded-xl bg-slate-50/70 focus:bg-white focus:outline-none focus:border-gov-blue focus:ring-1 focus:ring-gov-blue"
+                      />
+                      <span className="text-[10px] text-slate-400">Top blue header title</span>
+                    </div>
+
+                    {/* 2. Stub Sub-Header */}
+                    <div className="md:col-span-4 space-y-1">
+                      <label className="block text-[11px] font-extrabold text-slate-700 uppercase">
+                        2. Stub Sub-Header
+                      </label>
+                      <input
+                        type="text"
+                        value={stubSubHeader}
+                        onChange={(e) => setStubSubHeader(e.target.value)}
+                        placeholder="e.g. BENEFICIARY VERIFICATION STUB NO."
+                        className="w-full px-3 py-2 text-xs font-bold border border-slate-300 rounded-xl bg-slate-50/70 focus:bg-white focus:outline-none focus:border-gov-blue focus:ring-1 focus:ring-gov-blue"
+                      />
+                      <span className="text-[10px] text-slate-400">Subtitle below header</span>
+                    </div>
+
+                    {/* 3. Orientation Date & Venue */}
+                    <div className="md:col-span-4 space-y-1">
+                      <label className="block text-[11px] font-extrabold text-slate-700 uppercase">
+                        3. Orientation Date & Venue
+                      </label>
+                      <input
+                        type="text"
+                        value={customOrientation}
+                        onChange={(e) => setCustomOrientation(e.target.value)}
+                        placeholder="e.g. Sep 04, 2026 • 08:00 (Municipal Gymnasium)"
+                        className="w-full px-3 py-2 text-xs font-bold border border-slate-300 rounded-xl bg-slate-50/70 focus:bg-white focus:outline-none focus:border-gov-blue focus:ring-1 focus:ring-gov-blue"
+                      />
+                      <span className="text-[10px] text-slate-400">Sitting above footer underline</span>
+                    </div>
+
+                    {/* 4. Paalala / Advisory Notice */}
+                    <div className="md:col-span-12 space-y-1">
+                      <label className="block text-[11px] font-extrabold text-slate-700 uppercase">
+                        4. Paalala / Advisory Notice Text
+                      </label>
+                      <textarea
+                        rows={2}
+                        value={customPaalala}
+                        onChange={(e) => setCustomPaalala(e.target.value)}
+                        placeholder="e.g. DALHIN ANG STUB NA ITO AT VALID ID NA GINAMIT SA APPLICATION SA ORIENTATION"
+                        className="w-full px-3 py-2 text-xs font-bold border border-slate-300 rounded-xl bg-slate-50/70 focus:bg-white focus:outline-none focus:border-gov-blue focus:ring-1 focus:ring-gov-blue"
+                      />
+                      <div className="flex flex-wrap items-center justify-between gap-2 pt-1 text-[11px]">
+                        <span className="text-slate-400">
+                          Bottom advisory line rendered on all printed verification stubs.
+                        </span>
+
+                        {/* Quick Preset Buttons */}
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          <span className="text-[10px] font-bold text-slate-500 uppercase">Quick Presets:</span>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setCustomOrientation("Sep 04, 2026 • 08:00 (Municipal Gymnasium)")
+                            }
+                            className="px-2 py-0.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-[10px] font-bold rounded-md border border-slate-200"
+                          >
+                            Municipal Gym • 8:00 AM
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setCustomOrientation("Sep 05, 2026 • 09:00 (Barangay Multi-Purpose Hall)")
+                            }
+                            className="px-2 py-0.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-[10px] font-bold rounded-md border border-slate-200"
+                          >
+                            Barangay Hall • 9:00 AM
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setCustomPaalala(
+                                "DALHIN ANG STUB NA ITO AT VALID ID NA GINAMIT SA APPLICATION SA ORIENTATION"
+                              )
+                            }
+                            className="px-2 py-0.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-[10px] font-bold rounded-md border border-slate-200"
+                          >
+                            Standard DOLE Paalala
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -1021,8 +1340,8 @@ function StubsContent() {
         </div>
       </div>
 
-      {/* Screen Preview Container (Ultra-Fast 0ms Response with Live Custom Texts) */}
-      <div className="no-print bg-white p-4 sm:p-8 rounded-2xl shadow-xl border border-slate-200">
+      {/* Screen Preview Container (Ultra-Fast 0ms Response with Live Custom Texts & Custom Styles) */}
+      <div className="no-print bg-white p-4 sm:p-6 rounded-2xl shadow-xl border border-slate-200">
         {!viewAllInPreview && totalSheets > 1 && (
           <div className="pb-4 mb-4 border-b flex items-center justify-between text-xs text-slate-500 font-semibold">
             <span className="flex items-center space-x-1.5">
@@ -1051,7 +1370,7 @@ function StubsContent() {
 
             if (templateMode === "FULL_STUB") {
               return (
-                <div key={pb.id} className="flex items-center justify-center p-1">
+                <div key={pb.id} className="flex items-center justify-center p-0.5">
                   <Format1Stub
                     designatedNumber={pb.designatedNumber}
                     qrDataUrl={qrImg}
@@ -1063,6 +1382,18 @@ function StubsContent() {
                     stubSubHeader={stubSubHeader}
                     orientationDetails={customOrientation}
                     paalalaText={customPaalala}
+                    headerFontSize={headerFontSize}
+                    subHeaderFontSize={subHeaderFontSize}
+                    desigNumFontSize={desigNumFontSize}
+                    nameFontSizeScale={nameFontSizeScale}
+                    brgyFontSizeScale={brgyFontSizeScale}
+                    tableFontSize={tableFontSize}
+                    orientationFontSize={orientationFontSize}
+                    paalalaFontSize={paalalaFontSize}
+                    labelsFontSize={labelsFontSize}
+                    qrSizePercent={qrSizePercent}
+                    cardPadding={cardPadding}
+                    nameAlignment={nameAlignment}
                   />
                 </div>
               );
@@ -1136,7 +1467,7 @@ function StubsContent() {
 
             if (templateMode === "FULL_STUB") {
               return (
-                <div key={pb.id} className="flex items-center justify-center p-1 page-break-inside-avoid">
+                <div key={pb.id} className="flex items-center justify-center p-0.5 page-break-inside-avoid">
                   <Format1Stub
                     designatedNumber={pb.designatedNumber}
                     qrDataUrl={qrImg}
@@ -1148,6 +1479,18 @@ function StubsContent() {
                     stubSubHeader={stubSubHeader}
                     orientationDetails={customOrientation}
                     paalalaText={customPaalala}
+                    headerFontSize={headerFontSize}
+                    subHeaderFontSize={subHeaderFontSize}
+                    desigNumFontSize={desigNumFontSize}
+                    nameFontSizeScale={nameFontSizeScale}
+                    brgyFontSizeScale={brgyFontSizeScale}
+                    tableFontSize={tableFontSize}
+                    orientationFontSize={orientationFontSize}
+                    paalalaFontSize={paalalaFontSize}
+                    labelsFontSize={labelsFontSize}
+                    qrSizePercent={qrSizePercent}
+                    cardPadding={cardPadding}
+                    nameAlignment={nameAlignment}
                   />
                 </div>
               );

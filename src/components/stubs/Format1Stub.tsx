@@ -12,11 +12,24 @@ export interface Format1StubProps {
   stubSubHeader?: string;
   orientationDetails?: string;
   paalalaText?: string;
+  // Manual Design, Typography & Positioning Customizer Props
+  headerFontSize?: number;
+  subHeaderFontSize?: number;
+  desigNumFontSize?: number;
+  nameFontSizeScale?: number;
+  brgyFontSizeScale?: number;
+  tableFontSize?: number;
+  orientationFontSize?: number;
+  paalalaFontSize?: number;
+  labelsFontSize?: number;
+  qrSizePercent?: number;
+  cardPadding?: number;
+  nameAlignment?: "left" | "center";
 }
 
 /**
  * 100% Vector Proportional "Format 1: TUPAD Beneficiary Verification Stub"
- * Features an expanded, stretched header banner and significantly increased Beneficiary Name typography.
+ * Supports real-time manual adjustments for font sizes, scaling, positioning, and alignment.
  */
 export const Format1Stub = memo(function Format1Stub({
   designatedNumber,
@@ -29,30 +42,44 @@ export const Format1Stub = memo(function Format1Stub({
   stubSubHeader = "BENEFICIARY VERIFICATION STUB NO.",
   orientationDetails = "Sep 04, 2026 • 08:00 (Municipal Gymnasium)",
   paalalaText = "DALHIN ANG STUB NA ITO AT VALID ID NA GINAMIT SA APPLICATION SA ORIENTATION",
+  headerFontSize = 6.0,
+  subHeaderFontSize = 2.5,
+  desigNumFontSize = 8.8,
+  nameFontSizeScale = 1.0,
+  brgyFontSizeScale = 1.0,
+  tableFontSize = 4.8,
+  orientationFontSize = 2.3,
+  paalalaFontSize = 2.0,
+  labelsFontSize = 2.0,
+  qrSizePercent = 28,
+  cardPadding = 2.4,
+  nameAlignment = "left",
 }: Format1StubProps) {
   const numStr = String(designatedNumber).replace(/^#/, "");
   const cleanTable = String(tableNumber).replace(/^Table\s*/i, "").replace(/^#/, "");
   const effectiveQr = qrDataUrl || (token ? getCachedQrSync(token) : undefined);
 
-  // Scaled-up Beneficiary Name Typography
+  // Scaled-up Beneficiary Name Base Typography
   const nameLen = fullName.length;
-  const nameFontSize =
+  const baseNameSize =
     nameLen <= 18
-      ? "6.0cqw"
+      ? 6.0
       : nameLen <= 26
-      ? "5.2cqw"
+      ? 5.2
       : nameLen <= 34
-      ? "4.5cqw"
-      : "3.8cqw";
+      ? 4.5
+      : 3.8;
+  const effectiveNameFontSize = `${(baseNameSize * nameFontSizeScale).toFixed(2)}cqw`;
 
-  // Scaled-up Barangay Typography
+  // Scaled-up Barangay Base Typography
   const brgyLen = barangay.length;
-  const brgyFontSize =
+  const baseBrgySize =
     brgyLen <= 8
-      ? "4.6cqw"
+      ? 4.6
       : brgyLen <= 14
-      ? "4.0cqw"
-      : "3.4cqw";
+      ? 4.0
+      : 3.4;
+  const effectiveBrgyFontSize = `${(baseBrgySize * brgyFontSizeScale).toFixed(2)}cqw`;
 
   // Clean orientation details text
   const cleanOrientation = orientationDetails
@@ -67,13 +94,13 @@ export const Format1Stub = memo(function Format1Stub({
     .replace(/\s+/g, " ")
     .trim();
 
-  // Stretched Header Designated Number Size
-  const numFontSize =
+  // Dynamic calculated designated number size
+  const effectiveNumFontSize =
     numStr.length <= 2
-      ? "8.8cqw"
+      ? `${desigNumFontSize}cqw`
       : numStr.length === 3
-      ? "7.4cqw"
-      : "6.0cqw";
+      ? `${(desigNumFontSize * 0.85).toFixed(2)}cqw`
+      : `${(desigNumFontSize * 0.70).toFixed(2)}cqw`;
 
   return (
     <div
@@ -83,14 +110,14 @@ export const Format1Stub = memo(function Format1Stub({
         maxWidth: "480px",
         aspectRatio: "1.52 / 1",
         containerType: "inline-size",
-        padding: "2.4cqw 2.8cqw",
+        padding: `${cardPadding}cqw ${(cardPadding * 1.15).toFixed(2)}cqw`,
         borderRadius: "2.2cqw",
         border: "0.4cqw solid #004b93",
         fontFamily: "'Anton', 'Oswald', 'Bebas Neue', Impact, sans-serif",
       }}
     >
       {/* ========================================================================= */}
-      {/* 1. STRETCHED HEADER & DESIGNATED # (Top Tier)                            */}
+      {/* 1. HEADER SECTION (Adjustable font size & stretch)                        */}
       {/* ========================================================================= */}
       <div
         className="flex items-center justify-between min-w-0 shrink-0"
@@ -105,9 +132,9 @@ export const Format1Stub = memo(function Format1Stub({
             src="/peso-logo.png"
             alt="PESO Logo"
             style={{
-              height: "9.2cqw",
+              height: `${(headerFontSize * 1.5).toFixed(2)}cqw`,
               width: "auto",
-              maxHeight: "9.2cqw",
+              maxHeight: "9.6cqw",
               objectFit: "contain",
               flexShrink: 0,
             }}
@@ -116,7 +143,7 @@ export const Format1Stub = memo(function Format1Stub({
             <h2
               className="text-[#004b93] font-black uppercase tracking-wide leading-none truncate"
               style={{
-                fontSize: "6.0cqw",
+                fontSize: `${headerFontSize}cqw`,
                 letterSpacing: "0.04em",
               }}
               title={stubHeader}
@@ -126,7 +153,7 @@ export const Format1Stub = memo(function Format1Stub({
             <p
               className="text-[#132e57] font-extrabold uppercase tracking-widest leading-tight truncate"
               style={{
-                fontSize: "2.5cqw",
+                fontSize: `${subHeaderFontSize}cqw`,
                 marginTop: "0.4cqw",
                 letterSpacing: "0.04em",
               }}
@@ -142,7 +169,7 @@ export const Format1Stub = memo(function Format1Stub({
           <span
             className="text-[#132e57] font-black tracking-tight leading-none select-all"
             style={{
-              fontSize: numFontSize,
+              fontSize: effectiveNumFontSize,
             }}
           >
             #{numStr}
@@ -151,7 +178,7 @@ export const Format1Stub = memo(function Format1Stub({
       </div>
 
       {/* ========================================================================= */}
-      {/* 2. CORE DEMOGRAPHICS: MAXIMIZED BENEFICIARY NAME, BARANGAY & TABLE       */}
+      {/* 2. CORE DEMOGRAPHICS (Adjustable font size, QR box size & positioning)     */}
       {/* ========================================================================= */}
       <div
         className="flex items-center flex-1 min-h-0"
@@ -161,12 +188,12 @@ export const Format1Stub = memo(function Format1Stub({
           gap: "2.6cqw",
         }}
       >
-        {/* Left: QR Code Container */}
+        {/* Left: QR Code Container (Adjustable Size) */}
         <div
           className="shrink-0 bg-white flex items-center justify-center"
           style={{
-            width: "28cqw",
-            height: "28cqw",
+            width: `${qrSizePercent}cqw`,
+            height: `${qrSizePercent}cqw`,
             borderRadius: "1.6cqw",
             border: "0.25cqw solid #94a3b8",
             padding: "0.8cqw",
@@ -191,18 +218,18 @@ export const Format1Stub = memo(function Format1Stub({
 
         {/* Right: Maximized Demographics Block */}
         <div className="flex-1 flex flex-col justify-between h-full min-w-0 py-0.5">
-          {/* Beneficiary Name (Increased font size & commanding presence) */}
-          <div className="min-w-0">
+          {/* Beneficiary Name */}
+          <div className={`min-w-0 ${nameAlignment === "center" ? "text-center" : "text-left"}`}>
             <span
               className="block font-extrabold text-[#132e57] uppercase tracking-wider"
-              style={{ fontSize: "2.2cqw", marginBottom: "0.2cqw", lineHeight: "1" }}
+              style={{ fontSize: `${labelsFontSize}cqw`, marginBottom: "0.2cqw", lineHeight: "1" }}
             >
               BENEFICIARY NAME:
             </span>
             <span
               className="block text-[#004b93] font-black uppercase tracking-tight select-all break-words"
               style={{
-                fontSize: nameFontSize,
+                fontSize: effectiveNameFontSize,
                 lineHeight: "1.04",
                 letterSpacing: "0.015em",
               }}
@@ -226,14 +253,14 @@ export const Format1Stub = memo(function Format1Stub({
             <div className="min-w-0">
               <span
                 className="block font-extrabold text-[#132e57] uppercase tracking-wider"
-                style={{ fontSize: "2.0cqw", marginBottom: "0.15cqw", lineHeight: "1" }}
+                style={{ fontSize: `${labelsFontSize}cqw`, marginBottom: "0.15cqw", lineHeight: "1" }}
               >
                 BARANGAY:
               </span>
               <span
                 className="block text-[#004b93] font-black uppercase tracking-tight select-all break-words"
                 style={{
-                  fontSize: brgyFontSize,
+                  fontSize: effectiveBrgyFontSize,
                   lineHeight: "1.05",
                 }}
                 title={barangay}
@@ -252,14 +279,14 @@ export const Format1Stub = memo(function Format1Stub({
             >
               <span
                 className="block font-extrabold text-[#132e57] uppercase tracking-wider"
-                style={{ fontSize: "2.0cqw", marginBottom: "0.15cqw", lineHeight: "1" }}
+                style={{ fontSize: `${labelsFontSize}cqw`, marginBottom: "0.15cqw", lineHeight: "1" }}
               >
                 TABLE ASSIGNMENT:
               </span>
               <span
                 className="block text-[#004b93] font-black tracking-tight select-all"
                 style={{
-                  fontSize: "4.8cqw",
+                  fontSize: `${tableFontSize}cqw`,
                   lineHeight: "1.0",
                 }}
               >
@@ -271,7 +298,7 @@ export const Format1Stub = memo(function Format1Stub({
       </div>
 
       {/* ========================================================================= */}
-      {/* 3. FOOTER SECTION: ORIENTATION DATE & VENUE + PAALALA ADVISORY             */}
+      {/* 3. FOOTER SECTION (Adjustable font size & schedule text)                   */}
       {/* ========================================================================= */}
       <div
         className="flex flex-col min-w-0 shrink-0"
@@ -282,11 +309,11 @@ export const Format1Stub = memo(function Format1Stub({
           fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
         }}
       >
-        {/* Tier 3: Orientation Date & Venue */}
+        {/* Orientation Date & Venue */}
         <div
           className="flex flex-wrap items-baseline text-[#004b93] leading-tight"
           style={{
-            fontSize: "2.3cqw",
+            fontSize: `${orientationFontSize}cqw`,
             gap: "0.8cqw",
           }}
         >
@@ -298,11 +325,11 @@ export const Format1Stub = memo(function Format1Stub({
           </span>
         </div>
 
-        {/* Tier 4: Reminder / Paalala Notice */}
+        {/* Paalala Notice */}
         <div
           className="flex flex-wrap items-baseline text-[#004b93]"
           style={{
-            fontSize: "2.0cqw",
+            fontSize: `${paalalaFontSize}cqw`,
             lineHeight: "1.18",
             gap: "0.8cqw",
           }}
