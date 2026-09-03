@@ -60,7 +60,11 @@ export default async function LandingPage() {
             <a href="#hero" className="hover:text-gov-blue text-gov-blue border-b-2 border-gov-blue pb-0.5 whitespace-nowrap">
               Home
             </a>
-            <a href="#inquiry" className="hover:text-gov-blue text-gov-blue transition whitespace-nowrap flex items-center space-x-1">
+            <a href="/apply" className="text-emerald-700 hover:text-emerald-800 bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-200 transition whitespace-nowrap flex items-center space-x-1 font-extrabold">
+              <Sparkles className="w-3.5 h-3.5 text-emerald-600" />
+              <span>Online TUPAD Application</span>
+            </a>
+            <a href="#inquiry" className="hover:text-gov-blue transition whitespace-nowrap flex items-center space-x-1">
               <FileCheck className="w-3.5 h-3.5 text-gov-gold" />
               <span>Application Status Inquiry</span>
             </a>
@@ -137,18 +141,34 @@ export default async function LandingPage() {
             </p>
 
             {/* Quick Access Card Grid */}
-            <div className="pt-2 grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div className="pt-2 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
               <a
-                href="#inquiry"
-                className="group p-3.5 bg-white hover:bg-blue-50/50 rounded-2xl border border-slate-200 shadow-sm hover:shadow-md transition flex items-center justify-between"
+                href="/apply"
+                className="group p-3 bg-gradient-to-br from-emerald-600 to-emerald-700 text-white rounded-2xl border border-emerald-500 shadow-md hover:shadow-lg transition flex items-center justify-between"
               >
-                <div className="flex items-center space-x-2.5">
-                  <div className="w-9 h-9 rounded-xl bg-gov-blue/10 text-gov-blue flex items-center justify-center font-bold flex-shrink-0">
-                    <FileCheck className="w-4.5 h-4.5 text-gov-blue group-hover:scale-110 transition" />
+                <div className="flex items-center space-x-2">
+                  <div className="w-8 h-8 rounded-xl bg-white/20 text-white flex items-center justify-center font-bold flex-shrink-0">
+                    <Sparkles className="w-4 h-4 text-gov-goldLight group-hover:scale-110 transition" />
                   </div>
                   <div>
-                    <h2 className="text-xs font-black text-slate-900 group-hover:text-gov-blue transition">Status Inquiry</h2>
-                    <p className="text-[10px] text-slate-500 font-medium">Check Application</p>
+                    <h2 className="text-xs font-black leading-tight">Online Application</h2>
+                    <p className="text-[10px] text-emerald-100 font-medium">Apply Online</p>
+                  </div>
+                </div>
+                <ArrowRight className="w-3.5 h-3.5 text-white/80 group-hover:translate-x-0.5 transition" />
+              </a>
+
+              <a
+                href="#inquiry"
+                className="group p-3 bg-white hover:bg-blue-50/50 rounded-2xl border border-slate-200 shadow-sm hover:shadow-md transition flex items-center justify-between"
+              >
+                <div className="flex items-center space-x-2">
+                  <div className="w-8 h-8 rounded-xl bg-gov-blue/10 text-gov-blue flex items-center justify-center font-bold flex-shrink-0">
+                    <FileCheck className="w-4 h-4 text-gov-blue group-hover:scale-110 transition" />
+                  </div>
+                  <div>
+                    <h2 className="text-xs font-black text-slate-900 group-hover:text-gov-blue transition leading-tight">Status Inquiry</h2>
+                    <p className="text-[10px] text-slate-500 font-medium">Check Status</p>
                   </div>
                 </div>
                 <ArrowRight className="w-3.5 h-3.5 text-slate-400 group-hover:text-gov-blue group-hover:translate-x-0.5 transition" />
@@ -156,31 +176,31 @@ export default async function LandingPage() {
 
               <a
                 href="#inquiry-form"
-                className="group p-3.5 bg-white hover:bg-blue-50/50 rounded-2xl border border-slate-200 shadow-sm hover:shadow-md transition flex items-center justify-between"
+                className="group p-3 bg-white hover:bg-blue-50/50 rounded-2xl border border-slate-200 shadow-sm hover:shadow-md transition flex items-center justify-between"
               >
-                <div className="flex items-center space-x-2.5">
-                  <div className="w-9 h-9 rounded-xl bg-emerald-500/10 text-emerald-700 flex items-center justify-center font-bold flex-shrink-0">
-                    <MessageSquare className="w-4.5 h-4.5 text-emerald-600 group-hover:scale-110 transition" />
+                <div className="flex items-center space-x-2">
+                  <div className="w-8 h-8 rounded-xl bg-blue-500/10 text-gov-blue flex items-center justify-center font-bold flex-shrink-0">
+                    <MessageSquare className="w-4 h-4 text-gov-blue group-hover:scale-110 transition" />
                   </div>
                   <div>
-                    <h2 className="text-xs font-black text-slate-900 group-hover:text-emerald-700 transition">Direct Message</h2>
-                    <p className="text-[10px] text-slate-500 font-medium">Inquiry & Feedback</p>
+                    <h2 className="text-xs font-black text-slate-900 group-hover:text-gov-blue transition leading-tight">Direct Message</h2>
+                    <p className="text-[10px] text-slate-500 font-medium">Send Feedback</p>
                   </div>
                 </div>
-                <ArrowRight className="w-3.5 h-3.5 text-slate-400 group-hover:text-emerald-600 group-hover:translate-x-0.5 transition" />
+                <ArrowRight className="w-3.5 h-3.5 text-slate-400 group-hover:text-gov-blue group-hover:translate-x-0.5 transition" />
               </a>
 
               <a
                 href="/restrictions/checker"
-                className="group p-3.5 bg-white hover:bg-amber-50/50 rounded-2xl border border-slate-200 shadow-sm hover:shadow-md transition flex items-center justify-between"
+                className="group p-3 bg-white hover:bg-amber-50/50 rounded-2xl border border-slate-200 shadow-sm hover:shadow-md transition flex items-center justify-between"
               >
-                <div className="flex items-center space-x-2.5">
-                  <div className="w-9 h-9 rounded-xl bg-amber-500/10 text-amber-700 flex items-center justify-center font-bold flex-shrink-0">
-                    <Search className="w-4.5 h-4.5 text-amber-600 group-hover:scale-110 transition" />
+                <div className="flex items-center space-x-2">
+                  <div className="w-8 h-8 rounded-xl bg-amber-500/10 text-amber-700 flex items-center justify-center font-bold flex-shrink-0">
+                    <Search className="w-4 h-4 text-amber-600 group-hover:scale-110 transition" />
                   </div>
                   <div>
-                    <h2 className="text-xs font-black text-slate-900 group-hover:text-amber-700 transition">365-Day Checker</h2>
-                    <p className="text-[10px] text-slate-500 font-medium">Verify Eligibility</p>
+                    <h2 className="text-xs font-black text-slate-900 group-hover:text-amber-700 transition leading-tight">365-Day Checker</h2>
+                    <p className="text-[10px] text-slate-500 font-medium">Check Eligibility</p>
                   </div>
                 </div>
                 <ArrowRight className="w-3.5 h-3.5 text-slate-400 group-hover:text-amber-600 group-hover:translate-x-0.5 transition" />

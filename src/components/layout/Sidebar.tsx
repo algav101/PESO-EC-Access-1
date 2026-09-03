@@ -22,6 +22,7 @@ import {
   RefreshCw,
   Search,
   MessageSquare,
+  Sparkles,
   X,
   LogOut,
   User as UserIcon,
@@ -44,6 +45,7 @@ export function Sidebar({ isMobile = false, onClose }: SidebarProps) {
         { label: "Programs & Work Plans", href: "/programs", icon: FolderKanban, permission: "program.read" },
         { label: "Beneficiaries Masterlist", href: "/beneficiaries", icon: Users, permission: "beneficiary.read" },
         { label: "QR & Stub Designer", href: "/stubs", icon: Printer, permission: "stub.configure" },
+        { label: "Online Application Portal", href: "/apply", icon: Sparkles, permission: "dashboard.view" },
       ],
     },
     {

@@ -22,17 +22,25 @@ async function runE2ETests() {
   }
 
   // -------------------------------------------------------------------------
-  // 1. Check Server Health
+  // 1. Check Server Health (with warm-up retry)
   // -------------------------------------------------------------------------
   console.log("[1] Checking Local Server & Database Health...");
-  try {
-    const res = await fetch(`${BASE_URL}/api/v1/health`);
-    const data = await res.json();
-    assert(res.status === 200, "Health check responded with status 200");
-    assert(data.database === "connected", "PostgreSQL database is connected");
-  } catch (err) {
-    assert(false, `Health check failed: ${err.message}`);
+  let healthOk = false;
+  for (let i = 0; i < 5; i++) {
+    try {
+      const res = await fetch(`${BASE_URL}/api/v1/health`);
+      if (res.status === 200) {
+        const data = await res.json();
+        if (data.database === "connected") {
+          healthOk = true;
+          break;
+        }
+      }
+    } catch (e) {
+      await new Promise((r) => setTimeout(r, 1000));
+    }
   }
+  assert(healthOk, "Local server and PostgreSQL database are healthy and connected");
 
   // -------------------------------------------------------------------------
   // 2. Check Landing Page HTML Render
@@ -274,6 +282,85 @@ async function runE2ETests() {
     } catch (err) {
       assert(false, `Template download test failed: ${err.message}`);
     }
+  }
+
+  // -------------------------------------------------------------------------
+  // 6. Testing Online TUPAD Application & Dummy Logic Scenarios
+  // -------------------------------------------------------------------------
+  console.log("\n[6] Testing Online TUPAD Application Portal & Sandbox Submissions...");
+  try {
+    // 6a. Submit Complete Eligible Application
+    const submitRes = await fetch(`${BASE_URL}/api/v1/public/applications`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        lastName: "DELA CRUZ",
+        firstName: "JUAN",
+        middleName: "SANTOS",
+        birthday: "1988-05-14",
+        sex: "MALE",
+        civilStatus: "MARRIED",
+        contactNumber: "09123456789",
+        streetSitio: "Centro",
+        barangay: "Paltic",
+        idPresented: "UMID",
+        idNumber: "CRN-0111-2222-3333",
+        is4ps: "N",
+        isIp: "N",
+        occupation: "CONSTRUCTION LABORER",
+        monthlyIncome: "4500",
+        dependentFullName: "MARIA DELA CRUZ",
+        dependentAge: "34",
+        dependentRelationship: "SPOUSE",
+        remarks: "Online Application Test Submission",
+      }),
+    });
+    const submitData = await submitRes.json();
+    assert(submitRes.status === 200, "Online application submission endpoint responded with status 200");
+    assert(submitData.applicationCode && submitData.applicationCode.startsWith("APP-"), "Generated unique application tracking code");
+    assert(submitData.status === "QUEUED", "Complete application marked with status QUEUED");
+    assert(submitData.message.includes("kasalukuyang nakapila"), "Returns queued approval confirmation message");
+
+    // 6b. Submit Incomplete Application (Missing ID & Contact)
+    const incompleteRes = await fetch(`${BASE_URL}/api/v1/public/applications`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        lastName: "SANTOS",
+        firstName: "MARIA",
+        middleName: "GOMEZ",
+        birthday: "1994-11-22",
+        sex: "FEMALE",
+        civilStatus: "SINGLE",
+        contactNumber: "",
+        streetSitio: "Purok 2",
+        barangay: "Aplaya",
+        idPresented: "",
+        idNumber: "",
+        is4ps: "N",
+        isIp: "N",
+        occupation: "HOUSEWIFE",
+        monthlyIncome: "2000",
+        dependentFullName: "",
+        dependentAge: "",
+        dependentRelationship: "",
+      }),
+    });
+    const incompleteData = await incompleteRes.json();
+    assert(incompleteRes.status === 200, "Incomplete submission recorded successfully");
+    assert(incompleteData.status === "INCOMPLETE", "Incomplete application marked with status INCOMPLETE");
+    assert(incompleteData.isLackingDetails === true, "Flags lacking details boolean");
+    assert(incompleteData.lackingFields.length >= 3, "Itemizes missing requirements for applicant follow-up");
+    assert(incompleteData.message.includes("Magtungo sa Tangapan ng PESO-Dingalan"), "Returns lacking details guidance notice");
+
+    // 6c. Verify /apply page render
+    const applyPageRes = await fetch(`${BASE_URL}/apply`);
+    const applyHtml = await applyPageRes.text();
+    assert(applyPageRes.status === 200, "Online application page (/apply) responded with status 200");
+    assert(applyHtml.includes("Online TUPAD Application Portal"), "Contains portal header and title");
+    assert(applyHtml.includes("Logic Planning &amp; Debugging Quick Autofill Sandbox") || applyHtml.includes("Quick Autofill Sandbox"), "Contains testing & logic planning sandbox dummy toolbar");
+  } catch (err) {
+    assert(false, `Online application test failed: ${err.message}`);
   }
 
   // -------------------------------------------------------------------------
