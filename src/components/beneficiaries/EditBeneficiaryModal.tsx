@@ -64,6 +64,9 @@ export function EditBeneficiaryModal({
   const [designatedNumber, setDesignatedNumber] = useState("");
   const [participationStatus, setParticipationStatus] = useState("ACTIVE");
   const [orientationStatus, setOrientationStatus] = useState("PENDING");
+  const [distributionStatus, setDistributionStatus] = useState("NO_CHANGE");
+  const [replacementReason, setReplacementReason] = useState("UNREACHABLE_PHONE_OR_RESIDENCE");
+  const [replacementRemarks, setReplacementRemarks] = useState("");
   const [tableNumber, setTableNumber] = useState("");
   const [slotGroup, setSlotGroup] = useState("");
 
@@ -100,6 +103,20 @@ export function EditBeneficiaryModal({
         setSlotGroup(targetPb.slotGroup || "Main");
         const hasOrientation = targetPb.orientationAttendance && targetPb.orientationAttendance.length > 0;
         setOrientationStatus(hasOrientation ? "PRESENT" : "PENDING");
+
+        const isFlagged =
+          targetPb.participationStatus === "FLAGGED_FOR_REPLACEMENT" ||
+          targetPb.stubDistributions?.some((d: any) => d.status === "FLAGGED_REPLACEMENT");
+        const isDist = targetPb.stubDistributions?.some((d: any) => d.status === "DISTRIBUTED");
+
+        if (isFlagged) {
+          setDistributionStatus("FLAGGED_REPLACEMENT");
+        } else if (isDist) {
+          setDistributionStatus("DISTRIBUTED");
+        } else {
+          setDistributionStatus("PENDING");
+        }
+        setReplacementRemarks(targetPb.stubDistributions?.[0]?.remarks || "");
       }
 
       if (targetBene) {
@@ -152,6 +169,9 @@ export function EditBeneficiaryModal({
             tableNumber,
             slotGroup,
             orientationStatus,
+            distributionStatus: distributionStatus !== "NO_CHANGE" ? distributionStatus : undefined,
+            replacementReason: distributionStatus === "FLAGGED_REPLACEMENT" ? replacementReason : undefined,
+            replacementRemarks,
             fullName,
             birthday,
             sex,
@@ -359,6 +379,105 @@ export function EditBeneficiaryModal({
                   onChange={(e) => setSlotGroup(e.target.value)}
                   placeholder="e.g. Main, DepEd Slot"
                   className="w-full text-xs font-medium px-3 py-2 bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-gov-blue focus:outline-none"
+                />
+            </div>
+
+            {/* Stub Distribution & Affirmation / Flag for Replacement Admin Override */}
+            <div className="pt-3 border-t border-slate-200 space-y-2">
+              <div className="flex items-center justify-between">
+                <label className="text-[11px] font-black text-gov-blue uppercase tracking-wider flex items-center space-x-1.5">
+                  <ShieldAlert className="w-3.5 h-3.5 text-gov-gold" />
+                  <span>Stub Distribution & Affirmation (PESO Admin Override)</span>
+                </label>
+                <span className="text-[10px] px-1.5 py-0.5 bg-amber-100 text-amber-900 font-bold rounded">
+                  Admin Authority
+                </span>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                <button
+                  type="button"
+                  onClick={() => setDistributionStatus("DISTRIBUTED")}
+                  className={`p-2 rounded-xl text-left border-2 transition ${
+                    distributionStatus === "DISTRIBUTED"
+                      ? "border-emerald-600 bg-emerald-50/70 text-emerald-900"
+                      : "border-slate-200 hover:border-slate-300 bg-white text-slate-700"
+                  }`}
+                >
+                  <div className="flex items-center space-x-1 text-xs font-bold">
+                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                    <span>✓ Distributed & Affirmed</span>
+                  </div>
+                  <p className="text-[10px] text-slate-500 mt-0.5 leading-tight">
+                    Informed & confirmed received
+                  </p>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setDistributionStatus("PENDING")}
+                  className={`p-2 rounded-xl text-left border-2 transition ${
+                    distributionStatus === "PENDING"
+                      ? "border-amber-500 bg-amber-50/70 text-amber-900"
+                      : "border-slate-200 hover:border-slate-300 bg-white text-slate-700"
+                  }`}
+                >
+                  <div className="flex items-center space-x-1 text-xs font-bold">
+                    <Clock className="w-3.5 h-3.5 text-amber-600" />
+                    <span>⏳ Pending (Reset)</span>
+                  </div>
+                  <p className="text-[10px] text-slate-500 mt-0.5 leading-tight">
+                    Reset coordinator scan mistake
+                  </p>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setDistributionStatus("FLAGGED_REPLACEMENT")}
+                  className={`p-2 rounded-xl text-left border-2 transition ${
+                    distributionStatus === "FLAGGED_REPLACEMENT"
+                      ? "border-rose-600 bg-rose-50/70 text-rose-900"
+                      : "border-slate-200 hover:border-slate-300 bg-white text-slate-700"
+                  }`}
+                >
+                  <div className="flex items-center space-x-1 text-xs font-bold">
+                    <AlertCircle className="w-3.5 h-3.5 text-rose-600" />
+                    <span>🚩 Flag for Replacement</span>
+                  </div>
+                  <p className="text-[10px] text-slate-500 mt-0.5 leading-tight">
+                    Candidate for onsite replacement
+                  </p>
+                </button>
+              </div>
+
+              {distributionStatus === "FLAGGED_REPLACEMENT" && (
+                <div className="p-2.5 bg-rose-50 rounded-lg border border-rose-200 space-y-1.5 animate-in fade-in">
+                  <label className="block text-[10px] font-bold text-rose-900 uppercase">
+                    Replacement Reason:
+                  </label>
+                  <select
+                    value={replacementReason}
+                    onChange={(e) => setReplacementReason(e.target.value)}
+                    className="w-full text-xs font-bold px-2.5 py-1.5 bg-white border border-rose-300 rounded-lg text-slate-800 focus:outline-none"
+                  >
+                    <option value="UNREACHABLE_PHONE_OR_RESIDENCE">Unreachable / Contact Inactive / Unlocated</option>
+                    <option value="REFUSED_BENEFICIARY">Voluntarily Refused / Declined Participation</option>
+                    <option value="RELOCATED_OR_MOVED">Relocated / Moved Outside Dingalan</option>
+                    <option value="DUPLICATE_OR_INELIGIBLE">Disqualified / Restricted (Duplicate / Appointive / 320-Day Rule)</option>
+                    <option value="HOSPITALIZED_OR_MEDICAL">Medical Incapacity / Hospitalized / Bedridden</option>
+                    <option value="DECEASED">Deceased</option>
+                    <option value="OTHER">Other Administrative Reason</option>
+                  </select>
+                </div>
+              )}
+
+              <div className="pt-1">
+                <input
+                  type="text"
+                  value={replacementRemarks}
+                  onChange={(e) => setReplacementRemarks(e.target.value)}
+                  placeholder="Admin Remarks / Audit notes regarding distribution or replacement..."
+                  className="w-full text-xs px-3 py-1.5 bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-gov-blue focus:outline-none placeholder:text-slate-400"
                 />
               </div>
             </div>

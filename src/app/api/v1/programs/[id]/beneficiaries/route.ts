@@ -70,7 +70,7 @@ export async function GET(request: Request, { params }: { params: { id: string }
           select: { id: true, publicToken: true, status: true },
         },
         stubDistributions: {
-          select: { id: true, status: true, distributedAt: true },
+          select: { id: true, status: true, distributedAt: true, verificationMethod: true, remarks: true },
         },
         orientationAttendance: {
           select: { id: true, status: true, scannedAt: true },
@@ -326,6 +326,11 @@ export async function PATCH(request: Request, { params }: { params: { id: string
       tableNumber,
       slotGroup,
       orientationStatus, // "PRESENT", "PENDING", "ABSENT"
+      // Administrative Distribution & Replacement Override fields
+      distributionStatus, // "DISTRIBUTED", "PENDING", "FLAGGED_REPLACEMENT"
+      distributionMethod, // "MANUAL_ADMIN_OVERRIDE", "BIRTHDAY_PIN"
+      replacementReason,
+      replacementRemarks,
       // Beneficiary fields
       fullName,
       lastName,
@@ -365,6 +370,8 @@ export async function PATCH(request: Request, { params }: { params: { id: string
       include: {
         beneficiary: true,
         orientationAttendance: true,
+        qrCodes: true,
+        stubDistributions: true,
       },
     });
 
@@ -462,6 +469,104 @@ export async function PATCH(request: Request, { params }: { params: { id: string
               programId: params.id,
               programBeneficiaryId: targetPb.id,
             },
+          });
+        }
+      }
+
+      // 4. Update Stub Distribution & Affirmation / Flag for Replacement status if requested
+      if (distributionStatus !== undefined) {
+        if (distributionStatus === "DISTRIBUTED") {
+          let activeQr = targetPb.qrCodes.find((q: any) => q.status === "ACTIVE") || targetPb.qrCodes[0];
+          if (!activeQr) {
+            const qrData = generateBeneficiaryToken(params.id, targetPb.designatedNumber);
+            activeQr = await tx.qrCode.create({
+              data: {
+                programId: params.id,
+                programBeneficiaryId: targetPb.id,
+                publicToken: qrData.publicToken,
+                tokenHash: qrData.tokenHash,
+                status: "ACTIVE",
+              },
+            });
+          }
+
+          // Clear any existing distribution/flagging
+          await tx.stubDistribution.deleteMany({
+            where: { programBeneficiaryId: targetPb.id },
+          });
+
+          await tx.stubDistribution.create({
+            data: {
+              qrId: activeQr.id,
+              programBeneficiaryId: targetPb.id,
+              distributedById: user.id,
+              verificationMethod: distributionMethod || "MANUAL_ADMIN_OVERRIDE",
+              status: "DISTRIBUTED",
+              remarks: replacementRemarks || "PESO Admin manual distribution & affirmation override",
+              latitude: 15.3941,
+              longitude: 121.3965,
+              deviceId: "ADMIN_CONSOLE",
+            },
+          });
+
+          // Ensure participation status is ACTIVE
+          await tx.programBeneficiary.update({
+            where: { id: targetPb.id },
+            data: { participationStatus: "ACTIVE" },
+          });
+        } else if (distributionStatus === "PENDING") {
+          // Reset / clear distribution records
+          await tx.stubDistribution.deleteMany({
+            where: { programBeneficiaryId: targetPb.id },
+          });
+
+          // Restore participation status to ACTIVE if it was FLAGGED_FOR_REPLACEMENT
+          if (targetPb.participationStatus === "FLAGGED_FOR_REPLACEMENT") {
+            await tx.programBeneficiary.update({
+              where: { id: targetPb.id },
+              data: { participationStatus: "ACTIVE" },
+            });
+          }
+        } else if (distributionStatus === "FLAGGED_REPLACEMENT") {
+          let activeQr = targetPb.qrCodes.find((q: any) => q.status === "ACTIVE") || targetPb.qrCodes[0];
+          if (!activeQr) {
+            const qrData = generateBeneficiaryToken(params.id, targetPb.designatedNumber);
+            activeQr = await tx.qrCode.create({
+              data: {
+                programId: params.id,
+                programBeneficiaryId: targetPb.id,
+                publicToken: qrData.publicToken,
+                tokenHash: qrData.tokenHash,
+                status: "ACTIVE",
+              },
+            });
+          }
+
+          await tx.stubDistribution.deleteMany({
+            where: { programBeneficiaryId: targetPb.id },
+          });
+
+          const combinedReason = replacementReason
+            ? `${replacementReason}${replacementRemarks ? ` - ${replacementRemarks}` : ""}`
+            : replacementRemarks || "Flagged for replacement by PESO Admin";
+
+          await tx.stubDistribution.create({
+            data: {
+              qrId: activeQr.id,
+              programBeneficiaryId: targetPb.id,
+              distributedById: user.id,
+              verificationMethod: "ADMIN_FLAG",
+              status: "FLAGGED_REPLACEMENT",
+              remarks: combinedReason,
+              latitude: 15.3941,
+              longitude: 121.3965,
+              deviceId: "ADMIN_CONSOLE",
+            },
+          });
+
+          await tx.programBeneficiary.update({
+            where: { id: targetPb.id },
+            data: { participationStatus: "FLAGGED_FOR_REPLACEMENT" },
           });
         }
       }
