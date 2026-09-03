@@ -143,7 +143,7 @@ export default async function LandingPage() {
             </div>
 
             <h1 className="text-3xl sm:text-4xl lg:text-5xl font-black text-slate-900 tracking-tight leading-[1.15]">
-              Empowering Dingalan through Emergency Employment
+              Pagpapalakas ng Serbisyo ng PESO upang mas maipa-DAMA sa bawat Pamilyang DINGALEÑO
             </h1>
 
             <p className="text-sm sm:text-base text-slate-600 leading-relaxed font-normal">
