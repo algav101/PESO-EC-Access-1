@@ -380,6 +380,7 @@ export function EditBeneficiaryModal({
                   placeholder="e.g. Main, DepEd Slot"
                   className="w-full text-xs font-medium px-3 py-2 bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-gov-blue focus:outline-none"
                 />
+              </div>
             </div>
 
             {/* Stub Distribution & Affirmation / Flag for Replacement Admin Override */}
