@@ -486,3 +486,64 @@ model TupadWorkProgramItem {
   attendanceRecords   AttendanceRecord[]
   accomplishmentPhotos AccomplishmentPhoto[]
 }
+
+model TupadApplicationRoster {
+  id                    String   @id @default(uuid())
+  batchName             String?  @default("TUPAD Applicant Masterlist")
+  lastName              String
+  firstName             String
+  middleName            String?
+  extensionName         String?
+  fullName              String   // Standard normalized: "LAST, FIRST MIDDLE EXT"
+  birthMonth            String?
+  birthDay              String?
+  birthYear             String?
+  birthday              String?  // Formatted MM-DD-YYYY or YYYY-MM-DD
+  civilStatus           String?
+  streetSitio           String?
+  barangay              String?
+  contactNumber         String?
+  idPresented           String?
+  idNumber              String?
+  is4ps                 String?  // "Y", "N", "YES", "NO"
+  isIp                  String?  // "Y", "N", "YES", "NO"
+  occupation            String?
+  monthlyIncome         String?
+  dependentFullName     String?
+  dependentAge          String?
+  dependentRelationship String?
+  remarks               String?
+  status                String   @default("QUEUED") // QUEUED, INCOMPLETE, APPROVED, DISQUALIFIED
+  uploadedById          String?
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  @@index([fullName])
+  @@index([lastName, firstName])
+  @@index([barangay])
+}
+
+model PublicInquiryMessage {
+  id             String    @id @default(uuid())
+  trackingCode   String    @unique
+  category       String    @default("INQUIRY") // INQUIRY, SUGGESTION, COMMENT, APPLICATION_FOLLOWUP
+  subject        String?
+  message        String
+  isAnonymous    Boolean   @default(false)
+  senderName     String
+  senderContact  String
+  senderBarangay String?
+  status         String    @default("UNREAD") // UNREAD, REVIEWED, REPLIED, RESOLVED, ARCHIVED
+  adminRemarks   String?
+  adminReply     String?
+  repliedAt      DateTime?
+  repliedById    String?
+  ipAddress      String?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  @@index([status])
+  @@index([trackingCode])
+  @@index([createdAt])
+}
+

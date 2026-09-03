@@ -1,6 +1,8 @@
 import React from "react";
 import prisma from "@/lib/prisma";
 import { PesoLogo } from "@/components/layout/PesoLogo";
+import { PublicStatusInquiryCard } from "@/components/public/PublicStatusInquiryCard";
+import { PublicInquiryMessageForm } from "@/components/public/PublicInquiryMessageForm";
 import {
   ShieldCheck,
   MapPin,
@@ -19,6 +21,8 @@ import {
   ExternalLink,
   ChevronRight,
   Award,
+  MessageSquare,
+  FileCheck,
 } from "lucide-react";
 
 export const dynamic = "force-dynamic";
@@ -56,8 +60,13 @@ export default async function LandingPage() {
             <a href="#hero" className="hover:text-gov-blue text-gov-blue border-b-2 border-gov-blue pb-0.5 whitespace-nowrap">
               Home
             </a>
-            <a href="#about" className="hover:text-gov-blue transition whitespace-nowrap">
-              About TUPAD
+            <a href="#inquiry" className="hover:text-gov-blue text-gov-blue transition whitespace-nowrap flex items-center space-x-1">
+              <FileCheck className="w-3.5 h-3.5 text-gov-gold" />
+              <span>Application Status Inquiry</span>
+            </a>
+            <a href="#inquiry-form" className="hover:text-gov-blue transition whitespace-nowrap flex items-center space-x-1">
+              <MessageSquare className="w-3.5 h-3.5 text-gov-blue" />
+              <span>Message & Feedback</span>
             </a>
             <a href="#programs" className="hover:text-gov-blue transition whitespace-nowrap">
               Active Programs
@@ -127,38 +136,54 @@ export default async function LandingPage() {
               The <strong className="text-slate-900">TUPAD Electronic Content (EC) Management System</strong> streamlines the administration of emergency employment programs—delivering transparent beneficiary verification, cryptographic QR attendance, and automated 365-day compliance monitoring for the municipality of Dingalan under the leadership of <strong className="text-slate-900">Mayor Aurora G. Taay</strong>.
             </p>
 
-            {/* Quick Access Card */}
-            <div className="pt-2 grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {/* Quick Access Card Grid */}
+            <div className="pt-2 grid grid-cols-1 sm:grid-cols-3 gap-3">
               <a
-                href="/login"
-                className="group p-4 bg-white hover:bg-blue-50/50 rounded-2xl border border-slate-200 shadow-sm hover:shadow-md transition flex items-center justify-between"
+                href="#inquiry"
+                className="group p-3.5 bg-white hover:bg-blue-50/50 rounded-2xl border border-slate-200 shadow-sm hover:shadow-md transition flex items-center justify-between"
               >
-                <div className="flex items-center space-x-3">
-                  <div className="w-10 h-10 rounded-xl bg-gov-blue/10 text-gov-blue flex items-center justify-center font-bold">
-                    <Lock className="w-5 h-5 text-gov-blue group-hover:scale-110 transition" />
+                <div className="flex items-center space-x-2.5">
+                  <div className="w-9 h-9 rounded-xl bg-gov-blue/10 text-gov-blue flex items-center justify-center font-bold flex-shrink-0">
+                    <FileCheck className="w-4.5 h-4.5 text-gov-blue group-hover:scale-110 transition" />
                   </div>
                   <div>
-                    <h2 className="text-xs font-black text-slate-900 group-hover:text-gov-blue transition">TUPAD Staff Portal</h2>
-                    <p className="text-[11px] text-slate-500 font-medium">Login to EC Management</p>
+                    <h2 className="text-xs font-black text-slate-900 group-hover:text-gov-blue transition">Status Inquiry</h2>
+                    <p className="text-[10px] text-slate-500 font-medium">Check Application</p>
                   </div>
                 </div>
-                <ArrowRight className="w-4 h-4 text-slate-400 group-hover:text-gov-blue group-hover:translate-x-0.5 transition" />
+                <ArrowRight className="w-3.5 h-3.5 text-slate-400 group-hover:text-gov-blue group-hover:translate-x-0.5 transition" />
+              </a>
+
+              <a
+                href="#inquiry-form"
+                className="group p-3.5 bg-white hover:bg-blue-50/50 rounded-2xl border border-slate-200 shadow-sm hover:shadow-md transition flex items-center justify-between"
+              >
+                <div className="flex items-center space-x-2.5">
+                  <div className="w-9 h-9 rounded-xl bg-emerald-500/10 text-emerald-700 flex items-center justify-center font-bold flex-shrink-0">
+                    <MessageSquare className="w-4.5 h-4.5 text-emerald-600 group-hover:scale-110 transition" />
+                  </div>
+                  <div>
+                    <h2 className="text-xs font-black text-slate-900 group-hover:text-emerald-700 transition">Direct Message</h2>
+                    <p className="text-[10px] text-slate-500 font-medium">Inquiry & Feedback</p>
+                  </div>
+                </div>
+                <ArrowRight className="w-3.5 h-3.5 text-slate-400 group-hover:text-emerald-600 group-hover:translate-x-0.5 transition" />
               </a>
 
               <a
                 href="/restrictions/checker"
-                className="group p-4 bg-white hover:bg-amber-50/50 rounded-2xl border border-slate-200 shadow-sm hover:shadow-md transition flex items-center justify-between"
+                className="group p-3.5 bg-white hover:bg-amber-50/50 rounded-2xl border border-slate-200 shadow-sm hover:shadow-md transition flex items-center justify-between"
               >
-                <div className="flex items-center space-x-3">
-                  <div className="w-10 h-10 rounded-xl bg-amber-500/10 text-amber-700 flex items-center justify-center font-bold">
-                    <Search className="w-5 h-5 text-amber-600 group-hover:scale-110 transition" />
+                <div className="flex items-center space-x-2.5">
+                  <div className="w-9 h-9 rounded-xl bg-amber-500/10 text-amber-700 flex items-center justify-center font-bold flex-shrink-0">
+                    <Search className="w-4.5 h-4.5 text-amber-600 group-hover:scale-110 transition" />
                   </div>
                   <div>
                     <h2 className="text-xs font-black text-slate-900 group-hover:text-amber-700 transition">365-Day Checker</h2>
-                    <p className="text-[11px] text-slate-500 font-medium">Verify public eligibility</p>
+                    <p className="text-[10px] text-slate-500 font-medium">Verify Eligibility</p>
                   </div>
                 </div>
-                <ArrowRight className="w-4 h-4 text-slate-400 group-hover:text-amber-600 group-hover:translate-x-0.5 transition" />
+                <ArrowRight className="w-3.5 h-3.5 text-slate-400 group-hover:text-amber-600 group-hover:translate-x-0.5 transition" />
               </a>
             </div>
           </div>
@@ -166,7 +191,7 @@ export default async function LandingPage() {
       </section>
 
       {/* Program Statistics Section */}
-      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           <div className="gov-card p-5 bg-white flex items-center space-x-4 shadow-sm border-l-4 border-l-gov-blue">
             <div className="p-3 bg-blue-50 text-gov-blue rounded-xl">
@@ -208,6 +233,16 @@ export default async function LandingPage() {
             </div>
           </div>
         </div>
+      </section>
+
+      {/* FEATURE 1: Public TUPAD Application Status Inquiry Section */}
+      <section id="inquiry" className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
+        <PublicStatusInquiryCard />
+      </section>
+
+      {/* FEATURE 2: Public Comments, Suggestions & Messages Form Section */}
+      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+        <PublicInquiryMessageForm />
       </section>
 
       {/* Active Programs Section */}
@@ -398,6 +433,12 @@ export default async function LandingPage() {
               <h4 className="text-xs font-bold text-gov-goldLight uppercase tracking-wider">Quick Navigation</h4>
               <ul className="space-y-2 text-xs text-blue-100">
                 <li>
+                  <a href="#inquiry" className="hover:text-white hover:underline transition">TUPAD Application Status Inquiry</a>
+                </li>
+                <li>
+                  <a href="#inquiry-form" className="hover:text-white hover:underline transition">Send Direct Message / Inquiry</a>
+                </li>
+                <li>
                   <a href="/login" className="hover:text-white hover:underline transition">Staff & Coordinator Portal</a>
                 </li>
                 <li>
@@ -405,9 +446,6 @@ export default async function LandingPage() {
                 </li>
                 <li>
                   <a href="#programs" className="hover:text-white hover:underline transition">Active Work Programs</a>
-                </li>
-                <li>
-                  <a href="#org-structure" className="hover:text-white hover:underline transition">Organizational Structure</a>
                 </li>
               </ul>
             </div>

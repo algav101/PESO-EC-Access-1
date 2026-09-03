@@ -71,11 +71,17 @@ export function Sidebar({ isMobile = false, onClose }: SidebarProps) {
         { label: "Offline Sync Center", href: "/sync", icon: RefreshCw, permission: "sync.read" },
       ],
     },
-    ...(can("user.read") || can("settings.read")
+    ...(can("user.read") || can("settings.read") || user?.role === "PESO_ADMIN"
       ? [
           {
             title: "System Administration",
             items: [
+              ...(user?.role === "PESO_ADMIN"
+                ? [
+                    { label: "Applicant Status Roster", href: "/admin/applications", icon: FileSpreadsheet, permission: "settings.read" },
+                    { label: "Public Inquiries Inbox", href: "/admin/inquiries", icon: MessageSquare, permission: "settings.read" },
+                  ]
+                : []),
               ...(can("user.read")
                 ? [{ label: "User Management", href: "/admin/users", icon: Users, permission: "user.read" }]
                 : []),
