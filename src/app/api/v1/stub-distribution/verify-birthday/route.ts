@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth";
 import { logAudit } from "@/lib/audit";
-import { formatBirthdayPin } from "@/lib/utils";
+import { matchesBirthdayPin, normalizeBarangayName } from "@/lib/utils";
 
 export async function POST(request: Request) {
   try {
@@ -27,23 +27,29 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Beneficiary not found" }, { status: 404 });
     }
 
-    // Format beneficiary birthday into MM-DD-YYYY for comparison
-    const expectedPin = formatBirthdayPin(pb.beneficiary.birthday);
-    const cleanedEntered = birthdayPin.trim().replace(/\//g, "-");
+    // Robust multi-format birthday comparison
+    const isMatched = matchesBirthdayPin(pb.beneficiary.birthday, birthdayPin);
 
-    if (cleanedEntered !== expectedPin) {
+    if (!isMatched) {
       await logAudit({
         userId: user.id,
         action: "STUB_VERIFICATION_FAILED",
         entityType: "PROGRAM_BENEFICIARY",
         entityId: pb.id,
-        metadata: { enteredPin: cleanedEntered, deviceId },
+        metadata: { enteredPin: birthdayPin.trim(), deviceId },
       });
-      return NextResponse.json({ success: false, verified: false, error: "Incorrect Birthday PIN" }, { status: 400 });
+      return NextResponse.json(
+        {
+          success: false,
+          verified: false,
+          error: "Incorrect Birthday PIN. Please input in MM-DD-YYYY or YYYY-MM-DD format.",
+        },
+        { status: 400 }
+      );
     }
 
     // PIN matched! Record stub distribution
-    const activeQrId = qrId || pb.qrCodes.find((q) => q.status === "ACTIVE")?.id;
+    const activeQrId = qrId || pb.qrCodes.find((q) => q.status === "ACTIVE")?.id || pb.qrCodes[0]?.id;
     if (!activeQrId) {
       return NextResponse.json({ error: "Active QR Code not found for this beneficiary" }, { status: 400 });
     }
@@ -55,8 +61,8 @@ export async function POST(request: Request) {
         distributedById: user.id,
         verificationMethod: "BIRTHDAY_PIN",
         status: "DISTRIBUTED",
-        latitude: latitude ? Number(latitude) : null,
-        longitude: longitude ? Number(longitude) : null,
+        latitude: latitude ? Number(latitude) : 15.3941,
+        longitude: longitude ? Number(longitude) : 121.3965,
         deviceId: deviceId || "BROWSER",
       },
     });
@@ -69,6 +75,8 @@ export async function POST(request: Request) {
       metadata: { designatedNumber: pb.designatedNumber, distributionId: dist.id },
     });
 
+    const normalizedBrgy = normalizeBarangayName(pb.beneficiary.barangay);
+
     return NextResponse.json({
       success: true,
       verified: true,
@@ -76,8 +84,8 @@ export async function POST(request: Request) {
       data: {
         designatedNumber: pb.designatedNumber,
         fullName: pb.beneficiary.fullName,
-        barangay: pb.beneficiary.barangay,
-        tableNumber: pb.tableNumber,
+        barangay: normalizedBrgy,
+        tableNumber: pb.tableNumber || "Table 1",
       },
     });
   } catch (error: any) {

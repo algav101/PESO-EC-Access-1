@@ -3,6 +3,7 @@ import prisma from "@/lib/prisma";
 import { getCurrentUser, hasPermission } from "@/lib/auth";
 import { logAudit } from "@/lib/audit";
 import { generateBeneficiaryToken } from "@/lib/qr";
+import { normalizeBarangayName } from "@/lib/utils";
 
 export async function POST(request: Request, { params }: { params: { id: string } }) {
   try {
@@ -67,7 +68,7 @@ export async function POST(request: Request, { params }: { params: { id: string 
               occupation: r.occupation,
               idType: r.idType,
               idNumber: r.idNumber,
-              barangay: r.barangay,
+              barangay: normalizeBarangayName(r.barangay),
               sitio: r.sitio,
               municipality: "Dingalan",
               province: "Aurora",

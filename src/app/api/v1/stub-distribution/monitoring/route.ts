@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth";
+import { DINGALAN_BARANGAYS, normalizeBarangayName } from "@/lib/utils";
 
 export async function GET(request: Request) {
   try {
@@ -51,20 +52,17 @@ export async function GET(request: Request) {
     let totalFlaggedReplacement = 0;
     let totalPending = 0;
 
-    // Barangay aggregation map
-    const DINGALAN_BARANGAYS = [
-      "Aplaya", "Butas na Bato", "Caragsacan", "Davildavilan",
-      "Dikapanikian", "Ibona", "Matawe", "Paltic",
-      "Poblacion", "Tanawan", "Umiray"
-    ];
-
-    const brgyStats: Record<string, {
-      total: number;
-      distributed: number;
-      confirmed: number;
-      pending: number;
-      flaggedReplacement: number;
-    }> = {};
+    // Canonical Barangay aggregation map initialized with all 11 Dingalan barangays
+    const brgyStats: Record<
+      string,
+      {
+        total: number;
+        distributed: number;
+        confirmed: number;
+        pending: number;
+        flaggedReplacement: number;
+      }
+    > = {};
 
     for (const b of DINGALAN_BARANGAYS) {
       brgyStats[b] = { total: 0, distributed: 0, confirmed: 0, pending: 0, flaggedReplacement: 0 };
@@ -91,22 +89,24 @@ export async function GET(request: Request) {
         totalPending++;
       }
 
-      const brgy = pb.beneficiary.barangay || "Unassigned";
-      if (!brgyStats[brgy]) {
-        brgyStats[brgy] = { total: 0, distributed: 0, confirmed: 0, pending: 0, flaggedReplacement: 0 };
+      // Normalize barangay name to eliminate case-splitting (e.g. "PALTIC" -> "Paltic", "CARAGSACAN" -> "Caragsacan")
+      const normalizedBrgy = normalizeBarangayName(pb.beneficiary.barangay);
+
+      if (!brgyStats[normalizedBrgy]) {
+        brgyStats[normalizedBrgy] = { total: 0, distributed: 0, confirmed: 0, pending: 0, flaggedReplacement: 0 };
       }
 
-      brgyStats[brgy].total++;
-      if (isFlagged) brgyStats[brgy].flaggedReplacement++;
-      else if (isConfirmed) brgyStats[brgy].confirmed++, brgyStats[brgy].distributed++;
-      else if (isDistributed) brgyStats[brgy].distributed++;
-      else brgyStats[brgy].pending++;
+      brgyStats[normalizedBrgy].total++;
+      if (isFlagged) brgyStats[normalizedBrgy].flaggedReplacement++;
+      else if (isConfirmed) brgyStats[normalizedBrgy].confirmed++, brgyStats[normalizedBrgy].distributed++;
+      else if (isDistributed) brgyStats[normalizedBrgy].distributed++;
+      else brgyStats[normalizedBrgy].pending++;
 
       return {
         id: pb.id,
         designatedNumber: pb.designatedNumber,
         fullName: pb.beneficiary.fullName,
-        barangay: pb.beneficiary.barangay,
+        barangay: normalizedBrgy,
         tableNumber: pb.tableNumber || "Table 1",
         contactNumber: pb.beneficiary.contactNumber || "N/A",
         birthday: pb.beneficiary.birthday,
@@ -137,7 +137,7 @@ export async function GET(request: Request) {
       };
     });
 
-    // Natural sort roster
+    // Natural sort roster by designated slot number
     beneficiaryRoster.sort((a, b) => parseInt(a.designatedNumber, 10) - parseInt(b.designatedNumber, 10));
 
     return NextResponse.json({

@@ -27,7 +27,7 @@ import {
 import { QrScannerModal } from "@/components/scanner/QrScannerModal";
 import { useOffline } from "@/context/OfflineContext";
 import { offlineDb, queueOfflineTransaction } from "@/lib/dexie";
-import { formatDate } from "@/lib/utils";
+import { formatDate, normalizeBarangayName } from "@/lib/utils";
 
 export default function StubDistributionPage() {
   return (
@@ -315,7 +315,8 @@ function StubDistributionContent() {
         : b.status === "FLAGGED_REPLACEMENT";
 
     const matchesBarangay =
-      selectedBarangayFilter === "ALL" || b.barangay === selectedBarangayFilter;
+      selectedBarangayFilter === "ALL" ||
+      normalizeBarangayName(b.barangay).toLowerCase() === normalizeBarangayName(selectedBarangayFilter).toLowerCase();
 
     return matchesSearch && matchesStatus && matchesBarangay;
   });
