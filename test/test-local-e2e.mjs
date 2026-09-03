@@ -50,6 +50,7 @@ async function runE2ETests() {
     const res = await fetch(`${BASE_URL}/`);
     const html = await res.text();
     assert(res.status === 200, "Landing page responded with status 200");
+    assert(html.includes("login-portal-badge.png"), "Landing page contains clickable MAEDUP! e-PESO access login button");
     assert(html.includes("TUPAD Application Status Inquiry"), "Landing page contains Application Status Inquiry section");
     assert(html.includes("PESO-Dingalan Public Message &amp; Inquiry Form") || html.includes("PESO-Dingalan Public Message"), "Landing page contains Public Message Form section");
     assert(html.includes("CAPTCHA"), "Landing page contains CAPTCHA Anti-Spam Security");

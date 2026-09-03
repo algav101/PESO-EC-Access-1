@@ -111,9 +111,17 @@ export function Navbar({ onToggleSidebar }: NavbarProps) {
             ) : (
               <a
                 href="/login"
-                className="px-3.5 py-1.5 bg-gov-gold text-gov-dark font-bold text-xs rounded-lg hover:bg-gov-goldLight transition shadow"
+                className="group flex items-center space-x-2 bg-slate-950/90 hover:bg-slate-900 px-2.5 py-1 rounded-xl border border-amber-400/50 hover:border-amber-300 transition shadow-sm hover:shadow-md transform hover:scale-[1.02]"
+                title="MAEDUP! e PESO access - Staff Login"
               >
-                Portal Login
+                <img
+                  src="/images/login-portal-badge.png"
+                  alt="MAEDUP! e PESO access"
+                  className="h-7 sm:h-8 w-auto object-contain"
+                />
+                <span className="text-xs font-black text-white group-hover:text-amber-300 transition pr-1 hidden sm:inline">
+                  Log in
+                </span>
               </a>
             )}
           </div>

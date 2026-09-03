@@ -148,14 +148,18 @@ export default function LoginPage() {
           {/* Header */}
           <div className="text-center space-y-3 pb-6 border-b border-slate-100">
             <div className="flex items-center justify-center">
-              <PesoLogo className="h-16 w-16" size={64} />
+              <img
+                src="/images/login-portal-badge.png"
+                alt="MAEDUP! e PESO access"
+                className="h-20 sm:h-24 w-auto object-contain drop-shadow-md"
+              />
             </div>
             <div className="space-y-0.5">
               <h2 className="text-lg font-black text-slate-900 tracking-tight">
                 LGU DINGALAN • PESO DINGALAN
               </h2>
               <p className="text-xs text-slate-500 font-semibold">
-                TUPAD EC Management System
+                TUPAD EC Management System Login
               </p>
             </div>
           </div>
