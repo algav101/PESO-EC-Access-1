@@ -30,7 +30,7 @@ export default async function BeneficiaryProfilePage({ params }: { params: { id:
   const currentUser = await getCurrentUser();
   const isAdmin = currentUser?.role === "PESO_ADMIN";
 
-  const beneficiary = await prisma.beneficiary.findUnique({
+  const rawBeneficiary = await prisma.beneficiary.findUnique({
     where: { id: params.id },
     include: {
       programBeneficiaries: {
@@ -41,7 +41,7 @@ export default async function BeneficiaryProfilePage({ params }: { params: { id:
           orientationAttendance: true,
           attendanceRecords: {
             include: { workDay: true },
-            orderBy: { workDay: { dayNumber: "asc" } },
+            orderBy: { attendanceDate: "asc" },
           },
           payouts: true,
         },
@@ -53,14 +53,26 @@ export default async function BeneficiaryProfilePage({ params }: { params: { id:
     },
   });
 
-  if (!beneficiary) {
+  if (!rawBeneficiary) {
     notFound();
   }
 
-  const latestProgramEnrollment = beneficiary.programBeneficiaries[0];
-  const activeQr = latestProgramEnrollment?.qrCodes.find((q) => q.status === "ACTIVE");
-  const qrDataUrl = activeQr ? await generateQrDataUrl(activeQr.publicToken) : null;
-  const activeRestriction = beneficiary.restrictions.find((r) => r.status === "ACTIVE");
+  // Convert to clean serializable POJO (removes raw Date objects for client components)
+  const beneficiary = JSON.parse(JSON.stringify(rawBeneficiary));
+
+  const latestProgramEnrollment = beneficiary.programBeneficiaries?.[0] || null;
+  const activeQr = latestProgramEnrollment?.qrCodes?.find((q: any) => q.status === "ACTIVE") || latestProgramEnrollment?.qrCodes?.[0];
+
+  let qrDataUrl: string | null = null;
+  if (activeQr?.publicToken) {
+    try {
+      qrDataUrl = await generateQrDataUrl(activeQr.publicToken);
+    } catch (e) {
+      console.error("Failed to generate QR thumbnail:", e);
+    }
+  }
+
+  const activeRestriction = beneficiary.restrictions?.find((r: any) => r.status === "ACTIVE");
 
   return (
     <div className="max-w-5xl mx-auto space-y-6">
@@ -100,9 +112,9 @@ export default async function BeneficiaryProfilePage({ params }: { params: { id:
           <div className="space-y-1">
             <div className="flex items-center space-x-2">
               <span className="text-xs font-mono font-bold px-2 py-0.5 rounded bg-slate-100 text-slate-700">
-                {beneficiary.beneficiaryNumber}
+                {beneficiary.beneficiaryNumber || "No BN"}
               </span>
-              <StatusBadge status={beneficiary.status} />
+              <StatusBadge status={beneficiary.status || "ACTIVE"} />
               {activeRestriction && (
                 <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-50 text-rose-700 border border-rose-200">
                   365-Day Locked
@@ -117,11 +129,11 @@ export default async function BeneficiaryProfilePage({ params }: { params: { id:
             <div className="flex flex-wrap items-center gap-3 text-xs text-slate-500 pt-1">
               <span className="flex items-center space-x-1">
                 <MapPin className="w-3.5 h-3.5 text-slate-400" />
-                <span>Brgy. {beneficiary.barangay}, Dingalan</span>
+                <span>Brgy. {beneficiary.barangay || "Dingalan"}, Dingalan</span>
               </span>
               <span className="flex items-center space-x-1 font-mono">
                 <Calendar className="w-3.5 h-3.5 text-slate-400" />
-                <span>Birthday: {beneficiary.birthday}</span>
+                <span>Birthday: {beneficiary.birthday || "-"}</span>
               </span>
               {beneficiary.contactNumber && (
                 <span className="flex items-center space-x-1">
@@ -137,7 +149,7 @@ export default async function BeneficiaryProfilePage({ params }: { params: { id:
         {qrDataUrl && (
           <div className="flex flex-col items-center p-3 bg-slate-50 border rounded-xl space-y-1">
             <img src={qrDataUrl} alt="Beneficiary QR" className="w-20 h-20" />
-            <span className="font-mono text-[9px] text-slate-400">Designated #{latestProgramEnrollment?.designatedNumber}</span>
+            <span className="font-mono text-[9px] text-slate-400">Designated #{latestProgramEnrollment?.designatedNumber || "-"}</span>
           </div>
         )}
       </div>
@@ -167,13 +179,13 @@ export default async function BeneficiaryProfilePage({ params }: { params: { id:
               <div className="space-y-2 text-xs">
                 <div>
                   <span className="text-slate-400 text-[10px] uppercase font-bold">Program Title</span>
-                  <p className="font-bold text-slate-900">{latestProgramEnrollment.program.programName}</p>
+                  <p className="font-bold text-slate-900">{latestProgramEnrollment.program?.programName || "TUPAD Emergency Employment"}</p>
                 </div>
                 <div className="grid grid-cols-2 gap-2 pt-1">
                   <div>
                     <span className="text-slate-400 text-[10px] uppercase font-bold">Designated #</span>
                     <p className="font-mono font-extrabold text-gov-blue text-base">
-                      {latestProgramEnrollment.designatedNumber}
+                      #{latestProgramEnrollment.designatedNumber}
                     </p>
                   </div>
                   <div>
@@ -196,19 +208,19 @@ export default async function BeneficiaryProfilePage({ params }: { params: { id:
           {/* Identification Documents */}
           <div className="gov-card p-5 space-y-3">
             <h2 className="text-xs font-bold text-slate-800 uppercase tracking-wider border-b pb-2">
-              Verification Documents ({beneficiary.documents.length})
+              Verification Documents ({beneficiary.documents?.length || 0})
             </h2>
-            {beneficiary.documents.length === 0 ? (
+            {(!beneficiary.documents || beneficiary.documents.length === 0) ? (
               <p className="text-xs text-slate-400">No ID documents uploaded yet.</p>
             ) : (
               <div className="space-y-2">
-                {beneficiary.documents.map((doc) => (
+                {beneficiary.documents.map((doc: any) => (
                   <div key={doc.id} className="p-2.5 bg-slate-50 rounded-lg text-xs flex items-center justify-between">
                     <div>
-                      <p className="font-bold text-slate-800">{doc.documentType.replace(/_/g, " ")}</p>
+                      <p className="font-bold text-slate-800">{doc.documentType?.replace(/_/g, " ") || "DOCUMENT"}</p>
                       <p className="text-[10px] text-slate-400">{doc.fileName}</p>
                     </div>
-                    <StatusBadge status={doc.verificationStatus} />
+                    <StatusBadge status={doc.verificationStatus || "VERIFIED"} />
                   </div>
                 ))}
               </div>
@@ -225,7 +237,7 @@ export default async function BeneficiaryProfilePage({ params }: { params: { id:
                 <span>10-Day Attendance Verification Record</span>
               </h2>
               <span className="text-xs font-bold text-gov-blue">
-                {latestProgramEnrollment?.attendanceRecords.length || 0} / 10 Recorded
+                {latestProgramEnrollment?.attendanceRecords?.length || 0} / 10 Recorded
               </span>
             </div>
 
@@ -245,7 +257,9 @@ export default async function BeneficiaryProfilePage({ params }: { params: { id:
                 <tbody className="divide-y divide-slate-100">
                   {(latestProgramEnrollment?.attendanceRecords || []).map((att: any) => (
                     <tr key={att.id} className="hover:bg-slate-50">
-                      <td className="px-3 py-2 font-bold text-gov-blue">Day {att.workDay.dayNumber}</td>
+                      <td className="px-3 py-2 font-bold text-gov-blue">
+                        Day {att.workDay?.dayNumber || 1}
+                      </td>
                       <td className="px-3 py-2 font-mono text-slate-600">{att.attendanceDate}</td>
                       <td className="px-3 py-2 text-center font-mono font-semibold text-slate-800">
                         {formatTime(att.morningTimeIn)}
@@ -260,11 +274,11 @@ export default async function BeneficiaryProfilePage({ params }: { params: { id:
                         {formatTime(att.afternoonTimeOut)}
                       </td>
                       <td className="px-3 py-2 text-center">
-                        <StatusBadge status={att.status} />
+                        <StatusBadge status={att.status || "PRESENT"} />
                       </td>
                     </tr>
                   ))}
-                  {(!latestProgramEnrollment || latestProgramEnrollment.attendanceRecords.length === 0) && (
+                  {(!latestProgramEnrollment || !latestProgramEnrollment.attendanceRecords || latestProgramEnrollment.attendanceRecords.length === 0) && (
                     <tr>
                       <td colSpan={7} className="px-3 py-6 text-center text-slate-400">
                         No daily attendance records scanned yet.
@@ -282,7 +296,7 @@ export default async function BeneficiaryProfilePage({ params }: { params: { id:
               Payout & 365-Day Restriction Timeline
             </h2>
             <div className="space-y-2">
-              {beneficiary.restrictions.map((r) => (
+              {(beneficiary.restrictions || []).map((r: any) => (
                 <div key={r.id} className="p-3 bg-slate-50 rounded-lg text-xs flex items-center justify-between">
                   <div>
                     <span className="font-bold text-slate-800 block">{r.reason}</span>
@@ -290,10 +304,10 @@ export default async function BeneficiaryProfilePage({ params }: { params: { id:
                       Window: {r.restrictionStart} to {r.restrictionEnd}
                     </span>
                   </div>
-                  <StatusBadge status={r.status} />
+                  <StatusBadge status={r.status || "ACTIVE"} />
                 </div>
               ))}
-              {beneficiary.restrictions.length === 0 && (
+              {(!beneficiary.restrictions || beneficiary.restrictions.length === 0) && (
                 <p className="text-xs text-slate-400">No past restrictions recorded for this beneficiary.</p>
               )}
             </div>
