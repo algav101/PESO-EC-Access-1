@@ -312,8 +312,11 @@ export async function DELETE(request: Request, { params }: { params: { id: strin
 export async function PATCH(request: Request, { params }: { params: { id: string } }) {
   try {
     const user = await getCurrentUser();
-    if (!user || !hasPermission(user.role, "beneficiary.update")) {
-      return NextResponse.json({ error: "Forbidden: insufficient permissions" }, { status: 403 });
+    if (!user || user.role !== "PESO_ADMIN") {
+      return NextResponse.json(
+        { error: "Forbidden: Only PESO Admin accounts are authorized to manually edit beneficiary records." },
+        { status: 403 }
+      );
     }
 
     const body = await request.json();
