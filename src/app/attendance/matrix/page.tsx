@@ -10,12 +10,17 @@ import {
   Users,
   Clock,
   Printer,
+  ShieldAlert,
 } from "lucide-react";
 import { formatTime } from "@/lib/utils";
+import { useAuth } from "@/context/AuthContext";
+import { AdminStubOverrideModal } from "@/components/beneficiaries/AdminStubOverrideModal";
 
 function AttendanceMatrixContent() {
   const searchParams = useSearchParams();
   const urlProgramId = searchParams.get("programId");
+  const { user } = useAuth();
+  const isAdmin = user?.role === "PESO_ADMIN";
 
   const [programs, setPrograms] = useState<any[]>([]);
   const [selectedProgramId, setSelectedProgramId] = useState<string>(urlProgramId || "");
@@ -24,6 +29,7 @@ function AttendanceMatrixContent() {
   const [selectedBarangay, setSelectedBarangay] = useState("ALL");
   const [searchQuery, setSearchQuery] = useState("");
   const [loading, setLoading] = useState(true);
+  const [selectedPbForOverride, setSelectedPbForOverride] = useState<any | null>(null);
 
   useEffect(() => {
     fetchPrograms();
@@ -75,9 +81,9 @@ function AttendanceMatrixContent() {
   const filtered = beneficiaries.filter((pb) => {
     const q = searchQuery.toLowerCase();
     const matchesSearch =
-      pb.designatedNumber.toLowerCase().includes(q) ||
-      pb.beneficiary.fullName.toLowerCase().includes(q);
-    const matchesBrgy = selectedBarangay === "ALL" || pb.beneficiary.barangay === selectedBarangay;
+      pb.designatedNumber?.toLowerCase().includes(q) ||
+      pb.beneficiary?.fullName?.toLowerCase().includes(q);
+    const matchesBrgy = selectedBarangay === "ALL" || pb.beneficiary?.barangay === selectedBarangay;
     return matchesSearch && matchesBrgy;
   });
 
@@ -165,6 +171,11 @@ function AttendanceMatrixContent() {
           <span className="text-xs font-bold text-slate-800 uppercase tracking-wider">
             Consolidated Attendance Matrix ({filtered.length} Beneficiaries • {numWorkDays} Work Days)
           </span>
+          {isAdmin && (
+            <span className="text-[11px] font-bold text-amber-800 bg-amber-50 px-2 py-0.5 rounded border border-amber-200">
+              💡 PESO Admin: Click "Edit / Reset" to modify slots or restart days
+            </span>
+          )}
         </div>
 
         {loading ? (
@@ -177,6 +188,11 @@ function AttendanceMatrixContent() {
               <thead className="bg-slate-100 text-slate-700 font-bold border-b text-center">
                 {/* Row 1: Day Headers */}
                 <tr>
+                  {isAdmin && (
+                    <th rowSpan={2} className="px-2 py-2 border-r bg-slate-200 text-center">
+                      Action
+                    </th>
+                  )}
                   <th rowSpan={2} className="px-3 py-2 border-r bg-slate-200 text-left">
                     # Desig
                   </th>
@@ -220,14 +236,27 @@ function AttendanceMatrixContent() {
               <tbody className="divide-y divide-slate-100 font-mono text-[10px]">
                 {filtered.map((pb) => (
                   <tr key={pb.id} className="hover:bg-slate-50 text-center">
+                    {isAdmin && (
+                      <td className="px-2 py-2 border-r text-center">
+                        <button
+                          type="button"
+                          onClick={() => setSelectedPbForOverride(pb)}
+                          className="px-2 py-1 bg-amber-50 hover:bg-amber-600 text-amber-900 hover:text-white border border-amber-300 rounded font-bold text-[10px] transition inline-flex items-center space-x-1"
+                          title="PESO Admin: Edit / Reset Attendance Slots"
+                        >
+                          <ShieldAlert className="w-3 h-3" />
+                          <span>Reset</span>
+                        </button>
+                      </td>
+                    )}
                     <td className="px-3 py-2 text-left font-bold text-gov-blue border-r">
-                      {pb.designatedNumber}
+                      #{pb.designatedNumber}
                     </td>
                     <td className="px-3 py-2 text-left font-bold text-slate-900 font-sans border-r truncate">
-                      {pb.beneficiary.fullName}
+                      {pb.beneficiary?.fullName || "Unnamed"}
                     </td>
                     <td className="px-3 py-2 text-left text-slate-700 font-sans border-r">
-                      {pb.beneficiary.barangay}
+                      {pb.beneficiary?.barangay || "-"}
                     </td>
                     <td className="px-3 py-2 font-bold text-slate-800 border-r">
                       {pb.tableNumber || "T1"}
@@ -266,6 +295,21 @@ function AttendanceMatrixContent() {
           </div>
         )}
       </div>
+
+      {/* Override Modal for Attendance Matrix */}
+      {selectedPbForOverride && (
+        <AdminStubOverrideModal
+          isOpen={!!selectedPbForOverride}
+          onClose={() => setSelectedPbForOverride(null)}
+          programId={selectedProgramId}
+          programBeneficiary={selectedPbForOverride}
+          onUpdated={(updatedPb) => {
+            setBeneficiaries((prev) =>
+              prev.map((b) => (b.id === updatedPb.id ? { ...b, ...updatedPb } : b))
+            );
+          }}
+        />
+      )}
     </div>
   );
 }

@@ -566,10 +566,10 @@ export default function BeneficiariesMasterlistPage() {
                           <button
                             onClick={() => setStubOverridePb(pb)}
                             className="px-2.5 py-1 text-[11px] font-bold text-amber-900 hover:text-white bg-amber-50 hover:bg-amber-600 border border-amber-300 hover:border-amber-600 rounded-lg transition inline-flex items-center space-x-1 shadow-xs"
-                            title="PESO Admin: Manually Edit Distribution, Affirmation & Replacement Status"
+                            title="PESO Admin: Edit / Reset Stub Distribution, Orientation & 10-Day Attendance"
                           >
                             <ShieldAlert className="w-3 h-3 text-amber-700" />
-                            <span>Stub / Flag</span>
+                            <span>Workflow & Reset</span>
                           </button>
                         )}
                         {isAdmin && (
