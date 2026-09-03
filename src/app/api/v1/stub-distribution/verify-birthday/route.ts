@@ -48,7 +48,24 @@ export async function POST(request: Request) {
       );
     }
 
-    // PIN matched! Record stub distribution
+    // PIN matched! Check anti-double scan rule
+    const alreadyDist = await prisma.stubDistribution.findFirst({
+      where: {
+        programBeneficiaryId: pb.id,
+        status: "DISTRIBUTED",
+      },
+    });
+
+    if (alreadyDist) {
+      return NextResponse.json(
+        {
+          error: "TRANSACTION BLOCKED: Stub is already distributed and affirmed. Cannot distribute again.",
+          alreadyDistributed: true,
+        },
+        { status: 400 }
+      );
+    }
+
     const activeQrId = qrId || pb.qrCodes.find((q) => q.status === "ACTIVE")?.id || pb.qrCodes[0]?.id;
     if (!activeQrId) {
       return NextResponse.json({ error: "Active QR Code not found for this beneficiary" }, { status: 400 });

@@ -87,11 +87,25 @@ export async function POST(request: Request) {
 
     const originalPb = await prisma.programBeneficiary.findUnique({
       where: { id: originalProgramBeneficiaryId },
-      include: { beneficiary: true, qrCodes: true },
+      include: { beneficiary: true, qrCodes: true, payouts: true },
     });
 
     if (!originalPb) {
       return NextResponse.json({ error: "Original beneficiary not found" }, { status: 404 });
+    }
+
+    if (originalPb.participationStatus === "REPLACED") {
+      return NextResponse.json(
+        { error: `CANNOT REPLACE: Beneficiary #${originalPb.designatedNumber} has already been replaced.` },
+        { status: 400 }
+      );
+    }
+
+    if (originalPb.payouts?.some((p) => p.status === "PAID")) {
+      return NextResponse.json(
+        { error: `CANNOT REPLACE: Beneficiary #${originalPb.designatedNumber} has already claimed payout.` },
+        { status: 400 }
+      );
     }
 
     const result = await prisma.$transaction(async (tx) => {

@@ -22,29 +22,33 @@ export async function POST(request: Request) {
     try {
       if (rawQrToken.startsWith("http://") || rawQrToken.startsWith("https://")) {
         const parsedUrl = new URL(rawQrToken);
-        cleanToken = parsedUrl.searchParams.get("token") || parsedUrl.searchParams.get("qrToken") || parsedUrl.pathname.split("/").pop() || rawQrToken;
+        cleanToken =
+          parsedUrl.searchParams.get("token") ||
+          parsedUrl.searchParams.get("qrToken") ||
+          parsedUrl.pathname.split("/").pop() ||
+          rawQrToken;
       }
     } catch {}
 
     cleanToken = cleanToken.trim();
 
     let qr = null;
-    let pb = null;
+    let pb: any = null;
 
     // Strategy 1: Find by exact or uppercase publicToken
     qr = await prisma.qrCode.findFirst({
       where: {
-        OR: [
-          { publicToken: cleanToken },
-          { publicToken: cleanToken.toUpperCase() },
-        ],
+        OR: [{ publicToken: cleanToken }, { publicToken: cleanToken.toUpperCase() }],
       },
       include: {
         programBeneficiary: {
           include: {
             beneficiary: true,
             program: true,
-            stubDistributions: true,
+            stubDistributions: {
+              include: { distributedBy: { select: { fullName: true } } },
+              orderBy: { distributedAt: "desc" },
+            },
           },
         },
       },
@@ -54,7 +58,7 @@ export async function POST(request: Request) {
       pb = qr.programBeneficiary;
     }
 
-    // Strategy 2: If not found, search by Case-Insensitive substring of publicToken
+    // Strategy 2: Search by Case-Insensitive substring of publicToken
     if (!pb) {
       qr = await prisma.qrCode.findFirst({
         where: {
@@ -65,7 +69,10 @@ export async function POST(request: Request) {
             include: {
               beneficiary: true,
               program: true,
-              stubDistributions: true,
+              stubDistributions: {
+                include: { distributedBy: { select: { fullName: true } } },
+                orderBy: { distributedAt: "desc" },
+              },
             },
           },
         },
@@ -75,7 +82,7 @@ export async function POST(request: Request) {
       }
     }
 
-    // Strategy 3: Check if scanned input is a designated slot number (e.g. "1", "22", "81", "92")
+    // Strategy 3: Numeric slot match (e.g. "1", "22", "81", "92")
     const isNumericSlot = /^\d+$/.test(cleanToken);
     if (!pb && isNumericSlot) {
       const slotNum = String(parseInt(cleanToken, 10));
@@ -88,7 +95,10 @@ export async function POST(request: Request) {
         include: {
           beneficiary: true,
           program: true,
-          stubDistributions: true,
+          stubDistributions: {
+            include: { distributedBy: { select: { fullName: true } } },
+            orderBy: { distributedAt: "desc" },
+          },
           qrCodes: true,
         },
       });
@@ -98,7 +108,7 @@ export async function POST(request: Request) {
       }
     }
 
-    // Strategy 4: Check by Beneficiary Number (e.g. "BN-0001") or Full Name
+    // Strategy 4: Beneficiary Number or Full Name match
     if (!pb) {
       const whereClause: any = {
         OR: [
@@ -114,7 +124,10 @@ export async function POST(request: Request) {
         include: {
           beneficiary: true,
           program: true,
-          stubDistributions: true,
+          stubDistributions: {
+            include: { distributedBy: { select: { fullName: true } } },
+            orderBy: { distributedAt: "desc" },
+          },
           qrCodes: true,
         },
       });
@@ -139,7 +152,10 @@ export async function POST(request: Request) {
         include: {
           beneficiary: true,
           program: true,
-          stubDistributions: true,
+          stubDistributions: {
+            include: { distributedBy: { select: { fullName: true } } },
+            orderBy: { distributedAt: "desc" },
+          },
           qrCodes: true,
         },
       });
@@ -164,7 +180,40 @@ export async function POST(request: Request) {
       });
     }
 
-    const isDistributed = pb.stubDistributions?.some((d: any) => d.status === "DISTRIBUTED") || false;
+    // =========================================================================
+    // ANTI-DOUBLE SCAN ENFORCEMENT: Check if Stub is Already Distributed & Affirmed
+    // =========================================================================
+    const existingDistribution = pb.stubDistributions?.find(
+      (d: any) => d.status === "DISTRIBUTED"
+    );
+
+    if (existingDistribution) {
+      const distTime = existingDistribution.distributedAt
+        ? new Date(existingDistribution.distributedAt).toLocaleString()
+        : "a previous session";
+      const officer = existingDistribution.distributedBy?.fullName || "Assigned Coordinator";
+
+      return NextResponse.json(
+        {
+          error: `ALREADY DISTRIBUTED & AFFIRMED: Stub #${pb.designatedNumber} (${pb.beneficiary.fullName}) was already verified and distributed on ${distTime} by ${officer}. Double scanning is not allowed.`,
+          alreadyDistributed: true,
+          data: {
+            qrId: qr.id,
+            programBeneficiaryId: pb.id,
+            designatedNumber: pb.designatedNumber,
+            fullName: pb.beneficiary.fullName,
+            barangay: normalizeBarangayName(pb.beneficiary.barangay),
+            sitio: pb.beneficiary.sitio || "Centro",
+            tableNumber: pb.tableNumber || "Table 1",
+            programName: pb.program.programName,
+            isDistributed: true,
+            distributedAt: existingDistribution.distributedAt,
+          },
+        },
+        { status: 400 }
+      );
+    }
+
     const normalizedBrgy = normalizeBarangayName(pb.beneficiary.barangay);
 
     return NextResponse.json({
@@ -178,7 +227,7 @@ export async function POST(request: Request) {
         sitio: pb.beneficiary.sitio || "Centro",
         tableNumber: pb.tableNumber || "Table 1",
         programName: pb.program.programName,
-        isDistributed,
+        isDistributed: false,
       },
     });
   } catch (error: any) {

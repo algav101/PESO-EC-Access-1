@@ -37,15 +37,15 @@ export default function PayoutScannerPage() {
 
     try {
       if (isOnline) {
-        // Look up beneficiary details
-        const res = await fetch("/api/v1/stub-distribution/scan", {
+        // Look up beneficiary details and validate sequence + anti-double payout checks
+        const res = await fetch("/api/v1/payout/scan", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ qrToken: token }),
+          body: JSON.stringify({ qrToken: token, isLookupOnly: true }),
         });
 
         const data = await res.json();
-        if (!res.ok) throw new Error(data.error || "Invalid QR Code");
+        if (!res.ok) throw new Error(data.error || "Payout scan validation failed");
 
         setScannedBeneficiary({
           ...data.data,
