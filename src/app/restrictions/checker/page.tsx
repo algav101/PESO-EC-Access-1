@@ -18,6 +18,7 @@ import {
   AlertTriangle,
   Sparkles,
   ChevronRight,
+  ArrowLeft,
   Info,
   X,
   Zap,
@@ -193,6 +194,25 @@ export default function EligibilityCheckerPage() {
 
   return (
     <div className="max-w-3xl mx-auto space-y-6 pb-12">
+      {/* Back to Landing Page */}
+      <div className="flex items-center justify-between">
+        <a
+          href="/"
+          className="text-xs font-bold text-slate-600 hover:text-gov-blue flex items-center space-x-1.5 transition"
+        >
+          <ArrowLeft className="w-4 h-4" />
+          <span>Bumalik sa Landing Page</span>
+        </a>
+
+        <a
+          href="/apply"
+          className="text-xs font-bold text-emerald-700 hover:text-emerald-800 flex items-center space-x-1"
+        >
+          <Sparkles className="w-3.5 h-3.5 text-emerald-600" />
+          <span>Online Application Portal</span>
+        </a>
+      </div>
+
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="space-y-1">
