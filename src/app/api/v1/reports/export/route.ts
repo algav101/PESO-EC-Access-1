@@ -3,6 +3,8 @@ import { getCurrentUser } from "@/lib/auth";
 import { generateAttendanceExcel, generateAccomplishmentExcel, generateWorkProgramExcel } from "@/lib/excel-exporter";
 import prisma from "@/lib/prisma";
 
+export const dynamic = "force-dynamic";
+
 export async function GET(request: Request) {
   try {
     const user = await getCurrentUser();

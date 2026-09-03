@@ -21,6 +21,7 @@ import {
   History,
   RefreshCw,
   Search,
+  MessageSquare,
   X,
   LogOut,
   User as UserIcon,
