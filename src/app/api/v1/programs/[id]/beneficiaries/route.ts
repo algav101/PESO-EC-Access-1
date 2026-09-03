@@ -76,10 +76,10 @@ export async function GET(request: Request, { params }: { params: { id: string }
           select: { id: true, status: true, scannedAt: true },
         },
         attendanceRecords: {
-          select: { id: true, workDayId: true, timeInAm: true, timeOutAm: true, timeInPm: true, timeOutPm: true },
+          select: { id: true, workDayId: true, morningTimeIn: true, morningTimeOut: true, afternoonTimeIn: true, afternoonTimeOut: true, status: true },
         },
         payouts: {
-          select: { id: true, status: true, amount: true, paidAt: true },
+          select: { id: true, status: true, payoutDate: true, verifiedAt: true, remarks: true },
         },
       },
     });

@@ -36,7 +36,7 @@ import {
   AlignCenter,
   Move,
 } from "lucide-react";
-import { formatDate } from "@/lib/utils";
+import { formatDate, normalizeBarangayName } from "@/lib/utils";
 import { TableAssignmentModal } from "@/components/tables/TableAssignmentModal";
 import { ETupadCard } from "@/components/stubs/ETupadCard";
 import { Format1Stub } from "@/components/stubs/Format1Stub";
@@ -247,7 +247,12 @@ function StubsContent() {
   // Collect unique Puroks / Sitios
   const uniqueSitios = useMemo(() => {
     const list = beneficiaries
-      .filter((pb) => selectedBarangay === "ALL" || pb.beneficiary?.barangay === selectedBarangay)
+      .filter(
+        (pb) =>
+          selectedBarangay === "ALL" ||
+          normalizeBarangayName(pb.beneficiary?.barangay).toLowerCase() ===
+            normalizeBarangayName(selectedBarangay).toLowerCase()
+      )
       .map((pb) => pb.beneficiary?.sitio)
       .filter(Boolean);
     return Array.from(new Set(list)).sort((a: any, b: any) =>
@@ -259,7 +264,10 @@ function StubsContent() {
   const filteredBeneficiaries = useMemo(() => {
     return beneficiaries
       .filter((pb) => {
-        const matchesBrgy = selectedBarangay === "ALL" || pb.beneficiary?.barangay === selectedBarangay;
+        const matchesBrgy =
+          selectedBarangay === "ALL" ||
+          normalizeBarangayName(pb.beneficiary?.barangay).toLowerCase() ===
+            normalizeBarangayName(selectedBarangay).toLowerCase();
         const matchesSitio = selectedSitio === "ALL" || pb.beneficiary?.sitio === selectedSitio;
         const matchesTable = filterTable === "ALL" || pb.tableNumber === filterTable;
 
