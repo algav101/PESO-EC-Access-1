@@ -32,6 +32,7 @@ export default function BeneficiariesMasterlistPage() {
   const [selectedProgram, setSelectedProgram] = useState<string>("");
   const [selectedBarangay, setSelectedBarangay] = useState<string>("ALL");
   const [selectedSitio, setSelectedSitio] = useState<string>("ALL");
+  const [selectedStubStatus, setSelectedStubStatus] = useState<string>("ALL");
   const [searchQuery, setSearchQuery] = useState("");
   const [loading, setLoading] = useState(true);
 
@@ -181,11 +182,23 @@ export default function BeneficiariesMasterlistPage() {
         (pb.tableNumber && pb.tableNumber.toLowerCase().includes(q));
       const matchesBrgy = selectedBarangay === "ALL" || pb.beneficiary?.barangay === selectedBarangay;
       const matchesSitio = selectedSitio === "ALL" || pb.beneficiary?.sitio === selectedSitio;
-      return matchesSearch && matchesBrgy && matchesSitio;
-    });
-  }, [beneficiaries, searchQuery, selectedBarangay, selectedSitio]);
 
-  // Sort beneficiaries (supports Purok/Sitio, Designated #, Name, Barangay, Table, etc.)
+      const isDist = Boolean(pb.stubDistributions?.some((d: any) => d.status === "DISTRIBUTED"));
+      const isFlagged =
+        pb.participationStatus === "FLAGGED_FOR_REPLACEMENT" ||
+        Boolean(pb.stubDistributions?.some((d: any) => d.status === "FLAGGED_REPLACEMENT"));
+
+      const matchesStub =
+        selectedStubStatus === "ALL" ||
+        (selectedStubStatus === "DISTRIBUTED" && isDist && !isFlagged) ||
+        (selectedStubStatus === "FLAGGED_REPLACEMENT" && isFlagged) ||
+        (selectedStubStatus === "PENDING" && !isDist && !isFlagged);
+
+      return matchesSearch && matchesBrgy && matchesSitio && matchesStub;
+    });
+  }, [beneficiaries, searchQuery, selectedBarangay, selectedSitio, selectedStubStatus]);
+
+  // Sort beneficiaries (supports Purok/Sitio, Designated #, Name, Barangay, Table, Stub & Affirmation, Orientation, etc.)
   const sortedBeneficiaries = useMemo(() => {
     return [...filtered].sort((a, b) => {
       let comp = 0;
@@ -216,6 +229,39 @@ export default function BeneficiariesMasterlistPage() {
         const tblA = String(a.tableNumber || "");
         const tblB = String(b.tableNumber || "");
         comp = tblA.localeCompare(tblB, undefined, { numeric: true });
+      } else if (sortBy === "stubAffirmation") {
+        const getStubRank = (pb: any) => {
+          if (
+            pb.participationStatus === "FLAGGED_FOR_REPLACEMENT" ||
+            pb.stubDistributions?.some((d: any) => d.status === "FLAGGED_REPLACEMENT")
+          ) {
+            return 3; // Flagged for Replacement
+          }
+          if (pb.stubDistributions?.some((d: any) => d.status === "DISTRIBUTED")) {
+            return 1; // Affirmed & Distributed
+          }
+          return 2; // Uninformed / Pending
+        };
+
+        const rankA = getStubRank(a);
+        const rankB = getStubRank(b);
+        comp = rankA - rankB;
+        if (comp === 0) {
+          const numA = parseInt(a.designatedNumber, 10);
+          const numB = parseInt(b.designatedNumber, 10);
+          if (!isNaN(numA) && !isNaN(numB)) comp = numA - numB;
+          else comp = String(a.designatedNumber || "").localeCompare(String(b.designatedNumber || ""), undefined, { numeric: true });
+        }
+      } else if (sortBy === "orientation") {
+        const isOrientedA = Boolean(a.orientationAttendance && a.orientationAttendance.length > 0) ? 1 : 2;
+        const isOrientedB = Boolean(b.orientationAttendance && b.orientationAttendance.length > 0) ? 1 : 2;
+        comp = isOrientedA - isOrientedB;
+        if (comp === 0) {
+          const numA = parseInt(a.designatedNumber, 10);
+          const numB = parseInt(b.designatedNumber, 10);
+          if (!isNaN(numA) && !isNaN(numB)) comp = numA - numB;
+          else comp = String(a.designatedNumber || "").localeCompare(String(b.designatedNumber || ""), undefined, { numeric: true });
+        }
       } else if (sortBy === "attendance") {
         comp = (a.attendanceRecords?.length || 0) - (b.attendanceRecords?.length || 0);
       } else if (sortBy === "status") {
@@ -305,7 +351,7 @@ export default function BeneficiariesMasterlistPage() {
 
       {/* Filter & Sort Bar */}
       <div className="gov-card p-4 space-y-3">
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-3">
           {/* Select Program */}
           <div>
             <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Select Program</label>
@@ -367,6 +413,24 @@ export default function BeneficiariesMasterlistPage() {
             </select>
           </div>
 
+          {/* Filter Stub & Affirmation */}
+          <div>
+            <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1 flex items-center space-x-1">
+              <ShieldAlert className="w-3 h-3 text-amber-600" />
+              <span>Stub & Affirmation</span>
+            </label>
+            <select
+              value={selectedStubStatus}
+              onChange={(e) => setSelectedStubStatus(e.target.value)}
+              className="w-full px-3 py-1.5 text-xs border border-slate-300 rounded-lg bg-slate-50 focus:outline-none focus:border-gov-blue font-semibold text-slate-800"
+            >
+              <option value="ALL">All Stub States</option>
+              <option value="DISTRIBUTED">✓ Affirmed & Distributed</option>
+              <option value="PENDING">⏳ Uninformed (Pending)</option>
+              <option value="FLAGGED_REPLACEMENT">🚩 Flagged Replacement</option>
+            </select>
+          </div>
+
           {/* Search Beneficiary */}
           <div>
             <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Search Beneficiary</label>
@@ -397,6 +461,8 @@ export default function BeneficiariesMasterlistPage() {
                 { label: "Full Name", field: "fullName" },
                 { label: "Barangay", field: "barangay" },
                 { label: "Table Assignment", field: "tableNumber" },
+                { label: "Stub & Affirmation", field: "stubAffirmation" },
+                { label: "Orientation", field: "orientation" },
                 { label: "Status", field: "status" },
               ].map(({ label, field }) => (
                 <button
@@ -417,11 +483,12 @@ export default function BeneficiariesMasterlistPage() {
             </div>
           </div>
 
-          {(selectedBarangay !== "ALL" || selectedSitio !== "ALL" || searchQuery) && (
+          {(selectedBarangay !== "ALL" || selectedSitio !== "ALL" || selectedStubStatus !== "ALL" || searchQuery) && (
             <button
               onClick={() => {
                 setSelectedBarangay("ALL");
                 setSelectedSitio("ALL");
+                setSelectedStubStatus("ALL");
                 setSearchQuery("");
                 setSortBy("designatedNumber");
                 setSortOrder("ASC");
@@ -442,6 +509,16 @@ export default function BeneficiariesMasterlistPage() {
             {sortBy === "sitio" && (
               <span className="ml-2 px-2 py-0.5 rounded bg-blue-100 text-gov-blue font-bold text-[10px]">
                 Sorted by Purok / Sitio ({sortOrder})
+              </span>
+            )}
+            {sortBy === "stubAffirmation" && (
+              <span className="ml-2 px-2 py-0.5 rounded bg-amber-100 text-amber-900 font-bold text-[10px]">
+                Sorted by Stub & Affirmation ({sortOrder === "ASC" ? "Affirmed → Pending → Flagged" : "Flagged → Pending → Affirmed"})
+              </span>
+            )}
+            {sortBy === "orientation" && (
+              <span className="ml-2 px-2 py-0.5 rounded bg-emerald-100 text-emerald-900 font-bold text-[10px]">
+                Sorted by Orientation ({sortOrder === "ASC" ? "Present First" : "Pending First"})
               </span>
             )}
           </span>
@@ -482,8 +559,8 @@ export default function BeneficiariesMasterlistPage() {
                   {renderSortHeader("Birthday", "birthday")}
                   {renderSortHeader("Barangay / Sitio", "sitio")}
                   {renderSortHeader("Table Assignment", "tableNumber")}
-                  <th className="px-4 py-3">Stub & Affirmation</th>
-                  <th className="px-4 py-3">Orientation</th>
+                  {renderSortHeader("Stub & Affirmation", "stubAffirmation")}
+                  {renderSortHeader("Orientation", "orientation")}
                   {renderSortHeader("Attendance", "attendance")}
                   {renderSortHeader("Status", "status")}
                   <th className="px-4 py-3 text-right">Action</th>
