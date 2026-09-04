@@ -128,7 +128,7 @@ export default async function LandingPage() {
             </h1>
 
             <p className="text-sm sm:text-base text-slate-600 leading-relaxed font-normal">
-              <strong className="text-slate-900">TUPAD EC Access</strong>; isa sa mga web based application sa ilalim ng programa ng lokal na pamahalaan na <strong className="text-slate-900">PESO EC Access</strong> ang isinasagawang i-Pliot Test kung saan mas lalong inilalapit sa tao ang isang mas accessible, transparent, mas mabilis, automated at Digital simula Aplikasyon, paguupdate ng Status ng Aplikasyon ng mga tao, pagiimporma sa mga kwalipikadong beneficiaries, pag attend ng orientation, attendance, work program, accomplishment report hangang sa payout ay mas pinasimple at pinadali na.
+              <strong className="text-slate-900">TUPAD EC Access</strong>; isa sa mga web based application sa ilalim ng programa ng lokal na pamahalaan na <strong className="text-slate-900">PESO EC Access</strong> ang isinasagawang i-Pilot Test kung saan mas lalong inilalapit sa tao ang isang mas accessible, transparent, mas mabilis, automated at Digital simula Aplikasyon, paguupdate ng Status ng Aplikasyon ng mga tao, pagiimporma sa mga kwalipikadong beneficiaries, pag attend ng orientation, attendance, work program, accomplishment report hangang sa payout ay mas pinasimple at pinadali na.
             </p>
 
             {/* Quick Access Card Grid */}
