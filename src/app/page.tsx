@@ -127,9 +127,53 @@ export default async function LandingPage() {
               Pagpapalakas ng Serbisyo ng PESO upang mas maipa-DAMA sa bawat Pamilyang DINGALEÑO
             </h1>
 
-            <p className="text-sm sm:text-base text-slate-600 leading-relaxed font-normal">
-              <strong className="text-slate-900">TUPAD EC Access</strong>; isa sa mga web based application sa ilalim ng programa ng lokal na pamahalaan na <strong className="text-slate-900">PESO EC Access</strong> ang isinasagawang i-Pilot Test kung saan mas lalong inilalapit sa tao ang isang mas accessible, transparent, mas mabilis, automated at Digital simula Aplikasyon, paguupdate ng Status ng Aplikasyon ng mga tao, pagiimporma sa mga kwalipikadong beneficiaries, pag attend ng orientation, attendance, work program, accomplishment report hangang sa payout ay mas pinasimple at pinadali na.
-            </p>
+            <div className="space-y-3 text-sm sm:text-base text-slate-600 leading-relaxed font-normal">
+              <p className="font-extrabold text-gov-blue flex items-center space-x-1.5 text-base sm:text-lg">
+                <span>🚀 DIGITAL NA ANG SERBISYO NG PESO DINGALAN! 💻📱</span>
+              </p>
+
+              <p>
+                Ipinakikilala ang <strong className="text-slate-900">PESO EC Access</strong> — ang bagong digital portal na magpapadali sa mga programa at serbisyo ng Public Employment Service Office para sa bawat mamamayan ng Dingalan!
+              </p>
+
+              <div className="bg-amber-50/90 border border-amber-200/80 rounded-xl p-3 text-xs sm:text-sm text-slate-800">
+                <span className="font-black text-amber-900 block mb-0.5">🌟 KAHANGA-HANGA AT PROUDLY LOCAL:</span>
+                <span>💡 Higit sa lahat, ang sistemang ito ay <strong className="text-amber-950 font-black">LIBRENG</strong> nabuo at pinondohan ng sariling husay at talento ng <strong className="text-slate-900">PESO Dingalan team</strong> upang mas mapalapit ang teknolohiya at serbisyo sa tao!</span>
+              </div>
+
+              <div className="space-y-1.5 text-xs sm:text-sm pt-1">
+                <p className="font-bold text-slate-900">🛠️ Mga Tampok na Serbisyo:</p>
+                <ul className="grid grid-cols-1 gap-1 pl-1 text-slate-600">
+                  <li className="flex items-start space-x-1.5">
+                    <span className="text-emerald-600 font-bold">✔️</span>
+                    <span><strong className="text-slate-800">Mag-apply Online</strong> para sa programang TUPAD kahit nasa bahay</span>
+                  </li>
+                  <li className="flex items-start space-x-1.5">
+                    <span className="text-emerald-600 font-bold">✔️</span>
+                    <span><strong className="text-slate-800">I-check ang Status</strong> ng aplikasyon anumang oras</span>
+                  </li>
+                  <li className="flex items-start space-x-1.5">
+                    <span className="text-emerald-600 font-bold">✔️</span>
+                    <span><strong className="text-slate-800">365-Day Checker</strong> para sa patas at transparent na proseso</span>
+                  </li>
+                  <li className="flex items-start space-x-1.5">
+                    <span className="text-emerald-600 font-bold">✔️</span>
+                    <span><strong className="text-slate-800">Mabilis na QR Verification</strong> sa stubs, orientation, at attendance</span>
+                  </li>
+                  <li className="flex items-start space-x-1.5">
+                    <span className="text-emerald-600 font-bold">✔️</span>
+                    <span><strong className="text-slate-800">Direct Feedback Desk</strong> para sa agarang sagot sa mga tanong</span>
+                  </li>
+                </ul>
+              </div>
+
+              <div className="flex flex-wrap gap-1.5 pt-1 text-[11px] font-bold text-gov-blue">
+                <span className="bg-blue-50 px-2.5 py-0.5 rounded-full border border-blue-200">#PESOECAccess</span>
+                <span className="bg-blue-50 px-2.5 py-0.5 rounded-full border border-blue-200">#SerbisyongDAMA</span>
+                <span className="bg-blue-50 px-2.5 py-0.5 rounded-full border border-blue-200">#DigitalGovernance</span>
+                <span className="bg-blue-50 px-2.5 py-0.5 rounded-full border border-blue-200">#Innovation</span>
+              </div>
+            </div>
 
             {/* Quick Access Card Grid */}
             <div className="pt-2 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
