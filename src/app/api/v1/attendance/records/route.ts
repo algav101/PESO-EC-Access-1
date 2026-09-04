@@ -48,9 +48,9 @@ export async function GET(request: Request) {
 export async function PATCH(request: Request) {
   try {
     const user = await getCurrentUser();
-    if (!user || user.role !== "PESO_ADMIN") {
+    if (!user || (!isAdminUser(user) && !hasPermission(user.role, "attendance.correct"))) {
       return NextResponse.json(
-        { error: "Forbidden: Only PESO Admin can manually edit or reset daily attendance." },
+        { error: "Forbidden: Only Domain Master and PESO Admin can manually edit or reset daily attendance." },
         { status: 403 }
       );
     }

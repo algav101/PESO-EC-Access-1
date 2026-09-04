@@ -224,9 +224,9 @@ export async function POST(request: Request) {
           replacementProgramBeneficiaryId: newPb.id,
           reason,
           initiatedById: user.id,
-          approvedById: user.role === "PESO_ADMIN" ? user.id : null,
-          approvedAt: user.role === "PESO_ADMIN" ? new Date() : null,
-          status: user.role === "PESO_ADMIN" ? "APPROVED" : "PENDING",
+          approvedById: isAdminUser(user) ? user.id : null,
+          approvedAt: isAdminUser(user) ? new Date() : null,
+          status: isAdminUser(user) ? "APPROVED" : "PENDING",
         },
         include: {
           originalProgramBeneficiary: { include: { beneficiary: true } },

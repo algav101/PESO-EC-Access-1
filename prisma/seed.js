@@ -14,13 +14,15 @@ async function main() {
   // Users
   const adminUser = await prisma.user.upsert({
     where: { username: 'admin' },
-    update: {},
+    update: {
+      role: 'DOMAIN_MASTER',
+    },
     create: {
       username: 'admin',
       fullName: 'PESO Dingalan Admin Officer',
       email: 'peso.dingalan@aurora.gov.ph',
       passwordHash: adminPass,
-      role: 'PESO_ADMIN',
+      role: 'DOMAIN_MASTER',
       status: 'ACTIVE',
     },
   });

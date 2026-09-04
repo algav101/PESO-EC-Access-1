@@ -1,13 +1,34 @@
+export type UserRole = "DOMAIN_MASTER" | "PESO_ADMIN" | "TUPAD_COORDINATOR" | "DOLE_COORDINATOR";
+
 export interface AuthUser {
   id: string;
   username: string;
   fullName: string;
   email?: string | null;
-  role: "PESO_ADMIN" | "TUPAD_COORDINATOR" | "DOLE_COORDINATOR";
+  role: UserRole | string;
   assignedBarangay?: string | null;
 }
 
 export const PERMISSIONS = {
+  DOMAIN_MASTER: [
+    "dashboard.view",
+    "program.create", "program.read", "program.update", "program.delete", "program.close",
+    "beneficiary.import", "beneficiary.create", "beneficiary.read", "beneficiary.update", "beneficiary.delete", "beneficiary.archive", "beneficiary.profile.edit",
+    "dependent.create", "dependent.read", "dependent.update", "dependent.delete",
+    "qr.generate", "qr.read", "qr.print", "qr.reprint", "qr.invalidate",
+    "stub.configure", "stub.print", "stub.distribution.scan", "stub.distribution.read", "stub.distribution.monitor", "stub.override",
+    "orientation.scan", "orientation.read", "orientation.correct",
+    "replacement.create", "replacement.read", "replacement.approve",
+    "attendance.scan", "attendance.read", "attendance.correct", "attendance.export",
+    "photo.upload", "photo.read", "photo.approve", "photo.reject", "photo.configure",
+    "payout.scan", "payout.read", "payout.correct",
+    "restriction.read", "restriction.create", "restriction.override",
+    "report.generate", "report.template.create", "report.template.update", "report.export",
+    "user.create", "user.read", "user.update", "user.disable", "user.delete",
+    "settings.read", "settings.update",
+    "audit.read",
+    "sync.read", "sync.resolve"
+  ],
   PESO_ADMIN: [
     "dashboard.view",
     "program.create", "program.read", "program.update", "program.delete", "program.close",
@@ -55,7 +76,16 @@ export const PERMISSIONS = {
   ]
 };
 
+export function isDomainMaster(user?: { role?: string } | null): boolean {
+  return user?.role === "DOMAIN_MASTER";
+}
+
+export function isAdminUser(user?: { role?: string } | null): boolean {
+  return user?.role === "DOMAIN_MASTER" || user?.role === "PESO_ADMIN";
+}
+
 export function hasPermission(role: string, permission: string): boolean {
+  if (role === "DOMAIN_MASTER") return true; // Domain Master has full wildcard bypass
   const list = PERMISSIONS[role as keyof typeof PERMISSIONS] || [];
   return list.includes(permission);
 }

@@ -11,7 +11,9 @@ export function StatusBadge({ status, className }: StatusBadgeProps) {
 
   let badgeStyle = "bg-slate-100 text-slate-700 border-slate-200";
 
-  if (["ACTIVE", "PRESENT", "DISTRIBUTED", "APPROVED", "PAID", "SYNCED", "VALID"].includes(s)) {
+  if (s === "DOMAIN_MASTER") {
+    badgeStyle = "bg-gradient-to-r from-amber-500/15 to-purple-500/15 text-amber-900 border-amber-400 font-black";
+  } else if (["ACTIVE", "PRESENT", "DISTRIBUTED", "APPROVED", "PAID", "SYNCED", "VALID"].includes(s)) {
     badgeStyle = "bg-emerald-50 text-emerald-700 border-emerald-200";
   } else if (["PENDING", "FOR_REVIEW", "SCHEDULED", "DRAFT", "PREVIEW"].includes(s)) {
     badgeStyle = "bg-amber-50 text-amber-700 border-amber-200";

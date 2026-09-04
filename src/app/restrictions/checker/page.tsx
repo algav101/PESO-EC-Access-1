@@ -24,10 +24,11 @@ import {
   Zap,
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
+import { isAdminUser } from "@/lib/permissions";
 
 export default function EligibilityCheckerPage() {
   const { user } = useAuth();
-  const isAdmin = user?.role === "PESO_ADMIN";
+  const isAdmin = isAdminUser(user);
 
   // Form Fields
   const [firstName, setFirstName] = useState("");

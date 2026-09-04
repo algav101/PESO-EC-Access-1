@@ -29,11 +29,11 @@ interface PresetAccount {
 
 const PRESET_ROLES: { id: string; label: string; description: string; accounts: PresetAccount[] }[] = [
   {
-    id: "PESO_ADMIN",
-    label: "PESO Admin",
-    description: "Full administrative, database, and program management access",
+    id: "DOMAIN_MASTER",
+    label: "👑 Domain Master",
+    description: "Full system owner access, beneficiary profile editing, and administrative control",
     accounts: [
-      { label: "PESO Dingalan Admin Officer", name: "PESO Dingalan Admin", username: "admin", role: "PESO Admin", barangay: "Municipality-wide" },
+      { label: "PESO Dingalan Admin Officer", name: "PESO Dingalan Admin", username: "admin", role: "Domain Master", barangay: "Municipality-wide (Full Access)" },
     ],
   },
   {

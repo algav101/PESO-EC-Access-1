@@ -20,11 +20,12 @@ import {
 import { StatusBadge } from "@/components/common/StatusBadge";
 import * as XLSX from "xlsx";
 import { useAuth } from "@/context/AuthContext";
+import { isAdminUser } from "@/lib/permissions";
 import Link from "next/link";
 
 export default function RestrictionsPage() {
   const { user } = useAuth();
-  const isAdmin = user?.role === "PESO_ADMIN";
+  const isAdmin = isAdminUser(user);
   const [restrictions, setRestrictions] = useState<any[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [loading, setLoading] = useState(true);

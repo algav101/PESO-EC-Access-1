@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
-import { getCurrentUser } from "@/lib/auth";
+import { getCurrentUser, isAdminUser } from "@/lib/auth";
 import { logAudit } from "@/lib/audit";
 import fs from "fs";
 import path from "path";
@@ -8,8 +8,8 @@ import path from "path";
 export async function GET() {
   try {
     const user = await getCurrentUser();
-    if (!user || user.role !== "PESO_ADMIN") {
-      return NextResponse.json({ error: "Forbidden: Only PESO Admins can access restore status" }, { status: 403 });
+    if (!user || !isAdminUser(user)) {
+      return NextResponse.json({ error: "Forbidden: Only Domain Master and PESO Admins can access restore status" }, { status: 403 });
     }
 
     const beneCount = await prisma.beneficiary.count();
@@ -38,8 +38,8 @@ export async function GET() {
 export async function POST(request: Request) {
   try {
     const user = await getCurrentUser();
-    if (!user || user.role !== "PESO_ADMIN") {
-      return NextResponse.json({ error: "Forbidden: Only PESO Admins can restore data" }, { status: 403 });
+    if (!user || !isAdminUser(user)) {
+      return NextResponse.json({ error: "Forbidden: Only Domain Master and PESO Admins can restore data" }, { status: 403 });
     }
 
     const backupPath = path.join(process.cwd(), "data_export/master_tupad_dingalan_backup.json");

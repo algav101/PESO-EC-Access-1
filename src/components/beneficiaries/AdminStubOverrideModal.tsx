@@ -94,7 +94,13 @@ export function AdminStubOverrideModal({
   // Sync attendance state when day selector changes
   useEffect(() => {
     const matchingRecord = pb.attendanceRecords?.find((r: any) => {
-      const dNum = r.workDay?.dayNumber || (r.attendanceDate ? parseInt(r.attendanceDate.split("-")[2], 10) : 1);
+      const dNum =
+        r.workDay?.dayNumber ||
+        (typeof r.attendanceDate === "string"
+          ? parseInt(r.attendanceDate.split("-")[2] || "1", 10)
+          : r.attendanceDate instanceof Date
+          ? r.attendanceDate.getDate()
+          : 1);
       return dNum === selectedDayNumber;
     });
 

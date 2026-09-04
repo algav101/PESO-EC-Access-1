@@ -5,8 +5,8 @@ import { getCurrentUser } from "@/lib/auth";
 export async function GET(request: Request) {
   try {
     const user = await getCurrentUser();
-    if (!user || user.role !== "PESO_ADMIN") {
-      return NextResponse.json({ error: "Forbidden: PESO Admin access required" }, { status: 403 });
+    if (!user || (!isAdminUser(user) && !hasPermission(user.role, "audit.read"))) {
+      return NextResponse.json({ error: "Forbidden: Domain Master or PESO Admin access required" }, { status: 403 });
     }
 
     const { searchParams } = new URL(request.url);

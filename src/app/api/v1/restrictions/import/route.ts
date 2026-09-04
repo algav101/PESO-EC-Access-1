@@ -147,9 +147,9 @@ export async function POST(request: Request) {
     if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
-    if (user.role !== "PESO_ADMIN") {
+    if (!isAdminUser(user) && !hasPermission(user.role, "restriction.create")) {
       return NextResponse.json(
-        { error: "Forbidden: Only PESO Admins can upload disqualified beneficiaries reference lists" },
+        { error: "Forbidden: Only Domain Master and PESO Admins can upload disqualified beneficiaries reference lists" },
         { status: 403 }
       );
     }

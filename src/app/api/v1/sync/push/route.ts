@@ -180,9 +180,9 @@ export async function POST(request: Request) {
               longitude: longitude ? Number(longitude) : 121.3965,
               capturedAt: capturedAt ? new Date(capturedAt) : new Date(),
               uploadedById: user?.id || (await prisma.user.findFirst())?.id || "",
-              status: user?.role === "PESO_ADMIN" ? "APPROVED" : "FOR_REVIEW",
-              approvedById: user?.role === "PESO_ADMIN" ? user.id : null,
-              approvedAt: user?.role === "PESO_ADMIN" ? new Date() : null,
+              status: isAdminUser(user) ? "APPROVED" : "FOR_REVIEW",
+              approvedById: isAdminUser(user) ? user?.id : null,
+              approvedAt: isAdminUser(user) ? new Date() : null,
             },
           });
           accepted.push(clientTransactionId);

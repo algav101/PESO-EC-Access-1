@@ -23,10 +23,11 @@ import { EditBeneficiaryModal } from "@/components/beneficiaries/EditBeneficiary
 import { AdminStubOverrideModal } from "@/components/beneficiaries/AdminStubOverrideModal";
 import { useAuth } from "@/context/AuthContext";
 import { offlineDb } from "@/lib/dexie";
+import { isAdminUser } from "@/lib/permissions";
 
 export default function BeneficiariesMasterlistPage() {
   const { user } = useAuth();
-  const isAdmin = user?.role === "PESO_ADMIN";
+  const isAdmin = isAdminUser(user);
   const [beneficiaries, setBeneficiaries] = useState<any[]>([]);
   const [programs, setPrograms] = useState<any[]>([]);
   const [selectedProgram, setSelectedProgram] = useState<string>("");
@@ -568,19 +569,27 @@ export default function BeneficiariesMasterlistPage() {
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {sortedBeneficiaries.map((pb) => {
+                  if (!pb) return null;
                   const isOriented = Boolean(pb.orientationAttendance && pb.orientationAttendance.length > 0);
-                  const attendCount = pb.attendanceRecords ? pb.attendanceRecords.length : 0;
-                  const dist = pb.stubDistributions?.find((d: any) => d.status === "DISTRIBUTED");
+                  const attendCount = Array.isArray(pb.attendanceRecords) ? pb.attendanceRecords.length : 0;
+                  const dist = Array.isArray(pb.stubDistributions)
+                    ? pb.stubDistributions.find((d: any) => d?.status === "DISTRIBUTED")
+                    : null;
+                  const flaggedDist = Array.isArray(pb.stubDistributions)
+                    ? pb.stubDistributions.find((d: any) => d?.status === "FLAGGED_REPLACEMENT")
+                    : null;
                   const isFlagged =
                     pb.participationStatus === "FLAGGED_FOR_REPLACEMENT" ||
-                    Boolean(pb.stubDistributions?.some((d: any) => d.status === "FLAGGED_REPLACEMENT"));
+                    Boolean(flaggedDist);
+
+                  const flagRemarks = flaggedDist?.remarks || pb.stubDistributions?.[0]?.remarks || "";
 
                   const formattedDistDate = dist?.distributedAt
                     ? new Date(dist.distributedAt).toLocaleDateString()
                     : "";
 
                   return (
-                    <tr key={pb.id} className="hover:bg-slate-50 transition">
+                    <tr key={pb.id || Math.random()} className="hover:bg-slate-50 transition">
                       <td className="px-4 py-3 font-mono font-bold text-gov-blue">
                         {pb.designatedNumber || "-"}
                       </td>
@@ -605,16 +614,16 @@ export default function BeneficiariesMasterlistPage() {
                           <div className="space-y-1">
                             <span
                               className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-50 text-rose-700 border border-rose-200 inline-flex items-center space-x-1"
-                              title={pb.stubDistributions?.[0]?.remarks || "Flagged for onsite replacement"}
+                              title={flagRemarks || "Flagged for onsite replacement"}
                             >
                               <span>🚩 Flagged Repl.</span>
                             </span>
-                            {pb.stubDistributions?.[0]?.remarks && (
+                            {flagRemarks && (
                               <p
                                 className="text-[10px] text-rose-700 font-semibold max-w-[170px] truncate leading-tight"
-                                title={pb.stubDistributions[0].remarks}
+                                title={flagRemarks}
                               >
-                                {pb.stubDistributions[0].remarks}
+                                {flagRemarks}
                               </p>
                             )}
                           </div>

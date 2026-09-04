@@ -1,12 +1,12 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
-import { getCurrentUser } from "@/lib/auth";
+import { getCurrentUser, isAdminUser, hasPermission } from "@/lib/auth";
 
 export async function GET(request: Request) {
   try {
     const user = await getCurrentUser();
-    if (!user || user.role !== "PESO_ADMIN") {
-      return NextResponse.json({ error: "Forbidden: PESO Admin access required" }, { status: 403 });
+    if (!user || (!isAdminUser(user) && !hasPermission(user.role, "program.read"))) {
+      return NextResponse.json({ error: "Forbidden: Domain Master or PESO Admin access required" }, { status: 403 });
     }
 
     const { searchParams } = new URL(request.url);
@@ -23,27 +23,22 @@ export async function GET(request: Request) {
         { lastName: { contains: search, mode: "insensitive" } },
         { firstName: { contains: search, mode: "insensitive" } },
         { contactNumber: { contains: search } },
-        { idNumber: { contains: search } },
       ];
     }
 
-    const [applicants, totalCount, incompleteCount, queuedCount] = await Promise.all([
-      prisma.tupadApplicationRoster.findMany({
-        where,
-        orderBy: [{ lastName: "asc" }, { firstName: "asc" }],
-        take: 500,
-      }),
-      prisma.tupadApplicationRoster.count(),
-      prisma.tupadApplicationRoster.count({ where: { status: "INCOMPLETE" } }),
-      prisma.tupadApplicationRoster.count({ where: { status: "QUEUED" } }),
-    ]);
-
-    return NextResponse.json({
-      applicants,
-      totalCount,
-      incompleteCount,
-      queuedCount,
+    const applications = await prisma.tupadApplicationRoster.findMany({
+      where,
+      orderBy: { createdAt: "desc" },
     });
+
+    const counts = {
+      total: await prisma.tupadApplicationRoster.count(),
+      approved: await prisma.tupadApplicationRoster.count({ where: { status: "APPROVED" } }),
+      pending: await prisma.tupadApplicationRoster.count({ where: { status: "PENDING" } }),
+      ineligible: await prisma.tupadApplicationRoster.count({ where: { status: "INELIGIBLE" } }),
+    };
+
+    return NextResponse.json({ success: true, applications, counts });
   } catch (error: any) {
     console.error("GET /applications error:", error);
     return NextResponse.json({ error: error.message }, { status: 500 });
@@ -53,7 +48,7 @@ export async function GET(request: Request) {
 export async function DELETE(request: Request) {
   try {
     const user = await getCurrentUser();
-    if (!user || user.role !== "PESO_ADMIN") {
+    if (!user || (!isAdminUser(user) && !hasPermission(user.role, "program.delete"))) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 

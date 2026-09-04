@@ -14,13 +14,14 @@ import {
 } from "lucide-react";
 import { formatTime } from "@/lib/utils";
 import { useAuth } from "@/context/AuthContext";
+import { isAdminUser } from "@/lib/permissions";
 import { AdminStubOverrideModal } from "@/components/beneficiaries/AdminStubOverrideModal";
 
 function AttendanceMatrixContent() {
   const searchParams = useSearchParams();
   const urlProgramId = searchParams.get("programId");
   const { user } = useAuth();
-  const isAdmin = user?.role === "PESO_ADMIN";
+  const isAdmin = isAdminUser(user);
 
   const [programs, setPrograms] = useState<any[]>([]);
   const [selectedProgramId, setSelectedProgramId] = useState<string>(urlProgramId || "");

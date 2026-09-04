@@ -104,9 +104,9 @@ export async function POST(request: Request) {
         longitude: longitude ? Number(longitude) : 121.3965,
         capturedAt: capturedAt ? new Date(capturedAt) : new Date(),
         uploadedById: user.id,
-        status: user.role === "PESO_ADMIN" ? "APPROVED" : "FOR_REVIEW",
-        approvedById: user.role === "PESO_ADMIN" ? user.id : null,
-        approvedAt: user.role === "PESO_ADMIN" ? new Date() : null,
+        status: isAdminUser(user) ? "APPROVED" : "FOR_REVIEW",
+        approvedById: isAdminUser(user) ? user.id : null,
+        approvedAt: isAdminUser(user) ? new Date() : null,
       },
     });
 
@@ -174,8 +174,8 @@ export async function PATCH(request: Request) {
 export async function DELETE(request: Request) {
   try {
     const user = await getCurrentUser();
-    if (!user || user.role !== "PESO_ADMIN") {
-      return NextResponse.json({ error: "Forbidden: Only PESO Admins can purge photo data" }, { status: 403 });
+    if (!user || (!isAdminUser(user) && !hasPermission(user.role, "photo.reject"))) {
+      return NextResponse.json({ error: "Forbidden: Only Domain Master and PESO Admins can purge photo data" }, { status: 403 });
     }
 
     const { searchParams } = new URL(request.url);

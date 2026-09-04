@@ -29,6 +29,7 @@ import { StatusBadge } from "@/components/common/StatusBadge";
 import { formatDate, formatTime } from "@/lib/utils";
 import { useOffline } from "@/context/OfflineContext";
 import { useAuth } from "@/context/AuthContext";
+import { isAdminUser } from "@/lib/permissions";
 import { TableAssignmentModal } from "@/components/tables/TableAssignmentModal";
 import { EditProgramModal } from "@/components/programs/EditProgramModal";
 import { DeleteProgramModal } from "@/components/programs/DeleteProgramModal";
@@ -38,7 +39,7 @@ export default function ProgramDetailsHub() {
   const params = useParams();
   const router = useRouter();
   const { user } = useAuth();
-  const isAdmin = user?.role === "PESO_ADMIN";
+  const isAdmin = isAdminUser(user);
   const { cacheProgramData } = useOffline();
 
   const [program, setProgram] = useState<any>(null);

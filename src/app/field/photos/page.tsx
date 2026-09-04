@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState, useRef } from "react";
 import { useAuth } from "@/context/AuthContext";
+import { isAdminUser } from "@/lib/permissions";
 import {
   Camera,
   MapPin,
@@ -419,7 +420,7 @@ export default function PhotosPage() {
 
   const currentProgram = programs.find((p) => p.id === selectedProgramId);
   const isDole = user?.role === "DOLE_COORDINATOR";
-  const isAdmin = user?.role === "PESO_ADMIN";
+  const isAdmin = isAdminUser(user);
 
   // Filter activities for active upload modal Barangay + Day
   const activeWp = workPrograms.find(

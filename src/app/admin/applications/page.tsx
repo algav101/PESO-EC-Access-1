@@ -17,10 +17,11 @@ import {
   ShieldCheck,
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
+import { isAdminUser } from "@/lib/permissions";
 
 export default function AdminApplicationsPage() {
   const { user } = useAuth();
-  const isAdmin = user?.role === "PESO_ADMIN";
+  const isAdmin = isAdminUser(user);
 
   const [applicants, setApplicants] = useState<any[]>([]);
   const [totalCount, setTotalCount] = useState(0);

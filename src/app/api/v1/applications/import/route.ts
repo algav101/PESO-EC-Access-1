@@ -25,9 +25,9 @@ function getVal(row: any, keys: string[]): string {
 export async function POST(request: Request) {
   try {
     const user = await getCurrentUser();
-    if (!user || user.role !== "PESO_ADMIN") {
+    if (!user || (!isAdminUser(user) && !hasPermission(user.role, "program.create"))) {
       return NextResponse.json(
-        { error: "Forbidden: Only PESO Admin can upload application status rosters." },
+        { error: "Forbidden: Only Domain Master and PESO Admin can upload application status rosters." },
         { status: 403 }
       );
     }

@@ -1,6 +1,7 @@
 import React from "react";
 import prisma from "@/lib/prisma";
-import { getCurrentUser } from "@/lib/auth";
+import { getCurrentUser, isAdminUser } from "@/lib/auth";
+import { format } from "date-fns";
 import {
   FolderKanban,
   Users,
@@ -20,13 +21,12 @@ import {
   ShieldCheck,
   HelpCircle,
 } from "lucide-react";
-import { format } from "date-fns";
 
 export const dynamic = "force-dynamic";
 
 export default async function DashboardPage() {
   const user = await getCurrentUser();
-  const isPesoAdmin = user?.role === "PESO_ADMIN";
+  const isPesoAdmin = isAdminUser(user);
 
   const [
     activeProgramsCount,

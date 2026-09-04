@@ -9,10 +9,10 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // Strict Authorization: Only PESO_ADMIN can view audit logs
-    if (user.role !== "PESO_ADMIN") {
+    // Strict Authorization: Only DOMAIN_MASTER and PESO_ADMIN can view audit logs
+    if (!isAdminUser(user) && !hasPermission(user.role, "audit.read")) {
       return NextResponse.json(
-        { error: "Forbidden. System audit trail viewing is strictly restricted to PESO Dingalan Admin Officers." },
+        { error: "Forbidden. System audit trail viewing is strictly restricted to Domain Master and PESO Dingalan Admin Officers." },
         { status: 403 }
       );
     }

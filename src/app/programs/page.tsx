@@ -20,10 +20,11 @@ import { EditProgramModal } from "@/components/programs/EditProgramModal";
 import { DeleteProgramModal } from "@/components/programs/DeleteProgramModal";
 
 import { useAuth } from "@/context/AuthContext";
+import { isAdminUser } from "@/lib/permissions";
 
 export default function ProgramsPage() {
   const { user } = useAuth();
-  const isAdmin = user?.role === "PESO_ADMIN";
+  const isAdmin = isAdminUser(user);
 
   const [programs, setPrograms] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);

@@ -6,8 +6,8 @@ import { logAudit } from "@/lib/audit";
 export async function PATCH(request: Request, { params }: { params: { id: string } }) {
   try {
     const user = await getCurrentUser();
-    if (!user || user.role !== "PESO_ADMIN") {
-      return NextResponse.json({ error: "Forbidden: PESO Admin access required" }, { status: 403 });
+    if (!user || (!isAdminUser(user) && !hasPermission(user.role, "audit.read"))) {
+      return NextResponse.json({ error: "Forbidden: Domain Master or PESO Admin access required" }, { status: 403 });
     }
 
     const body = await request.json();
@@ -46,8 +46,8 @@ export async function PATCH(request: Request, { params }: { params: { id: string
 export async function DELETE(request: Request, { params }: { params: { id: string } }) {
   try {
     const user = await getCurrentUser();
-    if (!user || user.role !== "PESO_ADMIN") {
-      return NextResponse.json({ error: "Forbidden: PESO Admin access required" }, { status: 403 });
+    if (!user || (!isAdminUser(user) && !hasPermission(user.role, "audit.read"))) {
+      return NextResponse.json({ error: "Forbidden: Domain Master or PESO Admin access required" }, { status: 403 });
     }
 
     await prisma.publicInquiryMessage.delete({

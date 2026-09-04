@@ -16,6 +16,8 @@ import {
   Download,
   AlertCircle,
   FileText,
+  Crown,
+  ShieldAlert,
 } from "lucide-react";
 import { StatusBadge } from "@/components/common/StatusBadge";
 import { formatDate } from "@/lib/utils";
@@ -331,8 +333,22 @@ export default function UserManagementPage() {
                 <tr key={u.id} className="hover:bg-slate-50">
                   <td className="px-4 py-3 font-bold text-slate-900">{u.fullName}</td>
                   <td className="px-4 py-3 font-mono text-slate-600">@{u.username}</td>
-                  <td className="px-4 py-3 font-semibold text-gov-blue">
-                    {u.role.replace(/_/g, " ")}
+                  <td className="px-4 py-3 font-semibold">
+                    {u.role === "DOMAIN_MASTER" ? (
+                      <span className="inline-flex items-center space-x-1 px-2.5 py-0.5 bg-gradient-to-r from-amber-500/10 to-purple-500/10 text-amber-900 border border-amber-400/60 rounded-full font-black text-[11px] shadow-xs">
+                        <Crown className="w-3.5 h-3.5 text-amber-600" />
+                        <span>Domain Master</span>
+                      </span>
+                    ) : u.role === "PESO_ADMIN" ? (
+                      <span className="inline-flex items-center space-x-1 px-2.5 py-0.5 bg-blue-50 text-gov-blue border border-blue-200 rounded-full font-bold text-[11px]">
+                        <ShieldAlert className="w-3 h-3" />
+                        <span>PESO Admin</span>
+                      </span>
+                    ) : (
+                      <span className="text-slate-700 font-medium">
+                        {(u.role || "").replace(/_/g, " ")}
+                      </span>
+                    )}
                   </td>
                   <td className="px-4 py-3">
                     {u.role === "TUPAD_COORDINATOR" ? (
@@ -583,6 +599,7 @@ export default function UserManagementPage() {
               >
                 <option value="TUPAD_COORDINATOR">TUPAD Field Coordinator (Barangay-Scoped)</option>
                 <option value="PESO_ADMIN">PESO Admin (Full Operations Access)</option>
+                <option value="DOMAIN_MASTER">👑 Domain Master (Super Admin Access)</option>
                 <option value="DOLE_COORDINATOR">DOLE Coordinator (Auditing & Reports)</option>
               </select>
             </div>
@@ -670,6 +687,7 @@ export default function UserManagementPage() {
                 >
                   <option value="TUPAD_COORDINATOR">TUPAD Coordinator</option>
                   <option value="PESO_ADMIN">PESO Admin</option>
+                  <option value="DOMAIN_MASTER">👑 Domain Master</option>
                   <option value="DOLE_COORDINATOR">DOLE Coordinator</option>
                 </select>
               </div>

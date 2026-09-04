@@ -121,9 +121,9 @@ export async function DELETE(request: Request, { params }: { params: { id: strin
 export async function PATCH(request: Request, { params }: { params: { id: string } }) {
   try {
     const user = await getCurrentUser();
-    if (!user || user.role !== "PESO_ADMIN") {
+    if (!user || (!isAdminUser(user) && !hasPermission(user.role, "beneficiary.update"))) {
       return NextResponse.json(
-        { error: "Forbidden: Only PESO Admin accounts are authorized to manually edit beneficiary records." },
+        { error: "Forbidden: Only Domain Master and PESO Admin accounts are authorized to manually edit beneficiary records." },
         { status: 403 }
       );
     }

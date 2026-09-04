@@ -27,12 +27,13 @@ import {
 import { StatusBadge } from "@/components/common/StatusBadge";
 import { ParsedBarangayWorkProgram, WorkProgramPreviewResult } from "@/lib/work-program-parser";
 import { useAuth } from "@/context/AuthContext";
+import { isAdminUser } from "@/lib/permissions";
 
 export default function WorkProgramManagementPage() {
   const params = useParams();
   const router = useRouter();
   const { user } = useAuth();
-  const isAdmin = user?.role === "PESO_ADMIN";
+  const isAdmin = isAdminUser(user);
 
   const [program, setProgram] = useState<any>(null);
   const [workPrograms, setWorkPrograms] = useState<any[]>([]);

@@ -22,13 +22,13 @@ import { generateQrDataUrl } from "@/lib/qr";
 
 import { DeleteBeneficiaryModal } from "@/components/beneficiaries/DeleteBeneficiaryModal";
 import { EditBeneficiaryButton } from "@/components/beneficiaries/EditBeneficiaryButton";
-import { getCurrentUser } from "@/lib/auth";
+import { getCurrentUser, isAdminUser } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
 export default async function BeneficiaryProfilePage({ params }: { params: { id: string } }) {
   const currentUser = await getCurrentUser();
-  const isAdmin = currentUser?.role === "PESO_ADMIN";
+  const isAdmin = isAdminUser(currentUser);
 
   const rawBeneficiary = await prisma.beneficiary.findUnique({
     where: { id: params.id },

@@ -4,6 +4,7 @@ import React, { useEffect, useState } from "react";
 import { History, Search, Filter, ShieldCheck, User, Calendar, FileText, ShieldAlert, ArrowLeft } from "lucide-react";
 import { formatDate } from "@/lib/utils";
 import { useAuth } from "@/context/AuthContext";
+import { isAdminUser } from "@/lib/permissions";
 
 export default function AuditLogsPage() {
   const { user, loading: authLoading } = useAuth();
@@ -13,9 +14,9 @@ export default function AuditLogsPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!authLoading && user?.role === "PESO_ADMIN") {
+    if (!authLoading && isAdminUser(user)) {
       fetchLogs();
-    } else if (!authLoading && user && user.role !== "PESO_ADMIN") {
+    } else if (!authLoading && user && !isAdminUser(user)) {
       setLoading(false);
     }
   }, [user, authLoading]);
@@ -34,8 +35,8 @@ export default function AuditLogsPage() {
     }
   };
 
-  // Role Gate: Only PESO_ADMIN can view this page
-  if (!authLoading && user && user.role !== "PESO_ADMIN") {
+  // Role Gate: Only DOMAIN_MASTER and PESO_ADMIN can view this page
+  if (!authLoading && user && !isAdminUser(user)) {
     return (
       <div className="max-w-2xl mx-auto py-12 px-4">
         <div className="gov-card p-8 text-center space-y-4 border-t-4 border-t-rose-600 bg-white shadow-xl">

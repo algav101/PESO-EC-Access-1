@@ -18,10 +18,11 @@ import {
   History,
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
+import { isAdminUser } from "@/lib/permissions";
 
 export default function ReportCenterPage() {
   const { user } = useAuth();
-  const isPesoAdmin = user?.role === "PESO_ADMIN";
+  const isPesoAdmin = isAdminUser(user);
 
   const [programs, setPrograms] = useState<any[]>([]);
   const [selectedProgramId, setSelectedProgramId] = useState<string>("");

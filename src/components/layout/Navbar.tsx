@@ -95,9 +95,15 @@ export function Navbar({ onToggleSidebar }: NavbarProps) {
               <div className="flex items-center space-x-3 pl-2 border-l border-white/20">
                 <div className="hidden sm:flex flex-col text-right">
                   <span className="text-xs font-semibold text-white leading-tight">{user.fullName}</span>
-                  <span className="text-[11px] text-gov-goldLight font-mono">
-                    {user.role.replace(/_/g, " ")}
-                  </span>
+                  {user.role === "DOMAIN_MASTER" ? (
+                    <span className="text-[10px] font-black text-amber-300 bg-amber-500/20 px-1.5 py-0.2 rounded border border-amber-400/40 inline-flex items-center space-x-1 justify-end">
+                      <span>👑 Domain Master</span>
+                    </span>
+                  ) : (
+                    <span className="text-[11px] text-gov-goldLight font-mono">
+                      {(user.role || "").replace(/_/g, " ")}
+                    </span>
+                  )}
                 </div>
                 <button
                   onClick={logout}

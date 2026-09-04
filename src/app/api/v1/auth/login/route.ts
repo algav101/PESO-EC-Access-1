@@ -33,7 +33,7 @@ export async function POST(request: Request) {
               fullName: "PESO Dingalan Admin Officer",
               email: "peso.dingalan@aurora.gov.ph",
               passwordHash: adminPass,
-              role: "PESO_ADMIN",
+              role: "DOMAIN_MASTER",
               status: "ACTIVE",
             },
             {

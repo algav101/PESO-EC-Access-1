@@ -4,10 +4,12 @@ import React from "react";
 import { usePathname } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 import { PesoLogo } from "./PesoLogo";
+import { isAdminUser } from "@/lib/permissions";
 import {
   LayoutDashboard,
   FolderKanban,
   Users,
+  Crown,
   QrCode,
   Printer,
   CalendarCheck,
@@ -74,12 +76,12 @@ export function Sidebar({ isMobile = false, onClose }: SidebarProps) {
         { label: "Offline Sync Center", href: "/sync", icon: RefreshCw, permission: "sync.read" },
       ],
     },
-    ...(can("user.read") || can("settings.read") || user?.role === "PESO_ADMIN"
+    ...(can("user.read") || can("settings.read") || isAdminUser(user)
       ? [
           {
             title: "System Administration",
             items: [
-              ...(user?.role === "PESO_ADMIN"
+              ...(isAdminUser(user)
                 ? [
                     { label: "Applicant Status Roster", href: "/admin/applications", icon: FileSpreadsheet, permission: "settings.read" },
                     { label: "Public Inquiries Inbox", href: "/admin/inquiries", icon: MessageSquare, permission: "settings.read" },

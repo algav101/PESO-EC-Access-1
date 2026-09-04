@@ -20,10 +20,11 @@ import {
   RotateCcw,
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
+import { isAdminUser } from "@/lib/permissions";
 
 export default function AdminInquiriesPage() {
   const { user } = useAuth();
-  const isAdmin = user?.role === "PESO_ADMIN";
+  const isAdmin = isAdminUser(user);
 
   const [messages, setMessages] = useState<any[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
