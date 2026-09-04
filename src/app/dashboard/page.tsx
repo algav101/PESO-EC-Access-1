@@ -20,6 +20,7 @@ import {
   Phone,
   ShieldCheck,
   HelpCircle,
+  AlertTriangle,
 } from "lucide-react";
 
 export const dynamic = "force-dynamic";
@@ -28,27 +29,75 @@ export default async function DashboardPage() {
   const user = await getCurrentUser();
   const isPesoAdmin = isAdminUser(user);
 
+  // Fetch all active, non-replaced program beneficiaries for exact arithmetic reconciliation
+  const activeProgramBeneficiaries = await prisma.programBeneficiary.findMany({
+    where: {
+      participationStatus: { not: "REPLACED" },
+    },
+    include: {
+      stubDistributions: {
+        orderBy: { distributedAt: "desc" },
+      },
+      orientationAttendance: {
+        where: { status: "PRESENT" },
+      },
+    },
+  });
+
+  const totalBeneficiariesCount = activeProgramBeneficiaries.length;
+
+  let stubsConfirmedCount = 0;
+  let flaggedReplacementCount = 0;
+
+  for (const pb of activeProgramBeneficiaries) {
+    const isFlagged =
+      pb.participationStatus === "FLAGGED_FOR_REPLACEMENT" ||
+      pb.stubDistributions?.some((d: any) => d.status === "FLAGGED_REPLACEMENT");
+    const isDist = Boolean(pb.stubDistributions?.some((d: any) => d.status === "DISTRIBUTED"));
+
+    if (isFlagged) {
+      flaggedReplacementCount++;
+    } else if (isDist) {
+      stubsConfirmedCount++;
+    }
+  }
+
+  // Exact Arithmetic: Pending (Uninformed) = Target - (Confirmed + Flagged for Replacement)
+  const pendingUninformedCount = Math.max(
+    0,
+    totalBeneficiariesCount - (stubsConfirmedCount + flaggedReplacementCount)
+  );
+
+  const orientationPresentCount = activeProgramBeneficiaries.filter(
+    (pb) => pb.orientationAttendance && pb.orientationAttendance.length > 0
+  ).length;
+
   const [
     activeProgramsCount,
-    totalBeneficiariesCount,
     qrGeneratedCount,
-    stubsPrintedCount,
-    stubsDistributedCount,
-    orientationPresentCount,
     todayAttendanceCount,
     payoutPaidCount,
     restrictedCount,
   ] = await Promise.all([
     prisma.program.count({ where: { status: "ACTIVE" } }),
-    prisma.programBeneficiary.count(),
-    prisma.qrCode.count(),
-    prisma.qrPrintLog.count(),
-    prisma.stubDistribution.count({ where: { status: "DISTRIBUTED" } }),
-    prisma.orientationAttendance.count({ where: { status: "PRESENT" } }),
-    prisma.attendanceRecord.count({
-      where: { attendanceDate: format(new Date(), "yyyy-MM-dd") },
+    prisma.qrCode.count({
+      where: {
+        status: "ACTIVE",
+        programBeneficiary: { participationStatus: { not: "REPLACED" } },
+      },
     }),
-    prisma.payout.count({ where: { status: "PAID" } }),
+    prisma.attendanceRecord.count({
+      where: {
+        attendanceDate: format(new Date(), "yyyy-MM-dd"),
+        programBeneficiary: { participationStatus: { not: "REPLACED" } },
+      },
+    }),
+    prisma.payout.count({
+      where: {
+        status: "PAID",
+        programBeneficiary: { participationStatus: { not: "REPLACED" } },
+      },
+    }),
     prisma.beneficiaryRestriction.count({ where: { status: "ACTIVE" } }),
   ]);
 
@@ -58,9 +107,9 @@ export default async function DashboardPage() {
     include: {
       _count: {
         select: {
-          programBeneficiaries: true,
-          attendanceRecords: true,
-          payouts: true,
+          programBeneficiaries: { where: { participationStatus: { not: "REPLACED" } } },
+          attendanceRecords: { where: { programBeneficiary: { participationStatus: { not: "REPLACED" } } } },
+          payouts: { where: { programBeneficiary: { participationStatus: { not: "REPLACED" } } } },
         },
       },
     },
@@ -78,15 +127,87 @@ export default async function DashboardPage() {
     : [];
 
   const metricCards = [
-    { label: "Active Programs", value: activeProgramsCount, icon: FolderKanban, color: "text-blue-700", bg: "bg-blue-50", href: "/programs" },
-    { label: "Beneficiaries", value: totalBeneficiariesCount, icon: Users, color: "text-indigo-700", bg: "bg-indigo-50", href: "/beneficiaries" },
-    { label: "QR Generated", value: qrGeneratedCount, icon: QrCode, color: "text-cyan-700", bg: "bg-cyan-50", href: "/stubs" },
-    { label: "Stubs Printed", value: stubsPrintedCount, icon: Printer, color: "text-slate-700", bg: "bg-slate-100", href: "/stubs" },
-    { label: "Stubs Distributed", value: stubsDistributedCount, icon: QrCode, color: "text-emerald-700", bg: "bg-emerald-50", href: "/field/stub-distribution" },
-    { label: "Orientation Present", value: orientationPresentCount, icon: CalendarCheck, color: "text-teal-700", bg: "bg-teal-50", href: "/field/orientation" },
-    { label: "Today's Attendance", value: todayAttendanceCount, icon: Clock, color: "text-amber-700", bg: "bg-amber-50", href: "/field/attendance" },
-    { label: "Payout Completed", value: payoutPaidCount, icon: Banknote, color: "text-green-700", bg: "bg-green-50", href: "/field/payout" },
-    { label: "365-Day Restricted", value: restrictedCount, icon: ShieldAlert, color: "text-rose-700", bg: "bg-rose-50", href: "/restrictions" },
+    {
+      label: "Active Programs",
+      value: activeProgramsCount,
+      sublabel: "Ongoing TUPAD Batches",
+      icon: FolderKanban,
+      color: "text-blue-700",
+      bg: "bg-blue-50",
+      href: "/programs",
+    },
+    {
+      label: "Target Beneficiaries",
+      value: totalBeneficiariesCount,
+      sublabel: "Active Enrolled Roster",
+      icon: Users,
+      color: "text-indigo-700",
+      bg: "bg-indigo-50",
+      href: "/beneficiaries",
+    },
+    {
+      label: "Stubs Confirmed",
+      value: stubsConfirmedCount,
+      sublabel: totalBeneficiariesCount > 0 ? `${((stubsConfirmedCount / totalBeneficiariesCount) * 100).toFixed(1)}% Affirmed` : "Affirmed & Distributed",
+      icon: QrCode,
+      color: "text-emerald-700",
+      bg: "bg-emerald-50",
+      href: "/field/stub-distribution?tab=monitoring",
+    },
+    {
+      label: "Pending (Uninformed)",
+      value: pendingUninformedCount,
+      sublabel: "Awaiting Field Distribution",
+      icon: Clock,
+      color: "text-amber-700",
+      bg: "bg-amber-50",
+      href: "/field/stub-distribution?tab=monitoring",
+    },
+    {
+      label: "Flagged for Replacement",
+      value: flaggedReplacementCount,
+      sublabel: "Awaiting Onsite Substitute",
+      icon: AlertTriangle,
+      color: "text-rose-700",
+      bg: "bg-rose-50",
+      href: "/replacements",
+    },
+    {
+      label: "Orientation Present",
+      value: orientationPresentCount,
+      sublabel: totalBeneficiariesCount > 0 ? `${((orientationPresentCount / totalBeneficiariesCount) * 100).toFixed(1)}% Verified` : "Attendance Verified",
+      icon: CalendarCheck,
+      color: "text-teal-700",
+      bg: "bg-teal-50",
+      href: "/field/orientation",
+    },
+    {
+      label: "Today's Attendance",
+      value: todayAttendanceCount,
+      sublabel: "Scanned Today",
+      icon: Clock,
+      color: "text-blue-800",
+      bg: "bg-sky-50",
+      href: "/field/attendance",
+    },
+    {
+      label: "Payout Completed",
+      value: payoutPaidCount,
+      sublabel: "Verified Claims",
+      icon: Banknote,
+      color: "text-green-700",
+      bg: "bg-green-50",
+      href: "/field/payout",
+    },
+    {
+      label: "365-Day Restricted",
+      value: restrictedCount.toLocaleString(),
+      sublabel: "Lockout Database",
+      icon: ShieldCheck,
+      color: "text-red-700",
+      bg: "bg-red-50",
+      href: "/restrictions",
+    },
   ];
 
   return (
@@ -125,7 +246,7 @@ export default async function DashboardPage() {
         </div>
       </div>
 
-      {/* 9 Metric Cards */}
+      {/* 9 Reconciled Metric Cards */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-3 xl:grid-cols-3 gap-4">
         {metricCards.map((card, idx) => {
           const Icon = card.icon;
@@ -145,6 +266,11 @@ export default async function DashboardPage() {
                 <p className="text-xl sm:text-2xl font-black text-slate-900 leading-tight">
                   {card.value}
                 </p>
+                {card.sublabel && (
+                  <p className="text-[10px] text-slate-400 truncate mt-0.5 font-medium">
+                    {card.sublabel}
+                  </p>
+                )}
               </div>
             </a>
           );
