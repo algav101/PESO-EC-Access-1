@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { useSearchParams } from "next/navigation";
+import Link from "next/link";
 import {
   QrCode,
   ShieldCheck,
@@ -23,6 +24,7 @@ import {
   Check,
   TrendingUp,
   Clock,
+  ArrowRight,
 } from "lucide-react";
 import { QrScannerModal } from "@/components/scanner/QrScannerModal";
 import { useOffline } from "@/context/OfflineContext";
@@ -783,6 +785,7 @@ function StubDistributionContent() {
                     <th className="py-2 px-3">Distribution Status</th>
                     <th className="py-2 px-3">Remarks / Flag Reason</th>
                     <th className="py-2 px-3">Verified By</th>
+                    <th className="py-2 px-3 text-center">Action</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 font-medium">
@@ -835,6 +838,19 @@ function StubDistributionContent() {
                           </span>
                         ) : (
                           <span className="text-slate-400 italic">Not yet verified</span>
+                        )}
+                      </td>
+                      <td className="py-2.5 px-3 text-center">
+                        {b.status === "FLAGGED_REPLACEMENT" ? (
+                          <Link
+                            href={`/replacements?programId=${selectedProgramId}&originalPbId=${b.id}`}
+                            className="inline-flex items-center space-x-1 px-2.5 py-1 bg-rose-600 hover:bg-rose-700 text-white font-bold text-[10px] rounded-lg shadow-sm transition whitespace-nowrap"
+                          >
+                            <span>Process Replacement</span>
+                            <ArrowRight className="w-3 h-3" />
+                          </Link>
+                        ) : (
+                          <span className="text-[10px] text-slate-300 font-mono">—</span>
                         )}
                       </td>
                     </tr>

@@ -14,7 +14,11 @@ export async function GET(request: Request, { params }: { params: { id: string }
     const query = searchParams.get("q");
 
     const whereClause: any = { programId: params.id };
-    if (status) whereClause.participationStatus = status;
+    if (status) {
+      if (status !== "ALL") whereClause.participationStatus = status;
+    } else {
+      whereClause.participationStatus = { not: "REPLACED" };
+    }
 
     // Enforce coordinator barangay-level isolation
     if (user.role === "TUPAD_COORDINATOR" && user.assignedBarangay) {

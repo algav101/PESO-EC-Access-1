@@ -28,6 +28,7 @@ export async function GET(request: Request) {
       include: {
         programBarangays: true,
         programBeneficiaries: {
+          where: { participationStatus: { not: "REPLACED" } },
           include: {
             beneficiary: true,
             stubDistributions: {
@@ -47,11 +48,6 @@ export async function GET(request: Request) {
     const beneficiaries = program.programBeneficiaries;
     const totalBeneficiaries = beneficiaries.length;
 
-    let totalDistributed = 0;
-    let totalConfirmed = 0;
-    let totalFlaggedReplacement = 0;
-    let totalPending = 0;
-
     // Canonical Barangay aggregation map initialized with all 11 Dingalan barangays
     const brgyStats: Record<
       string,
@@ -69,24 +65,22 @@ export async function GET(request: Request) {
     }
 
     const beneficiaryRoster = beneficiaries.map((pb) => {
-      const dist = pb.stubDistributions[0];
-      const isConfirmed = dist?.status === "DISTRIBUTED" && dist?.verificationMethod === "BIRTHDAY_PIN";
-      const isFlagged = dist?.status === "FLAGGED_REPLACEMENT" || pb.participationStatus === "FLAGGED_FOR_REPLACEMENT";
-      const isDistributed = !!dist && dist.status === "DISTRIBUTED";
+      const flaggedDist = pb.stubDistributions?.find((d: any) => d.status === "FLAGGED_REPLACEMENT");
+      const distributedDist = pb.stubDistributions?.find((d: any) => d.status === "DISTRIBUTED");
+
+      const isFlagged =
+        pb.participationStatus === "FLAGGED_FOR_REPLACEMENT" ||
+        Boolean(flaggedDist);
+
+      const isConfirmed = !isFlagged && Boolean(distributedDist);
 
       let status = "PENDING";
       if (isFlagged) {
         status = "FLAGGED_REPLACEMENT";
-        totalFlaggedReplacement++;
       } else if (isConfirmed) {
         status = "CONFIRMED";
-        totalConfirmed++;
-        totalDistributed++;
-      } else if (isDistributed) {
-        status = "DISTRIBUTED";
-        totalDistributed++;
       } else {
-        totalPending++;
+        status = "PENDING";
       }
 
       // Normalize barangay name to eliminate case-splitting (e.g. "PALTIC" -> "Paltic", "CARAGSACAN" -> "Caragsacan")
@@ -97,10 +91,14 @@ export async function GET(request: Request) {
       }
 
       brgyStats[normalizedBrgy].total++;
-      if (isFlagged) brgyStats[normalizedBrgy].flaggedReplacement++;
-      else if (isConfirmed) brgyStats[normalizedBrgy].confirmed++, brgyStats[normalizedBrgy].distributed++;
-      else if (isDistributed) brgyStats[normalizedBrgy].distributed++;
-      else brgyStats[normalizedBrgy].pending++;
+      if (isFlagged) {
+        brgyStats[normalizedBrgy].flaggedReplacement++;
+      } else if (isConfirmed) {
+        brgyStats[normalizedBrgy].confirmed++;
+        brgyStats[normalizedBrgy].distributed++;
+      }
+
+      const activeDist = isFlagged ? (flaggedDist || distributedDist) : (distributedDist || flaggedDist);
 
       return {
         id: pb.id,
@@ -111,12 +109,25 @@ export async function GET(request: Request) {
         contactNumber: pb.beneficiary.contactNumber || "N/A",
         birthday: pb.beneficiary.birthday,
         status,
-        distributedAt: dist?.distributedAt || null,
-        distributedBy: dist?.distributedBy?.fullName || null,
-        remarks: dist?.remarks || null,
+        distributedAt: activeDist?.distributedAt || null,
+        distributedBy: activeDist?.distributedBy?.fullName || null,
+        remarks: activeDist?.remarks || (isFlagged ? "Flagged for onsite replacement" : null),
         qrToken: pb.qrCodes[0]?.publicToken || null,
       };
     });
+
+    // Compute Pending (Uninformed) mathematically: Target - (Confirmed + Flagged for Replacement)
+    for (const key of Object.keys(brgyStats)) {
+      brgyStats[key].pending = Math.max(
+        0,
+        brgyStats[key].total - (brgyStats[key].confirmed + brgyStats[key].flaggedReplacement)
+      );
+    }
+
+    const totalConfirmed = Object.values(brgyStats).reduce((acc, s) => acc + s.confirmed, 0);
+    const totalFlaggedReplacement = Object.values(brgyStats).reduce((acc, s) => acc + s.flaggedReplacement, 0);
+    const totalDistributed = totalConfirmed;
+    const totalPending = Math.max(0, totalBeneficiaries - (totalConfirmed + totalFlaggedReplacement));
 
     const barangaysBreakdown = Object.entries(brgyStats).map(([name, stats]) => {
       const percentage = stats.total > 0 ? Math.round((stats.confirmed / stats.total) * 100) : 0;

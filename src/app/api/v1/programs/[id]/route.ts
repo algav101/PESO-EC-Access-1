@@ -22,7 +22,7 @@ export async function GET(request: Request, { params }: { params: { id: string }
         },
         _count: {
           select: {
-            programBeneficiaries: true,
+            programBeneficiaries: { where: { participationStatus: { not: "REPLACED" } } },
             qrCodes: true,
             orientationAttendance: true,
             beneficiaryReplacements: true,

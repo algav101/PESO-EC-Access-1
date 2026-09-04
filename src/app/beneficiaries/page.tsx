@@ -184,6 +184,12 @@ export default function BeneficiariesMasterlistPage() {
       const matchesBrgy = selectedBarangay === "ALL" || pb.beneficiary?.barangay === selectedBarangay;
       const matchesSitio = selectedSitio === "ALL" || pb.beneficiary?.sitio === selectedSitio;
 
+      const isReplaced = pb.participationStatus === "REPLACED";
+      if (selectedStubStatus === "REPLACED") {
+        return matchesSearch && matchesBrgy && matchesSitio && isReplaced;
+      }
+      if (isReplaced) return false;
+
       const isDist = Boolean(pb.stubDistributions?.some((d: any) => d.status === "DISTRIBUTED"));
       const isFlagged =
         pb.participationStatus === "FLAGGED_FOR_REPLACEMENT" ||
@@ -425,10 +431,11 @@ export default function BeneficiariesMasterlistPage() {
               onChange={(e) => setSelectedStubStatus(e.target.value)}
               className="w-full px-3 py-1.5 text-xs border border-slate-300 rounded-lg bg-slate-50 focus:outline-none focus:border-gov-blue font-semibold text-slate-800"
             >
-              <option value="ALL">All Stub States</option>
+              <option value="ALL">All Active Target Beneficiaries</option>
               <option value="DISTRIBUTED">✓ Affirmed & Distributed</option>
               <option value="PENDING">⏳ Uninformed (Pending)</option>
               <option value="FLAGGED_REPLACEMENT">🚩 Flagged Replacement</option>
+              <option value="REPLACED">Archived (Replaced Onsite)</option>
             </select>
           </div>
 

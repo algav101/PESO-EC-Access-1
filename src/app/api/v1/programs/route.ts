@@ -14,7 +14,7 @@ export async function GET() {
       include: {
         _count: {
           select: {
-            programBeneficiaries: true,
+            programBeneficiaries: { where: { participationStatus: { not: "REPLACED" } } },
             workDays: true,
             qrCodes: true,
             payouts: true,

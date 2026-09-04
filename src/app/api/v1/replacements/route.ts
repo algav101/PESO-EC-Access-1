@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getCurrentUser, hasPermission } from "@/lib/auth";
+import { isAdminUser } from "@/lib/permissions";
 import { logAudit } from "@/lib/audit";
 import { generateBeneficiaryToken } from "@/lib/qr";
 
@@ -216,7 +217,20 @@ export async function POST(request: Request) {
         });
       }
 
-      // 7. Log replacement record
+      // 7. Create affirmed StubDistribution record for the newly enrolled replacement beneficiary
+      const assignedQrId = activeQr?.id || "ONSITE_REPLACEMENT_QR";
+      await tx.stubDistribution.create({
+        data: {
+          qrId: assignedQrId,
+          programBeneficiaryId: newPb.id,
+          distributedById: user.id,
+          verificationMethod: "ONSITE_REPLACEMENT",
+          status: "DISTRIBUTED",
+          remarks: `Onsite replacement enrolled for slot #${originalPb.designatedNumber} (Replaced ${originalPb.beneficiary.fullName})`,
+        },
+      });
+
+      // 8. Log replacement record
       const rep = await tx.beneficiaryReplacement.create({
         data: {
           programId,
