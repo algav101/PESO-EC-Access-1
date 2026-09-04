@@ -12,6 +12,10 @@
     "prisma:seed": "node prisma/seed.js",
     "test": "node test/test-suite.mjs"
   },
+  "engines": {
+    "node": ">=20.0.0",
+    "npm": ">=10.0.0"
+  },
   "dependencies": {
     "@hookform/resolvers": "^3.9.1",
     "@prisma/client": "^5.22.0",
