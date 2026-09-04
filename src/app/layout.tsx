@@ -7,8 +7,8 @@ import { ClientLayout } from "@/components/layout/ClientLayout";
 import { ServiceWorkerRegister } from "@/components/common/ServiceWorkerRegister";
 
 export const metadata: Metadata = {
-  title: "LGU Dingalan - PESO Dingalan | TUPAD EC Management System",
-  description: "Official offline-first TUPAD EC Management System for LGU Dingalan PESO and DOLE.",
+  title: "LGU Dingalan - PESO EC Access",
+  description: "Official PESO EC Access portal for LGU Dingalan and DOLE programs.",
   manifest: "/manifest.json",
   themeColor: "#1e3a8a",
   appleWebApp: {

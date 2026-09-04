@@ -11,7 +11,6 @@ import {
   ArrowRight,
   CheckCircle,
   Search,
-  Lock,
   Sparkles,
   Building2,
   TreePine,
@@ -86,24 +85,6 @@ export default async function LandingPage() {
               <span>Check Eligibility</span>
             </a>
           </div>
-
-          <div className="hidden sm:flex items-center space-x-3">
-            <a
-              href="/login"
-              className="group px-2.5 py-1 bg-slate-950 hover:bg-slate-900 border border-amber-400/60 hover:border-amber-300 rounded-xl transition flex items-center space-x-2 shadow-sm hover:shadow-md transform hover:scale-[1.02]"
-              title="MAEDUP! e PESO access - Proceed to Login Page"
-            >
-              <img
-                src="/images/login-portal-badge.png"
-                alt="MAEDUP! e PESO access"
-                className="h-7 w-auto object-contain"
-              />
-              <span className="text-[11px] font-black text-white group-hover:text-amber-300 transition pr-1 flex items-center space-x-1">
-                <span>Staff Login</span>
-                <ArrowRight className="w-3 h-3 text-amber-400 group-hover:translate-x-0.5 transition" />
-              </span>
-            </a>
-          </div>
         </div>
       </div>
 
@@ -147,49 +128,8 @@ export default async function LandingPage() {
             </h1>
 
             <p className="text-sm sm:text-base text-slate-600 leading-relaxed font-normal">
-              The <strong className="text-slate-900">TUPAD Electronic Content (EC) Management System</strong> streamlines the administration of emergency employment programs—delivering transparent beneficiary verification, cryptographic QR attendance, and automated 365-day compliance monitoring for the municipality of Dingalan under the leadership of <strong className="text-slate-900">Mayor Aurora G. Taay</strong>.
+              <strong className="text-slate-900">TUPAD EC Access</strong>; isa sa mga web based application sa ilalim ng programa ng lokal na pamahalaan na <strong className="text-slate-900">PESO EC Access</strong> ang isinasagawang i-Pliot Test kung saan mas lalong inilalapit sa tao ang isang mas accessible, transparent, mas mabilis, automated at Digital simula Aplikasyon, paguupdate ng Status ng Aplikasyon ng mga tao, pagiimporma sa mga kwalipikadong beneficiaries, pag attend ng orientation, attendance, work program, accomplishment report hangang sa payout ay mas pinasimple at pinadali na.
             </p>
-
-            {/* Clickable MAEDUP! e-PESO Access Login Button */}
-            <div className="pt-1">
-              <a
-                href="/login"
-                className="group relative block w-full rounded-2xl overflow-hidden shadow-xl hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-0.5 hover:scale-[1.01] border-2 border-amber-400/50 hover:border-amber-300 focus:outline-none focus:ring-4 focus:ring-amber-400/50 bg-gradient-to-r from-slate-950 via-slate-900 to-slate-950 p-3 sm:p-4 cursor-pointer"
-                title="MAEDUP! e-PESO Access - Click to Proceed to Login Page"
-              >
-                <div className="flex items-center justify-between gap-3">
-                  <div className="flex items-center space-x-3 sm:space-x-4">
-                    <img
-                      src="/images/login-portal-badge.png"
-                      alt="MAEDUP! e PESO access - Click to Login"
-                      className="h-14 sm:h-18 md:h-20 w-auto object-contain drop-shadow-[0_4px_12px_rgba(245,158,11,0.25)] group-hover:scale-105 group-hover:brightness-110 transition duration-300 flex-shrink-0"
-                    />
-                    <div className="text-left space-y-1">
-                      <div className="flex items-center space-x-1.5">
-                        <span className="inline-flex items-center space-x-1 text-[10px] uppercase font-black tracking-wider text-amber-300 bg-amber-950/90 px-2 py-0.5 rounded-full border border-amber-500/40">
-                          <Lock className="w-3 h-3 text-amber-300" />
-                          <span>Staff & Coordinator Portal</span>
-                        </span>
-                        <span className="hidden sm:inline-block text-[10px] font-bold text-emerald-400 bg-emerald-950/80 px-2 py-0.5 rounded-full border border-emerald-500/30">
-                          ● Online
-                        </span>
-                      </div>
-                      <h2 className="text-sm sm:text-base md:text-lg font-black text-white group-hover:text-amber-300 transition flex items-center space-x-2">
-                        <span>Click to Enter System Login</span>
-                        <ArrowRight className="w-4 h-4 text-amber-400 group-hover:translate-x-1 transition" />
-                      </h2>
-                      <p className="text-[11px] sm:text-xs text-slate-300 font-medium">
-                        Pindutin ang badge na ito upang magtungo sa opisyal na login page.
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="hidden md:flex items-center justify-center p-3 bg-white/10 rounded-xl group-hover:bg-amber-400 group-hover:text-slate-950 text-white transition duration-300 flex-shrink-0">
-                    <ArrowRight className="w-5 h-5 group-hover:translate-x-0.5 transition" />
-                  </div>
-                </div>
-              </a>
-            </div>
 
             {/* Quick Access Card Grid */}
             <div className="pt-2 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
@@ -490,7 +430,7 @@ export default async function LandingPage() {
                 <PesoLogo className="h-12 w-12" size={48} />
                 <div>
                   <h3 className="font-extrabold text-base tracking-tight">PESO Dingalan</h3>
-                  <p className="text-xs text-gov-goldLight font-medium">TUPAD EC Management System</p>
+                  <p className="text-xs text-gov-goldLight font-medium">PESO EC Access</p>
                 </div>
               </div>
 
@@ -545,7 +485,7 @@ export default async function LandingPage() {
           </div>
 
           <div className="pt-8 border-t border-white/10 flex flex-col sm:flex-row items-center justify-between text-[11px] text-blue-200 gap-2">
-            <p>© 2026 PESO Dingalan TUPAD EC Management System • Municipality of Dingalan, Aurora. All Rights Reserved.</p>
+            <p>© 2026 PESO Dingalan • PESO EC Access • Municipality of Dingalan, Aurora. All Rights Reserved.</p>
             <p className="font-mono text-gov-goldLight">DOLE Aurora Field Office Partner Portal</p>
           </div>
         </div>

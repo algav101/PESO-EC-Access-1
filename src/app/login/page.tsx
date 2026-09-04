@@ -181,7 +181,7 @@ export default function LoginPage() {
                 LGU DINGALAN • PESO DINGALAN
               </h2>
               <p className="text-xs text-slate-500 font-semibold">
-                TUPAD EC Management System Login
+                PESO EC Access System Login
               </p>
             </div>
           </div>

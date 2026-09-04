@@ -45,12 +45,9 @@ export function Navbar({ onToggleSidebar }: NavbarProps) {
               <div className="flex flex-col">
                 <div className="flex items-center space-x-1.5">
                   <span className="font-bold tracking-tight text-base sm:text-lg">LGU DINGALAN</span>
-                  <span className="bg-gov-gold/30 text-gov-goldLight text-[10px] uppercase font-bold px-2 py-0.5 rounded-full border border-gov-gold/40 tracking-wider">
-                    PESO Dingalan
-                  </span>
                 </div>
                 <span className="text-xs text-blue-200 hidden sm:inline font-medium">
-                  TUPAD EC Management System
+                  PESO EC Access
                 </span>
               </div>
             </a>
@@ -117,17 +114,10 @@ export function Navbar({ onToggleSidebar }: NavbarProps) {
             ) : (
               <a
                 href="/login"
-                className="group flex items-center space-x-2 bg-slate-950/90 hover:bg-slate-900 px-2.5 py-1 rounded-xl border border-amber-400/50 hover:border-amber-300 transition shadow-sm hover:shadow-md transform hover:scale-[1.02]"
-                title="MAEDUP! e PESO access - Staff Login"
+                className="flex items-center space-x-1.5 bg-gov-gold hover:bg-gov-goldLight text-gov-dark font-black px-3.5 py-1.5 rounded-lg border border-amber-300 transition shadow text-xs"
+                title="Staff & Coordinator Login"
               >
-                <img
-                  src="/images/login-portal-badge.png"
-                  alt="MAEDUP! e PESO access"
-                  className="h-7 sm:h-8 w-auto object-contain"
-                />
-                <span className="text-xs font-black text-white group-hover:text-amber-300 transition pr-1 hidden sm:inline">
-                  Log in
-                </span>
+                <span>Log in</span>
               </a>
             )}
           </div>
