@@ -216,6 +216,13 @@ export async function POST(request: Request) {
 
     const normalizedBrgy = normalizeBarangayName(pb.beneficiary.barangay);
 
+    const flaggedDistribution = pb.stubDistributions?.find(
+      (d: any) => d.status === "FLAGGED_REPLACEMENT"
+    );
+    const isFlagged =
+      pb.participationStatus === "FLAGGED_FOR_REPLACEMENT" || Boolean(flaggedDistribution);
+    const flagRemarks = flaggedDistribution?.remarks || (isFlagged ? "Flagged for onsite replacement" : null);
+
     return NextResponse.json({
       success: true,
       data: {
@@ -228,6 +235,10 @@ export async function POST(request: Request) {
         tableNumber: pb.tableNumber || "Table 1",
         programName: pb.program.programName,
         isDistributed: false,
+        isFlagged,
+        remarks: flagRemarks,
+        flaggedAt: flaggedDistribution?.distributedAt || null,
+        flaggedBy: flaggedDistribution?.distributedBy?.fullName || null,
       },
     });
   } catch (error: any) {

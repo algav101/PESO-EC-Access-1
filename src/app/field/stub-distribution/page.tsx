@@ -414,6 +414,26 @@ function StubDistributionContent() {
                 </p>
               </div>
 
+              {scannedData.isFlagged && (
+                <div className="p-3.5 bg-rose-50 border border-rose-200 rounded-xl text-xs text-rose-900 space-y-1.5 shadow-xs">
+                  <div className="flex items-center space-x-1.5 font-black text-rose-700">
+                    <AlertTriangle className="w-4 h-4 text-rose-600 flex-shrink-0" />
+                    <span>CURRENTLY FLAGGED FOR ONSITE REPLACEMENT</span>
+                  </div>
+                  {scannedData.remarks && (
+                    <div className="text-[11px] text-rose-800 bg-white/90 p-2 rounded-lg border border-rose-200">
+                      <strong className="block text-[10px] font-bold uppercase text-rose-600 mb-0.5">Recorded Flag Reason & Remarks:</strong>
+                      <span>{scannedData.remarks}</span>
+                    </div>
+                  )}
+                  {scannedData.flaggedBy && (
+                    <p className="text-[10px] text-rose-600 italic">
+                      Flagged by {scannedData.flaggedBy} {scannedData.flaggedAt ? `on ${new Date(scannedData.flaggedAt).toLocaleDateString()}` : ""}
+                    </p>
+                  )}
+                </div>
+              )}
+
               <div>
                 <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1 flex items-center justify-between">
                   <span>Enter Beneficiary Birthday PIN *</span>
@@ -761,6 +781,7 @@ function StubDistributionContent() {
                     <th className="py-2 px-3">Table</th>
                     <th className="py-2 px-3">Contact Number</th>
                     <th className="py-2 px-3">Distribution Status</th>
+                    <th className="py-2 px-3">Remarks / Flag Reason</th>
                     <th className="py-2 px-3">Verified By</th>
                   </tr>
                 </thead>
@@ -790,6 +811,22 @@ function StubDistributionContent() {
                             ? "⚠ Flagged Replacement"
                             : "Pending (Uninformed)"}
                         </span>
+                      </td>
+                      <td className="py-2.5 px-3">
+                        {b.status === "FLAGGED_REPLACEMENT" ? (
+                          <div className="flex items-start space-x-1 max-w-xs">
+                            <AlertTriangle className="w-3.5 h-3.5 text-rose-600 flex-shrink-0 mt-0.5" />
+                            <span className="text-[11px] font-bold text-rose-700 line-clamp-2" title={b.remarks || "Flagged for replacement"}>
+                              {b.remarks || "Flagged for onsite replacement"}
+                            </span>
+                          </div>
+                        ) : b.remarks ? (
+                          <span className="text-[11px] text-slate-600 truncate block max-w-xs" title={b.remarks}>
+                            {b.remarks}
+                          </span>
+                        ) : (
+                          <span className="text-[10px] text-slate-400 italic">—</span>
+                        )}
                       </td>
                       <td className="py-2.5 px-3 text-[11px] text-slate-500">
                         {b.distributedBy ? (

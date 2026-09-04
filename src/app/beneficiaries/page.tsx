@@ -602,12 +602,22 @@ export default function BeneficiariesMasterlistPage() {
                       </td>
                       <td className="px-4 py-3">
                         {isFlagged ? (
-                          <span
-                            className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-50 text-rose-700 border border-rose-200 inline-flex items-center space-x-1"
-                            title={pb.stubDistributions?.[0]?.remarks || "Flagged for onsite replacement"}
-                          >
-                            <span>🚩 Flagged Repl.</span>
-                          </span>
+                          <div className="space-y-1">
+                            <span
+                              className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-50 text-rose-700 border border-rose-200 inline-flex items-center space-x-1"
+                              title={pb.stubDistributions?.[0]?.remarks || "Flagged for onsite replacement"}
+                            >
+                              <span>🚩 Flagged Repl.</span>
+                            </span>
+                            {pb.stubDistributions?.[0]?.remarks && (
+                              <p
+                                className="text-[10px] text-rose-700 font-semibold max-w-[170px] truncate leading-tight"
+                                title={pb.stubDistributions[0].remarks}
+                              >
+                                {pb.stubDistributions[0].remarks}
+                              </p>
+                            )}
+                          </div>
                         ) : dist ? (
                           <span
                             className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 inline-flex items-center space-x-1"

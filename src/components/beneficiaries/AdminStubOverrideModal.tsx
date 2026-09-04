@@ -49,9 +49,10 @@ export function AdminStubOverrideModal({
 
   const pb = programBeneficiary;
   const existingDist = pb.stubDistributions?.find((d: any) => d.status === "DISTRIBUTED");
+  const flaggedDist = pb.stubDistributions?.find((d: any) => d.status === "FLAGGED_REPLACEMENT");
   const isCurrentlyFlagged =
     pb.participationStatus === "FLAGGED_FOR_REPLACEMENT" ||
-    Boolean(pb.stubDistributions?.some((d: any) => d.status === "FLAGGED_REPLACEMENT"));
+    Boolean(flaggedDist);
 
   const hasOrientation = Boolean(
     pb.orientationAttendance &&
@@ -67,7 +68,11 @@ export function AdminStubOverrideModal({
   );
   const [distributionMethod, setDistributionMethod] = useState<"MANUAL_ADMIN_OVERRIDE" | "BIRTHDAY_PIN">("MANUAL_ADMIN_OVERRIDE");
   const [replacementReason, setReplacementReason] = useState("UNREACHABLE_PHONE_OR_RESIDENCE");
-  const [remarks, setRemarks] = useState(existingDist?.remarks || "");
+  const [remarks, setRemarks] = useState(
+    isCurrentlyFlagged
+      ? (flaggedDist?.remarks || "")
+      : (existingDist?.remarks || "")
+  );
 
   // Step 2: Orientation Verification
   const [orientationStatus, setOrientationStatus] = useState<"PRESENT" | "PENDING" | "ABSENT">(
@@ -111,6 +116,7 @@ export function AdminStubOverrideModal({
   useEffect(() => {
     if (isCurrentlyFlagged) {
       setDistributionStatus("FLAGGED_REPLACEMENT");
+      setRemarks(flaggedDist?.remarks || "");
     } else if (existingDist) {
       setDistributionStatus("DISTRIBUTED");
       setRemarks(existingDist.remarks || "");
@@ -446,19 +452,27 @@ export function AdminStubOverrideModal({
               </div>
 
               {distributionStatus === "FLAGGED_REPLACEMENT" && (
-                <div className="p-2.5 bg-rose-50 rounded-lg border border-rose-200 space-y-1">
-                  <label className="block text-[10px] font-bold text-rose-900 uppercase">
-                    Replacement Reason:
-                  </label>
-                  <select
-                    value={replacementReason}
-                    onChange={(e) => setReplacementReason(e.target.value)}
-                    className="w-full text-xs font-bold px-2 py-1.5 bg-white border border-rose-300 rounded-lg text-slate-800"
-                  >
-                    {REPLACEMENT_REASONS.map((r) => (
-                      <option key={r.value} value={r.value}>{r.label}</option>
-                    ))}
-                  </select>
+                <div className="p-3 bg-rose-50 rounded-lg border border-rose-200 space-y-2">
+                  <div>
+                    <label className="block text-[10px] font-bold text-rose-900 uppercase mb-1">
+                      Replacement Reason:
+                    </label>
+                    <select
+                      value={replacementReason}
+                      onChange={(e) => setReplacementReason(e.target.value)}
+                      className="w-full text-xs font-bold px-2 py-1.5 bg-white border border-rose-300 rounded-lg text-slate-800"
+                    >
+                      {REPLACEMENT_REASONS.map((r) => (
+                        <option key={r.value} value={r.value}>{r.label}</option>
+                      ))}
+                    </select>
+                  </div>
+                  {flaggedDist?.remarks && (
+                    <div className="text-[11px] text-rose-800 bg-white/90 p-2 rounded-lg border border-rose-200">
+                      <strong className="block text-[10px] font-bold uppercase text-rose-600 mb-0.5">Recorded Flag Remarks:</strong>
+                      <span>{flaggedDist.remarks}</span>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
