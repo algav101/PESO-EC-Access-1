@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   CalendarCheck,
   QrCode,
@@ -27,6 +27,7 @@ type ActiveTab = "SCANNER" | "MONITORING" | "DAY1_DEPLOYMENT";
 
 export default function OrientationPage() {
   const { isOnline } = useOffline();
+  const [mounted, setMounted] = useState(false);
 
   const [activeTab, setActiveTab] = useState<ActiveTab>("SCANNER");
 
@@ -44,6 +45,10 @@ export default function OrientationPage() {
   const [day1DeploymentData, setDay1DeploymentData] = useState<Day1DeploymentData | null>(null);
   const [day1ManualInput, setDay1ManualInput] = useState("");
 
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
   // Handler for Orientation Attendance Scan
   const handleAttendanceScan = async (token: string) => {
     setAttendanceScannerOpen(false);
@@ -58,7 +63,7 @@ export default function OrientationPage() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             qrToken: token,
-            deviceId: localStorage.getItem("tupad_device_id") || "MOBILE_DEVICE",
+            deviceId: typeof window !== "undefined" ? localStorage.getItem("tupad_device_id") || "MOBILE_DEVICE" : "MOBILE_DEVICE",
           }),
         });
 
@@ -128,6 +133,15 @@ export default function OrientationPage() {
       setDay1Loading(false);
     }
   };
+
+  if (!mounted) {
+    return (
+      <div className="w-full max-w-7xl mx-auto p-12 text-center space-y-4">
+        <RefreshCw className="w-8 h-8 text-gov-blue animate-spin mx-auto" />
+        <p className="text-xs text-slate-500 font-medium">Loading Orientation Hub...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="w-full max-w-7xl mx-auto space-y-6 pb-16">
@@ -348,7 +362,11 @@ export default function OrientationPage() {
       {/* TAB 2: MONITORING SCHEME */}
       {activeTab === "MONITORING" && (
         <div className="space-y-4">
-          <OrientationMonitoringTable />
+          <OrientationMonitoringTable
+            onSelectBeneficiaryForDay1={(bene) => {
+              handleDay1Scan(bene.qrToken || bene.designatedNumber);
+            }}
+          />
         </div>
       )}
 
