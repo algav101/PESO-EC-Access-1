@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
-import { getCurrentUser, hasPermission } from "@/lib/auth";
+import { getCurrentUser, isAdminUser, hasPermission } from "@/lib/auth";
 import { logAudit } from "@/lib/audit";
 
 export async function GET(request: Request) {

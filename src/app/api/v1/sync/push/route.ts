@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
-import { getCurrentUser } from "@/lib/auth";
+import { getCurrentUser, isAdminUser, hasPermission } from "@/lib/auth";
 import { logAudit } from "@/lib/audit";
 import { formatBirthdayPin } from "@/lib/utils";
 import { addDays, format, parseISO } from "date-fns";

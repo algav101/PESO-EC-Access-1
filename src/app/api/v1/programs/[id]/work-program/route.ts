@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getCurrentUser } from "@/lib/auth";
+import { getCurrentUser, isAdminUser, hasPermission } from "@/lib/auth";
 import prisma from "@/lib/prisma";
 import { logAudit } from "@/lib/audit";
 
