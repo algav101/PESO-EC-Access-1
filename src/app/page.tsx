@@ -1,6 +1,7 @@
 import React from "react";
 import prisma from "@/lib/prisma";
 import { PesoLogo } from "@/components/layout/PesoLogo";
+import { LandingNavDrawer } from "@/components/layout/LandingNavDrawer";
 import { PublicStatusInquiryCard } from "@/components/public/PublicStatusInquiryCard";
 import { PublicInquiryMessageForm } from "@/components/public/PublicInquiryMessageForm";
 import {
@@ -13,8 +14,6 @@ import {
   Search,
   Sparkles,
   Building2,
-  Phone,
-  Mail,
   ExternalLink,
   ChevronRight,
   Award,
@@ -22,11 +21,8 @@ import {
   FileCheck,
   Globe,
   CheckCircle2,
-  Lock,
-  Clock,
-  HelpCircle,
-  Layers,
-  Sparkle,
+  Mail,
+  Video,
 } from "lucide-react";
 
 export const dynamic = "force-dynamic";
@@ -60,7 +56,6 @@ export default async function LandingPage() {
       {/* 1. DICT GWT Top Utility Bar */}
       <section className="bg-slate-950 text-slate-300 text-xs py-2 px-4 border-b border-slate-800" data-purpose="dict-gwt-utility-bar">
         <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-3">
-          {/* Contact Information */}
           <div className="flex items-center gap-4 flex-wrap text-[11px] sm:text-xs">
             <span className="font-semibold text-white">PESO Dingalan, Aurora</span>
             <span className="hidden sm:inline-block text-slate-600">|</span>
@@ -72,7 +67,6 @@ export default async function LandingPage() {
             </span>
           </div>
 
-          {/* Philippine Standard Time & Accessibility */}
           <div className="flex items-center gap-4 flex-wrap ml-auto text-[11px] sm:text-xs">
             <div className="hidden sm:flex items-center gap-1.5 text-slate-300">
               <span className="inline-block w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
@@ -90,7 +84,7 @@ export default async function LandingPage() {
         </div>
       </section>
 
-      {/* 2. Official Government Masthead with Authentic Dingalan & PESO Seals */}
+      {/* 2. Official Government Masthead with Dingalan & PESO Seals */}
       <header className="bg-white border-b border-slate-200 shadow-xs relative z-30" data-purpose="official-masthead">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3.5 sm:py-4 flex flex-col md:flex-row items-center justify-between gap-4">
           <div className="flex flex-col md:flex-row items-center gap-4 text-center md:text-left">
@@ -118,276 +112,126 @@ export default async function LandingPage() {
               </h1>
               <div className="flex items-center justify-center md:justify-start gap-1.5 mt-0.5">
                 <span className="text-xs sm:text-sm text-emerald-700 font-extrabold uppercase tracking-wide">
-                  PESO EC Access Portal
+                  PESO EC ACCESS
                 </span>
               </div>
             </div>
-
-            {/* Authentic PESO Official Seal & Transparent Logo Marks */}
-            <div className="flex items-center gap-3 shrink-0">
-              <img
-                src="https://lh3.googleusercontent.com/aida-public/AB6AXuBtoUir3ZE52UnEYaw7AR9APtwPi3pEyJBFiuEUIbBsoGvXafd88xp6a33vjrxUZnUpw__3WElv2cDxVridP6KGVkxw4pCH5H73dbV9ZACrE_LxLpujsdC2YyxhXyLU6NoM26us_oh84MDWGwGKupSPueyvyDSFq_h_CBPp7KnSZHa0lU3LbmaZNQi-YTS7t-LeEFoUFFQtCMUJldN0DT-dRyjvhMqcBH6W4pv4DKMK5luQAc0nUsKvA5Vtq1gLHojM3qw"
-                alt="PESO Public Employment Service Office Seal"
-                className="w-14 h-14 sm:w-16 sm:h-16 object-contain rounded-full shadow-xs border border-slate-200 hover:scale-105 transition-transform"
-              />
-              <img
-                src="https://lh3.googleusercontent.com/aida-public/AB6AXuCItKj6QUue20tf4u2IqFvkQaalkEu69hmpiTtw3CZSSC-3h4zotuueIR2IUh1CQueexM-HvRtnavAPtigDgqsmzQ0drwmMCmjOWSIm2PLIHxowW15uzSuffJLpSmBqLNSFJ4sNZRYylydaqAQUjdiAtiHtrM2iZ742pQYg4VKQC7-NyxSlpIUdqpDbLDn46kxwyNliCAMwWcLj5JoLtDi0HuBvM_jWY9eUPZVChBIQFcfgy5p_K1HIQaNspZ6O35OuxhA"
-                alt="PESO e-access Logo"
-                className="w-14 h-14 sm:w-16 sm:h-16 object-contain hover:scale-105 transition-transform"
-              />
-            </div>
           </div>
 
-          {/* Right MAEDUP! Staff & Coordinator Portal CTA */}
-          <div className="flex items-center shrink-0">
-            <a
-              href="/login"
-              className="group relative flex items-center gap-2 bg-gradient-to-r from-amber-500 via-emerald-500 to-blue-600 p-0.5 rounded-2xl shadow-md hover:shadow-lg transition-all transform hover:-translate-y-0.5"
-              title="MAEDUP! e PESO Access Login & Coordinator Terminal"
-            >
-              <div className="bg-slate-900 hover:bg-slate-800 text-white rounded-[14px] px-3.5 py-2 flex items-center gap-3 transition-colors">
-                <img
-                  src="https://lh3.googleusercontent.com/aida-public/AB6AXuBAuFRrdS56G2DSbPoUVZz4HCox-4sYgn0iLcMXXnIy6XXQpXrJZC11lk8PhfZbUMkQLAuSEi9uN98FRwRJDzuefzCGGc_UgW5X9NaJlVUwvXe_hZHfbwuKjnUGVgJ74DjwombkIsngdU-OsZWW0rtI29btWxwK4uvz67PCxc3_E2Y4F6v-7EFYxvDrrLlKfwWmN7MCY9y2BCWKJ6Wbs9gOToCjss0c0fN8whfVE1uKHZjuLevN54R_Qx2kCZ3UuDm260U"
-                  alt="MAEDUP! e PESO access Portal Login"
-                  className="h-9 sm:h-11 w-auto object-contain shrink-0 group-hover:scale-105 transition-transform"
-                />
-                <div className="text-left">
-                  <span className="block text-[10px] font-black uppercase tracking-wider text-amber-400 leading-none">
-                    Staff & Coordinator
-                  </span>
-                  <span className="text-xs font-extrabold text-white flex items-center gap-1 mt-0.5">
-                    Portal Log In <span className="text-xs text-emerald-400 group-hover:translate-x-1 transition-transform">→</span>
-                  </span>
-                </div>
-              </div>
-            </a>
+          {/* Authentic PESO Official Seal & PESO e-access Logo Marks */}
+          <div className="flex items-center gap-3 shrink-0">
+            <img
+              src="https://lh3.googleusercontent.com/aida-public/AB6AXuBtoUir3ZE52UnEYaw7AR9APtwPi3pEyJBFiuEUIbBsoGvXafd88xp6a33vjrxUZnUpw__3WElv2cDxVridP6KGVkxw4pCH5H73dbV9ZACrE_LxLpujsdC2YyxhXyLU6NoM26us_oh84MDWGwGKupSPueyvyDSFq_h_CBPp7KnSZHa0lU3LbmaZNQi-YTS7t-LeEFoUFFQtCMUJldN0DT-dRyjvhMqcBH6W4pv4DKMK5luQAc0nUsKvA5Vtq1gLHojM3qw"
+              alt="PESO Public Employment Service Office Seal"
+              className="w-14 h-14 sm:w-16 sm:h-16 object-contain rounded-full shadow-xs border border-slate-200 hover:scale-105 transition-transform"
+            />
+            <img
+              src="https://lh3.googleusercontent.com/aida-public/AB6AXuCItKj6QUue20tf4u2IqFvkQaalkEu69hmpiTtw3CZSSC-3h4zotuueIR2IUh1CQueexM-HvRtnavAPtigDgqsmzQ0drwmMCmjOWSIm2PLIHxowW15uzSuffJLpSmBqLNSFJ4sNZRYylydaqAQUjdiAtiHtrM2iZ742pQYg4VKQC7-NyxSlpIUdqpDbLDn46kxwyNliCAMwWcLj5JoLtDi0HuBvM_jWY9eUPZVChBIQFcfgy5p_K1HIQaNspZ6O35OuxhA"
+              alt="PESO e-access Logo"
+              className="w-14 h-14 sm:w-16 sm:h-16 object-contain hover:scale-105 transition-transform"
+            />
           </div>
         </div>
       </header>
 
-      {/* 3. Sticky Sub-Navbar with Preserved Anchor Targets */}
-      <nav aria-label="Quick Page Navigation" className="bg-slate-900 text-white border-b-2 border-emerald-500 sticky top-0 z-40 shadow-md">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-between h-13 text-xs font-bold">
-          <div className="flex items-center space-x-4 sm:space-x-6 overflow-x-auto py-2 no-scrollbar">
-            <a
-              href="#hero"
-              className="text-emerald-400 border-b-2 border-emerald-400 pb-0.5 whitespace-nowrap transition-colors flex items-center space-x-1"
-            >
-              <span>Home</span>
-            </a>
-            <a
-              href="/apply"
-              className="text-white bg-emerald-600 hover:bg-emerald-500 px-3 py-1 rounded-full border border-emerald-400 transition-all whitespace-nowrap flex items-center space-x-1.5 font-extrabold shadow-xs"
-            >
-              <Sparkles className="w-3.5 h-3.5 text-amber-300" />
-              <span>Online TUPAD Application</span>
-            </a>
-            <a
-              href="#inquiry"
-              className="text-slate-200 hover:text-emerald-400 transition-colors whitespace-nowrap flex items-center space-x-1"
-            >
-              <FileCheck className="w-3.5 h-3.5 text-amber-400" />
-              <span>Application Status Inquiry</span>
-            </a>
-            <a
-              href="#inquiry-form"
-              className="text-slate-200 hover:text-emerald-400 transition-colors whitespace-nowrap flex items-center space-x-1"
-            >
-              <MessageSquare className="w-3.5 h-3.5 text-blue-400" />
-              <span>Message & Feedback</span>
-            </a>
-            <a
-              href="#programs"
-              className="text-slate-200 hover:text-emerald-400 transition-colors whitespace-nowrap"
-            >
-              Active Programs
-            </a>
-            <a
-              href="#gallery"
-              className="text-slate-200 hover:text-emerald-400 transition-colors whitespace-nowrap"
-            >
-              TUPAD in Action
-            </a>
-            <a
-              href="#org-structure"
-              className="text-slate-200 hover:text-emerald-400 transition-colors whitespace-nowrap"
-            >
-              PESO Org Chart
-            </a>
-            <a
-              href="/restrictions/checker"
-              className="text-amber-300 hover:text-amber-200 bg-amber-500/20 hover:bg-amber-500/30 px-2.5 py-1 rounded-full border border-amber-400/40 transition-colors flex items-center space-x-1 whitespace-nowrap font-bold"
-            >
-              <Search className="w-3.5 h-3.5 text-amber-300" />
-              <span>Check Eligibility</span>
-            </a>
-          </div>
+      {/* 3. Primary Navigation Bar with Sliding Drawer & MAEDUP! Login Button */}
+      <LandingNavDrawer />
 
-          <div className="hidden lg:flex items-center shrink-0 pl-2">
-            <img
-              src="https://lh3.googleusercontent.com/aida-public/AB6AXuAtqq1AnBWH-IzGl0TscldgxBJ_eyEGCS0nd9WZmSFUVAf4L7caXSH1ql5LKwwNGYrQxSDRH8ctQQlAJtTQhTf0YcatJbBY-2WCk4q-2-B7xqHWzGcNbALIlc8_2AjPiM6XNqJz1SKhth4ueruC9B4xKn_oypFD1xnFXZLL5fKWRPe4ra1UzHRCbkBmdowTklgFaPj6KVn3sY2Ch2nnAwbYsNAvjA4sYP5gfObxzMBHZJDJHGdtgOTN8yubzq8xruwNxGk"
-              alt="e PESO access Logo"
-              className="h-8 w-auto object-contain"
-            />
-          </div>
-        </div>
-      </nav>
-
-      {/* 4. Hero Section (#hero) */}
-      <section id="hero" className="relative w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-12 md:py-16 scroll-mt-20">
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 items-center">
-          {/* Left Column: Featured Video Showcase */}
-          <div className="lg:col-span-6 order-2 lg:order-1">
-            <div className="relative rounded-3xl overflow-hidden shadow-2xl border border-slate-300/80 bg-slate-900 group">
-              <video
-                src="https://www.image2url.com/r2/default/videos/1788303848432-e7f6f01f-ef1c-4460-a6e4-99f8f2386145.mp4"
-                autoPlay
-                muted
-                loop
-                playsInline
-                className="w-full h-auto max-h-[480px] object-cover block group-hover:scale-[1.01] transition duration-500"
-              />
-              <div className="absolute inset-0 bg-gradient-to-t from-slate-950/85 via-transparent to-transparent pointer-events-none" />
-              <div className="absolute bottom-5 left-5 right-5 text-white space-y-1.5">
-                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/90 text-white backdrop-blur-sm shadow-xs">
-                  ● Community Employment in Action
-                </span>
-                <p className="text-xs sm:text-sm font-bold text-slate-100 drop-shadow">
-                  LGU Dingalan • DOLE Emergency Employment Program
-                </p>
-                <p className="text-[11px] text-slate-300 hidden sm:block">
-                  Direct government assistance providing temporary wage employment to displaced and marginalized workers.
-                </p>
-              </div>
-            </div>
-          </div>
-
-          {/* Right Column: Hero Tagalog Headline, Announcement & Quick Action Grid */}
-          <div className="lg:col-span-6 order-1 lg:order-2 space-y-5">
-            <div className="flex flex-wrap items-center gap-2">
-              <div className="inline-flex items-center space-x-2 px-3.5 py-1 rounded-full bg-blue-50 text-blue-900 text-xs font-extrabold border border-blue-200/80 shadow-xs">
-                <ShieldCheck className="w-4 h-4 text-amber-500" />
-                <span>Official PESO Dingalan Initiative</span>
-              </div>
-            </div>
-
-            <h1 className="text-3xl sm:text-4xl lg:text-5xl font-black text-slate-900 tracking-tight leading-[1.15]">
+      {/* 4. EXACT Hero Section Matching User Screenshot */}
+      <section id="hero" className="py-8 sm:py-12 bg-gradient-to-b from-slate-100 via-white to-slate-50 border-b border-slate-200 scroll-mt-16">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="max-w-5xl mx-auto space-y-6 bg-white p-6 sm:p-10 lg:p-12 rounded-3xl border border-slate-200 shadow-sm">
+            {/* Big Main Tagalog Headline */}
+            <h2 className="text-3xl sm:text-4xl lg:text-5xl font-black text-slate-900 leading-[1.12] tracking-tight">
               Pagpapalakas ng Serbisyo ng PESO upang mas maipa-DAMA sa bawat Pamilyang DINGALEÑO
-            </h1>
+            </h2>
 
-            <div className="space-y-3.5 text-sm sm:text-base text-slate-600 leading-relaxed font-normal">
-              <p className="font-extrabold text-blue-900 flex items-center space-x-1.5 text-base sm:text-lg">
-                <span>🚀 DIGITAL NA ANG SERBISYO NG PESO DINGALAN! 💻📱</span>
-              </p>
-
-              <p>
-                Ipinakikilala ang <strong className="text-slate-900 font-bold">PESO EC Access</strong> — ang bagong digital portal na magpapadali sa mga programa at serbisyo ng Public Employment Service Office para sa bawat mamamayan ng Dingalan!
-              </p>
-
-              <div className="bg-amber-50/90 border border-amber-200/80 rounded-2xl p-3.5 text-xs sm:text-sm text-slate-800 shadow-xs">
-                <span className="font-black text-amber-900 block mb-0.5">🌟 KAHANGA-HANGA AT PROUDLY LOCAL:</span>
-                <span>💡 Higit sa lahat, ang sistemang ito ay <strong className="text-amber-950 font-black">LIBRENG</strong> nabuo at pinondohan ng sariling husay at talento ng <strong className="text-slate-900 font-bold">PESO Dingalan team</strong> upang mas mapalapit ang teknolohiya at serbisyo sa tao!</span>
-              </div>
-
-              <div className="space-y-1.5 text-xs sm:text-sm pt-1">
-                <p className="font-bold text-slate-900">🛠️ Mga Tampok na Serbisyo:</p>
-                <ul className="grid grid-cols-1 gap-1.5 pl-1 text-slate-600">
-                  <li className="flex items-start space-x-2">
-                    <span className="text-emerald-600 font-bold">✔️</span>
-                    <span><strong className="text-slate-800">Mag-apply Online</strong> para sa programang TUPAD kahit nasa bahay</span>
-                  </li>
-                  <li className="flex items-start space-x-2">
-                    <span className="text-emerald-600 font-bold">✔️</span>
-                    <span><strong className="text-slate-800">I-check ang Status</strong> ng aplikasyon anumang oras</span>
-                  </li>
-                  <li className="flex items-start space-x-2">
-                    <span className="text-emerald-600 font-bold">✔️</span>
-                    <span><strong className="text-slate-800">365-Day Checker</strong> para sa patas at transparent na proseso</span>
-                  </li>
-                  <li className="flex items-start space-x-2">
-                    <span className="text-emerald-600 font-bold">✔️</span>
-                    <span><strong className="text-slate-800">Mabilis na QR Verification</strong> sa stubs, orientation, at attendance</span>
-                  </li>
-                  <li className="flex items-start space-x-2">
-                    <span className="text-emerald-600 font-bold">✔️</span>
-                    <span><strong className="text-slate-800">Direct Feedback Desk</strong> para sa agarang sagot sa mga tanong</span>
-                  </li>
-                </ul>
-              </div>
-
-              <div className="flex flex-wrap gap-1.5 pt-1 text-[11px] font-bold text-blue-900">
-                <span className="bg-blue-50 px-2.5 py-0.5 rounded-full border border-blue-200">#PESOECAccess</span>
-                <span className="bg-blue-50 px-2.5 py-0.5 rounded-full border border-blue-200">#SerbisyongDAMA</span>
-                <span className="bg-blue-50 px-2.5 py-0.5 rounded-full border border-blue-200">#DigitalGovernance</span>
-                <span className="bg-blue-50 px-2.5 py-0.5 rounded-full border border-blue-200">#Innovation</span>
-              </div>
+            {/* Digital Announcement Subtitle */}
+            <div className="text-base sm:text-lg font-black text-blue-950 flex items-center gap-2 flex-wrap">
+              <span>🚀 DIGITAL NA ANG SERBISYO NG PESO DINGALAN!</span>
+              <span className="text-xl">💻📱</span>
             </div>
 
-            {/* Quick Access Card Grid */}
-            <div className="pt-2 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
-              <a
-                href="/apply"
-                className="group p-3.5 bg-gradient-to-br from-emerald-600 to-emerald-700 text-white rounded-2xl border border-emerald-500 shadow-md hover:shadow-lg transition-all flex items-center justify-between"
-              >
-                <div className="flex items-center space-x-2.5">
-                  <div className="w-8 h-8 rounded-xl bg-white/20 text-white flex items-center justify-center font-bold flex-shrink-0">
-                    <Sparkles className="w-4 h-4 text-amber-300 group-hover:scale-110 transition" />
-                  </div>
-                  <div>
-                    <h2 className="text-xs font-black leading-tight">Online Application</h2>
-                    <p className="text-[10px] text-emerald-100 font-medium">Apply Online</p>
-                  </div>
-                </div>
-                <ArrowRight className="w-3.5 h-3.5 text-white/80 group-hover:translate-x-0.5 transition" />
-              </a>
+            {/* Introduction Paragraph */}
+            <p className="text-base sm:text-lg text-slate-700 leading-relaxed">
+              Ipinakikilala ang <strong className="text-slate-900 font-bold">PESO EC Access</strong> — ang bagong digital portal na magpapadali sa mga programa at serbisyo ng Public Employment Service Office para sa bawat mamamayan ng Dingalan!
+            </p>
 
-              <a
-                href="#inquiry"
-                className="group p-3.5 bg-white hover:bg-blue-50/50 rounded-2xl border border-slate-200 shadow-xs hover:shadow-md transition-all flex items-center justify-between"
-              >
-                <div className="flex items-center space-x-2.5">
-                  <div className="w-8 h-8 rounded-xl bg-blue-50 text-blue-900 flex items-center justify-center font-bold flex-shrink-0">
-                    <FileCheck className="w-4 h-4 text-blue-800 group-hover:scale-110 transition" />
-                  </div>
-                  <div>
-                    <h2 className="text-xs font-black text-slate-900 group-hover:text-blue-900 transition leading-tight">Status Inquiry</h2>
-                    <p className="text-[10px] text-slate-500 font-medium">Check Status</p>
-                  </div>
-                </div>
-                <ArrowRight className="w-3.5 h-3.5 text-slate-400 group-hover:text-blue-900 group-hover:translate-x-0.5 transition" />
-              </a>
+            {/* Warm Yellow/Amber Highlight Box */}
+            <div className="bg-amber-50/90 border-2 border-amber-300 rounded-xl p-5 sm:p-6 text-sm sm:text-base text-amber-950 shadow-sm space-y-2">
+              <div className="font-extrabold text-amber-900 flex items-center gap-1.5 tracking-wide uppercase text-sm sm:text-base">
+                <span>🌟</span> KAHANGA-HANGA AT PROUDLY LOCAL:
+              </div>
+              <p className="text-amber-900 leading-relaxed">
+                💡 Higit sa lahat, ang sistemang ito ay <strong className="font-black text-slate-950">LIBRENG</strong> nabuo at pinondohan ng sariling husay at talento ng <strong className="font-black text-slate-950">PESO Dingalan team</strong> upang mas mapalapit ang teknolohiya at serbisyo sa tao!
+              </p>
+            </div>
 
-              <a
-                href="#inquiry-form"
-                className="group p-3.5 bg-white hover:bg-blue-50/50 rounded-2xl border border-slate-200 shadow-xs hover:shadow-md transition-all flex items-center justify-between"
-              >
-                <div className="flex items-center space-x-2.5">
-                  <div className="w-8 h-8 rounded-xl bg-blue-50 text-blue-900 flex items-center justify-center font-bold flex-shrink-0">
-                    <MessageSquare className="w-4 h-4 text-blue-800 group-hover:scale-110 transition" />
-                  </div>
-                  <div>
-                    <h2 className="text-xs font-black text-slate-900 group-hover:text-blue-900 transition leading-tight">Direct Message</h2>
-                    <p className="text-[10px] text-slate-500 font-medium">Send Feedback</p>
-                  </div>
-                </div>
-                <ArrowRight className="w-3.5 h-3.5 text-slate-400 group-hover:text-blue-900 group-hover:translate-x-0.5 transition" />
-              </a>
+            {/* Checklist of Features in 2 Columns */}
+            <div className="space-y-3 pt-2">
+              <div className="text-sm sm:text-base font-black text-slate-900 flex items-center gap-1.5">
+                <span>🛠️</span> Mga Tampok na Serbisyo:
+              </div>
+              <ul className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs sm:text-sm text-slate-700">
+                <li className="flex items-start gap-2 bg-slate-50 p-2.5 rounded-lg border border-slate-100 hover:border-slate-300 transition-colors">
+                  <span className="text-purple-700 font-bold">✔</span>
+                  <span>
+                    <a href="/apply" className="hover:underline font-bold text-slate-900">
+                      Mag-apply Online
+                    </a>{" "}
+                    para sa programang TUPAD kahit nasa bahay
+                  </span>
+                </li>
+                <li className="flex items-start gap-2 bg-slate-50 p-2.5 rounded-lg border border-slate-100 hover:border-slate-300 transition-colors">
+                  <span className="text-purple-700 font-bold">✔</span>
+                  <span>
+                    <a href="#inquiry" className="hover:underline font-bold text-slate-900">
+                      I-check ang Status
+                    </a>{" "}
+                    ng aplikasyon anumang oras
+                  </span>
+                </li>
+                <li className="flex items-start gap-2 bg-slate-50 p-2.5 rounded-lg border border-slate-100 hover:border-slate-300 transition-colors">
+                  <span className="text-purple-700 font-bold">✔</span>
+                  <span>
+                    <a href="/restrictions/checker" className="hover:underline font-bold text-slate-900">
+                      365-Day Checker
+                    </a>{" "}
+                    para sa patas at transparent na proseso
+                  </span>
+                </li>
+                <li className="flex items-start gap-2 bg-slate-50 p-2.5 rounded-lg border border-slate-100 hover:border-slate-300 transition-colors">
+                  <span className="text-purple-700 font-bold">✔</span>
+                  <span>
+                    <strong className="font-bold text-slate-900">Mabilis na QR Verification</strong> sa stubs, orientation, at attendance
+                  </span>
+                </li>
+                <li className="flex items-start gap-2 bg-slate-50 p-2.5 rounded-lg border border-slate-100 hover:border-slate-300 transition-colors sm:col-span-2">
+                  <span className="text-purple-700 font-bold">✔</span>
+                  <span>
+                    <a href="#inquiry-form" className="hover:underline font-bold text-slate-900">
+                      Direct Feedback Desk
+                    </a>{" "}
+                    para sa agarang sagot sa mga tanong
+                  </span>
+                </li>
+              </ul>
+            </div>
 
-              <a
-                href="/restrictions/checker"
-                className="group p-3.5 bg-white hover:bg-amber-50/50 rounded-2xl border border-slate-200 shadow-xs hover:shadow-md transition-all flex items-center justify-between"
-              >
-                <div className="flex items-center space-x-2.5">
-                  <div className="w-8 h-8 rounded-xl bg-amber-500/10 text-amber-700 flex items-center justify-center font-bold flex-shrink-0">
-                    <Search className="w-4 h-4 text-amber-600 group-hover:scale-110 transition" />
-                  </div>
-                  <div>
-                    <h2 className="text-xs font-black text-slate-900 group-hover:text-amber-700 transition leading-tight">365-Day Checker</h2>
-                    <p className="text-[10px] text-slate-500 font-medium">Check Eligibility</p>
-                  </div>
-                </div>
-                <ArrowRight className="w-3.5 h-3.5 text-slate-400 group-hover:text-amber-600 group-hover:translate-x-0.5 transition" />
-              </a>
+            {/* Hashtag Pill List */}
+            <div className="flex flex-wrap gap-2 pt-2 text-xs font-semibold">
+              <span className="bg-sky-100 hover:bg-sky-200 text-sky-800 px-3 py-1 rounded-full border border-sky-200 transition-colors">
+                #PESOECAccess
+              </span>
+              <span className="bg-sky-100 hover:bg-sky-200 text-sky-800 px-3 py-1 rounded-full border border-sky-200 transition-colors">
+                #SerbisyongDAMA
+              </span>
+              <span className="bg-sky-100 hover:bg-sky-200 text-sky-800 px-3 py-1 rounded-full border border-sky-200 transition-colors">
+                #DigitalGovernance
+              </span>
+              <span className="bg-sky-100 hover:bg-sky-200 text-sky-800 px-3 py-1 rounded-full border border-sky-200 transition-colors">
+                #Innovation
+              </span>
             </div>
           </div>
         </div>
@@ -440,8 +284,34 @@ export default async function LandingPage() {
         </div>
       </section>
 
-      {/* 6. Citizen Online Services Hub: Public Status Inquiry & Direct Feedback */}
-      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 space-y-10">
+      {/* 6. Community Video Showcase Section */}
+      <section className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
+        <div className="relative rounded-3xl overflow-hidden shadow-2xl border border-slate-300/80 bg-slate-900 group">
+          <video
+            src="https://www.image2url.com/r2/default/videos/1788303848432-e7f6f01f-ef1c-4460-a6e4-99f8f2386145.mp4"
+            autoPlay
+            muted
+            loop
+            playsInline
+            className="w-full h-auto max-h-[460px] object-cover block group-hover:scale-[1.01] transition duration-500"
+          />
+          <div className="absolute inset-0 bg-gradient-to-t from-slate-950/85 via-transparent to-transparent pointer-events-none" />
+          <div className="absolute bottom-5 left-5 right-5 text-white space-y-1.5">
+            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/90 text-white backdrop-blur-sm shadow-xs">
+              ● Community Employment in Action
+            </span>
+            <p className="text-xs sm:text-sm font-bold text-slate-100 drop-shadow">
+              LGU Dingalan • DOLE Emergency Employment Program
+            </p>
+            <p className="text-[11px] text-slate-300 hidden sm:block">
+              Direct government assistance providing temporary wage employment to displaced and marginalized workers.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      {/* 7. Citizen Online Services Hub: Public Status Inquiry & Direct Feedback */}
+      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-10">
         <div className="text-center space-y-2 max-w-2xl mx-auto">
           <div className="inline-flex items-center space-x-1.5 px-3 py-0.5 rounded-full bg-blue-50 text-blue-900 text-[11px] font-bold border border-blue-200">
             <Globe className="w-3.5 h-3.5 text-blue-800" />
@@ -466,7 +336,7 @@ export default async function LandingPage() {
         </div>
       </section>
 
-      {/* 7. Active TUPAD Work Programs Hub (#programs) */}
+      {/* 8. Active TUPAD Work Programs Hub (#programs) */}
       <section id="programs" className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 space-y-6 scroll-mt-24">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-200 pb-4">
           <div>
@@ -536,7 +406,7 @@ export default async function LandingPage() {
         </div>
       </section>
 
-      {/* 8. Community Impact Bento Grid & "TUPAD in Action" (#gallery) */}
+      {/* 9. Community Impact Bento Grid & "TUPAD in Action" (#gallery) */}
       <section id="gallery" className="bg-slate-100/80 py-16 px-4 sm:px-6 lg:px-8 border-y border-slate-200 scroll-mt-20">
         <div className="max-w-7xl mx-auto space-y-10">
           <div className="text-center space-y-2 max-w-2xl mx-auto">
@@ -608,7 +478,7 @@ export default async function LandingPage() {
         </div>
       </section>
 
-      {/* 9. PESO Dingalan Organizational Structure (#org-structure) */}
+      {/* 10. PESO Dingalan Organizational Structure (#org-structure) */}
       <section id="org-structure" className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 space-y-8 scroll-mt-20">
         <div className="text-center space-y-2 max-w-2xl mx-auto">
           <div className="inline-flex items-center space-x-1.5 px-3 py-0.5 rounded-full bg-blue-50 text-blue-900 text-[11px] font-bold border border-blue-200">
@@ -634,7 +504,7 @@ export default async function LandingPage() {
         </div>
       </section>
 
-      {/* 10. Official Philippine DICT Government Web Template (GWT) Footer */}
+      {/* 11. Official Philippine DICT Government Web Template (GWT) Footer */}
       <footer className="bg-slate-950 text-slate-300 text-xs border-t-4 border-emerald-500 mt-auto" data-purpose="dict-gwt-official-footer">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 sm:py-14 space-y-10">
           <div className="grid grid-cols-1 md:grid-cols-12 gap-8 items-start">
