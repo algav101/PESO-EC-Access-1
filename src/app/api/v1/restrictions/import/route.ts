@@ -4,6 +4,8 @@ import { getCurrentUser, isAdminUser, hasPermission } from "@/lib/auth";
 import { logAudit } from "@/lib/audit";
 import * as XLSX from "xlsx";
 
+export const maxDuration = 60; // 60s max execution for Vercel/Node
+
 function parseDateToISO(val: any): { iso: string; formatted: string; timestamp: number } {
   if (!val) {
     const d = new Date();
@@ -207,14 +209,12 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "No rows found in uploaded file" }, { status: 400 });
     }
 
-    // 1. In-Memory Normalization & Deduplication
-    const processedRows = [];
-    const errors = [];
+    // 1. Fast In-Memory Normalization & Deduplication
+    const deduplicatedRowsMap = new Map<string, any>();
     const uniqueFullNameSet = new Set<string>();
 
     for (let i = 0; i < rawRows.length; i++) {
       const row = rawRows[i];
-      const rowIdx = i + 1;
 
       // Column A: NAME OF BENEFICIARIES
       const rawName = (
@@ -228,10 +228,7 @@ export async function POST(request: Request) {
         (row["FIRST NAME"] && row["LAST NAME"] ? `${row["LAST NAME"]}, ${row["FIRST NAME"]}` : "")
       )?.toString().trim();
 
-      if (!rawName) {
-        errors.push({ row: rowIdx, error: "Missing Name of Beneficiary" });
-        continue;
-      }
+      if (!rawName) continue;
 
       const parsedName = parseNameParts(rawName);
       uniqueFullNameSet.add(parsedName.fullName);
@@ -308,7 +305,7 @@ export async function POST(request: Request) {
         reason = `Barangay Appointive Personnel / Government Employee (${adlNo || "Appointive Position"}). Barred from emergency employment.`;
       }
 
-      processedRows.push({
+      const rowData = {
         ...parsedName,
         adlNo: adlNo || "HISTORICAL_BATCH",
         orientationDate: orientationDateParsed.formatted,
@@ -321,43 +318,47 @@ export async function POST(request: Request) {
         municipality,
         isAppointive,
         reason,
-      });
+      };
+
+      // Key by name + adlNo to deduplicate duplicates in single file
+      const dedupKey = `${parsedName.fullName}__${rowData.adlNo}`;
+      deduplicatedRowsMap.set(dedupKey, rowData);
     }
+
+    const processedRows = Array.from(deduplicatedRowsMap.values());
 
     if (processedRows.length === 0) {
       return NextResponse.json(
-        {
-          error: "No valid rows could be parsed. Please check the Excel column format.",
-          details: errors,
-        },
+        { error: "No valid beneficiary rows could be parsed. Please check the Excel/CSV column headers." },
         { status: 400 }
       );
     }
 
-    // 2. High-Speed Bulk Fetch of Existing Beneficiaries in 1 Single Query
+    // 2. Chunked Lookup of Existing Beneficiaries (batches of 1,000 to prevent Postgres parameter limit)
     const uniqueNamesArray = Array.from(uniqueFullNameSet);
-    const existingBenes = await prisma.beneficiary.findMany({
-      where: {
-        fullName: { in: uniqueNamesArray },
-      },
-      select: {
-        id: true,
-        fullName: true,
-        lastName: true,
-        firstName: true,
-        middleName: true,
-        extensionName: true,
-        barangay: true,
-        municipality: true,
-      },
-    });
-
     const beneMap = new Map<string, any>();
-    for (const b of existingBenes) {
-      beneMap.set(b.fullName.toUpperCase().trim(), b);
+    const CHUNK_SIZE = 1000;
+
+    for (let i = 0; i < uniqueNamesArray.length; i += CHUNK_SIZE) {
+      const nameChunk = uniqueNamesArray.slice(i, i + CHUNK_SIZE);
+      const existing = await prisma.beneficiary.findMany({
+        where: {
+          fullName: { in: nameChunk },
+        },
+        select: {
+          id: true,
+          fullName: true,
+          barangay: true,
+          municipality: true,
+        },
+      });
+
+      for (const b of existing) {
+        beneMap.set(b.fullName.toUpperCase().trim(), b);
+      }
     }
 
-    // 3. Bulk Insert Missing Beneficiaries in 1 Batch
+    // 3. Bulk Insert Missing Beneficiaries in Batches of 1,000
     const newBenesToCreate: any[] = [];
     const seenNewBenes = new Set<string>();
 
@@ -381,8 +382,6 @@ export async function POST(request: Request) {
     }
 
     if (newBenesToCreate.length > 0) {
-      // Chunk inserts in batches of 500 for maximum safety & speed
-      const CHUNK_SIZE = 500;
       for (let i = 0; i < newBenesToCreate.length; i += CHUNK_SIZE) {
         const chunk = newBenesToCreate.slice(i, i + CHUNK_SIZE);
         await prisma.beneficiary.createMany({
@@ -391,116 +390,74 @@ export async function POST(request: Request) {
         });
       }
 
-      // Re-fetch newly created beneficiaries to populate beneMap
-      const newlyCreated = await prisma.beneficiary.findMany({
-        where: {
-          fullName: { in: Array.from(seenNewBenes) },
-        },
-        select: {
-          id: true,
-          fullName: true,
-          lastName: true,
-          firstName: true,
-          middleName: true,
-          extensionName: true,
-          barangay: true,
-          municipality: true,
-        },
-      });
+      // Re-fetch newly created beneficiaries in chunks
+      const newNamesArray = Array.from(seenNewBenes);
+      for (let i = 0; i < newNamesArray.length; i += CHUNK_SIZE) {
+        const chunk = newNamesArray.slice(i, i + CHUNK_SIZE);
+        const newlyCreated = await prisma.beneficiary.findMany({
+          where: {
+            fullName: { in: chunk },
+          },
+          select: {
+            id: true,
+            fullName: true,
+            barangay: true,
+            municipality: true,
+          },
+        });
 
-      for (const b of newlyCreated) {
-        beneMap.set(b.fullName.toUpperCase().trim(), b);
+        for (const b of newlyCreated) {
+          beneMap.set(b.fullName.toUpperCase().trim(), b);
+        }
       }
     }
 
-    // 4. High-Speed Bulk Fetch of Existing Restrictions for all beneficiaries in 1 Query
+    // 4. Collect and prepare all Restriction records
     const allBeneIds = Array.from(beneMap.values()).map((b) => b.id);
-    const existingRestrictions = await prisma.beneficiaryRestriction.findMany({
-      where: {
-        beneficiaryId: { in: allBeneIds },
-      },
-      select: {
-        id: true,
-        beneficiaryId: true,
-        adlNo: true,
-      },
-    });
-
-    const restrictionKeyMap = new Map<string, string>(); // `${beneId}_${adlNo}` -> restrictionId
-    for (const rx of existingRestrictions) {
-      restrictionKeyMap.set(`${rx.beneficiaryId}_${rx.adlNo || ""}`, rx.id);
-    }
-
-    // 5. Partition into Bulk Inserts vs Parallel Updates
-    const newRestrictionsToInsert: any[] = [];
-    const updatesToExecute: any[] = [];
-    const seenInsertKeys = new Set<string>();
+    const restrictionsToCreate: any[] = [];
 
     for (const r of processedRows) {
       const bene = beneMap.get(r.fullName);
       if (!bene) continue;
 
-      const key = `${bene.id}_${r.adlNo || ""}`;
-      if (restrictionKeyMap.has(key)) {
-        const existingId = restrictionKeyMap.get(key)!;
-        updatesToExecute.push({
-          id: existingId,
-          data: {
-            payoutDate: r.payoutDate,
-            workDate: r.workDate,
-            orientationDate: r.orientationDate,
-            barangay: r.barangay,
-            municipality: r.municipality,
-            restrictionEnd: r.restrictionEnd,
-            isAppointivePersonnel: r.isAppointive,
-            reason: r.reason,
-            status: "ACTIVE",
+      restrictionsToCreate.push({
+        beneficiaryId: bene.id,
+        payoutDate: r.payoutDate,
+        restrictionStart: r.payoutISO,
+        restrictionEnd: r.restrictionEnd,
+        adlNo: r.adlNo,
+        workDate: r.workDate,
+        orientationDate: r.orientationDate,
+        barangay: r.barangay,
+        municipality: r.municipality,
+        isAppointivePersonnel: r.isAppointive,
+        reason: r.reason,
+        status: "ACTIVE",
+      });
+    }
+
+    // 5. Blazing-Fast Overwrite: Remove existing restriction records for these beneficiaries in bulk chunks
+    if (allBeneIds.length > 0) {
+      for (let i = 0; i < allBeneIds.length; i += 2000) {
+        const idChunk = allBeneIds.slice(i, i + 2000);
+        await prisma.beneficiaryRestriction.deleteMany({
+          where: {
+            beneficiaryId: { in: idChunk },
           },
-        });
-      } else if (!seenInsertKeys.has(key)) {
-        seenInsertKeys.add(key);
-        newRestrictionsToInsert.push({
-          beneficiaryId: bene.id,
-          payoutDate: r.payoutDate,
-          restrictionStart: r.payoutISO,
-          restrictionEnd: r.restrictionEnd,
-          adlNo: r.adlNo,
-          workDate: r.workDate,
-          orientationDate: r.orientationDate,
-          barangay: r.barangay,
-          municipality: r.municipality,
-          isAppointivePersonnel: r.isAppointive,
-          reason: r.reason,
-          status: "ACTIVE",
         });
       }
     }
 
-    // 6. Bulk Insert All New Restrictions in 1 Operation
-    if (newRestrictionsToInsert.length > 0) {
-      const CHUNK_SIZE = 500;
-      for (let i = 0; i < newRestrictionsToInsert.length; i += CHUNK_SIZE) {
-        const chunk = newRestrictionsToInsert.slice(i, i + CHUNK_SIZE);
+    // 6. Fast Bulk Ingestion in chunks of 1,000 rows
+    let insertedCount = 0;
+    if (restrictionsToCreate.length > 0) {
+      for (let i = 0; i < restrictionsToCreate.length; i += CHUNK_SIZE) {
+        const chunk = restrictionsToCreate.slice(i, i + CHUNK_SIZE);
         await prisma.beneficiaryRestriction.createMany({
           data: chunk,
           skipDuplicates: true,
         });
-      }
-    }
-
-    // 7. Parallel Bulk Updates in Concurrency Chunks of 50
-    if (updatesToExecute.length > 0) {
-      const UPDATE_CONCURRENCY = 50;
-      for (let i = 0; i < updatesToExecute.length; i += UPDATE_CONCURRENCY) {
-        const chunk = updatesToExecute.slice(i, i + UPDATE_CONCURRENCY);
-        await Promise.all(
-          chunk.map((u) =>
-            prisma.beneficiaryRestriction.update({
-              where: { id: u.id },
-              data: u.data,
-            })
-          )
-        );
+        insertedCount += chunk.length;
       }
     }
 
@@ -512,22 +469,21 @@ export async function POST(request: Request) {
       entityType: "RESTRICTION",
       metadata: {
         totalRows: rawRows.length,
-        importedCount: newRestrictionsToInsert.length,
-        updatedCount: updatesToExecute.length,
+        processedRows: processedRows.length,
+        importedCount: insertedCount,
         durationSeconds,
       },
     });
 
     return NextResponse.json({
       success: true,
-      message: `Successfully processed ${processedRows.length} records in ${durationSeconds}s (${newRestrictionsToInsert.length} new registered, ${updatesToExecute.length} updated).`,
-      importedCount: newRestrictionsToInsert.length,
-      updatedCount: updatesToExecute.length,
+      message: `Successfully imported ${insertedCount} disqualified reference records in ${durationSeconds} seconds!`,
+      importedCount: insertedCount,
       totalProcessed: processedRows.length,
       durationSeconds,
     });
   } catch (error: any) {
     console.error("Restriction bulk import error:", error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ error: error.message || "Failed to process restriction masterlist" }, { status: 500 });
   }
 }
