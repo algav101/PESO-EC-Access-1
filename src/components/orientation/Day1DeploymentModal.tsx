@@ -15,12 +15,16 @@ import {
   Sparkles,
   HeartHandshake,
   Info,
+  Check,
 } from "lucide-react";
 import { ETupadCard } from "@/components/stubs/ETupadCard";
 
 export interface Day1DeploymentData {
   success: boolean;
   isAuthorizedForDeployment: boolean;
+  isNewlyDeployed?: boolean;
+  alreadyDeployed?: boolean;
+  deployedAt?: string | null;
   validationStatus: "DOLE_ORIENTED_AND_VALIDATED" | "ONSITE_REPLACEMENT_VALIDATED" | "AWAITING_ORIENTATION_VERIFICATION" | string;
   beneficiary: {
     id: string;
@@ -89,7 +93,17 @@ export function Day1DeploymentModal({
 
   if (!isOpen || !data) return null;
 
-  const { beneficiary, program, orientationRecord, day1Deployment, isAuthorizedForDeployment, validationStatus } = data;
+  const {
+    beneficiary,
+    program,
+    orientationRecord,
+    day1Deployment,
+    isAuthorizedForDeployment,
+    validationStatus,
+    isNewlyDeployed,
+    alreadyDeployed,
+    deployedAt,
+  } = data;
 
   const isDirectPurok = day1Deployment.purokPriorityScore >= 60;
 
@@ -142,7 +156,7 @@ export function Day1DeploymentModal({
 
         {/* Scrollable Content */}
         <div className="p-4 sm:p-6 overflow-y-auto space-y-5 print:p-0" ref={printRef}>
-          {/* Validation Status Banner */}
+          {/* Validation & Scan Tracking Status Banner */}
           <div
             className={`p-4 rounded-2xl border flex items-start space-x-3 shadow-sm ${
               isAuthorizedForDeployment
@@ -160,7 +174,7 @@ export function Day1DeploymentModal({
               </div>
             )}
             <div className="flex-1 space-y-0.5">
-              <div className="flex items-center space-x-2">
+              <div className="flex items-center flex-wrap gap-1.5">
                 <span className="text-xs font-black tracking-wide uppercase">
                   {validationStatus === "DOLE_ORIENTED_AND_VALIDATED"
                     ? "✓ DOLE VALIDATED & ORIENTED"
@@ -168,24 +182,26 @@ export function Day1DeploymentModal({
                     ? "✓ ONSITE REPLACEMENT VALIDATED"
                     : "⚠️ AWAITING DOLE ORIENTATION RECORD"}
                 </span>
-                <span className="text-[10px] px-2 py-0.5 rounded-full font-bold bg-white/80 border">
-                  Step 2 Verified
-                </span>
+
+                {isNewlyDeployed && (
+                  <span className="text-[10px] px-2 py-0.5 rounded-full font-bold bg-emerald-600 text-white shadow-xs">
+                    ✓ Just Deployed to Day 1
+                  </span>
+                )}
+                {alreadyDeployed && (
+                  <span className="text-[10px] px-2 py-0.5 rounded-full font-bold bg-teal-100 text-teal-900 border border-teal-300 font-mono">
+                    Scanned & Deployed
+                  </span>
+                )}
               </div>
               <p className="text-xs text-slate-600">
                 {isAuthorizedForDeployment
-                  ? `Orientation verified present by ${orientationRecord?.scannedBy || "DOLE Aurora / PESO Dingalan"} on ${
-                      orientationRecord?.scannedAt
-                        ? new Date(orientationRecord.scannedAt).toLocaleDateString("en-US", {
-                            month: "short",
-                            day: "numeric",
-                            year: "numeric",
-                            hour: "2-digit",
-                            minute: "2-digit",
-                          })
-                        : "Field Log"
-                    }. Ready for Day 1 site deployment.`
-                  : "Beneficiary has affirmed stub but orientation attendance has not been registered yet. Please proceed to the orientation scanning table."}
+                  ? `Orientation verified by ${orientationRecord?.scannedBy || "DOLE Aurora / PESO Dingalan"}. Day 1 site assignment registered at ${
+                      deployedAt
+                        ? new Date(deployedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+                        : "Field Dispatch"
+                    }.`
+                  : "Beneficiary orientation attendance has not been registered yet. Please direct beneficiary to the orientation table."}
               </p>
             </div>
           </div>

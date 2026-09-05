@@ -21,6 +21,7 @@ import { QrScannerModal } from "@/components/scanner/QrScannerModal";
 import { useOffline } from "@/context/OfflineContext";
 import { offlineDb, queueOfflineTransaction } from "@/lib/dexie";
 import { OrientationMonitoringTable } from "@/components/orientation/OrientationMonitoringTable";
+import { Day1DeploymentBoard } from "@/components/orientation/Day1DeploymentBoard";
 import { Day1DeploymentModal, Day1DeploymentData } from "@/components/orientation/Day1DeploymentModal";
 
 type ActiveTab = "SCANNER" | "MONITORING" | "DAY1_DEPLOYMENT";
@@ -44,12 +45,13 @@ export default function OrientationPage() {
   const [day1Error, setDay1Error] = useState<string | null>(null);
   const [day1DeploymentData, setDay1DeploymentData] = useState<Day1DeploymentData | null>(null);
   const [day1ManualInput, setDay1ManualInput] = useState("");
+  const [day1RefreshTrigger, setDay1RefreshTrigger] = useState<number>(0);
 
   useEffect(() => {
     setMounted(true);
   }, []);
 
-  // Handler for Orientation Attendance Scan
+  // Handler for Orientation Attendance Scan (Step 2)
   const handleAttendanceScan = async (token: string) => {
     setAttendanceScannerOpen(false);
     setLoading(true);
@@ -108,7 +110,7 @@ export default function OrientationPage() {
     }
   };
 
-  // Handler for Day 1 Deployment QR Scan / Search
+  // Handler for Day 1 Activity Deployment Scan / Search (Tracks & Registers in DB)
   const handleDay1Scan = async (token: string) => {
     setDay1ScannerOpen(false);
     setDay1Loading(true);
@@ -118,7 +120,10 @@ export default function OrientationPage() {
       const res = await fetch("/api/v1/orientation/day1-deployment", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ qrToken: token }),
+        body: JSON.stringify({
+          qrToken: token,
+          recordScan: true, // Retracks and registers Day 1 activity deployment
+        }),
       });
 
       const data = await res.json();
@@ -127,6 +132,8 @@ export default function OrientationPage() {
       }
 
       setDay1DeploymentData(data);
+      // Trigger live board refresh
+      setDay1RefreshTrigger((prev) => prev + 1);
     } catch (err: any) {
       setDay1Error(err.message);
     } finally {
@@ -159,7 +166,7 @@ export default function OrientationPage() {
             <span>Orientation Verification & Monitoring Scheme</span>
           </h1>
           <p className="text-xs sm:text-sm text-blue-100 max-w-2xl leading-relaxed">
-            Verify DOLE orientation attendance, monitor affirmed stubs & flagged replacements, and deploy validated beneficiaries to their Day 1 activity based on nearest Purok priority.
+            Verify DOLE orientation attendance, monitor affirmed stubs & flagged replacements, and retrack beneficiary scanning for Day 1 of activity with nearest Purok priority deployment.
           </p>
         </div>
 
@@ -331,7 +338,7 @@ export default function OrientationPage() {
                   className="w-full sm:w-auto px-5 py-3 bg-teal-600 hover:bg-teal-700 text-white font-extrabold text-xs rounded-xl shadow transition flex items-center justify-center space-x-1.5"
                 >
                   <Compass className="w-4 h-4 text-gov-goldLight" />
-                  <span>View Day 1 Activity</span>
+                  <span>Deploy to Day 1 Activity</span>
                 </button>
               </div>
             </div>
@@ -342,10 +349,10 @@ export default function OrientationPage() {
             <div className="space-y-0.5">
               <span className="text-xs font-bold text-slate-800 flex items-center space-x-1.5">
                 <Compass className="w-4 h-4 text-gov-blue" />
-                <span>Need to check Day 1 Deployment Itinerary?</span>
+                <span>Need to scan and track Day 1 Activity Deployment?</span>
               </span>
               <p className="text-[11px] text-slate-500">
-                Scan Format 2 e-TUPAD Card ID to see nearest Purok activity assignment.
+                Scan Format 2 e-TUPAD Card to retrack Day 1 activity assignments and nearest Purok priority.
               </p>
             </div>
             <button
@@ -359,7 +366,7 @@ export default function OrientationPage() {
         </div>
       )}
 
-      {/* TAB 2: MONITORING SCHEME */}
+      {/* TAB 2: RETAINED ORIENTATION MONITORING SCHEME */}
       {activeTab === "MONITORING" && (
         <div className="space-y-4">
           <OrientationMonitoringTable
@@ -370,38 +377,39 @@ export default function OrientationPage() {
         </div>
       )}
 
-      {/* TAB 3: DAY 1 ACTIVITY DEPLOYMENT SCANNER */}
+      {/* TAB 3: DAY 1 ACTIVITY DEPLOYMENT RETRACKING & SCANNER */}
       {activeTab === "DAY1_DEPLOYMENT" && (
-        <div className="max-w-2xl mx-auto space-y-6">
-          <div className="gov-card p-6 sm:p-8 text-center space-y-6 shadow-xl border-t-4 border-t-teal-600">
-            <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-3xl bg-teal-50 text-teal-700 flex items-center justify-center mx-auto border-4 border-teal-100 shadow-inner">
-              <Compass className="w-10 h-10 sm:w-12 sm:h-12 text-teal-600" />
+        <div className="space-y-6">
+          {/* Top Scanner Card */}
+          <div className="gov-card p-6 sm:p-7 text-center space-y-5 shadow-xl border-t-4 border-t-teal-600 max-w-2xl mx-auto">
+            <div className="w-16 h-16 rounded-3xl bg-teal-50 text-teal-700 flex items-center justify-center mx-auto border-4 border-teal-100 shadow-inner">
+              <Compass className="w-8 h-8 text-teal-600" />
             </div>
 
-            <div className="space-y-2">
-              <div className="inline-flex items-center space-x-1.5 px-3 py-1 rounded-full bg-teal-100 text-teal-800 text-[10px] font-black uppercase tracking-wider">
+            <div className="space-y-1.5">
+              <div className="inline-flex items-center space-x-1.5 px-3 py-0.5 rounded-full bg-teal-100 text-teal-800 text-[10px] font-black uppercase tracking-wider">
                 <Sparkles className="w-3 h-3 text-teal-600" />
-                <span>Format 2 e-TUPAD Card QR Scanner</span>
+                <span>FORMAT 2 E-TUPAD CARD QR SCANNER</span>
               </div>
-              <h3 className="text-base sm:text-xl font-black text-slate-900">
+              <h3 className="text-base sm:text-lg font-black text-slate-900">
                 Scan Assigned QR Code ID for Day 1 Activity
               </h3>
               <p className="text-xs text-slate-500 max-w-md mx-auto leading-relaxed">
-                Validated & oriented beneficiaries (including onsite replacements) can scan their assigned <strong className="text-gov-navy">Format 2 e-TUPAD Card</strong> to view their Day 1 activity schedule, nearest Purok priority deployment, and team quotas.
+                Validated & oriented beneficiaries (including onsite replacements) can scan their assigned <strong className="text-gov-navy">Format 2 e-TUPAD Card</strong> to record their Day 1 site deployment, nearest Purok priority area, and team quotas.
               </p>
             </div>
 
             <button
               onClick={() => setDay1ScannerOpen(true)}
               disabled={day1Loading}
-              className="w-full py-4 bg-gradient-to-r from-teal-700 via-gov-blue to-gov-navy hover:from-teal-800 hover:to-slate-900 text-white font-black text-sm rounded-2xl shadow-xl flex items-center justify-center space-x-2.5 transition transform active:scale-95 disabled:opacity-50"
+              className="w-full py-3.5 bg-gradient-to-r from-teal-700 via-gov-blue to-gov-navy hover:from-teal-800 hover:to-slate-900 text-white font-black text-sm rounded-2xl shadow-xl flex items-center justify-center space-x-2.5 transition transform active:scale-95 disabled:opacity-50"
             >
               <Camera className="w-5 h-5 text-gov-goldLight animate-pulse" />
               <span>SCAN FORMAT 2 QR CODE ID</span>
             </button>
 
             {/* Manual Lookup Form */}
-            <div className="pt-3 border-t border-slate-100">
+            <div className="pt-2 border-t border-slate-100">
               <form
                 onSubmit={(e) => {
                   e.preventDefault();
@@ -418,56 +426,32 @@ export default function OrientationPage() {
                     placeholder="Enter Designated Slot # (e.g. 1, 10, 522) or Beneficiary Name"
                     value={day1ManualInput}
                     onChange={(e) => setDay1ManualInput(e.target.value)}
-                    className="w-full pl-9 pr-3 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs font-medium focus:outline-none focus:ring-2 focus:ring-teal-600 text-slate-800"
+                    className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs font-medium focus:outline-none focus:ring-2 focus:ring-teal-600 text-slate-800"
                   />
                 </div>
                 <button
                   type="submit"
                   disabled={!day1ManualInput.trim() || day1Loading}
-                  className="px-5 py-2.5 bg-teal-700 hover:bg-teal-800 text-white font-bold text-xs rounded-xl transition shadow disabled:opacity-40"
+                  className="px-4 py-2 bg-teal-700 hover:bg-teal-800 text-white font-bold text-xs rounded-xl transition shadow disabled:opacity-40"
                 >
                   {day1Loading ? "Searching..." : "Lookup"}
                 </button>
               </form>
             </div>
-          </div>
 
-          {day1Error && (
-            <div className="p-4 bg-red-50 border border-red-200 rounded-2xl flex items-start space-x-3 text-xs text-red-700 shadow-sm">
-              <AlertCircle className="w-5 h-5 flex-shrink-0 mt-0.5 text-red-600" />
-              <div className="space-y-1">
-                <strong className="block font-bold">Lookup Alert</strong>
+            {day1Error && (
+              <div className="p-3 bg-red-50 border border-red-200 rounded-2xl flex items-start space-x-2 text-xs text-red-700 text-left">
+                <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5 text-red-600" />
                 <span>{day1Error}</span>
               </div>
-            </div>
-          )}
-
-          {/* Info Card explaining Nearest Purok Priority Logic */}
-          <div className="p-5 bg-gradient-to-r from-slate-900 to-gov-navy text-white rounded-3xl space-y-3 shadow-lg">
-            <div className="flex items-center space-x-2">
-              <Compass className="w-5 h-5 text-gov-gold" />
-              <h4 className="text-xs sm:text-sm font-black uppercase tracking-wider text-white">
-                Nearest Purok Priority Deployment Logic
-              </h4>
-            </div>
-            <p className="text-xs text-slate-200 leading-relaxed">
-              The system analyzes the beneficiary's registered <span className="text-gov-gold font-bold">Sitio / Purok</span> in their barangay and automatically computes a proximity affinity score against the Barangay Work Program items for Day 1.
-            </p>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1 text-xs">
-              <div className="bg-white/10 p-3 rounded-xl border border-white/10">
-                <span className="font-bold text-gov-goldLight block text-[11px]">1. Nearest Purok Match</span>
-                <span className="text-[10px] text-slate-300">Direct or overlapping Sitio proximity prioritized for work sector assignment.</span>
-              </div>
-              <div className="bg-white/10 p-3 rounded-xl border border-white/10">
-                <span className="font-bold text-blue-200 block text-[11px]">2. Gender & Team Quota</span>
-                <span className="text-[10px] text-slate-300">Factors in male vs. female slot quotas and SC/PWD assignments per activity.</span>
-              </div>
-              <div className="bg-white/10 p-3 rounded-xl border border-white/10">
-                <span className="font-bold text-emerald-300 block text-[11px]">3. DOLE Validation Gate</span>
-                <span className="text-[10px] text-slate-300">Only beneficiaries with affirmed stubs & DOLE orientation are cleared for site deployment.</span>
-              </div>
-            </div>
+            )}
           </div>
+
+          {/* Interactive Day 1 Activity Deployment Retracking Board */}
+          <Day1DeploymentBoard
+            onSelectBeneficiary={(token) => handleDay1Scan(token)}
+            refreshTrigger={day1RefreshTrigger}
+          />
         </div>
       )}
 
