@@ -1,0 +1,203 @@
+/* 13-Cube 3D Isometric Wave Loader Styles */
+.loaderContainer {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 2.5rem 1rem;
+  overflow: hidden;
+  position: relative;
+}
+
+.wrapper-grid {
+  --animation-duration: 3.5s;
+  --cube-width: 48px;
+  --cube-height: 48px;
+  --highlight-color: #00cc44;
+  --font-size: 1.8em;
+
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(13, var(--cube-width));
+  width: calc(13 * var(--cube-width));
+  height: var(--cube-height);
+  perspective: 350px;
+  perspective-origin: 50% 50%;
+  transform-style: preserve-3d;
+  margin: 0 auto;
+}
+
+/* 3D Cube Container */
+.cube {
+  position: relative;
+  width: var(--cube-width);
+  height: var(--cube-height);
+  transform-style: preserve-3d;
+  animation: translate-z var(--animation-duration) ease-in-out infinite;
+}
+
+/* Geometric Cube Faces */
+.face {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: var(--font-size);
+  font-weight: 900;
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  color: #ffffff;
+  border: 1.5px solid rgba(255, 255, 255, 0.15);
+  background-color: rgba(15, 23, 42, 0.88);
+  backface-visibility: visible;
+  box-sizing: border-box;
+  user-select: none;
+  animation: 
+    face-color var(--animation-duration) ease-in-out infinite,
+    face-glow var(--animation-duration) ease-in-out infinite,
+    edge-glow var(--animation-duration) ease-in-out infinite;
+}
+
+/* Precise 3D Face Transforms */
+.face-front {
+  transform: rotateY(0deg) translateZ(calc(var(--cube-width) / 2));
+}
+
+.face-back {
+  transform: rotateY(180deg) translateZ(calc(var(--cube-width) / 2));
+}
+
+.face-left {
+  transform: rotateY(-90deg) translateZ(calc(var(--cube-width) / 2));
+}
+
+.face-right {
+  transform: rotateY(90deg) translateZ(calc(var(--cube-width) / 2));
+}
+
+.face-top {
+  transform: rotateX(90deg) translateZ(calc(var(--cube-height) / 2));
+}
+
+.face-bottom {
+  transform: rotateX(-90deg) translateZ(calc(var(--cube-height) / 2));
+}
+
+/* Sequential Symmetrical Wave Delay Chains for 13 Cubes */
+.cube:nth-child(1), .cube:nth-child(1) .face {
+  animation-delay: 0s;
+}
+
+.cube:nth-child(2), .cube:nth-child(2) .face {
+  animation-delay: 0.2s;
+}
+
+.cube:nth-child(3), .cube:nth-child(3) .face {
+  animation-delay: 0.4s;
+}
+
+.cube:nth-child(4), .cube:nth-child(4) .face {
+  animation-delay: 0.6s;
+}
+
+.cube:nth-child(5), .cube:nth-child(5) .face {
+  animation-delay: 0.8s;
+}
+
+.cube:nth-child(6), .cube:nth-child(6) .face {
+  animation-delay: 1.0s;
+}
+
+.cube:nth-child(7), .cube:nth-child(7) .face {
+  animation-delay: 1.2s;
+}
+
+.cube:nth-child(8), .cube:nth-child(8) .face {
+  animation-delay: 1.4s;
+}
+
+.cube:nth-child(9), .cube:nth-child(9) .face {
+  animation-delay: 1.6s;
+}
+
+.cube:nth-child(10), .cube:nth-child(10) .face {
+  animation-delay: 1.8s;
+}
+
+.cube:nth-child(11), .cube:nth-child(11) .face {
+  animation-delay: 2.0s;
+}
+
+.cube:nth-child(12), .cube:nth-child(12) .face {
+  animation-delay: 2.2s;
+}
+
+.cube:nth-child(13), .cube:nth-child(13) .face {
+  animation-delay: 2.4s;
+}
+
+/* Keyframe 1: Dynamic Z-Axis Wave Translation */
+@keyframes translate-z {
+  0%, 100% {
+    transform: translateZ(0px);
+  }
+  50% {
+    transform: translateZ(calc(var(--cube-width) * 1.25));
+  }
+}
+
+/* Keyframe 2: Face Color & Material Saturation Modulation */
+@keyframes face-color {
+  0%, 100% {
+    background-color: rgba(15, 23, 42, 0.88);
+    color: #e2e8f0;
+  }
+  50% {
+    background-color: rgba(0, 204, 68, 0.28);
+    color: #ffffff;
+  }
+}
+
+/* Keyframe 3: Dynamic Text Glow & Ambient Face Lighting */
+@keyframes face-glow {
+  0%, 100% {
+    box-shadow: inset 0 0 4px rgba(255, 255, 255, 0.05);
+    text-shadow: 0 0 2px rgba(255, 255, 255, 0.2);
+  }
+  50% {
+    box-shadow: 0 0 24px var(--highlight-color), inset 0 0 16px rgba(0, 204, 68, 0.45);
+    text-shadow: 0 0 10px var(--highlight-color), 0 0 20px var(--highlight-color), 0 0 30px #ffffff;
+  }
+}
+
+/* Keyframe 4: Edge Perimeter Neon Glow */
+@keyframes edge-glow {
+  0%, 100% {
+    border-color: rgba(255, 255, 255, 0.15);
+    filter: drop-shadow(0 0 0px transparent);
+  }
+  50% {
+    border-color: var(--highlight-color);
+    filter: drop-shadow(0 0 8px var(--highlight-color));
+  }
+}
+
+/* Responsive Container Scaling for Smaller Devices */
+@media (max-width: 768px) {
+  .wrapper-grid {
+    --cube-width: 24px;
+    --cube-height: 24px;
+    --font-size: 0.95em;
+    perspective: 200px;
+  }
+}
+
+@media (min-width: 769px) and (max-width: 1024px) {
+  .wrapper-grid {
+    --cube-width: 36px;
+    --cube-height: 36px;
+    --font-size: 1.35em;
+    perspective: 280px;
+  }
+}
