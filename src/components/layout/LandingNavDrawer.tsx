@@ -124,7 +124,7 @@ export function LandingNavDrawer() {
               type="button"
             >
               <Menu className="w-5 h-5" />
-              <span>All Civic Services &amp; Modules</span>
+              <span>Narito ang mga Serbisyo ng PESO</span>
               <span className="bg-emerald-800 text-[10px] px-1.5 py-0.5 rounded font-mono uppercase tracking-wide hidden sm:inline-block">
                 Menu
               </span>
