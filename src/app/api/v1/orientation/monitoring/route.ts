@@ -6,32 +6,21 @@ import { DINGALAN_BARANGAYS, normalizeBarangayName } from "@/lib/utils";
 export async function GET(request: Request) {
   try {
     const user = await getCurrentUser();
-    if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
     const { searchParams } = new URL(request.url);
     const programId = searchParams.get("programId");
-    const barangayFilter = searchParams.get("barangay");
 
-    // Resolve target program ID
+    // If no programId provided, find the active or latest program
     let targetProgramId = programId;
     if (!targetProgramId) {
-      const activeProg = await prisma.program.findFirst({
-        where: { status: "ACTIVE" },
+      const latestProg = await prisma.program.findFirst({
         orderBy: { createdAt: "desc" },
       });
-      if (activeProg) {
-        targetProgramId = activeProg.id;
-      } else {
-        const latestProg = await prisma.program.findFirst({
-          orderBy: { createdAt: "desc" },
-        });
-        if (!latestProg) {
-          return NextResponse.json({ summary: null, barangays: [], beneficiaries: [] });
-        }
-        targetProgramId = latestProg.id;
+      if (!latestProg) {
+        return NextResponse.json({ summary: null, barangays: [], beneficiaries: [] });
       }
+      targetProgramId = latestProg.id;
     }
 
     const program = await prisma.program.findUnique({
@@ -39,6 +28,7 @@ export async function GET(request: Request) {
       include: {
         programBarangays: true,
         programBeneficiaries: {
+          where: { participationStatus: { not: "REPLACED" } },
           include: {
             beneficiary: true,
             stubDistributions: {
@@ -50,13 +40,6 @@ export async function GET(request: Request) {
               orderBy: { scannedAt: "desc" },
             },
             qrCodes: { where: { status: "ACTIVE" } },
-            originalReplacements: {
-              include: {
-                replacementProgramBeneficiary: {
-                  include: { beneficiary: true },
-                },
-              },
-            },
           },
         },
       },
@@ -66,159 +49,138 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: "Program not found" }, { status: 404 });
     }
 
-    let pbs = program.programBeneficiaries;
+    const beneficiaries = program.programBeneficiaries;
+    const totalBeneficiaries = beneficiaries.length;
 
-    // Filter by coordinator's assigned barangay if restricted
-    if (user.role === "TUPAD_COORDINATOR" && user.assignedBarangay) {
-      const userBrgyNorm = normalizeBarangayName(user.assignedBarangay).toLowerCase();
-      pbs = pbs.filter(
-        (pb) => normalizeBarangayName(pb.beneficiary.barangay).toLowerCase() === userBrgyNorm
-      );
-    } else if (barangayFilter && barangayFilter !== "ALL") {
-      const targetBrgyNorm = normalizeBarangayName(barangayFilter).toLowerCase();
-      pbs = pbs.filter(
-        (pb) => normalizeBarangayName(pb.beneficiary.barangay).toLowerCase() === targetBrgyNorm
-      );
-    }
-
-    // Initialize canonical 11 barangay stats
-    const brgyMap: Record<
+    // Canonical Barangay aggregation map initialized with all 11 Dingalan barangays
+    const brgyStats: Record<
       string,
       {
         total: number;
         stubsAffirmed: number;
-        flaggedForReplacement: number;
-        orientationPresent: number;
+        flaggedReplacement: number;
+        orientationScanned: number;
         orientationPending: number;
-        onsiteReplacements: number;
       }
     > = {};
 
     for (const b of DINGALAN_BARANGAYS) {
-      brgyMap[b] = {
+      brgyStats[b] = {
         total: 0,
         stubsAffirmed: 0,
-        flaggedForReplacement: 0,
-        orientationPresent: 0,
+        flaggedReplacement: 0,
+        orientationScanned: 0,
         orientationPending: 0,
-        onsiteReplacements: 0,
       };
     }
 
-    const beneficiaryRoster = pbs.map((pb) => {
-      const normalizedBrgy = normalizeBarangayName(pb.beneficiary.barangay);
-
-      if (!brgyMap[normalizedBrgy]) {
-        brgyMap[normalizedBrgy] = {
-          total: 0,
-          stubsAffirmed: 0,
-          flaggedForReplacement: 0,
-          orientationPresent: 0,
-          orientationPending: 0,
-          onsiteReplacements: 0,
-        };
-      }
-
+    const beneficiaryRoster = beneficiaries.map((pb) => {
       const flaggedDist = pb.stubDistributions?.find((d: any) => d.status === "FLAGGED_REPLACEMENT");
       const distributedDist = pb.stubDistributions?.find((d: any) => d.status === "DISTRIBUTED");
+      const orientationRecord = pb.orientationAttendance?.[0];
 
       const isFlagged =
         pb.participationStatus === "FLAGGED_FOR_REPLACEMENT" ||
         Boolean(flaggedDist);
 
-      const isAffirmedStub = !isFlagged && (Boolean(distributedDist) || !pb.originalBeneficiary);
+      const isStubAffirmed = !isFlagged && Boolean(distributedDist);
+      const isOrientationScanned = Boolean(orientationRecord && orientationRecord.status === "PRESENT");
 
-      const orientationRecord = pb.orientationAttendance?.[0];
-      const isOrientationPresent = orientationRecord?.status === "PRESENT";
-      const isReplaced = pb.participationStatus === "REPLACED";
-
-      // Overall lifecycle status for orientation
-      let lifecycleStatus = "PENDING_STUB";
-      if (isReplaced) {
-        lifecycleStatus = "REPLACED";
+      // Categorical orientation status:
+      // 1. SCANNED_PRESENT: Already scanned and verified present for orientation
+      // 2. NOT_SCANNED_PENDING: Stub was affirmed/distributed, but NOT YET scanned for orientation
+      // 3. FLAGGED_REPLACEMENT: Flagged for replacement during stub distribution
+      // 4. PENDING_STUB: Step 1 (stub distribution) not yet completed
+      let status = "PENDING_STUB";
+      if (isOrientationScanned) {
+        status = "SCANNED_PRESENT";
       } else if (isFlagged) {
-        lifecycleStatus = "FLAGGED_REPLACEMENT";
-      } else if (isOrientationPresent) {
-        lifecycleStatus = "ORIENTATION_PRESENT";
-      } else if (isAffirmedStub) {
-        lifecycleStatus = "AFFIRMED_AWAITING_ORIENTATION";
+        status = "FLAGGED_REPLACEMENT";
+      } else if (isStubAffirmed) {
+        status = "NOT_SCANNED_PENDING";
+      } else {
+        status = "PENDING_STUB";
       }
 
-      // Update counters
-      brgyMap[normalizedBrgy].total++;
-      if (isAffirmedStub) brgyMap[normalizedBrgy].stubsAffirmed++;
-      if (isFlagged) brgyMap[normalizedBrgy].flaggedForReplacement++;
-      if (isOrientationPresent) brgyMap[normalizedBrgy].orientationPresent++;
-      else if (!isReplaced) brgyMap[normalizedBrgy].orientationPending++;
-      if (!pb.originalBeneficiary) brgyMap[normalizedBrgy].onsiteReplacements++;
+      const normalizedBrgy = normalizeBarangayName(pb.beneficiary.barangay);
 
-      const latestStubDist = isFlagged ? (flaggedDist || distributedDist) : (distributedDist || flaggedDist);
+      if (!brgyStats[normalizedBrgy]) {
+        brgyStats[normalizedBrgy] = {
+          total: 0,
+          stubsAffirmed: 0,
+          flaggedReplacement: 0,
+          orientationScanned: 0,
+          orientationPending: 0,
+        };
+      }
+
+      brgyStats[normalizedBrgy].total++;
+      if (isFlagged) {
+        brgyStats[normalizedBrgy].flaggedReplacement++;
+      } else if (isStubAffirmed) {
+        brgyStats[normalizedBrgy].stubsAffirmed++;
+        if (isOrientationScanned) {
+          brgyStats[normalizedBrgy].orientationScanned++;
+        } else {
+          brgyStats[normalizedBrgy].orientationPending++;
+        }
+      }
 
       return {
         id: pb.id,
-        beneficiaryId: pb.beneficiary.id,
         designatedNumber: pb.designatedNumber,
         fullName: pb.beneficiary.fullName,
-        lastName: pb.beneficiary.lastName,
-        firstName: pb.beneficiary.firstName,
-        middleName: pb.beneficiary.middleName,
-        sitio: pb.beneficiary.sitio || "Centro",
         barangay: normalizedBrgy,
-        sex: pb.beneficiary.sex || "UNKNOWN",
-        birthday: pb.beneficiary.birthday,
-        age: pb.beneficiary.age,
-        contactNumber: pb.beneficiary.contactNumber || "N/A",
-        isSenior: pb.beneficiary.isSenior,
-        isPwd: pb.beneficiary.isPwd,
         tableNumber: pb.tableNumber || "Table 1",
-        originalBeneficiary: pb.originalBeneficiary,
-        participationStatus: pb.participationStatus,
-        lifecycleStatus,
-        isAffirmedStub,
-        isFlaggedForReplacement: isFlagged,
-        isOrientationPresent,
-        stubDistributedAt: latestStubDist?.distributedAt || null,
-        stubDistributedBy: latestStubDist?.distributedBy?.fullName || null,
-        stubRemarks: latestStubDist?.remarks || (isFlagged ? "Flagged for onsite replacement" : null),
+        contactNumber: pb.beneficiary.contactNumber || "N/A",
+        birthday: pb.beneficiary.birthday,
+        isStubAffirmed,
+        isFlagged,
+        isOrientationScanned,
+        status,
+        stubDistributedAt: distributedDist?.distributedAt || null,
+        stubDistributedBy: distributedDist?.distributedBy?.fullName || null,
         orientationScannedAt: orientationRecord?.scannedAt || null,
         orientationScannedBy: orientationRecord?.scannedBy?.fullName || null,
+        orientationStatus: orientationRecord?.status || (isOrientationScanned ? "PRESENT" : "PENDING"),
+        remarks: flaggedDist?.remarks || (isFlagged ? "Flagged for replacement in Stub Distribution" : null),
         qrToken: pb.qrCodes[0]?.publicToken || null,
       };
     });
 
-    // Natural sort by designated slot number
-    beneficiaryRoster.sort(
-      (a, b) => parseInt(a.designatedNumber, 10) - parseInt(b.designatedNumber, 10)
-    );
+    const totalStubsAffirmed = Object.values(brgyStats).reduce((acc, s) => acc + s.stubsAffirmed, 0);
+    const totalFlaggedReplacement = Object.values(brgyStats).reduce((acc, s) => acc + s.flaggedReplacement, 0);
+    const totalOrientationScanned = Object.values(brgyStats).reduce((acc, s) => acc + s.orientationScanned, 0);
+    const totalOrientationPending = Object.values(brgyStats).reduce((acc, s) => acc + s.orientationPending, 0);
 
-    // Summary calculations
-    const totalBeneficiaries = beneficiaryRoster.length;
-    const totalAffirmedStubs = beneficiaryRoster.filter((b) => b.isAffirmedStub).length;
-    const totalFlagged = beneficiaryRoster.filter((b) => b.isFlaggedForReplacement).length;
-    const totalOrientationPresent = beneficiaryRoster.filter((b) => b.isOrientationPresent).length;
-    const totalOrientationPending = beneficiaryRoster.filter(
-      (b) => !b.isOrientationPresent && b.participationStatus !== "REPLACED"
-    ).length;
-    const totalOnsiteReplacements = beneficiaryRoster.filter((b) => !b.originalBeneficiary).length;
+    const barangaysBreakdown = Object.entries(brgyStats).map(([name, stats]) => {
+      const eligibleForOrientation = stats.stubsAffirmed;
+      const percentage =
+        eligibleForOrientation > 0
+          ? Math.round((stats.orientationScanned / eligibleForOrientation) * 100)
+          : stats.total > 0 && stats.orientationScanned > 0
+          ? Math.round((stats.orientationScanned / stats.total) * 100)
+          : 0;
 
-    const barangaysBreakdown = Object.entries(brgyMap).map(([name, stats]) => {
-      const orientationRate =
-        stats.total > 0 ? Math.round((stats.orientationPresent / stats.total) * 100) : 0;
-      const stubAffirmedRate =
-        stats.total > 0 ? Math.round((stats.stubsAffirmed / stats.total) * 100) : 0;
+      let badgeStatus = "NOT_STARTED";
+      if (percentage === 100 && stats.orientationScanned > 0) badgeStatus = "COMPLETED";
+      else if (percentage >= 50) badgeStatus = "IN_PROGRESS";
+      else if (percentage > 0) badgeStatus = "LAGGING";
 
       return {
         barangayName: name,
         total: stats.total,
         stubsAffirmed: stats.stubsAffirmed,
-        flaggedForReplacement: stats.flaggedForReplacement,
-        orientationPresent: stats.orientationPresent,
+        flaggedReplacement: stats.flaggedReplacement,
+        orientationScanned: stats.orientationScanned,
         orientationPending: stats.orientationPending,
-        onsiteReplacements: stats.onsiteReplacements,
-        stubAffirmedRate,
-        orientationRate,
+        completionPercentage: percentage,
+        status: badgeStatus,
       };
     });
+
+    // Natural sort roster by designated slot number (1, 2, 3...)
+    beneficiaryRoster.sort((a, b) => parseInt(a.designatedNumber, 10) - parseInt(b.designatedNumber, 10));
 
     return NextResponse.json({
       success: true,
@@ -231,19 +193,16 @@ export async function GET(request: Request) {
       },
       summary: {
         totalBeneficiaries,
-        totalAffirmedStubs,
-        totalFlagged,
-        totalOrientationPresent,
+        totalStubsAffirmed,
+        totalFlaggedReplacement,
+        totalOrientationScanned,
         totalOrientationPending,
-        totalOnsiteReplacements,
-        orientationCompletionRate:
-          totalBeneficiaries > 0
-            ? ((totalOrientationPresent / totalBeneficiaries) * 100).toFixed(1)
-            : "0.0",
-        stubAffirmationRate:
-          totalBeneficiaries > 0
-            ? ((totalAffirmedStubs / totalBeneficiaries) * 100).toFixed(1)
-            : "0.0",
+        attendanceRate:
+          totalStubsAffirmed > 0
+            ? ((totalOrientationScanned / totalStubsAffirmed) * 100).toFixed(1)
+            : totalBeneficiaries > 0
+            ? ((totalOrientationScanned / totalBeneficiaries) * 100).toFixed(1)
+            : "0",
       },
       barangays: barangaysBreakdown,
       beneficiaries: beneficiaryRoster,
