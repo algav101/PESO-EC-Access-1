@@ -1,15 +1,28 @@
 [
   {
-    "id": "476bc5d4-f3d6-4979-a438-769c04e4cada",
-    "programId": "13f05f2a-8421-4e79-93eb-c0d3075fcaac",
-    "showGps": 1,
-    "showDate": 1,
-    "showTime": 1,
-    "showBarangay": 1,
-    "showProgramName": 1,
+    "id": "c2f5ea07-b206-4b4c-8994-2cb1978e06a1",
+    "programId": "7e37751c-61a2-4dfa-82f4-2665072dbcff",
+    "showGps": true,
+    "showDate": true,
+    "showTime": true,
+    "showBarangay": true,
+    "showProgramName": true,
     "dateFormat": "MMMM DD, YYYY",
     "gpsFormat": "DECIMAL",
     "overlayPosition": "BOTTOM",
-    "updatedAt": 1788302228918
+    "updatedAt": "2026-09-02T22:43:19.877Z"
+  },
+  {
+    "id": "476bc5d4-f3d6-4979-a438-769c04e4cada",
+    "programId": "13f05f2a-8421-4e79-93eb-c0d3075fcaac",
+    "showGps": true,
+    "showDate": true,
+    "showTime": true,
+    "showBarangay": true,
+    "showProgramName": true,
+    "dateFormat": "MMMM DD, YYYY",
+    "gpsFormat": "DECIMAL",
+    "overlayPosition": "BOTTOM",
+    "updatedAt": "2026-09-01T22:37:08.918Z"
   }
 ]

@@ -1,4 +1,14 @@
 id,programId,dayNumber,workDate,description,status
+547bb31f-4b99-45cb-96fc-00f84364c323,7e37751c-61a2-4dfa-82f4-2665072dbcff,1,2026-08-03,Day 1 Community Work Activities,COMPLETED
+607ecd22-2c33-4cc8-bb09-d8e3d36fa274,7e37751c-61a2-4dfa-82f4-2665072dbcff,2,2026-08-04,Day 2 Community Work Activities,COMPLETED
+eaff5b71-aea3-4c0e-ab3f-9757969cb3fa,7e37751c-61a2-4dfa-82f4-2665072dbcff,3,2026-08-05,Day 3 Community Work Activities,COMPLETED
+931294d5-cc90-496d-b6ae-c0ea32c11c4c,7e37751c-61a2-4dfa-82f4-2665072dbcff,4,2026-08-06,Day 4 Community Work Activities,COMPLETED
+06b207d8-4466-471b-8aac-d4a2b7b051c7,7e37751c-61a2-4dfa-82f4-2665072dbcff,5,2026-08-07,Day 5 Community Work Activities,COMPLETED
+fce9f4f5-397f-429b-a5b9-7c209c7d0f1f,7e37751c-61a2-4dfa-82f4-2665072dbcff,6,2026-08-10,Day 6 Community Work Activities,SCHEDULED
+682b7777-abc4-4595-85b3-226b09f992a1,7e37751c-61a2-4dfa-82f4-2665072dbcff,7,2026-08-11,Day 7 Community Work Activities,SCHEDULED
+45025d21-541a-41b8-9f67-ba77e415eacb,7e37751c-61a2-4dfa-82f4-2665072dbcff,8,2026-08-12,Day 8 Community Work Activities,SCHEDULED
+7120c4b6-4c41-49c3-bf8f-4594f66a2693,7e37751c-61a2-4dfa-82f4-2665072dbcff,9,2026-08-13,Day 9 Community Work Activities,SCHEDULED
+3c5cc24e-a474-455a-a488-cba9bda0104a,7e37751c-61a2-4dfa-82f4-2665072dbcff,10,2026-08-14,Day 10 Community Work Activities,SCHEDULED
 d4decbbc-cdfb-4d6e-ab09-987cb8fd6894,13f05f2a-8421-4e79-93eb-c0d3075fcaac,1,2026-09-09,Day 1 Community Work Activities,SCHEDULED
 f050fd47-3736-4fa6-9371-cff1c9834816,13f05f2a-8421-4e79-93eb-c0d3075fcaac,2,2026-09-10,Day 2 Community Work Activities,SCHEDULED
 a1575174-6518-43c9-adda-f0256db81886,13f05f2a-8421-4e79-93eb-c0d3075fcaac,3,2026-09-11,Day 3 Community Work Activities,SCHEDULED

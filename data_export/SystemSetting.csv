@@ -1,10 +1,10 @@
 key,value,description,updatedAt
-MUNICIPALITY,Dingalan,Municipality Name,1788238607500
-PROVINCE,Aurora,Province Name,1788238607504
-LGU_NAME,Municipality of Dingalan,Official LGU Header,1788238607507
-PESO_NAME,Public Employment Service Office (PESO) Dingalan,PESO Office,1788238607512
-DOLE_OFFICE,DOLE Regional Office III - Aurora Field Office,DOLE Partner Office,1788238607515
-DEFAULT_WORK_DAYS,10,Standard TUPAD Work Days,1788238607519
-DEFAULT_DAILY_HOURS,8,Standard Daily Work Hours,1788238607523
-DATE_FORMAT,"MMMM DD, YYYY",Standard Date Display Format,1788238607527
-BARANGAYS,"[""Aplaya"",""Butas na Bato"",""Caragsacan"",""Davildavilan"",""Dikapanikian"",""Ibona"",""Matawe"",""Paltic"",""Poblacion"",""Tanawan"",""Umiray""]",Dingalan Barangays List,1788238607531
+MUNICIPALITY,Dingalan,Municipality Name,2026-09-02T22:43:12.363Z
+PROVINCE,Aurora,Province Name,2026-09-02T22:43:12.976Z
+LGU_NAME,Municipality of Dingalan,Official LGU Header,2026-09-02T22:43:13.558Z
+PESO_NAME,Public Employment Service Office (PESO) Dingalan,PESO Office,2026-09-02T22:43:14.079Z
+DOLE_OFFICE,DOLE Regional Office III - Aurora Field Office,DOLE Partner Office,2026-09-02T22:43:14.650Z
+DEFAULT_WORK_DAYS,10,Standard TUPAD Work Days,2026-09-02T22:43:15.832Z
+DEFAULT_DAILY_HOURS,8,Standard Daily Work Hours,2026-09-02T22:43:16.344Z
+DATE_FORMAT,"MMMM DD, YYYY",Standard Date Display Format,2026-09-02T22:43:17.060Z
+BARANGAYS,"[""Aplaya"",""Butas na Bato"",""Caragsacan"",""Davildavilan"",""Dikapanikian"",""Ibona"",""Matawe"",""Paltic"",""Poblacion"",""Tanawan"",""Umiray""]",Dingalan Barangays List,2026-09-02T22:43:17.821Z

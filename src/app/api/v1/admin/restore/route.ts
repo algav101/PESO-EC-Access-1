@@ -245,9 +245,10 @@ export async function POST(request: Request) {
         id: wp.id,
         programId: wp.programId || targetProgramId,
         barangay: wp.barangay,
-        dayRange: wp.dayRange || "1-10",
-        status: wp.status || "ACTIVE",
-        uploadedById: user.id,
+        projectLocation: wp.projectLocation || `Barangay ${wp.barangay}`,
+        beneficiaryCount: Number(wp.beneficiaryCount) || 0,
+        natureOfWork: wp.natureOfWork || null,
+        workingHours: wp.workingHours || "Not Exceed Eight (8) Hours a day (8:00 AM–12:00 NN; 1:00 PM–5:00 PM)",
       }));
       await prisma.tupadWorkProgram.createMany({
         data: cleanWps,

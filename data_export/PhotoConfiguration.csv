@@ -1,2 +1,3 @@
 id,programId,showGps,showDate,showTime,showBarangay,showProgramName,dateFormat,gpsFormat,overlayPosition,updatedAt
-476bc5d4-f3d6-4979-a438-769c04e4cada,13f05f2a-8421-4e79-93eb-c0d3075fcaac,1,1,1,1,1,"MMMM DD, YYYY",DECIMAL,BOTTOM,1788302228918
+c2f5ea07-b206-4b4c-8994-2cb1978e06a1,7e37751c-61a2-4dfa-82f4-2665072dbcff,true,true,true,true,true,"MMMM DD, YYYY",DECIMAL,BOTTOM,2026-09-02T22:43:19.877Z
+476bc5d4-f3d6-4979-a438-769c04e4cada,13f05f2a-8421-4e79-93eb-c0d3075fcaac,true,true,true,true,true,"MMMM DD, YYYY",DECIMAL,BOTTOM,2026-09-01T22:37:08.918Z
