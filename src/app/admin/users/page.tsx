@@ -344,6 +344,11 @@ export default function UserManagementPage() {
                         <ShieldAlert className="w-3 h-3" />
                         <span>PESO Admin</span>
                       </span>
+                    ) : u.role === "PESO_STAFF" ? (
+                      <span className="inline-flex items-center space-x-1 px-2.5 py-0.5 bg-emerald-50 text-emerald-800 border border-emerald-200 rounded-full font-bold text-[11px]">
+                        <ShieldCheck className="w-3 h-3 text-emerald-600" />
+                        <span>PESO Operations Staff</span>
+                      </span>
                     ) : (
                       <span className="text-slate-700 font-medium">
                         {(u.role || "").replace(/_/g, " ")}
@@ -598,6 +603,7 @@ export default function UserManagementPage() {
                 className="w-full px-3 py-2 text-xs border rounded-lg bg-slate-50 font-bold"
               >
                 <option value="TUPAD_COORDINATOR">TUPAD Field Coordinator (Barangay-Scoped)</option>
+                <option value="PESO_STAFF">PESO Operations Staff (Operational Access - No Bulk Import)</option>
                 <option value="PESO_ADMIN">PESO Admin (Full Operations Access)</option>
                 <option value="DOMAIN_MASTER">👑 Domain Master (Super Admin Access)</option>
                 <option value="DOLE_COORDINATOR">DOLE Coordinator (Auditing & Reports)</option>
@@ -686,6 +692,7 @@ export default function UserManagementPage() {
                   className="w-full px-3 py-2 text-xs border rounded-lg bg-slate-50 font-bold"
                 >
                   <option value="TUPAD_COORDINATOR">TUPAD Coordinator</option>
+                  <option value="PESO_STAFF">PESO Operations Staff</option>
                   <option value="PESO_ADMIN">PESO Admin</option>
                   <option value="DOMAIN_MASTER">👑 Domain Master</option>
                   <option value="DOLE_COORDINATOR">DOLE Coordinator</option>

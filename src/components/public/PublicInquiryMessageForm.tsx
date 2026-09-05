@@ -34,7 +34,6 @@ export function PublicInquiryMessageForm() {
   const [senderBarangay, setSenderBarangay] = useState("Paltic");
 
   // CAPTCHA State
-  const [mounted, setMounted] = useState(false);
   const [num1, setNum1] = useState(7);
   const [num2, setNum2] = useState(5);
   const [captchaInput, setCaptchaInput] = useState("");
@@ -48,7 +47,6 @@ export function PublicInquiryMessageForm() {
   };
 
   useEffect(() => {
-    setMounted(true);
     refreshCaptcha();
   }, []);
 
@@ -401,7 +399,7 @@ export function PublicInquiryMessageForm() {
 
                   <div className="flex items-center space-x-2">
                     <div className="px-4 py-2 bg-white rounded-xl border border-amber-300 font-mono font-black text-sm text-slate-800 shadow-inner select-none">
-                      {mounted ? `${num1} + ${num2} = ?` : "7 + 5 = ?"}
+                      {num1} + {num2} = ?
                     </div>
 
                     <input

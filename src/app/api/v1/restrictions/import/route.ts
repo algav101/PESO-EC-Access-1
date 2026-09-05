@@ -36,6 +36,28 @@ function parseDateToISO(val: any): { iso: string; formatted: string; timestamp: 
 
   if (typeof val === "string") {
     const trimmed = val.trim();
+    // Check DD/MM/YYYY or DD-MM-YYYY format (e.g. 22/07/2025 or 13/09/2025)
+    const dmyMatch = trimmed.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
+    if (dmyMatch) {
+      const part1 = parseInt(dmyMatch[1], 10);
+      const part2 = parseInt(dmyMatch[2], 10);
+      const year = parseInt(dmyMatch[3], 10);
+      let day = part1;
+      let month = part2;
+      if (part1 <= 12 && part2 > 12) {
+        month = part1;
+        day = part2;
+      }
+      const jsDate = new Date(Date.UTC(year, month - 1, day));
+      if (!isNaN(jsDate.getTime())) {
+        return {
+          iso: jsDate.toISOString().split("T")[0],
+          formatted: jsDate.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" }),
+          timestamp: jsDate.getTime(),
+        };
+      }
+    }
+
     const parsed = new Date(trimmed);
     if (!isNaN(parsed.getTime())) {
       return {
@@ -214,8 +236,14 @@ export async function POST(request: Request) {
       const parsedName = parseNameParts(rawName);
       uniqueFullNameSet.add(parsedName.fullName);
 
-      // Column B: ADL NO. / Position
+      // Column B: Batch / Appointive Position / ADL No.
       const adlNo = (
+        row["Batch / Appointive Position"] ||
+        row["BATCH / APPOINTIVE POSITION"] ||
+        row["Batch / Position"] ||
+        row["Batch/Appointive Position"] ||
+        row["BATCH"] ||
+        row["Batch"] ||
         row["ADL NO."] ||
         row["ADL NO"] ||
         row["ADL No."] ||

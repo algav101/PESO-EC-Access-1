@@ -376,7 +376,7 @@ export function PublicStatusInquiryCard() {
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
                   <div>
                     <span className="text-slate-400 text-[10px] uppercase font-bold block">
-                      ADL No. / Appointive Position:
+                      Batch / Appointive Position:
                     </span>
                     <p className="font-mono font-bold text-gov-goldLight text-sm">
                       {result.lastAvailment.adlNo}

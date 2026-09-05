@@ -1,12 +1,12 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
-import { getCurrentUser } from "@/lib/auth";
+import { getCurrentUser, isAdminUser, hasPermission } from "@/lib/auth";
 
 export async function GET(request: Request) {
   try {
     const user = await getCurrentUser();
-    if (!user || (!isAdminUser(user) && !hasPermission(user.role, "audit.read"))) {
-      return NextResponse.json({ error: "Forbidden: Domain Master or PESO Admin access required" }, { status: 403 });
+    if (!user || (!isAdminUser(user) && !hasPermission(user.role, "inquiry.read") && !hasPermission(user.role, "audit.read"))) {
+      return NextResponse.json({ error: "Forbidden: Authorized access required" }, { status: 403 });
     }
 
     const { searchParams } = new URL(request.url);

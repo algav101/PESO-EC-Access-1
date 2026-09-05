@@ -81,7 +81,14 @@ export default function RestrictionsPage() {
             row["NAME"] ||
             `Row ${idx + 1}`;
 
-          const adl = row["ADL NO."] || row["ADL NO"] || row["BARANGAY APPOINTIVE POSITION"] || "HISTORICAL_BATCH";
+          const adl =
+            row["Batch / Appointive Position"] ||
+            row["BATCH / APPOINTIVE POSITION"] ||
+            row["Batch / Position"] ||
+            row["ADL NO."] ||
+            row["ADL NO"] ||
+            row["BARANGAY APPOINTIVE POSITION"] ||
+            "HISTORICAL_BATCH";
           const workDate = row["WORK DATE"] || row["WORK DURATION DATE"] || "N/A";
           const payout = row["PAYOUT DATE"] || row["PAYOUT DATE (YYYY-MM-DD)"] || "N/A";
           const brgy = row["Barangay"] || row["BARANGAY"] || "BUHANGIN";
@@ -196,7 +203,7 @@ export default function RestrictionsPage() {
           <Search className="w-4 h-4 text-slate-400" />
           <input
             type="text"
-            placeholder="Search by Beneficiary Name, ADL No., or Barangay..."
+            placeholder="Search by Beneficiary Name, Batch / Appointive Position, or Barangay..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="w-full text-xs font-bold focus:outline-none bg-transparent"
@@ -242,7 +249,7 @@ export default function RestrictionsPage() {
               <thead className="bg-slate-100 text-slate-700 font-bold uppercase text-[10px] border-b">
                 <tr>
                   <th className="px-4 py-3">Beneficiary Name</th>
-                  <th className="px-4 py-3">ADL No. / Appointive Position</th>
+                  <th className="px-4 py-3">Batch / Appointive Position</th>
                   <th className="px-4 py-3">Work Duration Date</th>
                   <th className="px-4 py-3">Payout Date</th>
                   <th className="px-4 py-3">Location</th>
@@ -310,7 +317,7 @@ export default function RestrictionsPage() {
                   <div className="space-y-0.5">
                     <span className="font-bold text-gov-blue block">Official Reference Template</span>
                     <span className="text-[11px] text-slate-500 font-mono">
-                      [A] NAME OF BENEFICIARIES • [B] ADL NO. • [C] ORIENTATION DATE • [D] WORK DATE • [E] PAYOUT DATE • [F] Barangay • [G] City/ Municipality
+                      [A] NAME OF BENEFICIARIES • [B] Batch / Appointive Position • [C] ORIENTATION DATE • [D] WORK DATE • [E] PAYOUT DATE • [F] Barangay • [G] City/ Municipality
                     </span>
                   </div>
                   <a
@@ -356,7 +363,7 @@ export default function RestrictionsPage() {
                         <thead className="bg-slate-100 text-slate-700 font-bold border-b sticky top-0">
                           <tr>
                             <th className="p-2">Name</th>
-                            <th className="p-2">ADL No. / Position</th>
+                            <th className="p-2">Batch / Appointive Position</th>
                             <th className="p-2">Work Date</th>
                             <th className="p-2">Payout Date</th>
                             <th className="p-2">Location</th>

@@ -22,6 +22,7 @@ function normalizeRole(rawRole?: string): string {
   const r = (rawRole || "").trim().toUpperCase().replace(/[\s_-]+/g, "_");
   if (r.includes("DOMAIN") || r.includes("MASTER")) return "DOMAIN_MASTER";
   if (r.includes("DOLE")) return "DOLE_COORDINATOR";
+  if (r.includes("STAFF") || r.includes("OPERATIONS") || r.includes("PESO_STAFF")) return "PESO_STAFF";
   if (r.includes("ADMIN") || r.includes("PESO_ADMIN")) return "PESO_ADMIN";
   return "TUPAD_COORDINATOR";
 }

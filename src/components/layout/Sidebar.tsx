@@ -76,15 +76,19 @@ export function Sidebar({ isMobile = false, onClose }: SidebarProps) {
         { label: "Offline Sync Center", href: "/sync", icon: RefreshCw, permission: "sync.read" },
       ],
     },
-    ...(can("user.read") || can("settings.read") || isAdminUser(user)
+    ...(can("user.read") || can("settings.read") || can("application.read") || can("inquiry.read") || isAdminUser(user)
       ? [
           {
             title: "System Administration",
             items: [
-              ...(isAdminUser(user)
+              ...(isAdminUser(user) || can("application.read")
                 ? [
-                    { label: "Applicant Status Roster", href: "/admin/applications", icon: FileSpreadsheet, permission: "settings.read" },
-                    { label: "Public Inquiries Inbox", href: "/admin/inquiries", icon: MessageSquare, permission: "settings.read" },
+                    { label: "Applicant Status Roster", href: "/admin/applications", icon: FileSpreadsheet, permission: "application.read" },
+                  ]
+                : []),
+              ...(isAdminUser(user) || can("inquiry.read")
+                ? [
+                    { label: "Public Inquiries Inbox", href: "/admin/inquiries", icon: MessageSquare, permission: "inquiry.read" },
                   ]
                 : []),
               ...(can("user.read")

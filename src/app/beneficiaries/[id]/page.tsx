@@ -27,8 +27,8 @@ import { getCurrentUser, isAdminUser } from "@/lib/auth";
 export const dynamic = "force-dynamic";
 
 export default async function BeneficiaryProfilePage({ params }: { params: { id: string } }) {
-  const currentUser = await getCurrentUser();
   const isAdmin = isAdminUser(currentUser);
+  const canEdit = isAdmin || hasPermission(currentUser?.role || "", "beneficiary.update");
 
   const rawBeneficiary = await prisma.beneficiary.findUnique({
     where: { id: params.id },
@@ -86,18 +86,20 @@ export default async function BeneficiaryProfilePage({ params }: { params: { id:
           <span>Back to Beneficiaries Masterlist</span>
         </a>
 
-        {isAdmin && (
+        {canEdit && (
           <div className="flex items-center space-x-2">
             <EditBeneficiaryButton
               beneficiary={beneficiary}
               programBeneficiary={latestProgramEnrollment}
             />
-            <DeleteBeneficiaryModal
-              beneficiaryId={beneficiary.id}
-              fullName={beneficiary.fullName}
-              beneficiaryNumber={beneficiary.beneficiaryNumber}
-              barangay={beneficiary.barangay || undefined}
-            />
+            {isAdmin && (
+              <DeleteBeneficiaryModal
+                beneficiaryId={beneficiary.id}
+                fullName={beneficiary.fullName}
+                beneficiaryNumber={beneficiary.beneficiaryNumber}
+                barangay={beneficiary.barangay || undefined}
+              />
+            )}
           </div>
         )}
       </div>

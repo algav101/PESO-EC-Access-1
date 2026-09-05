@@ -455,11 +455,11 @@ export default function EligibilityCheckerPage() {
               <p className="font-extrabold text-slate-800">{result.payoutDate || "N/A"}</p>
             </div>
 
-            {/* ADL No. or Barangay Appointive Position */}
+            {/* Batch / Appointive Position */}
             <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-0.5">
               <span className="text-[10px] font-bold text-slate-400 uppercase flex items-center space-x-1">
                 <FileSpreadsheet className="w-3 h-3 text-slate-500" />
-                <span>ADL No. / Position</span>
+                <span>Batch / Appointive Position</span>
               </span>
               <p className="font-extrabold text-gov-blue truncate" title={result.adlNo}>
                 {result.adlNo || "Clean"}
@@ -546,7 +546,7 @@ export default function EligibilityCheckerPage() {
                 <span>Required 7-Column Excel Layout:</span>
               </p>
               <p className="text-[11px] text-blue-900 font-mono leading-tight">
-                [A] NAME OF BENEFICIARIES • [B] ADL NO. • [C] ORIENTATION DATE • [D] WORK DATE • [E] PAYOUT DATE • [F] Barangay • [G] City/ Municipality
+                [A] NAME OF BENEFICIARIES • [B] Batch / Appointive Position • [C] ORIENTATION DATE • [D] WORK DATE • [E] PAYOUT DATE • [F] Barangay • [G] City/ Municipality
               </p>
             </div>
 
