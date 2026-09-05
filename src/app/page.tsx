@@ -22,6 +22,8 @@ import {
   Award,
   MessageSquare,
   FileCheck,
+  Globe,
+  CheckCircle2,
 } from "lucide-react";
 
 export const dynamic = "force-dynamic";
@@ -51,73 +53,100 @@ export default async function LandingPage() {
   }
 
   return (
-    <div className="bg-slate-50 min-h-screen flex flex-col selection:bg-gov-blue selection:text-white">
-      {/* Secondary Sticky Navigation Bar */}
-      <div className="bg-white/95 backdrop-blur-md border-b border-slate-200 sticky top-16 z-30 shadow-xs">
+    <div className="bg-slate-50 min-h-screen flex flex-col selection:bg-gov-blue selection:text-white scroll-smooth">
+      {/* 1. Secondary Sticky Sub-Navbar */}
+      <nav aria-label="Quick Page Navigation" className="bg-white/95 backdrop-blur-md border-b border-slate-200 sticky top-16 z-30 shadow-xs">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-between h-12 text-xs font-bold text-slate-700">
-          <div className="flex items-center space-x-6 overflow-x-auto py-2 no-scrollbar">
-            <a href="#hero" className="hover:text-gov-blue text-gov-blue border-b-2 border-gov-blue pb-0.5 whitespace-nowrap">
+          <div className="flex items-center space-x-5 sm:space-x-6 overflow-x-auto py-2 no-scrollbar">
+            <a
+              href="#hero"
+              className="hover:text-gov-blue text-gov-blue border-b-2 border-gov-blue pb-0.5 whitespace-nowrap transition-colors"
+            >
               Home
             </a>
-            <a href="/apply" className="text-emerald-700 hover:text-emerald-800 bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-200 transition whitespace-nowrap flex items-center space-x-1 font-extrabold">
+            <a
+              href="/apply"
+              className="text-emerald-700 hover:text-emerald-800 bg-emerald-50 hover:bg-emerald-100 px-3 py-1 rounded-full border border-emerald-200 transition-all whitespace-nowrap flex items-center space-x-1.5 font-extrabold shadow-xs"
+            >
               <Sparkles className="w-3.5 h-3.5 text-emerald-600" />
               <span>Online TUPAD Application</span>
             </a>
-            <a href="#inquiry" className="hover:text-gov-blue transition whitespace-nowrap flex items-center space-x-1">
+            <a
+              href="#inquiry"
+              className="hover:text-gov-blue text-slate-700 transition-colors whitespace-nowrap flex items-center space-x-1"
+            >
               <FileCheck className="w-3.5 h-3.5 text-gov-gold" />
               <span>Application Status Inquiry</span>
             </a>
-            <a href="#inquiry-form" className="hover:text-gov-blue transition whitespace-nowrap flex items-center space-x-1">
+            <a
+              href="#inquiry-form"
+              className="hover:text-gov-blue text-slate-700 transition-colors whitespace-nowrap flex items-center space-x-1"
+            >
               <MessageSquare className="w-3.5 h-3.5 text-gov-blue" />
               <span>Message & Feedback</span>
             </a>
-            <a href="#programs" className="hover:text-gov-blue transition whitespace-nowrap">
+            <a
+              href="#programs"
+              className="hover:text-gov-blue text-slate-700 transition-colors whitespace-nowrap"
+            >
               Active Programs
             </a>
-            <a href="#gallery" className="hover:text-gov-blue transition whitespace-nowrap">
+            <a
+              href="#gallery"
+              className="hover:text-gov-blue text-slate-700 transition-colors whitespace-nowrap"
+            >
               TUPAD in Action
             </a>
-            <a href="#org-structure" className="hover:text-gov-blue transition whitespace-nowrap">
+            <a
+              href="#org-structure"
+              className="hover:text-gov-blue text-slate-700 transition-colors whitespace-nowrap"
+            >
               PESO Org Chart
             </a>
-            <a href="/restrictions/checker" className="text-gov-gold hover:text-amber-700 transition flex items-center space-x-1 whitespace-nowrap">
-              <Search className="w-3.5 h-3.5" />
+            <a
+              href="/restrictions/checker"
+              className="text-amber-700 hover:text-amber-800 bg-amber-50 hover:bg-amber-100 px-2.5 py-1 rounded-full border border-amber-200/80 transition-colors flex items-center space-x-1 whitespace-nowrap"
+            >
+              <Search className="w-3.5 h-3.5 text-amber-600" />
               <span>Check Eligibility</span>
             </a>
           </div>
         </div>
-      </div>
+      </nav>
 
-      {/* Hero Section */}
-      <section id="hero" className="relative w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 md:py-16">
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 md:gap-12 items-center">
-          {/* Left: Featured Video Player */}
+      {/* 2. Hero Section */}
+      <section id="hero" className="relative w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-12 md:py-16">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 items-center">
+          {/* Left Column: Featured Video Showcase */}
           <div className="lg:col-span-6 order-2 lg:order-1">
-            <div className="relative rounded-2xl overflow-hidden shadow-2xl border border-slate-300/80 bg-slate-900 group">
+            <div className="relative rounded-3xl overflow-hidden shadow-2xl border border-slate-300/80 bg-slate-900 group">
               <video
                 src="https://www.image2url.com/r2/default/videos/1788303848432-e7f6f01f-ef1c-4460-a6e4-99f8f2386145.mp4"
                 autoPlay
                 muted
                 loop
                 playsInline
-                className="w-full h-auto max-h-[460px] object-cover block group-hover:scale-[1.01] transition duration-500"
+                className="w-full h-auto max-h-[480px] object-cover block group-hover:scale-[1.01] transition duration-500"
               />
-              <div className="absolute inset-0 bg-gradient-to-t from-slate-950/80 via-transparent to-transparent pointer-events-none" />
-              <div className="absolute bottom-4 left-4 right-4 text-white space-y-1">
-                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/90 text-white backdrop-blur-sm">
+              <div className="absolute inset-0 bg-gradient-to-t from-slate-950/85 via-transparent to-transparent pointer-events-none" />
+              <div className="absolute bottom-5 left-5 right-5 text-white space-y-1.5">
+                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/90 text-white backdrop-blur-sm shadow-xs">
                   ● Community Employment in Action
                 </span>
                 <p className="text-xs sm:text-sm font-bold text-slate-100 drop-shadow">
                   LGU Dingalan • DOLE Emergency Employment Program
                 </p>
+                <p className="text-[11px] text-slate-300 hidden sm:block">
+                  Direct government assistance providing temporary wage employment to displaced and marginalized workers.
+                </p>
               </div>
             </div>
           </div>
 
-          {/* Right: Hero Text & Call to Action */}
+          {/* Right Column: Hero Content & Call to Action */}
           <div className="lg:col-span-6 order-1 lg:order-2 space-y-5">
             <div className="flex flex-wrap items-center gap-2">
-              <div className="inline-flex items-center space-x-2 px-3.5 py-1 rounded-full bg-blue-50 text-gov-blue text-xs font-extrabold border border-blue-200/80">
+              <div className="inline-flex items-center space-x-2 px-3.5 py-1 rounded-full bg-blue-50 text-gov-blue text-xs font-extrabold border border-blue-200/80 shadow-xs">
                 <ShieldCheck className="w-4 h-4 text-gov-gold" />
                 <span>Official PESO Dingalan Initiative</span>
               </div>
@@ -127,40 +156,40 @@ export default async function LandingPage() {
               Pagpapalakas ng Serbisyo ng PESO upang mas maipa-DAMA sa bawat Pamilyang DINGALEÑO
             </h1>
 
-            <div className="space-y-3 text-sm sm:text-base text-slate-600 leading-relaxed font-normal">
+            <div className="space-y-3.5 text-sm sm:text-base text-slate-600 leading-relaxed font-normal">
               <p className="font-extrabold text-gov-blue flex items-center space-x-1.5 text-base sm:text-lg">
                 <span>🚀 DIGITAL NA ANG SERBISYO NG PESO DINGALAN! 💻📱</span>
               </p>
 
               <p>
-                Ipinakikilala ang <strong className="text-slate-900">PESO EC Access</strong> — ang bagong digital portal na magpapadali sa mga programa at serbisyo ng Public Employment Service Office para sa bawat mamamayan ng Dingalan!
+                Ipinakikilala ang <strong className="text-slate-900 font-bold">PESO EC Access</strong> — ang bagong digital portal na magpapadali sa mga programa at serbisyo ng Public Employment Service Office para sa bawat mamamayan ng Dingalan!
               </p>
 
-              <div className="bg-amber-50/90 border border-amber-200/80 rounded-xl p-3 text-xs sm:text-sm text-slate-800">
+              <div className="bg-amber-50/90 border border-amber-200/80 rounded-2xl p-3.5 text-xs sm:text-sm text-slate-800 shadow-xs">
                 <span className="font-black text-amber-900 block mb-0.5">🌟 KAHANGA-HANGA AT PROUDLY LOCAL:</span>
                 <span>💡 Higit sa lahat, ang sistemang ito ay <strong className="text-amber-950 font-black">LIBRENG</strong> nabuo at pinondohan ng sariling husay at talento ng <strong className="text-slate-900">PESO Dingalan team</strong> upang mas mapalapit ang teknolohiya at serbisyo sa tao!</span>
               </div>
 
               <div className="space-y-1.5 text-xs sm:text-sm pt-1">
                 <p className="font-bold text-slate-900">🛠️ Mga Tampok na Serbisyo:</p>
-                <ul className="grid grid-cols-1 gap-1 pl-1 text-slate-600">
-                  <li className="flex items-start space-x-1.5">
+                <ul className="grid grid-cols-1 gap-1.5 pl-1 text-slate-600">
+                  <li className="flex items-start space-x-2">
                     <span className="text-emerald-600 font-bold">✔️</span>
                     <span><strong className="text-slate-800">Mag-apply Online</strong> para sa programang TUPAD kahit nasa bahay</span>
                   </li>
-                  <li className="flex items-start space-x-1.5">
+                  <li className="flex items-start space-x-2">
                     <span className="text-emerald-600 font-bold">✔️</span>
                     <span><strong className="text-slate-800">I-check ang Status</strong> ng aplikasyon anumang oras</span>
                   </li>
-                  <li className="flex items-start space-x-1.5">
+                  <li className="flex items-start space-x-2">
                     <span className="text-emerald-600 font-bold">✔️</span>
                     <span><strong className="text-slate-800">365-Day Checker</strong> para sa patas at transparent na proseso</span>
                   </li>
-                  <li className="flex items-start space-x-1.5">
+                  <li className="flex items-start space-x-2">
                     <span className="text-emerald-600 font-bold">✔️</span>
                     <span><strong className="text-slate-800">Mabilis na QR Verification</strong> sa stubs, orientation, at attendance</span>
                   </li>
-                  <li className="flex items-start space-x-1.5">
+                  <li className="flex items-start space-x-2">
                     <span className="text-emerald-600 font-bold">✔️</span>
                     <span><strong className="text-slate-800">Direct Feedback Desk</strong> para sa agarang sagot sa mga tanong</span>
                   </li>
@@ -179,9 +208,9 @@ export default async function LandingPage() {
             <div className="pt-2 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
               <a
                 href="/apply"
-                className="group p-3 bg-gradient-to-br from-emerald-600 to-emerald-700 text-white rounded-2xl border border-emerald-500 shadow-md hover:shadow-lg transition flex items-center justify-between"
+                className="group p-3.5 bg-gradient-to-br from-emerald-600 to-emerald-700 text-white rounded-2xl border border-emerald-500 shadow-md hover:shadow-lg transition-all flex items-center justify-between"
               >
-                <div className="flex items-center space-x-2">
+                <div className="flex items-center space-x-2.5">
                   <div className="w-8 h-8 rounded-xl bg-white/20 text-white flex items-center justify-center font-bold flex-shrink-0">
                     <Sparkles className="w-4 h-4 text-gov-goldLight group-hover:scale-110 transition" />
                   </div>
@@ -195,9 +224,9 @@ export default async function LandingPage() {
 
               <a
                 href="#inquiry"
-                className="group p-3 bg-white hover:bg-blue-50/50 rounded-2xl border border-slate-200 shadow-sm hover:shadow-md transition flex items-center justify-between"
+                className="group p-3.5 bg-white hover:bg-blue-50/50 rounded-2xl border border-slate-200 shadow-xs hover:shadow-md transition-all flex items-center justify-between"
               >
-                <div className="flex items-center space-x-2">
+                <div className="flex items-center space-x-2.5">
                   <div className="w-8 h-8 rounded-xl bg-gov-blue/10 text-gov-blue flex items-center justify-center font-bold flex-shrink-0">
                     <FileCheck className="w-4 h-4 text-gov-blue group-hover:scale-110 transition" />
                   </div>
@@ -211,9 +240,9 @@ export default async function LandingPage() {
 
               <a
                 href="#inquiry-form"
-                className="group p-3 bg-white hover:bg-blue-50/50 rounded-2xl border border-slate-200 shadow-sm hover:shadow-md transition flex items-center justify-between"
+                className="group p-3.5 bg-white hover:bg-blue-50/50 rounded-2xl border border-slate-200 shadow-xs hover:shadow-md transition-all flex items-center justify-between"
               >
-                <div className="flex items-center space-x-2">
+                <div className="flex items-center space-x-2.5">
                   <div className="w-8 h-8 rounded-xl bg-blue-500/10 text-gov-blue flex items-center justify-center font-bold flex-shrink-0">
                     <MessageSquare className="w-4 h-4 text-gov-blue group-hover:scale-110 transition" />
                   </div>
@@ -227,9 +256,9 @@ export default async function LandingPage() {
 
               <a
                 href="/restrictions/checker"
-                className="group p-3 bg-white hover:bg-amber-50/50 rounded-2xl border border-slate-200 shadow-sm hover:shadow-md transition flex items-center justify-between"
+                className="group p-3.5 bg-white hover:bg-amber-50/50 rounded-2xl border border-slate-200 shadow-xs hover:shadow-md transition-all flex items-center justify-between"
               >
-                <div className="flex items-center space-x-2">
+                <div className="flex items-center space-x-2.5">
                   <div className="w-8 h-8 rounded-xl bg-amber-500/10 text-amber-700 flex items-center justify-center font-bold flex-shrink-0">
                     <Search className="w-4 h-4 text-amber-600 group-hover:scale-110 transition" />
                   </div>
@@ -245,10 +274,10 @@ export default async function LandingPage() {
         </div>
       </section>
 
-      {/* Program Statistics Section */}
-      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+      {/* 3. Program Statistics Strip */}
+      <section aria-label="Key Municipal Impact Metrics" className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          <div className="gov-card p-5 bg-white flex items-center space-x-4 shadow-sm border-l-4 border-l-gov-blue">
+          <div className="gov-card p-5 bg-white flex items-center space-x-4 shadow-sm border-l-4 border-l-gov-blue rounded-2xl">
             <div className="p-3 bg-blue-50 text-gov-blue rounded-xl">
               <Users className="w-6 h-6" />
             </div>
@@ -258,7 +287,7 @@ export default async function LandingPage() {
             </div>
           </div>
 
-          <div className="gov-card p-5 bg-white flex items-center space-x-4 shadow-sm border-l-4 border-l-gov-gold">
+          <div className="gov-card p-5 bg-white flex items-center space-x-4 shadow-sm border-l-4 border-l-gov-gold rounded-2xl">
             <div className="p-3 bg-amber-50 text-amber-700 rounded-xl">
               <Calendar className="w-6 h-6" />
             </div>
@@ -268,7 +297,7 @@ export default async function LandingPage() {
             </div>
           </div>
 
-          <div className="gov-card p-5 bg-white flex items-center space-x-4 shadow-sm border-l-4 border-l-emerald-600">
+          <div className="gov-card p-5 bg-white flex items-center space-x-4 shadow-sm border-l-4 border-l-emerald-600 rounded-2xl">
             <div className="p-3 bg-emerald-50 text-emerald-700 rounded-xl">
               <CheckCircle className="w-6 h-6" />
             </div>
@@ -278,7 +307,7 @@ export default async function LandingPage() {
             </div>
           </div>
 
-          <div className="gov-card p-5 bg-white flex items-center space-x-4 shadow-sm border-l-4 border-l-indigo-600">
+          <div className="gov-card p-5 bg-white flex items-center space-x-4 shadow-sm border-l-4 border-l-indigo-600 rounded-2xl">
             <div className="p-3 bg-indigo-50 text-indigo-700 rounded-xl">
               <MapPin className="w-6 h-6" />
             </div>
@@ -290,29 +319,49 @@ export default async function LandingPage() {
         </div>
       </section>
 
-      {/* FEATURE 1: Public TUPAD Application Status Inquiry Section */}
-      <section id="inquiry" className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
-        <PublicStatusInquiryCard />
+      {/* 4. Interactive Citizen Services Hub: Public Status Inquiry & Messaging Form */}
+      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-10">
+        <div className="text-center space-y-2 max-w-2xl mx-auto">
+          <div className="inline-flex items-center space-x-1.5 px-3 py-0.5 rounded-full bg-blue-50 text-gov-blue text-[11px] font-bold border border-blue-200">
+            <Globe className="w-3.5 h-3.5 text-gov-blue" />
+            <span>Citizen Online Services</span>
+          </div>
+          <h2 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
+            Mabilis at Transparent na Serbisyong Publiko
+          </h2>
+          <p className="text-xs sm:text-sm text-slate-600">
+            I-check ang estado ng iyong aplikasyon o magpadala ng direktang mensahe at mungkahi sa Tanggapan ng PESO Dingalan.
+          </p>
+        </div>
+
+        {/* Feature 1: Public Status Inquiry Card */}
+        <div id="inquiry" className="scroll-mt-32">
+          <PublicStatusInquiryCard />
+        </div>
+
+        {/* Feature 2: Public Comments, Suggestions & Direct Feedback Form */}
+        <div id="inquiry-form" className="scroll-mt-32">
+          <PublicInquiryMessageForm />
+        </div>
       </section>
 
-      {/* FEATURE 2: Public Comments, Suggestions & Messages Form Section */}
-      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-        <PublicInquiryMessageForm />
-      </section>
-
-      {/* Active Programs Section */}
-      <section id="programs" className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 space-y-6">
+      {/* 5. Active TUPAD Work Programs Hub */}
+      <section id="programs" className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 space-y-6 scroll-mt-24">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-200 pb-4">
           <div>
+            <div className="inline-flex items-center space-x-1.5 px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-800 text-[11px] font-bold border border-emerald-200 mb-1.5">
+              <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+              <span>Deployed Projects</span>
+            </div>
             <h2 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">Active TUPAD Work Programs</h2>
             <p className="text-xs text-slate-500">Current emergency community employment projects deployed across Dingalan</p>
           </div>
           <a
             href="/login"
-            className="text-xs font-bold text-gov-blue hover:text-gov-dark flex items-center space-x-1"
+            className="text-xs font-bold text-gov-blue hover:text-gov-dark flex items-center space-x-1 transition-colors group"
           >
             <span>View All Programs in Hub</span>
-            <ChevronRight className="w-3.5 h-3.5" />
+            <ChevronRight className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition" />
           </a>
         </div>
 
@@ -320,7 +369,7 @@ export default async function LandingPage() {
           {activePrograms.map((prog) => (
             <div
               key={prog.id}
-              className="gov-card p-6 space-y-4 gov-card-hover border-t-4 border-t-gov-blue bg-white flex flex-col justify-between"
+              className="gov-card p-6 space-y-4 gov-card-hover border-t-4 border-t-gov-blue bg-white flex flex-col justify-between rounded-2xl shadow-sm"
             >
               <div className="space-y-3">
                 <div className="flex items-start justify-between gap-2">
@@ -355,10 +404,10 @@ export default async function LandingPage() {
                 <span className="text-slate-500">{prog._count.programBeneficiaries} Beneficiaries Enrolled</span>
                 <a
                   href={`/programs/${prog.id}`}
-                  className="text-gov-blue hover:text-gov-dark font-bold flex items-center space-x-1"
+                  className="text-gov-blue hover:text-gov-dark font-bold flex items-center space-x-1 group"
                 >
                   <span>Program Details</span>
-                  <ArrowRight className="w-3.5 h-3.5" />
+                  <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition" />
                 </a>
               </div>
             </div>
@@ -366,8 +415,8 @@ export default async function LandingPage() {
         </div>
       </section>
 
-      {/* Community Collage & "TUPAD in Action" Section */}
-      <section id="gallery" className="bg-slate-100/80 py-16 px-4 sm:px-6 lg:px-8 border-y border-slate-200">
+      {/* 6. Community Impact Bento Grid & "TUPAD in Action" */}
+      <section id="gallery" className="bg-slate-100/80 py-16 px-4 sm:px-6 lg:px-8 border-y border-slate-200 scroll-mt-20">
         <div className="max-w-7xl mx-auto space-y-10">
           <div className="text-center space-y-2 max-w-2xl mx-auto">
             <div className="inline-flex items-center space-x-1.5 px-3 py-0.5 rounded-full bg-blue-100 text-gov-blue text-[11px] font-bold">
@@ -438,8 +487,8 @@ export default async function LandingPage() {
         </div>
       </section>
 
-      {/* Organizational Structure Section */}
-      <section id="org-structure" className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 space-y-8">
+      {/* 7. PESO Dingalan Organizational Structure */}
+      <section id="org-structure" className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 space-y-8 scroll-mt-20">
         <div className="text-center space-y-2 max-w-2xl mx-auto">
           <div className="inline-flex items-center space-x-1.5 px-3 py-0.5 rounded-full bg-blue-50 text-gov-blue text-[11px] font-bold border border-blue-200">
             <Building2 className="w-3.5 h-3.5 text-gov-blue" />
@@ -464,7 +513,7 @@ export default async function LandingPage() {
         </div>
       </section>
 
-      {/* Official Government Footer */}
+      {/* 8. Official Government Footer */}
       <footer className="gov-header-gradient text-white mt-auto pt-14 pb-8 border-t border-slate-800">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-10">
           <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
