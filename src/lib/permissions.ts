@@ -35,8 +35,8 @@ export const PERMISSIONS = {
     "dashboard.view",
     "program.create", "program.read", "program.update", "program.delete", "program.close",
     "beneficiary.import", "beneficiary.create", "beneficiary.read", "beneficiary.update", "beneficiary.delete", "beneficiary.archive", "beneficiary.profile.edit",
-    "dependent.create", "dependent.read", "dependent.update",
-    "qr.generate", "qr.read", "qr.print", "qr.reprint", "qr.invalidate",
+    "dependent.create", "dependent.read", "dependent.update", "dependent.delete",
+    "qr.generate", "qr.read", "qr.scan", "qr.print", "qr.reprint", "qr.invalidate",
     "stub.configure", "stub.print", "stub.distribution.scan", "stub.distribution.read", "stub.distribution.monitor", "stub.override",
     "orientation.scan", "orientation.read", "orientation.correct",
     "replacement.create", "replacement.read", "replacement.approve",
@@ -47,7 +47,7 @@ export const PERMISSIONS = {
     "report.generate", "report.template.create", "report.template.update", "report.export", "report.read",
     "application.read", "application.update", "application.download", "application.export", "application.import",
     "inquiry.read", "inquiry.update",
-    "user.create", "user.read", "user.update", "user.disable",
+    "user.create", "user.read", "user.update", "user.disable", "user.delete",
     "settings.read", "settings.update",
     "audit.read",
     "sync.read", "sync.resolve"
@@ -107,7 +107,7 @@ export function isAdminUser(user?: { role?: string } | null): boolean {
 }
 
 export function hasPermission(role: string, permission: string): boolean {
-  if (role === "DOMAIN_MASTER") return true; // Domain Master has full wildcard bypass
+  if (role === "DOMAIN_MASTER" || role === "PESO_ADMIN") return true; // Full wildcard bypass for Domain Master and PESO Admin
   const list = PERMISSIONS[role as keyof typeof PERMISSIONS] || [];
   return list.includes(permission);
 }

@@ -18,6 +18,7 @@ import {
   FileText,
   Crown,
   ShieldAlert,
+  ShieldCheck,
 } from "lucide-react";
 import { StatusBadge } from "@/components/common/StatusBadge";
 import { formatDate } from "@/lib/utils";
