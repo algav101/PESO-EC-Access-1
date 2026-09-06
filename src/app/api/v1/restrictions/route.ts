@@ -180,11 +180,11 @@ export async function POST(request: Request) {
       let disqualificationReason = "";
 
       // Check Appointive Personnel Rule
-      const isAppointive = restriction.isAppointivePersonnel || (restriction.adlNo && /BHW|TANOD|OFFICIAL|TREASURER|SECRETARY|COUNCIL|STAFF|APPOINTIVE/i.test(restriction.adlNo));
+      const isAppointive = restriction.isAppointivePersonnel || (restriction.adlNo && /BHW|TANOD|OFFICIAL|TREASURER|SECRETARY|COUNCIL|STAFF|APPOINTIVE|HEAD|MANAGER|DEPARTMENT|GOVERNMENT|GOOVERNMENT|MUNICIPAL|EMPLOYEE|PERSONNEL|LUPON|CAPTAIN|KAGAWAD|PESO/i.test(restriction.adlNo));
 
       if (isAppointive) {
         isDisqualified = true;
-        disqualificationReason = `Disqualified: Active Barangay Appointive Personnel / Government Employee (${restriction.adlNo || "Appointive Position"}). Government and Barangay personnel are strictly barred from TUPAD emergency employment under DOLE guidelines.`;
+        disqualificationReason = `Disqualified: Active Barangay / Municipal Appointive Personnel / Government Employee (${restriction.adlNo || "Appointive Position"}). Government officials, department heads, and appointive personnel are strictly barred from TUPAD emergency employment under DOLE statutory guidelines.`;
       } else if (payoutTimestamp > 0) {
         // Check 320 Days Rule
         daysElapsed = Math.floor((now.getTime() - payoutTimestamp) / (1000 * 60 * 60 * 24));
