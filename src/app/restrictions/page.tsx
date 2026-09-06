@@ -16,6 +16,7 @@ import {
   RefreshCw,
   Building,
   UserCheck,
+  Trash2,
 } from "lucide-react";
 import { StatusBadge } from "@/components/common/StatusBadge";
 import * as XLSX from "xlsx";
@@ -38,6 +39,11 @@ export default function RestrictionsPage() {
   const [uploadSuccessMsg, setUploadSuccessMsg] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // Clear / Reset Modal State
+  const [isClearModalOpen, setIsClearModalOpen] = useState(false);
+  const [isClearing, setIsClearing] = useState(false);
+  const [clearSuccessMsg, setClearSuccessMsg] = useState<string | null>(null);
+
   useEffect(() => {
     fetchRestrictions();
   }, []);
@@ -53,6 +59,31 @@ export default function RestrictionsPage() {
       console.error(e);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleClearRestrictions = async () => {
+    setIsClearing(true);
+    setClearSuccessMsg(null);
+    try {
+      const res = await fetch("/api/v1/restrictions", {
+        method: "DELETE",
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setClearSuccessMsg(`✓ ${data.message || "Restrictions cleared"}`);
+        setRestrictions([]);
+        setTimeout(() => {
+          setIsClearModalOpen(false);
+          setClearSuccessMsg(null);
+        }, 1800);
+      } else {
+        alert(data.error || "Failed to clear restrictions");
+      }
+    } catch (e) {
+      alert("Error clearing restrictions");
+    } finally {
+      setIsClearing(false);
     }
   };
 
@@ -186,13 +217,28 @@ export default function RestrictionsPage() {
           </a>
 
           {isAdmin && (
-            <button
-              onClick={() => setIsUploadModalOpen(true)}
-              className="px-4 py-2 bg-gov-blue hover:bg-gov-dark text-white font-bold text-xs rounded-xl shadow flex items-center space-x-1.5 transition"
-            >
-              <UploadCloud className="w-4 h-4 text-gov-goldLight" />
-              <span>Upload Reference List</span>
-            </button>
+            <>
+              <button
+                onClick={() => setIsUploadModalOpen(true)}
+                className="px-4 py-2 bg-gov-blue hover:bg-gov-dark text-white font-bold text-xs rounded-xl shadow flex items-center space-x-1.5 transition"
+              >
+                <UploadCloud className="w-4 h-4 text-gov-goldLight" />
+                <span>Upload Reference List</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setIsClearModalOpen(true);
+                  setClearSuccessMsg(null);
+                }}
+                className="px-3.5 py-2 bg-rose-50 hover:bg-rose-100 text-rose-700 hover:text-rose-800 border border-rose-200 font-bold text-xs rounded-xl shadow-xs flex items-center space-x-1.5 transition"
+                title="I-reset sa 0 ang Talaan"
+              >
+                <Trash2 className="w-4 h-4 text-rose-600" />
+                <span>Clear List (Reset to 0)</span>
+              </button>
+            </>
           )}
         </div>
       </div>
@@ -322,7 +368,7 @@ export default function RestrictionsPage() {
                   </div>
                   <a
                     href="/api/v1/restrictions/template"
-                    className="px-3 py-1.5 bg-gov-blue hover:bg-gov-light text-white font-bold text-xs rounded-lg shadow flex items-center space-x-1"
+                    className="px-3.5 py-1.5 bg-gov-blue hover:bg-gov-light text-white font-bold text-xs rounded-lg shadow flex items-center space-x-1"
                   >
                     <Download className="w-3.5 h-3.5 text-gov-goldLight" />
                     <span>Download .XLSX</span>
@@ -414,6 +460,86 @@ export default function RestrictionsPage() {
                 </div>
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* Confirmation Modal to Clear Restrictions (Reset to 0) */}
+      {isClearModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-4 overflow-y-auto backdrop-blur-xs">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 space-y-4 shadow-2xl animate-fadeIn border border-slate-200">
+            <div className="flex items-center justify-between border-b pb-3">
+              <div className="flex items-center space-x-2 text-rose-700">
+                <div className="p-2 bg-rose-100 rounded-xl">
+                  <Trash2 className="w-5 h-5 text-rose-600" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-black text-slate-900 uppercase tracking-wider">
+                    Clear Reference Registry
+                  </h3>
+                  <span className="text-[11px] text-rose-700 font-semibold">I-reset sa 0 ang Talaan</span>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => !isClearing && setIsClearModalOpen(false)}
+                className="p-1 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="space-y-3 text-xs text-slate-600">
+              <p className="font-medium text-slate-800">
+                Sigurado ka ba na nais mong burahin ang lahat ng {restrictions.length} restriction/disqualification records mula sa reference list?
+              </p>
+              
+              <div className="p-3.5 bg-rose-50 border border-rose-200 rounded-xl space-y-1.5 text-rose-950">
+                <div className="flex items-center space-x-1.5 font-bold text-rose-800">
+                  <AlertTriangle className="w-4 h-4 text-rose-600 flex-shrink-0" />
+                  <span>Kasalukuyang Database: {restrictions.length} records</span>
+                </div>
+                <p className="text-[11px] text-rose-900 leading-relaxed">
+                  Lahat ng active lockouts ay mabubura at babalik sa <strong>0</strong>. Maaari kang mag-upload muli ng panibagong Excel reference list anumang oras.
+                </p>
+              </div>
+            </div>
+
+            {clearSuccessMsg && (
+              <div className="p-3 rounded-xl text-xs font-bold flex items-center space-x-2 bg-emerald-50 border border-emerald-200 text-emerald-800">
+                <CheckCircle className="w-4 h-4 text-emerald-600 flex-shrink-0" />
+                <span>{clearSuccessMsg}</span>
+              </div>
+            )}
+
+            <div className="flex justify-end space-x-2 pt-3 border-t">
+              <button
+                type="button"
+                disabled={isClearing}
+                onClick={() => setIsClearModalOpen(false)}
+                className="px-4 py-2 text-xs font-bold border border-slate-300 rounded-xl hover:bg-slate-100 transition text-slate-700"
+              >
+                Kanselahin (Cancel)
+              </button>
+              <button
+                type="button"
+                disabled={isClearing}
+                onClick={handleClearRestrictions}
+                className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white font-extrabold text-xs rounded-xl shadow transition flex items-center space-x-1.5 disabled:opacity-50"
+              >
+                {isClearing ? (
+                  <>
+                    <RefreshCw className="w-4 h-4 animate-spin text-white" />
+                    <span>Clearing Database...</span>
+                  </>
+                ) : (
+                  <>
+                    <Trash2 className="w-4 h-4 text-white" />
+                    <span>I-reset sa 0 (Clear All)</span>
+                  </>
+                )}
+              </button>
+            </div>
           </div>
         </div>
       )}

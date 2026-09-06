@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
-import { getCurrentUser } from "@/lib/auth";
+import { getCurrentUser, isAdminUser, hasPermission } from "@/lib/auth";
+import { logAudit } from "@/lib/audit";
 
 function parsePayoutDateToTimestamp(payoutDateStr: string): number {
   if (!payoutDateStr) return 0;
@@ -20,6 +21,12 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const query = searchParams.get("q")?.trim();
     const isSuggestions = searchParams.get("suggestions") === "1" || searchParams.get("type") === "suggestions";
+    const isCountOnly = searchParams.get("countOnly") === "1";
+
+    if (isCountOnly) {
+      const totalCount = await prisma.beneficiaryRestriction.count();
+      return NextResponse.json({ totalCount });
+    }
 
     if (isSuggestions && query) {
       const qUpper = query.toUpperCase();
@@ -71,17 +78,20 @@ export async function GET(request: Request) {
       ];
     }
 
-    const restrictions = await prisma.beneficiaryRestriction.findMany({
-      where: whereClause,
-      include: {
-        beneficiary: true,
-        sourceProgram: true,
-      },
-      orderBy: { createdAt: "desc" },
-      take: 100,
-    });
+    const [restrictions, totalCount] = await Promise.all([
+      prisma.beneficiaryRestriction.findMany({
+        where: whereClause,
+        include: {
+          beneficiary: true,
+          sourceProgram: true,
+        },
+        orderBy: { createdAt: "desc" },
+        take: 100,
+      }),
+      prisma.beneficiaryRestriction.count(),
+    ]);
 
-    return NextResponse.json({ restrictions });
+    return NextResponse.json({ restrictions, totalCount });
   } catch (error: any) {
     console.error("GET restrictions error:", error);
     return NextResponse.json({ error: error.message }, { status: 500 });
@@ -238,5 +248,57 @@ export async function POST(request: Request) {
   } catch (error: any) {
     console.error("POST restrictions check error:", error);
     return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+}
+
+export async function DELETE(request: Request) {
+  try {
+    const user = await getCurrentUser();
+    if (!user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+    if (!isAdminUser(user) && !hasPermission(user.role, "restriction.create")) {
+      return NextResponse.json(
+        { error: "Forbidden: Only Domain Master and PESO Admins can clear the reference list." },
+        { status: 403 }
+      );
+    }
+
+    // 1. Delete all records from BeneficiaryRestriction
+    const deleteRestrictionsResult = await prisma.beneficiaryRestriction.deleteMany({});
+
+    // 2. Clean up placeholder reference beneficiaries with 'BN-REF-' prefix who are not enrolled in any program
+    let deletedBenesCount = 0;
+    try {
+      const deletedBenes = await prisma.beneficiary.deleteMany({
+        where: {
+          beneficiaryNumber: { startsWith: "BN-REF-" },
+          programBeneficiaries: { none: {} },
+        },
+      });
+      deletedBenesCount = deletedBenes.count;
+    } catch (e) {
+      console.warn("Could not delete orphaned reference beneficiaries:", e);
+    }
+
+    // 3. Log Audit
+    await logAudit({
+      userId: user.id,
+      action: "RESTRICTIONS_MASTERLIST_CLEARED",
+      entityType: "RESTRICTION",
+      metadata: {
+        deletedRestrictionsCount: deleteRestrictionsResult.count,
+        deletedPlaceholderBenesCount: deletedBenesCount,
+      },
+    });
+
+    return NextResponse.json({
+      success: true,
+      message: `Successfully cleared all reference records (reset to 0). Removed ${deleteRestrictionsResult.count} restriction entries.`,
+      deletedCount: deleteRestrictionsResult.count,
+    });
+  } catch (error: any) {
+    console.error("DELETE restrictions error:", error);
+    return NextResponse.json({ error: error.message || "Failed to clear restrictions" }, { status: 500 });
   }
 }

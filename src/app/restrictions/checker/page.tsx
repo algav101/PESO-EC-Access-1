@@ -22,6 +22,8 @@ import {
   Info,
   X,
   Zap,
+  Trash2,
+  Database,
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { isAdminUser } from "@/lib/permissions";
@@ -39,6 +41,12 @@ export default function EligibilityCheckerPage() {
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<any | null>(null);
 
+  // Reference Count & Clearing state
+  const [totalReferenceCount, setTotalReferenceCount] = useState<number | null>(null);
+  const [isClearModalOpen, setIsClearModalOpen] = useState(false);
+  const [clearing, setClearing] = useState(false);
+  const [clearMessage, setClearMessage] = useState<string | null>(null);
+
   // Live suggestions state
   const [suggestions, setSuggestions] = useState<any[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
@@ -51,6 +59,23 @@ export default function EligibilityCheckerPage() {
   const [uploadFile, setUploadFile] = useState<File | null>(null);
   const [uploadMessage, setUploadMessage] = useState<string | null>(null);
   const [uploadSuccess, setUploadSuccess] = useState(false);
+
+  // Fetch total restriction records count
+  const fetchReferenceCount = async () => {
+    try {
+      const res = await fetch("/api/v1/restrictions?countOnly=1");
+      if (res.ok) {
+        const data = await res.json();
+        setTotalReferenceCount(data.totalCount ?? 0);
+      }
+    } catch (e) {
+      console.error("Error fetching reference count:", e);
+    }
+  };
+
+  useEffect(() => {
+    fetchReferenceCount();
+  }, []);
 
   // Debounced suggestion fetcher
   useEffect(() => {
@@ -178,6 +203,7 @@ export default function EligibilityCheckerPage() {
         setUploadSuccess(true);
         setUploadMessage(`✓ ${data.message}`);
         setUploadFile(null);
+        fetchReferenceCount();
         setTimeout(() => {
           setIsUploadOpen(false);
           setUploadMessage(null);
@@ -190,6 +216,34 @@ export default function EligibilityCheckerPage() {
       alert("Error uploading reference template");
     } finally {
       setUploading(false);
+    }
+  };
+
+  const handleClearReferenceList = async () => {
+    setClearing(true);
+    setClearMessage(null);
+    try {
+      const res = await fetch("/api/v1/restrictions", {
+        method: "DELETE",
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setTotalReferenceCount(0);
+        setSuggestions([]);
+        setShowSuggestions(false);
+        setResult(null);
+        setClearMessage(`✓ ${data.message || "Reference list successfully reset to 0 records."}`);
+        setTimeout(() => {
+          setIsClearModalOpen(false);
+          setClearMessage(null);
+        }, 2000);
+      } else {
+        alert(data.error || "Failed to clear reference list");
+      }
+    } catch (e) {
+      alert("Error clearing reference list");
+    } finally {
+      setClearing(false);
     }
   };
 
@@ -227,6 +281,16 @@ export default function EligibilityCheckerPage() {
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
+          {/* Live Reference Database Count */}
+          <div className="flex items-center space-x-1.5 px-3 py-2 bg-slate-100 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 shadow-xs">
+            <Database className="w-3.5 h-3.5 text-gov-blue" />
+            <span>Database:</span>
+            <span className="font-mono text-gov-blue">
+              {totalReferenceCount !== null ? totalReferenceCount.toLocaleString() : "..."}
+            </span>
+            <span className="text-[10px] text-slate-400">records</span>
+          </div>
+
           <a
             href="/api/v1/restrictions/template"
             className="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition flex items-center space-x-1.5 border border-slate-300 shadow-xs"
@@ -236,17 +300,32 @@ export default function EligibilityCheckerPage() {
           </a>
 
           {isAdmin && (
-            <button
-              onClick={() => {
-                setIsUploadOpen(true);
-                setUploadMessage(null);
-                setUploadSuccess(false);
-              }}
-              className="px-4 py-2 bg-gov-blue hover:bg-gov-dark text-white rounded-xl text-xs font-bold transition flex items-center space-x-1.5 shadow"
-            >
-              <UploadCloud className="w-4 h-4 text-gov-goldLight" />
-              <span>Upload Reference List</span>
-            </button>
+            <>
+              <button
+                onClick={() => {
+                  setIsUploadOpen(true);
+                  setUploadMessage(null);
+                  setUploadSuccess(false);
+                }}
+                className="px-4 py-2 bg-gov-blue hover:bg-gov-dark text-white rounded-xl text-xs font-bold transition flex items-center space-x-1.5 shadow"
+              >
+                <UploadCloud className="w-4 h-4 text-gov-goldLight" />
+                <span>Upload Reference List</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setIsClearModalOpen(true);
+                  setClearMessage(null);
+                }}
+                className="px-3.5 py-2 bg-rose-50 hover:bg-rose-100 text-rose-700 hover:text-rose-800 border border-rose-200 rounded-xl text-xs font-bold transition flex items-center space-x-1.5 shadow-xs"
+                title="I-reset sa 0 ang TUPAD reference list"
+              >
+                <Trash2 className="w-4 h-4 text-rose-600" />
+                <span>Clear List (Reset to 0)</span>
+              </button>
+            </>
           )}
         </div>
       </div>
@@ -606,6 +685,86 @@ export default function EligibilityCheckerPage() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Confirmation Modal to Clear Reference List (Reset to 0) */}
+      {isClearModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-4 overflow-y-auto backdrop-blur-xs">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 space-y-4 shadow-2xl animate-fadeIn border border-slate-200">
+            <div className="flex items-center justify-between border-b pb-3">
+              <div className="flex items-center space-x-2 text-rose-700">
+                <div className="p-2 bg-rose-100 rounded-xl">
+                  <Trash2 className="w-5 h-5 text-rose-600" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-black text-slate-900 uppercase tracking-wider">
+                    Clear Reference List
+                  </h3>
+                  <span className="text-[11px] text-rose-700 font-semibold">I-reset sa 0 ang Talaan</span>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => !clearing && setIsClearModalOpen(false)}
+                className="p-1 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="space-y-3 text-xs text-slate-600">
+              <p className="font-medium text-slate-800">
+                Sigurado ka ba na nais mong i-clear ang buong TUPAD reference list ng mga disqualified / restricted records?
+              </p>
+              
+              <div className="p-3.5 bg-rose-50 border border-rose-200 rounded-xl space-y-1.5 text-rose-950">
+                <div className="flex items-center space-x-1.5 font-bold text-rose-800">
+                  <AlertTriangle className="w-4 h-4 text-rose-600 flex-shrink-0" />
+                  <span>Kasalukuyang Database: {totalReferenceCount !== null ? totalReferenceCount.toLocaleString() : 0} active records</span>
+                </div>
+                <p className="text-[11px] text-rose-900 leading-relaxed">
+                  Lahat ng {totalReferenceCount !== null ? totalReferenceCount.toLocaleString() : 0} reference records ay permanenteng buburahin at magiging <strong>0</strong> ang database. Lahat ng susunod na eligibility inquiries ay magiging <strong>ELIGIBLE</strong> hangga't hindi nag-a-upload muli ng bagong Excel reference file.
+                </p>
+              </div>
+            </div>
+
+            {clearMessage && (
+              <div className="p-3 rounded-xl text-xs font-bold flex items-center space-x-2 bg-emerald-50 border border-emerald-200 text-emerald-800">
+                <CheckCircle2 className="w-4 h-4 text-emerald-600 flex-shrink-0" />
+                <span>{clearMessage}</span>
+              </div>
+            )}
+
+            <div className="flex justify-end space-x-2 pt-3 border-t">
+              <button
+                type="button"
+                disabled={clearing}
+                onClick={() => setIsClearModalOpen(false)}
+                className="px-4 py-2 text-xs font-bold border border-slate-300 rounded-xl hover:bg-slate-100 transition text-slate-700"
+              >
+                Kanselahin (Cancel)
+              </button>
+              <button
+                type="button"
+                disabled={clearing}
+                onClick={handleClearReferenceList}
+                className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white font-extrabold text-xs rounded-xl shadow transition flex items-center space-x-1.5 disabled:opacity-50"
+              >
+                {clearing ? (
+                  <>
+                    <RefreshCw className="w-4 h-4 animate-spin text-white" />
+                    <span>Clearing Database...</span>
+                  </>
+                ) : (
+                  <>
+                    <Trash2 className="w-4 h-4 text-white" />
+                    <span>I-reset sa 0 (Clear All)</span>
+                  </>
+                )}
+              </button>
+            </div>
           </div>
         </div>
       )}
