@@ -491,7 +491,7 @@ async function handleLookup(params: any) {
     }));
   }
 
-  // Perform smart proximity and gender area assignment
+  // Perform smart proximity and gender area assignment for current day
   const assignment = assignBeneficiaryWorkArea(
     {
       id: beneficiary.id,
@@ -506,6 +506,73 @@ async function handleLookup(params: any) {
     dayItems,
     dayNumber
   );
+
+  // Pre-calculate full 10-day schedule so client can switch days with instant 0ms speed
+  const totalProgramDays = program.requiredWorkDays || 10;
+  const allDaysSchedule: any[] = [];
+  const dailyAssignmentsMap: Record<number, any> = {};
+
+  for (let d = 1; d <= totalProgramDays; d++) {
+    const matchingWorkDay = program.workDays.find((w: any) => w.dayNumber === d);
+    const dayDate = matchingWorkDay?.workDate || targetDate;
+
+    let specificDayItems: WorkProgramItemAllocation[] = (matchingWp?.items || [])
+      .filter((it: any) => it.dayNumber === d)
+      .map((it: any) => ({
+        id: it.id,
+        dayNumber: it.dayNumber,
+        specificActivities: it.specificActivities,
+        area: it.area,
+        maleCount: it.maleCount || 0,
+        femaleCount: it.femaleCount || 0,
+        scPwdMaleCount: it.scPwdMaleCount || 0,
+        scPwdFemaleCount: it.scPwdFemaleCount || 0,
+        totalCount: it.totalCount || 0,
+      }));
+
+    if (specificDayItems.length === 0 && matchingWp?.items?.length > 0) {
+      specificDayItems = matchingWp.items.map((it: any) => ({
+        id: it.id,
+        dayNumber: d,
+        specificActivities: it.specificActivities,
+        area: it.area,
+        maleCount: it.maleCount || 0,
+        femaleCount: it.femaleCount || 0,
+        scPwdMaleCount: it.scPwdMaleCount || 0,
+        scPwdFemaleCount: it.scPwdFemaleCount || 0,
+        totalCount: it.totalCount || 0,
+      }));
+    }
+
+    const calculatedDayAssignment = assignBeneficiaryWorkArea(
+      {
+        id: beneficiary.id,
+        designatedNumber: pb.designatedNumber,
+        fullName: beneficiary.fullName,
+        sex: beneficiary.sex,
+        sitio: beneficiary.sitio,
+        barangay: beneficiary.barangay,
+        isSenior: beneficiary.isSenior,
+        isPwd: beneficiary.isPwd,
+      },
+      specificDayItems,
+      d
+    );
+
+    const entry = {
+      dayNumber: d,
+      workDate: dayDate,
+      status: matchingWorkDay?.status || "SCHEDULED",
+      area: calculatedDayAssignment.area,
+      specificActivity: calculatedDayAssignment.specificActivity,
+      proximityScore: calculatedDayAssignment.proximityScore,
+      matchingRationale: calculatedDayAssignment.matchingRationale,
+      allocationMethod: calculatedDayAssignment.allocationMethod,
+    };
+
+    allDaysSchedule.push(entry);
+    dailyAssignmentsMap[d] = entry;
+  }
 
   // Check today's attendance record
   const todayAttendance = pb.attendanceRecords?.[0] || null;
@@ -554,6 +621,8 @@ async function handleLookup(params: any) {
       itemId: assignment.assignedItem?.id || null,
       dayNumber: assignment.dayNumber,
     },
+    allDaysSchedule,
+    dailyAssignments: dailyAssignmentsMap,
     attendance: todayAttendance
       ? {
           status: todayAttendance.status,

@@ -108,10 +108,16 @@ function AssignmentContent() {
 
   const handleDayChange = (newDay: number) => {
     setSelectedDay(newDay);
-    if (inputToken) {
+    // Only perform network lookup if data wasn't already preloaded in memory
+    if (!data?.dailyAssignments && inputToken) {
       performLookup(inputToken, newDay, middleNameInput);
     }
   };
+
+  const activeAssignment =
+    (data?.dailyAssignments && selectedDay && data.dailyAssignments[selectedDay])
+      ? data.dailyAssignments[selectedDay]
+      : data?.allDaysSchedule?.find((s: any) => s.dayNumber === selectedDay) || data?.assignment;
 
   return (
     <div className="min-h-screen bg-slate-900 text-slate-100 py-8 px-4 sm:px-6 lg:px-8 flex flex-col items-center">
@@ -320,19 +326,19 @@ function AssignmentContent() {
                     <span>Select Work Program Schedule:</span>
                   </span>
                   <span className="font-mono text-[11px] text-slate-400">
-                    Viewing Day {data.workDay.dayNumber} of {data.program.requiredWorkDays}
+                    Viewing Day {selectedDay || data.workDay.dayNumber} of {data.program.requiredWorkDays || 10}
                   </span>
                 </div>
 
                 <div className="grid grid-cols-5 sm:grid-cols-10 gap-1.5">
                   {Array.from({ length: data.program.requiredWorkDays || 10 }, (_, i) => i + 1).map((day) => {
-                    const isSelected = selectedDay === day;
+                    const isSelected = (selectedDay || data.workDay.dayNumber) === day;
                     return (
                       <button
                         key={day}
                         type="button"
                         onClick={() => handleDayChange(day)}
-                        className={`py-1.5 px-1 rounded-lg text-xs font-black transition text-center ${
+                        className={`py-1.5 px-1 rounded-lg text-xs font-black transition text-center cursor-pointer ${
                           isSelected
                             ? "bg-gov-gold text-gov-dark shadow-md scale-105 border border-amber-200 font-extrabold"
                             : "bg-slate-800/80 text-slate-300 hover:bg-slate-700 hover:text-white border border-slate-700/50"
@@ -351,10 +357,10 @@ function AssignmentContent() {
               <div className="flex items-center justify-between border-b border-slate-800 pb-3">
                 <div className="flex items-center space-x-2 text-emerald-400 font-bold text-xs">
                   <Navigation className="w-4 h-4" />
-                  <span>DESIGNATED WORK AREA (DAY {data.workDay.dayNumber})</span>
+                  <span>DESIGNATED WORK AREA (DAY {selectedDay || data.workDay.dayNumber})</span>
                 </div>
                 <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-950/60 text-emerald-300 border border-emerald-800/60 font-bold">
-                  {data.assignment.allocationMethod.replace(/_/g, " ")}
+                  {(activeAssignment?.allocationMethod || data.assignment?.allocationMethod || "PROXIMITY_PUROK").replace(/_/g, " ")}
                 </span>
               </div>
 
@@ -366,7 +372,7 @@ function AssignmentContent() {
                   </div>
                   <div>
                     <h4 className="text-base font-extrabold text-white leading-snug">
-                      {data.assignment.area}
+                      {activeAssignment?.area || data.assignment?.area}
                     </h4>
                     <p className="text-xs text-slate-400 mt-0.5">
                       Target Area Sector for Barangay {data.beneficiary.barangay}
@@ -384,7 +390,7 @@ function AssignmentContent() {
                       Specific Activity:
                     </span>
                     <p className="text-xs sm:text-sm font-bold text-slate-200 leading-snug">
-                      {data.assignment.specificActivity}
+                      {activeAssignment?.specificActivity || data.assignment?.specificActivity}
                     </p>
                   </div>
                 </div>
@@ -416,7 +422,7 @@ function AssignmentContent() {
                   <span>Proximity &amp; Gender Allocation Rationale:</span>
                 </div>
                 <p className="text-[11px] leading-relaxed">
-                  {data.assignment.matchingRationale}
+                  {activeAssignment?.matchingRationale || data.assignment?.matchingRationale}
                 </p>
               </div>
 

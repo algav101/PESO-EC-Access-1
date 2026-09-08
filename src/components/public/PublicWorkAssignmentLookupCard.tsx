@@ -51,7 +51,7 @@ export function PublicWorkAssignmentLookupCard() {
   const [data, setData] = useState<any | null>(null);
   const [selectedDay, setSelectedDay] = useState<number>(1);
 
-  const handleLookup = async (e?: React.FormEvent, customDay?: number) => {
+  const handleLookup = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
 
     if (!dpaConsent) {
@@ -75,17 +75,13 @@ export function PublicWorkAssignmentLookupCard() {
       if (barangay && barangay !== "ALL") {
         queryParams.set("barangay", barangay);
       }
-      const targetDay = customDay !== undefined ? customDay : selectedDay;
-      if (targetDay) {
-        queryParams.set("dayNumber", String(targetDay));
-      }
 
       const res = await fetch(`/api/v1/work-assignment/lookup?${queryParams.toString()}`);
       const json = await res.json();
 
       if (res.ok && json.success) {
         setData(json);
-        setSelectedDay(json.workDay.dayNumber || 1);
+        setSelectedDay(json.workDay?.dayNumber || 1);
         setError(null);
       } else if (json.requiresAuth || json.authFailed) {
         setError(json.error || "Maling Gitnang Pangalan. Pakitiyak ang tamang gitnang pangalan na nakarehistro sa iyong TUPAD application.");
@@ -102,17 +98,23 @@ export function PublicWorkAssignmentLookupCard() {
     }
   };
 
+  // Instant 0ms Day Switcher (reads pre-calculated 10-day schedule directly from memory)
   const handleDaySwitch = (dayNum: number) => {
     setSelectedDay(dayNum);
-    if (data && lastName && firstName && middleName) {
-      handleLookup(undefined, dayNum);
-    }
   };
 
   const handleReset = () => {
     setData(null);
     setError(null);
   };
+
+  // Active assignment for currently selected day (instant client-side evaluation)
+  const activeDayAssignment =
+    (data?.dailyAssignments && data.dailyAssignments[selectedDay])
+      ? data.dailyAssignments[selectedDay]
+      : data?.allDaysSchedule?.find((s: any) => s.dayNumber === selectedDay) || data?.assignment;
+
+  const [showFullTable, setShowFullTable] = useState(false);
 
   return (
     <div className="gov-card border-2 border-emerald-600/30 overflow-hidden bg-white shadow-xl rounded-3xl transition-all">
@@ -301,7 +303,7 @@ export function PublicWorkAssignmentLookupCard() {
           </form>
         ) : (
           /* 3. Verified Assignment Display Card */
-          <div className="space-y-6">
+          <div className="space-y-6 animate-fadeIn">
             {/* Top Verification Badge & Identity Summary */}
             <div className="bg-gradient-to-r from-emerald-50 via-teal-50 to-white border border-emerald-300/80 rounded-2xl p-5 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 shadow-sm">
               <div className="flex items-start space-x-3.5">
@@ -332,8 +334,9 @@ export function PublicWorkAssignmentLookupCard() {
               </div>
 
               <button
+                type="button"
                 onClick={handleReset}
-                className="px-4 py-2 bg-white hover:bg-slate-100 text-slate-700 border border-slate-300 rounded-xl text-xs font-bold transition flex items-center space-x-1.5 shadow-xs"
+                className="px-4 py-2 bg-white hover:bg-slate-100 text-slate-700 border border-slate-300 rounded-xl text-xs font-bold transition flex items-center space-x-1.5 shadow-xs cursor-pointer active:scale-95"
               >
                 <RefreshCw className="w-3.5 h-3.5" />
                 <span>Maghanap ng Ibang Pangalan</span>
@@ -342,8 +345,11 @@ export function PublicWorkAssignmentLookupCard() {
 
             {/* Program & Active Work Area Focus Card */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              {/* Left 2 Cols: Assigned Work Area Details */}
-              <div className="lg:col-span-2 space-y-4 bg-slate-900 text-white rounded-3xl p-6 shadow-xl border border-slate-800 relative overflow-hidden">
+              {/* Left 2 Cols: Assigned Work Area Details for Selected Day */}
+              <div
+                key={selectedDay}
+                className="lg:col-span-2 space-y-4 bg-slate-900 text-white rounded-3xl p-6 shadow-xl border border-slate-800 relative overflow-hidden"
+              >
                 <div className="flex items-center justify-between border-b border-slate-800 pb-3">
                   <div className="flex items-center space-x-2">
                     <MapPin className="w-5 h-5 text-emerald-400" />
@@ -351,18 +357,25 @@ export function PublicWorkAssignmentLookupCard() {
                       Itinalagang Lugar ng Paggawa (Assigned Work Area)
                     </span>
                   </div>
-                  <span className="px-2.5 py-0.5 bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 rounded-full text-[11px] font-bold">
-                    Araw {data.workDay.dayNumber} ng {data.program.requiredWorkDays || 10}
-                  </span>
+                  <div className="flex items-center gap-2">
+                    {activeDayAssignment?.workDate && (
+                      <span className="hidden sm:inline-block px-2.5 py-0.5 bg-slate-800 text-slate-300 font-mono text-[10px] rounded-md border border-slate-700">
+                        {activeDayAssignment.workDate}
+                      </span>
+                    )}
+                    <span className="px-3 py-1 bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 rounded-full text-xs font-black tracking-wide">
+                      Araw {selectedDay} ng {data.program.requiredWorkDays || 10}
+                    </span>
+                  </div>
                 </div>
 
                 <div className="space-y-2">
                   <div className="text-2xl sm:text-3xl font-black text-white leading-tight">
-                    {data.assignment.area || `Brgy. ${data.beneficiary.barangay} Community Work Area`}
+                    {activeDayAssignment?.area || data.assignment?.area || `Brgy. ${data.beneficiary.barangay} Community Work Area`}
                   </div>
                   <p className="text-xs sm:text-sm text-slate-300">
                     <strong className="text-emerald-400 font-bold">Partikular na Gawain: </strong>
-                    {data.assignment.specificActivity || "Community cleaning, roadside maintenance, and environmental protection."}
+                    {activeDayAssignment?.specificActivity || data.assignment?.specificActivity || "Community cleaning, roadside maintenance, and environmental protection."}
                   </p>
                 </div>
 
@@ -372,7 +385,7 @@ export function PublicWorkAssignmentLookupCard() {
                   <div>
                     <span className="font-bold text-amber-300">Dahilan ng Pagkakatalaga (Proximity Allocation):</span>
                     <p className="text-slate-300 mt-0.5">
-                      {data.assignment.matchingRationale || "Itinalaga sa pinakamalapit na purok/sitio sa iyong rehistradong tirahan upang maging maginhawa ang pagpasok."}
+                      {activeDayAssignment?.matchingRationale || data.assignment?.matchingRationale || "Itinalaga sa pinakamalapit na purok/sitio sa iyong rehistradong tirahan upang maging maginhawa ang pagpasok."}
                     </p>
                   </div>
                 </div>
@@ -433,31 +446,103 @@ export function PublicWorkAssignmentLookupCard() {
 
             {/* 10-Day Work Schedule Interactive Timeline Switcher */}
             <div className="space-y-3 pt-2">
-              <div className="flex items-center justify-between">
-                <h4 className="text-sm font-black text-slate-900 flex items-center space-x-2">
-                  <Calendar className="w-4 h-4 text-emerald-700" />
-                  <span>Iskedyul sa Kabuuang 10 Araw ng Programa</span>
-                </h4>
-                <span className="text-xs text-slate-500 font-medium">I-click ang bawat araw para makita ang assignment</span>
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                <div>
+                  <h4 className="text-sm font-black text-slate-900 flex items-center space-x-2">
+                    <Calendar className="w-4 h-4 text-emerald-700" />
+                    <span>Iskedyul sa Kabuuang 10 Araw ng Programa</span>
+                  </h4>
+                  <p className="text-xs text-slate-500">I-click ang bawat araw para makita agad ang assignment nang mabilis at walang delay.</p>
+                </div>
+
+                {data.allDaysSchedule?.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => setShowFullTable(!showFullTable)}
+                    className="text-xs font-bold text-emerald-700 hover:text-emerald-900 underline flex items-center gap-1 cursor-pointer self-start sm:self-auto"
+                  >
+                    <span>{showFullTable ? "Itago ang Buong Talaan" : "Ipakita ang Lahat ng 10 Araw na Talaan"}</span>
+                  </button>
+                )}
               </div>
 
+              {/* Day Buttons Grid with instant tactile responsiveness */}
               <div className="grid grid-cols-2 sm:grid-cols-5 lg:grid-cols-10 gap-2">
-                {Array.from({ length: data.program.requiredWorkDays || 10 }, (_, i) => i + 1).map((dayNum) => (
-                  <button
-                    key={dayNum}
-                    type="button"
-                    onClick={() => handleDaySwitch(dayNum)}
-                    className={`p-2.5 rounded-xl text-center border transition flex flex-col items-center justify-center ${
-                      selectedDay === dayNum
-                        ? "bg-emerald-700 text-white border-emerald-700 shadow-md scale-105 font-black"
-                        : "bg-slate-50 hover:bg-emerald-50 text-slate-700 border-slate-200 font-bold"
-                    }`}
-                  >
-                    <span className="text-[10px] uppercase font-bold opacity-80">Araw</span>
-                    <span className="text-base font-black font-mono leading-none mt-0.5">{dayNum}</span>
-                  </button>
-                ))}
+                {Array.from({ length: data.program.requiredWorkDays || 10 }, (_, i) => i + 1).map((dayNum) => {
+                  const isDaySelected = selectedDay === dayNum;
+                  return (
+                    <button
+                      key={dayNum}
+                      type="button"
+                      onClick={() => handleDaySwitch(dayNum)}
+                      className={`p-2.5 rounded-xl text-center border transition-all duration-75 flex flex-col items-center justify-center cursor-pointer active:scale-95 select-none ${
+                        isDaySelected
+                          ? "bg-emerald-700 text-white border-emerald-700 shadow-lg scale-105 font-black ring-2 ring-emerald-400/50"
+                          : "bg-slate-50 hover:bg-emerald-50 text-slate-700 hover:text-emerald-900 border-slate-200 font-bold"
+                      }`}
+                    >
+                      <span className="text-[10px] uppercase font-bold opacity-80">Araw</span>
+                      <span className="text-base font-black font-mono leading-none mt-0.5">{dayNum}</span>
+                    </button>
+                  );
+                })}
               </div>
+
+              {/* Optional Full 10-Day Table Breakdown for instant full-schedule overview */}
+              {showFullTable && data.allDaysSchedule && data.allDaysSchedule.length > 0 && (
+                <div className="mt-4 border border-slate-200 rounded-2xl overflow-hidden shadow-xs animate-fadeIn">
+                  <div className="bg-slate-100 px-4 py-2.5 border-b border-slate-200 flex items-center justify-between">
+                    <span className="text-xs font-black uppercase text-slate-700">
+                      Buong 10-Araw na Buod ng Assignment (I-click ang hilera upang piliin)
+                    </span>
+                    <span className="text-[11px] text-emerald-700 font-bold">10 Araw Kabuuan</span>
+                  </div>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left text-xs">
+                      <thead className="bg-slate-50 text-slate-600 font-bold uppercase text-[10px] border-b">
+                        <tr>
+                          <th className="px-3 py-2.5">Araw #</th>
+                          <th className="px-3 py-2.5">Itinalagang Work Area</th>
+                          <th className="px-3 py-2.5">Partikular na Gawain</th>
+                          <th className="px-3 py-2.5">Dahilan ng Pagkakatalaga</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {data.allDaysSchedule.map((sched: any) => {
+                          const isRowActive = selectedDay === sched.dayNumber;
+                          return (
+                            <tr
+                              key={sched.dayNumber}
+                              onClick={() => handleDaySwitch(sched.dayNumber)}
+                              className={`cursor-pointer transition-colors ${
+                                isRowActive
+                                  ? "bg-emerald-50 text-emerald-950 font-bold"
+                                  : "hover:bg-slate-50 text-slate-700"
+                              }`}
+                            >
+                              <td className="px-3 py-2 font-mono font-black text-emerald-700 whitespace-nowrap">
+                                Araw {sched.dayNumber}
+                              </td>
+                              <td className="px-3 py-2 font-semibold">
+                                <span className="flex items-center gap-1">
+                                  <MapPin className="w-3 h-3 text-emerald-600 shrink-0" />
+                                  <span>{sched.area}</span>
+                                </span>
+                              </td>
+                              <td className="px-3 py-2 max-w-xs truncate" title={sched.specificActivity}>
+                                {sched.specificActivity}
+                              </td>
+                              <td className="px-3 py-2 text-[11px] text-slate-500 max-w-xs truncate" title={sched.matchingRationale}>
+                                {sched.matchingRationale}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         )}
