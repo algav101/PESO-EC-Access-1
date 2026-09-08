@@ -4,6 +4,7 @@ import { PesoLogo } from "@/components/layout/PesoLogo";
 import { LandingNavDrawer } from "@/components/layout/LandingNavDrawer";
 import { PublicStatusInquiryCard } from "@/components/public/PublicStatusInquiryCard";
 import { PublicInquiryMessageForm } from "@/components/public/PublicInquiryMessageForm";
+import { PublicWorkAssignmentLookupCard } from "@/components/public/PublicWorkAssignmentLookupCard";
 import {
   ShieldCheck,
   MapPin,
@@ -206,6 +207,15 @@ export default async function LandingPage() {
                     <strong className="font-bold text-slate-900">Mabilis na QR Verification</strong> sa stubs, orientation, at attendance
                   </span>
                 </li>
+                <li className="flex items-start gap-2 bg-emerald-50/80 p-2.5 rounded-lg border border-emerald-200 hover:border-emerald-400 transition-colors sm:col-span-2">
+                  <span className="text-emerald-700 font-bold">✔</span>
+                  <span>
+                    <a href="#work-assignment" className="hover:underline font-extrabold text-emerald-950">
+                      Suriin ang Iyong TUPAD Work Area Assignment & Iskedyul
+                    </a>{" "}
+                    gamit ang iyong Buong Pangalan (Apelyido, Pangalan, Gitnang Pangalan)
+                  </span>
+                </li>
                 <li className="flex items-start gap-2 bg-slate-50 p-2.5 rounded-lg border border-slate-100 hover:border-slate-300 transition-colors sm:col-span-2">
                   <span className="text-purple-700 font-bold">✔</span>
                   <span>
@@ -325,12 +335,17 @@ export default async function LandingPage() {
           </p>
         </div>
 
-        {/* Feature 1: Public Status Inquiry Card */}
+        {/* Feature 1: TUPAD Beneficiary Work Area Assignment & 10-Day Schedule Lookup (DPA Compliant) */}
+        <div id="work-assignment" className="scroll-mt-28">
+          <PublicWorkAssignmentLookupCard />
+        </div>
+
+        {/* Feature 2: Public Status Inquiry Card */}
         <div id="inquiry" className="scroll-mt-28">
           <PublicStatusInquiryCard />
         </div>
 
-        {/* Feature 2: Public Comments, Suggestions & Direct Feedback Form */}
+        {/* Feature 3: Public Comments, Suggestions & Direct Feedback Form */}
         <div id="inquiry-form" className="scroll-mt-28">
           <PublicInquiryMessageForm />
         </div>
@@ -532,6 +547,9 @@ export default async function LandingPage() {
               <div>
                 <h6 className="font-bold text-white uppercase tracking-wider mb-2 text-xs">Quick Navigation</h6>
                 <ul className="space-y-1.5 text-slate-400">
+                  <li>
+                    <a href="#work-assignment" className="hover:text-white hover:underline transition font-bold text-emerald-400">TUPAD Work Assignment</a>
+                  </li>
                   <li>
                     <a href="#inquiry" className="hover:text-white hover:underline transition">Status Inquiry</a>
                   </li>

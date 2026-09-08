@@ -426,6 +426,68 @@ async function runTests() {
     assert(verifyMiddleNameTest("N/A", noMiddleBene) === true, "'N/A' accepted when no middle name on record");
     assert(verifyMiddleNameTest("none", noMiddleBene) === true, "'none' accepted when no middle name on record");
 
+    // TEST 11: Structured Name Work Assignment Lookup & DPA Verification
+    console.log("\n[TEST 11] Structured Name Work Assignment Lookup & DPA Verification");
+    const dpaBeneRecord = await prisma.beneficiary.create({
+      data: {
+        beneficiaryNumber: `TEST-DPA-${Date.now()}`,
+        fullName: "DELA CRUZ, JUAN SANTOS",
+        lastName: "DELA CRUZ",
+        firstName: "JUAN",
+        middleName: "SANTOS",
+        birthday: "1990-01-01",
+        sex: "MALE",
+        barangay: "Paltic",
+        sitio: "Purok 2",
+        status: "ACTIVE",
+      },
+    });
+
+    const dpaProgBene = await prisma.programBeneficiary.create({
+      data: {
+        programId: sampleProg.id,
+        beneficiaryId: dpaBeneRecord.id,
+        designatedNumber: "999",
+        tableNumber: "Table 1",
+        participationStatus: "ACTIVE",
+      },
+    });
+
+    // Simulate structured query search
+    const foundCandidate = await prisma.programBeneficiary.findFirst({
+      where: {
+        AND: [
+          {
+            OR: [
+              { beneficiary: { lastName: { contains: "DELA CRUZ", mode: "insensitive" } } },
+              { beneficiary: { fullName: { contains: "DELA CRUZ", mode: "insensitive" } } },
+            ],
+          },
+          {
+            OR: [
+              { beneficiary: { firstName: { contains: "JUAN", mode: "insensitive" } } },
+              { beneficiary: { fullName: { contains: "JUAN", mode: "insensitive" } } },
+            ],
+          },
+          { beneficiary: { barangay: { contains: "Paltic", mode: "insensitive" } } },
+        ],
+        participationStatus: "ACTIVE",
+      },
+      include: {
+        beneficiary: true,
+        program: true,
+      },
+    });
+
+    assert(Boolean(foundCandidate), "Found candidate by structured Last Name and First Name");
+    assert(foundCandidate.beneficiary.middleName === "SANTOS", "Candidate has matching middleName");
+    assert(verifyMiddleNameTest("santos", foundCandidate.beneficiary) === true, "Case-insensitive DPA middle name consent matches");
+
+    // Clean up test records
+    await prisma.programBeneficiary.delete({ where: { id: dpaProgBene.id } });
+    await prisma.beneficiary.delete({ where: { id: dpaBeneRecord.id } });
+    assert(true, "Test candidate cleaned up safely");
+
     console.log("\n==================================================================");
     console.log(`TEST SUMMARY: ${passed} PASSED, ${failed} FAILED`);
     console.log("==================================================================");

@@ -90,14 +90,18 @@ export async function GET(request: Request) {
 async function handleLookup(params: any) {
   const rawQrToken = (params.qrToken || params.token || params.code || "").toString().trim();
   const designatedNumber = params.designatedNumber ? String(params.designatedNumber).trim() : null;
+  const lastNameParam = (params.lastName || "").toString().trim();
+  const firstNameParam = (params.firstName || "").toString().trim();
   const enteredMiddleName = (params.middleName || params.authKey || "").toString();
+  const barangayParam = (params.barangay || "").toString().trim();
   const programIdParam = params.programId || null;
   const explicitDayNumber = params.dayNumber ? parseInt(params.dayNumber, 10) : null;
   const targetDate = params.targetDate || format(new Date(), "yyyy-MM-dd");
 
-  if (!rawQrToken && !designatedNumber) {
+  const hasNameInput = Boolean(lastNameParam && firstNameParam);
+  if (!rawQrToken && !designatedNumber && !hasNameInput) {
     return NextResponse.json(
-      { error: "Please provide a valid QR Token, QR Code string, or Designated Slot Number." },
+      { error: "Please provide your Full Name (Last Name, First Name, Middle Name), QR Token, or Designated Slot Number." },
       { status: 400 }
     );
   }
@@ -143,8 +147,69 @@ async function handleLookup(params: any) {
   let qr = null;
   let pb: any = null;
 
-  // Search by exact QR token
-  if (cleanToken) {
+  // 1. Search by structured Full Name (Last Name, First Name, Barangay)
+  if (hasNameInput) {
+    const andConditions: any[] = [];
+
+    // Match Last Name
+    andConditions.push({
+      OR: [
+        { beneficiary: { lastName: { contains: lastNameParam, mode: "insensitive" } } },
+        { beneficiary: { fullName: { contains: lastNameParam, mode: "insensitive" } } },
+      ],
+    });
+
+    // Match First Name
+    andConditions.push({
+      OR: [
+        { beneficiary: { firstName: { contains: firstNameParam, mode: "insensitive" } } },
+        { beneficiary: { fullName: { contains: firstNameParam, mode: "insensitive" } } },
+      ],
+    });
+
+    // Optional Barangay match
+    if (barangayParam && barangayParam !== "ALL") {
+      andConditions.push({
+        beneficiary: { barangay: { contains: barangayParam, mode: "insensitive" } },
+      });
+    }
+
+    const whereClause: any = {
+      AND: andConditions,
+      participationStatus: { in: ["ACTIVE", "REPLACED"] },
+    };
+    if (programIdParam) whereClause.programId = programIdParam;
+
+    const candidatePbs = await prisma.programBeneficiary.findMany({
+      where: whereClause,
+      orderBy: { createdAt: "desc" },
+      include: pbIncludes,
+      take: 10,
+    });
+
+    if (candidatePbs.length === 1) {
+      pb = candidatePbs[0];
+    } else if (candidatePbs.length > 1) {
+      // If middle name provided, filter candidates by middle name verification
+      if (enteredMiddleName) {
+        const verified = candidatePbs.find((c) => verifyMiddleName(enteredMiddleName, c.beneficiary));
+        if (verified) {
+          pb = verified;
+        } else {
+          pb = candidatePbs[0];
+        }
+      } else {
+        pb = candidatePbs[0];
+      }
+    }
+
+    if (pb) {
+      qr = pb.qrCodes.find((q: any) => q.status === "ACTIVE") || pb.qrCodes[0] || null;
+    }
+  }
+
+  // 2. Search by exact QR token
+  if (!pb && cleanToken) {
     qr = await prisma.qrCode.findFirst({
       where: {
         OR: [{ publicToken: cleanToken }, { publicToken: cleanToken.toUpperCase() }],
@@ -176,8 +241,8 @@ async function handleLookup(params: any) {
     }
   }
 
-  // Search by designated slot number
-  if (!pb && (designatedNumber || /^\d+$/.test(cleanToken))) {
+  // 3. Search by designated slot number
+  if (!pb && (designatedNumber || (/^\d+$/.test(cleanToken) && cleanToken.length < 5))) {
     const slotNum = designatedNumber || String(parseInt(cleanToken, 10));
     const whereClause: any = { designatedNumber: slotNum, participationStatus: "ACTIVE" };
     if (programIdParam) whereClause.programId = programIdParam;
@@ -193,12 +258,12 @@ async function handleLookup(params: any) {
     }
   }
 
-  // Search by beneficiary name or number
-  if (!pb && cleanToken) {
+  // 4. Search by general beneficiary name or token
+  if (!pb && cleanToken && !/^\d+$/.test(cleanToken)) {
     const whereClause: any = {
       OR: [
         { beneficiary: { beneficiaryNumber: cleanToken } },
-        { beneficiary: { fullName: { equals: cleanToken, mode: "insensitive" } } },
+        { beneficiary: { fullName: { contains: cleanToken, mode: "insensitive" } } },
       ],
     };
     if (programIdParam) whereClause.programId = programIdParam;
@@ -216,7 +281,7 @@ async function handleLookup(params: any) {
 
   if (!pb) {
     return NextResponse.json(
-      { error: "Beneficiary or QR Token was not recognized in any active TUPAD program." },
+      { error: "Walang nahanap na aktibong tala ng TUPAD benepisyaryo sa impormasyong ibinigay. Pakitiyak ang tamang baybay ng iyong Pangalan, Apelyido, at Gitnang Pangalan." },
       { status: 404 }
     );
   }

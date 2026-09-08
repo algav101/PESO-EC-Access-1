@@ -22,6 +22,7 @@ import {
   Globe,
   HelpCircle,
   FileText,
+  MapPin,
 } from "lucide-react";
 
 interface NavDrawerItem {
@@ -83,6 +84,7 @@ export function LandingNavDrawer() {
       category: "Core Mandate Services",
       links: [
         { title: "TUPAD Online Application & Registration", href: "/apply", icon: Sparkles, highlight: true, isExternal: false },
+        { title: "TUPAD Work Area & Assignment Lookup", href: "#work-assignment", icon: MapPin, highlight: true, badge: "DPA Verified", isExternal: false },
         { title: "TUPAD Application Status Inquiry", href: "#inquiry", icon: FileCheck, isExternal: false },
         { title: "365-Day Eligibility Rule Checker", href: "/restrictions/checker", icon: ShieldCheck, isExternal: false },
         { title: "Active Work Programs Hub", href: "#programs", icon: Briefcase, isExternal: false },
