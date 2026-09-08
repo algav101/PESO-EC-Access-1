@@ -40,13 +40,14 @@ import { formatDate, normalizeBarangayName } from "@/lib/utils";
 import { TableAssignmentModal } from "@/components/tables/TableAssignmentModal";
 import { ETupadCard } from "@/components/stubs/ETupadCard";
 import { Format1Stub } from "@/components/stubs/Format1Stub";
+import { Format4SchedulePass } from "@/components/stubs/Format4SchedulePass";
 import {
   getQrDataUrl,
   getCachedQrSync,
   batchPreloadQrCodes,
 } from "@/lib/qr-client-cache";
 
-type PrintTemplateMode = "FULL_STUB" | "QR_CARD_ONLY" | "STICKER_LABEL";
+type PrintTemplateMode = "FULL_STUB" | "QR_CARD_ONLY" | "STICKER_LABEL" | "SCHEDULE_PASS";
 
 function StubsContent() {
   const searchParams = useSearchParams();
@@ -61,6 +62,14 @@ function StubsContent() {
 
   // Print Mode
   const [templateMode, setTemplateMode] = useState<PrintTemplateMode>("FULL_STUB");
+
+  // Designated Batch QR Generation Modal State
+  const [isDesignatedGenModalOpen, setIsDesignatedGenModalOpen] = useState(false);
+  const [isGeneratingDesignated, setIsGeneratingDesignated] = useState(false);
+  const [designatedGenProgress, setDesignatedGenProgress] = useState<string | null>(null);
+  const [designatedSuccessMsg, setDesignatedSuccessMsg] = useState<string | null>(null);
+  const [forceRegenerateQrs, setForceRegenerateQrs] = useState(false);
+  const [designatedFilterBrgy, setDesignatedFilterBrgy] = useState("ALL");
 
   // Designer layout controls (Manual Row and Column Input Support)
   const [paperSize, setPaperSize] = useState("A4");
@@ -141,12 +150,49 @@ function StubsContent() {
     } else if (templateMode === "STICKER_LABEL") {
       setColumnsPerPage(3);
       setRowsPerPage(6);
+    } else if (templateMode === "SCHEDULE_PASS") {
+      setColumnsPerPage(2);
+      setRowsPerPage(2);
     } else {
       setColumnsPerPage(2);
       setRowsPerPage(5);
     }
     setPreviewSheetPage(1);
   }, [templateMode]);
+
+  const handleBatchGenerateDesignated = async () => {
+    if (!selectedProgramId) return;
+    setIsGeneratingDesignated(true);
+    setDesignatedGenProgress("Nagsisimulang mag-generate ng designated QR codes...");
+    setDesignatedSuccessMsg(null);
+
+    try {
+      const res = await fetch(`/api/v1/programs/${selectedProgramId}/qr/generate-designated`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          forceRegenerate: forceRegenerateQrs,
+          barangay: designatedFilterBrgy !== "ALL" ? designatedFilterBrgy : undefined,
+          origin: typeof window !== "undefined" ? window.location.origin : undefined,
+        }),
+      });
+
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setDesignatedSuccessMsg(
+          data.message || `Matagumpay na nai-generate ang Designated QR Codes para sa ${data.stats?.totalCount || "lahat ng"} benepisyaryo.`
+        );
+        await fetchBeneficiaries(selectedProgramId);
+      } else {
+        alert("Nabigo ang pag-generate ng QR codes: " + (data.error || "May naganap na error."));
+      }
+    } catch (err: any) {
+      alert("Network Error: " + err.message);
+    } finally {
+      setIsGeneratingDesignated(false);
+      setDesignatedGenProgress(null);
+    }
+  };
 
   const currentProgram = programs.find((p) => p.id === selectedProgramId);
 
@@ -446,6 +492,19 @@ function StubsContent() {
 
           <div className="flex flex-wrap items-center gap-2">
             <button
+              type="button"
+              onClick={() => {
+                setIsDesignatedGenModalOpen(true);
+                setDesignatedSuccessMsg(null);
+              }}
+              className="px-4 py-2 bg-gradient-to-r from-emerald-600 to-teal-700 hover:from-emerald-500 hover:to-teal-600 text-white font-extrabold text-xs rounded-xl shadow-lg flex items-center space-x-1.5 transition border border-emerald-400/40 active:scale-95"
+              title="Mag-generate ng bagong scannable QR pass na direct nagdidirekta sa designated schedule"
+            >
+              <Sparkles className="w-4 h-4 text-gov-goldLight" />
+              <span>Generate Designated QR for All</span>
+            </button>
+
+            <button
               onClick={() => setIsTableModalOpen(true)}
               className="px-3.5 py-2 bg-slate-800 hover:bg-slate-900 text-gov-goldLight font-bold text-xs rounded-xl shadow flex items-center space-x-1.5 transition border border-gov-gold/30"
             >
@@ -477,42 +536,73 @@ function StubsContent() {
           </div>
         </div>
 
+        {/* Designated QR Generation Notification Alert */}
+        {designatedSuccessMsg && (
+          <div className="p-4 bg-emerald-950/80 border-2 border-emerald-500/80 rounded-2xl flex items-start space-x-3 text-emerald-200 text-xs shadow-lg animate-fadeIn">
+            <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0 mt-0.5" />
+            <div className="space-y-1">
+              <p className="font-extrabold text-white text-sm flex items-center gap-1.5">
+                <span>🌟 Designated QR Codes Active &amp; Synchronized!</span>
+                <span className="px-2 py-0.5 rounded-full bg-emerald-500/30 text-emerald-300 font-mono text-[10px]">
+                  CANONICAL SOURCE ESTABLISHED
+                </span>
+              </p>
+              <p className="leading-relaxed">{designatedSuccessMsg}</p>
+              <p className="text-[11px] text-emerald-300/80">
+                Ang na-generate na QR code dito ang opisyal na magsisilbing reference para sa cellphone camera scanning at para sa <strong>Field Scanner Hub (Designated Beneficiary QR Pass &amp; Screenshot Studio)</strong>.
+              </p>
+            </div>
+          </div>
+        )}
+
         {/* Template Format Selector Tabs (Instant 0ms Switching) */}
         <div className="p-1.5 bg-slate-100 rounded-2xl flex flex-wrap gap-2 border border-slate-200 shadow-inner">
           <button
             onClick={() => setTemplateMode("FULL_STUB")}
-            className={`flex-1 min-w-[200px] py-2.5 px-4 rounded-xl text-xs font-black transition flex items-center justify-center space-x-2 ${
+            className={`flex-1 min-w-[180px] py-2.5 px-3 rounded-xl text-xs font-black transition flex items-center justify-center space-x-2 ${
               templateMode === "FULL_STUB"
                 ? "bg-gov-blue text-white shadow-md"
                 : "text-slate-600 hover:text-slate-900 hover:bg-white/70"
             }`}
           >
             <FileText className={`w-4 h-4 ${templateMode === "FULL_STUB" ? "text-gov-goldLight" : "text-slate-400"}`} />
-            <span>Format 1: Full Verification Stub (With Demographics)</span>
+            <span>Format 1: Full Verification Stub</span>
           </button>
 
           <button
             onClick={() => setTemplateMode("QR_CARD_ONLY")}
-            className={`flex-1 min-w-[200px] py-2.5 px-4 rounded-xl text-xs font-black transition flex items-center justify-center space-x-2 ${
+            className={`flex-1 min-w-[180px] py-2.5 px-3 rounded-xl text-xs font-black transition flex items-center justify-center space-x-2 ${
               templateMode === "QR_CARD_ONLY"
                 ? "bg-gov-blue text-white shadow-md"
                 : "text-slate-600 hover:text-slate-900 hover:bg-white/70"
             }`}
           >
             <CreditCard className={`w-4 h-4 ${templateMode === "QR_CARD_ONLY" ? "text-gov-goldLight" : "text-slate-400"}`} />
-            <span>Format 2: Dedicated Unique QR Card / Lamination Badge</span>
+            <span>Format 2: e-TUPAD Badge Card</span>
           </button>
 
           <button
             onClick={() => setTemplateMode("STICKER_LABEL")}
-            className={`flex-1 min-w-[200px] py-2.5 px-4 rounded-xl text-xs font-black transition flex items-center justify-center space-x-2 ${
+            className={`flex-1 min-w-[180px] py-2.5 px-3 rounded-xl text-xs font-black transition flex items-center justify-center space-x-2 ${
               templateMode === "STICKER_LABEL"
                 ? "bg-gov-blue text-white shadow-md"
                 : "text-slate-600 hover:text-slate-900 hover:bg-white/70"
             }`}
           >
             <Tag className={`w-4 h-4 ${templateMode === "STICKER_LABEL" ? "text-gov-goldLight" : "text-slate-400"}`} />
-            <span>Format 3: High-Density QR Sticker Labels</span>
+            <span>Format 3: QR Sticker Labels</span>
+          </button>
+
+          <button
+            onClick={() => setTemplateMode("SCHEDULE_PASS")}
+            className={`flex-1 min-w-[220px] py-2.5 px-3 rounded-xl text-xs font-black transition flex items-center justify-center space-x-2 ${
+              templateMode === "SCHEDULE_PASS"
+                ? "bg-gradient-to-r from-emerald-700 to-teal-800 text-white shadow-md border border-emerald-400/40"
+                : "text-emerald-800 bg-emerald-50 hover:bg-emerald-100/80 border border-emerald-200"
+            }`}
+          >
+            <Sparkles className={`w-4 h-4 ${templateMode === "SCHEDULE_PASS" ? "text-gov-gold" : "text-emerald-600"}`} />
+            <span>Format 4: Designated Work Area &amp; Schedule Pass</span>
           </button>
         </div>
 
@@ -1423,6 +1513,29 @@ function StubsContent() {
               );
             }
 
+            if (templateMode === "SCHEDULE_PASS") {
+              return (
+                <div key={pb.id} className="flex items-center justify-center p-1">
+                  <Format4SchedulePass
+                    designatedNumber={pb.designatedNumber}
+                    qrDataUrl={qrImg}
+                    token={activeQr?.publicToken}
+                    fullName={pb.beneficiary?.fullName || ""}
+                    barangay={pb.beneficiary?.barangay || ""}
+                    sitio={pb.beneficiary?.sitio || "Centro"}
+                    sex={pb.beneficiary?.sex || "BENEFICIARY"}
+                    tableNumber={pb.tableNumber || "Table 1"}
+                    programName={currentProgram?.programName}
+                    programCode={currentProgram?.programCode}
+                    allDaysSchedule={pb.allDaysSchedule}
+                    desigNumFontSize={desigNumFontSize}
+                    nameFontSizeScale={nameFontSizeScale}
+                    qrSizePercent={qrSizePercent}
+                  />
+                </div>
+              );
+            }
+
             return (
               <div
                 key={pb.id}
@@ -1520,6 +1633,29 @@ function StubsContent() {
               );
             }
 
+            if (templateMode === "SCHEDULE_PASS") {
+              return (
+                <div key={pb.id} className="flex items-center justify-center p-1 page-break-inside-avoid">
+                  <Format4SchedulePass
+                    designatedNumber={pb.designatedNumber}
+                    qrDataUrl={qrImg}
+                    token={activeQr?.publicToken}
+                    fullName={pb.beneficiary?.fullName || ""}
+                    barangay={pb.beneficiary?.barangay || ""}
+                    sitio={pb.beneficiary?.sitio || "Centro"}
+                    sex={pb.beneficiary?.sex || "BENEFICIARY"}
+                    tableNumber={pb.tableNumber || "Table 1"}
+                    programName={currentProgram?.programName}
+                    programCode={currentProgram?.programCode}
+                    allDaysSchedule={pb.allDaysSchedule}
+                    desigNumFontSize={desigNumFontSize}
+                    nameFontSizeScale={nameFontSizeScale}
+                    qrSizePercent={qrSizePercent}
+                  />
+                </div>
+              );
+            }
+
             return (
               <div
                 key={pb.id}
@@ -1557,6 +1693,136 @@ function StubsContent() {
           })}
         </div>
       </div>
+
+      {/* Batch Designated QR Generator Modal */}
+      {isDesignatedGenModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-fadeIn">
+          <div className="bg-slate-950 text-white rounded-3xl max-w-lg w-full p-6 space-y-5 shadow-2xl border-2 border-emerald-500/50 relative overflow-hidden">
+            <div className="flex items-start justify-between border-b border-slate-800 pb-3">
+              <div className="flex items-center space-x-2.5">
+                <div className="p-2.5 bg-emerald-500/20 text-emerald-400 rounded-xl border border-emerald-500/30">
+                  <Sparkles className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-black text-white tracking-tight">
+                    Generate Designated Work Area QR Codes
+                  </h3>
+                  <p className="text-xs text-slate-400">
+                    Mag-generate ng active scannable QR pass para sa lahat ng benepisyaryo.
+                  </p>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setIsDesignatedGenModalOpen(false)}
+                className="text-slate-400 hover:text-white text-sm p-1"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="space-y-4 text-xs text-slate-300">
+              <div className="p-3.5 bg-slate-900 rounded-2xl border border-slate-800 space-y-2">
+                <div className="flex items-center justify-between text-xs font-bold">
+                  <span className="text-slate-400">Program:</span>
+                  <span className="text-gov-gold font-mono">{currentProgram?.programName || "Active TUPAD Program"}</span>
+                </div>
+                <div className="flex items-center justify-between text-xs font-bold">
+                  <span className="text-slate-400">Kabuuang Benepisyaryo:</span>
+                  <span className="text-white font-mono font-black">{beneficiaries.length} Enrolled</span>
+                </div>
+              </div>
+
+              {/* Barangay Filter Selector */}
+              <div>
+                <label className="block text-[11px] font-bold text-slate-300 uppercase mb-1">
+                  Target Barangay (Opsyonal)
+                </label>
+                <select
+                  value={designatedFilterBrgy}
+                  onChange={(e) => setDesignatedFilterBrgy(e.target.value)}
+                  className="w-full bg-slate-900 border border-slate-700 text-white rounded-xl px-3 py-2 text-xs font-bold focus:outline-none focus:border-emerald-400"
+                >
+                  <option value="ALL">Lahat ng Barangay (All Beneficiaries)</option>
+                  {Array.from(new Set(beneficiaries.map((b) => b.beneficiary?.barangay).filter(Boolean))).map((brgy) => (
+                    <option key={brgy} value={brgy}>
+                      Brgy. {brgy}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Force Regenerate Checkbox */}
+              <label className="flex items-start space-x-2.5 p-3 bg-slate-900 rounded-xl border border-slate-800 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={forceRegenerateQrs}
+                  onChange={(e) => setForceRegenerateQrs(e.target.checked)}
+                  className="mt-0.5 rounded border-slate-700 text-emerald-500 focus:ring-emerald-400"
+                />
+                <div className="space-y-0.5">
+                  <span className="font-bold text-white block">Mag-generate ng Bagong Tokens (Force Refresh)</span>
+                  <span className="text-[10px] text-slate-400 block">
+                    Kung naka-check, papalitan ang umiiral na QR tokens ng bagong cryptographic tokens at ia-update ang active reference sa database.
+                  </span>
+                </div>
+              </label>
+
+              {/* Informative Guidance */}
+              <div className="p-3 bg-blue-950/60 border border-blue-800/80 rounded-xl text-blue-200 text-[11px] space-y-1">
+                <span className="font-bold flex items-center gap-1 text-blue-300">
+                  <ShieldCheck className="w-3.5 h-3.5 text-blue-400" />
+                  <span>Canonical QR Source:</span>
+                </span>
+                <p>
+                  Ang mga QR codes na ito ang magsisilbing reference para sa cellphone built-in camera scanning, direct work assignment routing, at magiging source sa <strong>Field Scanner Hub</strong>.
+                </p>
+              </div>
+
+              {designatedGenProgress && (
+                <div className="p-3 bg-emerald-950/80 border border-emerald-700 rounded-xl text-emerald-300 font-bold text-center flex items-center justify-center gap-2">
+                  <RefreshCw className="w-4 h-4 animate-spin text-emerald-400" />
+                  <span>{designatedGenProgress}</span>
+                </div>
+              )}
+            </div>
+
+            <div className="flex items-center justify-end space-x-2 pt-2 border-t border-slate-800">
+              <button
+                type="button"
+                onClick={() => setIsDesignatedGenModalOpen(false)}
+                disabled={isGeneratingDesignated}
+                className="px-4 py-2 text-xs font-bold text-slate-400 hover:text-white rounded-xl bg-slate-900 hover:bg-slate-800 transition disabled:opacity-50"
+              >
+                Kanselahin
+              </button>
+
+              <button
+                type="button"
+                onClick={async () => {
+                  await handleBatchGenerateDesignated();
+                  setIsDesignatedGenModalOpen(false);
+                }}
+                disabled={isGeneratingDesignated}
+                className="px-5 py-2 bg-gradient-to-r from-emerald-600 to-teal-700 hover:from-emerald-500 hover:to-teal-600 text-white font-black text-xs rounded-xl shadow-lg transition flex items-center space-x-1.5 active:scale-95 disabled:opacity-50"
+              >
+                {isGeneratingDesignated ? (
+                  <>
+                    <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                    <span>Nagsasagawa...</span>
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="w-3.5 h-3.5" />
+                    <span>I-generate Ngayon</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Mandatory Reprint Modal */}
       {isReprintModalOpen && (

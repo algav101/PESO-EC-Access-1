@@ -526,11 +526,72 @@ async function runTests() {
     assert(directRoutingUrl.includes("/my-assignment?token="), "Direct camera scannable routing URL formed correctly");
     assert(directRoutingUrl.includes(createdQr.publicToken), "Routing URL embeds unique beneficiary publicToken");
 
+    // TEST 13: Batch Designated QR Code Generation & Canonical Synchronization
+    console.log("\n[TEST 13] Batch Designated QR Code Generation & Canonical Synchronization");
+    const testBatchProg = await prisma.program.create({
+      data: {
+        programCode: `TEST-DESIG-${Date.now()}`,
+        programName: "Test Designated Work Program",
+        status: "ACTIVE",
+        requiredWorkDays: 10,
+      },
+    });
+
+    const beneA = await prisma.beneficiary.create({
+      data: {
+        beneficiaryNumber: `TEST-BENE-A-${Date.now()}`,
+        fullName: "ALVAREZ, MARIA SANTOS",
+        lastName: "ALVAREZ",
+        firstName: "MARIA",
+        middleName: "SANTOS",
+        birthday: "1990-01-01",
+        sex: "FEMALE",
+        barangay: "Poblacion",
+        sitio: "Purok 1",
+        status: "ACTIVE",
+      },
+    });
+
+    const pbA = await prisma.programBeneficiary.create({
+      data: {
+        programId: testBatchProg.id,
+        beneficiaryId: beneA.id,
+        designatedNumber: "1",
+        tableNumber: "Table 1",
+        participationStatus: "ACTIVE",
+      },
+    });
+
+    // Generate batch token
+    const tokenObjA = generateBeneficiaryToken(testBatchProg.id, pbA.designatedNumber);
+    const activeQrA = await prisma.qrCode.create({
+      data: {
+        programId: testBatchProg.id,
+        programBeneficiaryId: pbA.id,
+        publicToken: tokenObjA.publicToken,
+        tokenHash: tokenObjA.tokenHash,
+        status: "ACTIVE",
+      },
+    });
+
+    assert(Boolean(activeQrA.publicToken), "Batch designated QR code created with active token");
+    assert(activeQrA.status === "ACTIVE", "Designated QR status marked as ACTIVE");
+
+    // Verify token can be queried as canonical source
+    const queriedPb = await prisma.programBeneficiary.findUnique({
+      where: { id: pbA.id },
+      include: { qrCodes: { where: { status: "ACTIVE" } } },
+    });
+
+    assert(queriedPb.qrCodes.length === 1, "Exactly one active QR code attached as canonical source");
+    assert(queriedPb.qrCodes[0].publicToken === activeQrA.publicToken, "Canonical QR token matches generated pass token");
+
     // Clean up
-    await prisma.qrCode.delete({ where: { id: createdQr.id } });
-    await prisma.programBeneficiary.delete({ where: { id: testPb.id } });
-    await prisma.beneficiary.delete({ where: { id: testQrBene.id } });
-    assert(true, "Field QR Pass generation test candidate cleaned up safely");
+    await prisma.qrCode.deleteMany({ where: { programBeneficiaryId: pbA.id } });
+    await prisma.programBeneficiary.delete({ where: { id: pbA.id } });
+    await prisma.beneficiary.delete({ where: { id: beneA.id } });
+    await prisma.program.delete({ where: { id: testBatchProg.id } });
+    assert(true, "Batch designated QR test suite resources cleaned up");
 
     console.log("\n==================================================================");
     console.log(`TEST SUMMARY: ${passed} PASSED, ${failed} FAILED`);

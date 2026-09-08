@@ -4,6 +4,8 @@ import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getCurrentUser, isAdminUser, hasPermission } from "@/lib/auth";
 import { logAudit } from "@/lib/audit";
+import { assignBeneficiaryWorkArea, WorkProgramItemAllocation } from "@/lib/work-assignment";
+import { format } from "date-fns";
 
 export async function GET(request: Request, { params }: { params: { id: string } }) {
   try {
@@ -100,7 +102,102 @@ export async function GET(request: Request, { params }: { params: { id: string }
       return String(a.designatedNumber).localeCompare(String(b.designatedNumber), undefined, { numeric: true });
     });
 
-    return NextResponse.json({ beneficiaries });
+    // Query program details and work program items to attach 10-day nearest purok schedule
+    const program = await prisma.program.findUnique({
+      where: { id: params.id },
+      include: {
+        workDays: { orderBy: { dayNumber: "asc" } },
+        tupadWorkPrograms: {
+          include: {
+            items: { orderBy: [{ dayNumber: "asc" }, { orderIndex: "asc" }] },
+          },
+        },
+      },
+    });
+
+    const enrichedBeneficiaries = beneficiaries.map((pb) => {
+      if (!program) return pb;
+
+      const beneBrgy = (pb.beneficiary.barangay || "").toUpperCase().trim();
+      const matchingWp =
+        program.tupadWorkPrograms.find((wp: any) => {
+          const wpBrgy = (wp.barangay || "").toUpperCase().trim();
+          const wpLoc = (wp.projectLocation || "").toUpperCase().trim();
+          return (
+            wpBrgy === beneBrgy ||
+            wpLoc === beneBrgy ||
+            (beneBrgy && wpBrgy.includes(beneBrgy)) ||
+            (wpBrgy && beneBrgy.includes(wpBrgy))
+          );
+        }) || program.tupadWorkPrograms[0] || null;
+
+      const totalDays = program.requiredWorkDays || 10;
+      const allDaysSchedule: any[] = [];
+
+      for (let d = 1; d <= totalDays; d++) {
+        const matchingWorkDay = program.workDays.find((w: any) => w.dayNumber === d);
+        const dayDate = matchingWorkDay?.workDate || format(new Date(), "yyyy-MM-dd");
+
+        let specificDayItems: WorkProgramItemAllocation[] = (matchingWp?.items || [])
+          .filter((it: any) => it.dayNumber === d)
+          .map((it: any) => ({
+            id: it.id,
+            dayNumber: it.dayNumber,
+            specificActivities: it.specificActivities,
+            area: it.area,
+            maleCount: it.maleCount || 0,
+            femaleCount: it.femaleCount || 0,
+            scPwdMaleCount: it.scPwdMaleCount || 0,
+            scPwdFemaleCount: it.scPwdFemaleCount || 0,
+            totalCount: it.totalCount || 0,
+          }));
+
+        if (specificDayItems.length === 0 && matchingWp?.items?.length > 0) {
+          specificDayItems = matchingWp.items.map((it: any) => ({
+            id: it.id,
+            dayNumber: d,
+            specificActivities: it.specificActivities,
+            area: it.area,
+            maleCount: it.maleCount || 0,
+            femaleCount: it.femaleCount || 0,
+            scPwdMaleCount: it.scPwdMaleCount || 0,
+            scPwdFemaleCount: it.scPwdFemaleCount || 0,
+            totalCount: it.totalCount || 0,
+          }));
+        }
+
+        const calculated = assignBeneficiaryWorkArea(
+          {
+            id: pb.beneficiary.id,
+            designatedNumber: pb.designatedNumber,
+            fullName: pb.beneficiary.fullName,
+            sex: pb.beneficiary.sex,
+            sitio: pb.beneficiary.sitio,
+            barangay: pb.beneficiary.barangay,
+            isSenior: pb.beneficiary.isSenior,
+            isPwd: pb.beneficiary.isPwd,
+          },
+          specificDayItems,
+          d
+        );
+
+        allDaysSchedule.push({
+          dayNumber: d,
+          workDate: dayDate,
+          area: calculated.area,
+          specificActivity: calculated.specificActivity,
+          matchingRationale: calculated.matchingRationale,
+          allocationMethod: calculated.allocationMethod,
+        });
+      }
+
+      return {
+        ...pb,
+        allDaysSchedule,
+      };
+    });
+
+    return NextResponse.json({ beneficiaries: enrichedBeneficiaries });
   } catch (error: any) {
     console.error("GET /programs/[id]/beneficiaries error:", error);
     return NextResponse.json({ error: error.message }, { status: 500 });

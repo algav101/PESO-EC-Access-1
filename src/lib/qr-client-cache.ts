@@ -17,8 +17,16 @@ export async function getQrDataUrl(
   if (existing) return existing;
 
   try {
-    const dataUrl = await QRCode.toDataURL(token, {
-      width: 220,
+    let payload = token;
+    if (!token.startsWith("http://") && !token.startsWith("https://")) {
+      const origin = typeof window !== "undefined" && window.location?.origin ? window.location.origin : "";
+      if (origin) {
+        payload = `${origin}/my-assignment?token=${encodeURIComponent(token)}`;
+      }
+    }
+
+    const dataUrl = await QRCode.toDataURL(payload, {
+      width: 250,
       margin: 1,
       color: { dark: darkColor, light: "#ffffff" },
       errorCorrectionLevel: "M", // M level delivers crystal-clear scan accuracy and instant rendering

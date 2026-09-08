@@ -10,11 +10,14 @@ async function doCommit() {
 
     // List of files to add / track
     const filesToStage = [
-      "src/lib/work-assignment.ts",
-      "src/app/api/v1/work-assignment/lookup/route.ts",
-      "src/app/my-assignment/page.tsx",
-      "src/app/reports/page.tsx",
-      "src/lib/excel-exporter.ts",
+      "src/components/layout/Navbar.tsx",
+      "src/app/field/page.tsx",
+      "src/components/field/FieldQrPassGeneratorCard.tsx",
+      "src/components/stubs/Format4SchedulePass.tsx",
+      "src/app/stubs/page.tsx",
+      "src/app/api/v1/programs/[id]/qr/generate-designated/route.ts",
+      "src/app/api/v1/programs/[id]/beneficiaries/route.ts",
+      "src/lib/qr-client-cache.ts",
       "test/test-suite.mjs",
       "scripts/commit.js",
     ];
@@ -38,7 +41,7 @@ async function doCommit() {
         name: "PESO Dingalan",
         email: "peso@dingalan.gov.ph",
       },
-      message: "feat(accomplishment): add QR code work area routing and proximity/gender allocation engine",
+      message: "fix(field): fix client-side runtime exception and feat(stubs): add batch designated QR code generation & Format 4 schedule pass",
     });
 
     console.log("\n[SUCCESS] Committed successfully!");

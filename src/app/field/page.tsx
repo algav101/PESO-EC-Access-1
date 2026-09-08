@@ -65,6 +65,21 @@ const FIELD_OPERATIONS = [
 ];
 
 export default function FieldScannerHubPage() {
+  return (
+    <React.Suspense
+      fallback={
+        <div className="p-12 text-center text-xs text-slate-400 flex flex-col items-center justify-center space-y-3">
+          <div className="w-8 h-8 border-3 border-gov-gold border-t-transparent rounded-full animate-spin" />
+          <span>Ikinakarga ang TUPAD Field Scanner Hub...</span>
+        </div>
+      }
+    >
+      <FieldScannerHubContent />
+    </React.Suspense>
+  );
+}
+
+function FieldScannerHubContent() {
   const [activeTab, setActiveTab] = useState<"qr-generator" | "scanner-tools">("qr-generator");
 
   return (

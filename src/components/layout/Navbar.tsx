@@ -1,7 +1,6 @@
 "use client";
 
-import React from "react";
-import Link from "next/navigation";
+import Link from "next/link";
 import { useAuth } from "@/context/AuthContext";
 import { useOffline } from "@/context/OfflineContext";
 import { PesoLogo } from "./PesoLogo";
