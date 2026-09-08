@@ -184,7 +184,7 @@ async function handleLookup(params: any) {
 
     pb = await prisma.programBeneficiary.findFirst({
       where: whereClause,
-      orderBy: { createdAt: "desc" },
+      orderBy: { joinedAt: "desc" },
       include: pbIncludes,
     });
 
@@ -205,7 +205,7 @@ async function handleLookup(params: any) {
 
     pb = await prisma.programBeneficiary.findFirst({
       where: whereClause,
-      orderBy: { createdAt: "desc" },
+      orderBy: { joinedAt: "desc" },
       include: pbIncludes,
     });
 
