@@ -45,7 +45,7 @@ async function doCommit() {
         name: "PESO Dingalan",
         email: "peso@dingalan.gov.ph",
       },
-      message: "feat(privacy): retain original QR codes and enforce middle-name auth for work area and schedule routing",
+      message: "feat(stubs): lock and retain original Format 2 e-TUPAD CARD design and raw token QR encoding",
     });
 
     console.log("\n[SUCCESS] Committed successfully!");
