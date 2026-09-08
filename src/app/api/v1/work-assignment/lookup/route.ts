@@ -5,7 +5,7 @@ import { assignBeneficiaryWorkArea, WorkProgramItemAllocation } from "@/lib/work
 import { getCurrentUser } from "@/lib/auth";
 
 /**
- * Normalizes and verifies the entered middle name against the beneficiary's record (case-insensitive).
+ * Normalizes and verifies the entered middle name against the beneficiary's record (case-insensitive & accent-insensitive).
  */
 function verifyMiddleName(
   entered: string = "",
@@ -16,12 +16,26 @@ function verifyMiddleName(
     lastName?: string | null;
   }
 ): boolean {
-  const cleanEntered = (entered || "").trim().toLowerCase().replace(/[^a-z0-9]/g, "");
+  const cleanEntered = (entered || "")
+    .trim()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]/g, "");
 
   // 1. Direct match with beneficiary.middleName
-  const dbMiddle = (beneficiary.middleName || "").trim().toLowerCase().replace(/[^a-z0-9]/g, "");
+  const dbMiddle = (beneficiary.middleName || "")
+    .trim()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]/g, "");
+
   if (dbMiddle) {
     if (cleanEntered === dbMiddle) return true;
+    if (cleanEntered.length >= 3 && (dbMiddle.includes(cleanEntered) || cleanEntered.includes(dbMiddle))) return true;
+    // Single letter initial match
+    if (cleanEntered.length === 1 && dbMiddle.startsWith(cleanEntered)) return true;
   }
 
   // 2. If beneficiary has no middle name in DB, accept standard empty / N/A tokens
@@ -37,15 +51,27 @@ function verifyMiddleName(
     if (rawName.includes(",")) {
       const parts = rawName.split(",")[1]?.trim().split(/\s+/) || [];
       if (parts.length >= 2) {
-        const candidateMiddle = parts[parts.length - 1].toLowerCase().replace(/[^a-z0-9]/g, "");
+        const candidateMiddle = parts[parts.length - 1]
+          .toLowerCase()
+          .normalize("NFD")
+          .replace(/[\u0300-\u036f]/g, "")
+          .replace(/[^a-z0-9]/g, "");
         if (cleanEntered === candidateMiddle) return true;
+        if (cleanEntered.length >= 3 && (candidateMiddle.includes(cleanEntered) || cleanEntered.includes(candidateMiddle))) return true;
+        if (cleanEntered.length === 1 && candidateMiddle.startsWith(cleanEntered)) return true;
       }
     } else {
       // Format B: "FIRST MIDDLE LAST"
       const parts = rawName.split(/\s+/);
       if (parts.length >= 3) {
-        const candidateMiddle = parts[parts.length - 2].toLowerCase().replace(/[^a-z0-9]/g, "");
+        const candidateMiddle = parts[parts.length - 2]
+          .toLowerCase()
+          .normalize("NFD")
+          .replace(/[\u0300-\u036f]/g, "")
+          .replace(/[^a-z0-9]/g, "");
         if (cleanEntered === candidateMiddle) return true;
+        if (cleanEntered.length >= 3 && (candidateMiddle.includes(cleanEntered) || cleanEntered.includes(candidateMiddle))) return true;
+        if (cleanEntered.length === 1 && candidateMiddle.startsWith(cleanEntered)) return true;
       }
     }
   }
@@ -147,7 +173,7 @@ async function handleLookup(params: any) {
   let qr = null;
   let pb: any = null;
 
-  // 1. Search by structured Full Name (Last Name, First Name, Barangay)
+  // 1. Search in ProgramBeneficiary by structured Full Name (Last Name, First Name, Barangay)
   if (hasNameInput) {
     const andConditions: any[] = [];
 
@@ -182,7 +208,7 @@ async function handleLookup(params: any) {
 
     const candidatePbs = await prisma.programBeneficiary.findMany({
       where: whereClause,
-      orderBy: { createdAt: "desc" },
+      orderBy: { joinedAt: "desc" },
       include: pbIncludes,
       take: 10,
     });
@@ -205,6 +231,70 @@ async function handleLookup(params: any) {
 
     if (pb) {
       qr = pb.qrCodes.find((q: any) => q.status === "ACTIVE") || pb.qrCodes[0] || null;
+    }
+  }
+
+  // 1.5. Fallback: Search in Masterlist Beneficiaries if not found in ProgramBeneficiary
+  if (!pb && hasNameInput) {
+    const andConditions: any[] = [];
+    andConditions.push({
+      OR: [
+        { lastName: { contains: lastNameParam, mode: "insensitive" } },
+        { fullName: { contains: lastNameParam, mode: "insensitive" } },
+      ],
+    });
+    andConditions.push({
+      OR: [
+        { firstName: { contains: firstNameParam, mode: "insensitive" } },
+        { fullName: { contains: firstNameParam, mode: "insensitive" } },
+      ],
+    });
+    if (barangayParam && barangayParam !== "ALL") {
+      andConditions.push({
+        barangay: { contains: barangayParam, mode: "insensitive" },
+      });
+    }
+
+    const masterlistCandidates = await prisma.beneficiary.findMany({
+      where: { AND: andConditions },
+      orderBy: { createdAt: "desc" },
+      take: 10,
+    });
+
+    if (masterlistCandidates.length > 0) {
+      let matchedBene = masterlistCandidates[0];
+      if (enteredMiddleName) {
+        const verified = masterlistCandidates.find((c) => verifyMiddleName(enteredMiddleName, c));
+        if (verified) matchedBene = verified;
+      }
+
+      // Link with active program and work programs
+      const activeProg = await prisma.program.findFirst({
+        where: { status: "ACTIVE" },
+        include: {
+          workDays: { orderBy: { dayNumber: "asc" as const } },
+          tupadWorkPrograms: {
+            include: {
+              items: { orderBy: [{ dayNumber: "asc" as const }, { orderIndex: "asc" as const }] },
+            },
+          },
+        },
+        orderBy: { createdAt: "desc" },
+      });
+
+      if (activeProg) {
+        pb = {
+          id: `MASTERLIST-${matchedBene.id}`,
+          designatedNumber: "Enrolled",
+          participationStatus: "ACTIVE",
+          originalBeneficiary: true,
+          tableNumber: "Desk 1",
+          beneficiary: matchedBene,
+          program: activeProg,
+          qrCodes: [],
+          attendanceRecords: [],
+        };
+      }
     }
   }
 
@@ -249,7 +339,7 @@ async function handleLookup(params: any) {
 
     pb = await prisma.programBeneficiary.findFirst({
       where: whereClause,
-      orderBy: { createdAt: "desc" },
+      orderBy: { joinedAt: "desc" },
       include: pbIncludes,
     });
 
@@ -270,7 +360,7 @@ async function handleLookup(params: any) {
 
     pb = await prisma.programBeneficiary.findFirst({
       where: whereClause,
-      orderBy: { createdAt: "desc" },
+      orderBy: { joinedAt: "desc" },
       include: pbIncludes,
     });
 
@@ -360,25 +450,46 @@ async function handleLookup(params: any) {
   const workDate = activeWorkDay?.workDate || targetDate;
 
   // Get matching Work Program for the beneficiary's barangay
-  const beneBrgy = (beneficiary.barangay || "").toUpperCase();
-  const matchingWp = program.tupadWorkPrograms.find(
-    (wp: any) =>
-      wp.barangay.toUpperCase() === beneBrgy || (wp.projectLocation || "").toUpperCase() === beneBrgy
-  );
+  const beneBrgy = (beneficiary.barangay || "").toUpperCase().trim();
+  const matchingWp =
+    program.tupadWorkPrograms.find((wp: any) => {
+      const wpBrgy = (wp.barangay || "").toUpperCase().trim();
+      const wpLoc = (wp.projectLocation || "").toUpperCase().trim();
+      return (
+        wpBrgy === beneBrgy ||
+        wpLoc === beneBrgy ||
+        (beneBrgy && wpBrgy.includes(beneBrgy)) ||
+        (wpBrgy && beneBrgy.includes(wpBrgy))
+      );
+    }) || program.tupadWorkPrograms[0] || null;
 
-  const dayItems: WorkProgramItemAllocation[] = (matchingWp?.items || [])
+  let dayItems: WorkProgramItemAllocation[] = (matchingWp?.items || [])
     .filter((it: any) => it.dayNumber === dayNumber)
     .map((it: any) => ({
       id: it.id,
       dayNumber: it.dayNumber,
       specificActivities: it.specificActivities,
       area: it.area,
-      maleCount: it.maleCount,
-      femaleCount: it.femaleCount,
-      scPwdMaleCount: it.scPwdMaleCount,
-      scPwdFemaleCount: it.scPwdFemaleCount,
-      totalCount: it.totalCount,
+      maleCount: it.maleCount || 0,
+      femaleCount: it.femaleCount || 0,
+      scPwdMaleCount: it.scPwdMaleCount || 0,
+      scPwdFemaleCount: it.scPwdFemaleCount || 0,
+      totalCount: it.totalCount || 0,
     }));
+
+  if (dayItems.length === 0 && matchingWp?.items?.length > 0) {
+    dayItems = matchingWp.items.map((it: any) => ({
+      id: it.id,
+      dayNumber: it.dayNumber || dayNumber,
+      specificActivities: it.specificActivities,
+      area: it.area,
+      maleCount: it.maleCount || 0,
+      femaleCount: it.femaleCount || 0,
+      scPwdMaleCount: it.scPwdMaleCount || 0,
+      scPwdFemaleCount: it.scPwdFemaleCount || 0,
+      totalCount: it.totalCount || 0,
+    }));
+  }
 
   // Perform smart proximity and gender area assignment
   const assignment = assignBeneficiaryWorkArea(
