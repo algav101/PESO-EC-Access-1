@@ -397,6 +397,35 @@ async function runTests() {
     assert(assignmentFemale.assignedItem.id === "ITEM-B", "Female from Purok 5 assigned to nearest Purok 4-5 area");
     assert(assignmentFemale.allocationMethod === "EXACT_PUROK", "Allocation method is EXACT_PUROK");
 
+    // TEST 10: Case-Insensitive Middle Name Authentication
+    console.log("\n[TEST 10] Case-Insensitive Middle Name Authentication");
+    function verifyMiddleNameTest(entered, beneficiary) {
+      const cleanEntered = (entered || "").trim().toLowerCase().replace(/[^a-z0-9]/g, "");
+      const dbMiddle = (beneficiary.middleName || "").trim().toLowerCase().replace(/[^a-z0-9]/g, "");
+      if (dbMiddle && cleanEntered === dbMiddle) return true;
+      const noMiddleTokens = new Set(["", "na", "none", "wala", "no", "notapplicable"]);
+      if (!dbMiddle && noMiddleTokens.has(cleanEntered)) return true;
+      if (beneficiary.fullName) {
+        const rawName = beneficiary.fullName.trim();
+        if (rawName.includes(",")) {
+          const parts = rawName.split(",")[1]?.trim().split(/\s+/) || [];
+          if (parts.length >= 2 && cleanEntered === parts[parts.length - 1].toLowerCase().replace(/[^a-z0-9]/g, "")) return true;
+        }
+      }
+      return false;
+    }
+
+    const sampleBene = { middleName: "SANTOS", fullName: "DELA CRUZ, JUAN SANTOS" };
+    assert(verifyMiddleNameTest("santos", sampleBene) === true, "Lower-case 'santos' matches DB 'SANTOS'");
+    assert(verifyMiddleNameTest("SANTOS", sampleBene) === true, "Upper-case 'SANTOS' matches DB 'SANTOS'");
+    assert(verifyMiddleNameTest("Santos", sampleBene) === true, "Mixed-case 'Santos' matches DB 'SANTOS'");
+    assert(verifyMiddleNameTest("  santos  ", sampleBene) === true, "Padded '  santos  ' matches DB 'SANTOS'");
+    assert(verifyMiddleNameTest("GARCIA", sampleBene) === false, "Incorrect middle name 'GARCIA' is rejected");
+
+    const noMiddleBene = { middleName: null, fullName: "DELA CRUZ, JUAN" };
+    assert(verifyMiddleNameTest("N/A", noMiddleBene) === true, "'N/A' accepted when no middle name on record");
+    assert(verifyMiddleNameTest("none", noMiddleBene) === true, "'none' accepted when no middle name on record");
+
     console.log("\n==================================================================");
     console.log(`TEST SUMMARY: ${passed} PASSED, ${failed} FAILED`);
     console.log("==================================================================");
@@ -411,4 +440,5 @@ async function runTests() {
 }
 
 runTests();
+
 

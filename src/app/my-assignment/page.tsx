@@ -20,7 +20,9 @@ import {
   Phone,
   Layers,
   Search,
-  ExternalLink,
+  Lock,
+  KeyRound,
+  ShieldAlert,
 } from "lucide-react";
 import { QrScannerModal } from "@/components/scanner/QrScannerModal";
 import { PesoLogo } from "@/components/layout/PesoLogo";
@@ -31,8 +33,10 @@ function AssignmentContent() {
   const initialNumber = searchParams.get("designatedNumber") || searchParams.get("slot") || "";
 
   const [inputToken, setInputToken] = useState(initialToken || initialNumber);
+  const [middleNameInput, setMiddleNameInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [authChallenge, setAuthChallenge] = useState<any | null>(null);
   const [data, setData] = useState<any | null>(null);
   const [scannerOpen, setScannerOpen] = useState(false);
   const [selectedDay, setSelectedDay] = useState<number | null>(null);
@@ -43,7 +47,7 @@ function AssignmentContent() {
     }
   }, [initialToken, initialNumber]);
 
-  const performLookup = async (tokenOrNumber: string, dayNum?: number) => {
+  const performLookup = async (tokenOrNumber: string, dayNum?: number, customMiddleName?: string) => {
     if (!tokenOrNumber.trim()) return;
     setLoading(true);
     setError(null);
@@ -59,12 +63,24 @@ function AssignmentContent() {
         queryParams.set("dayNumber", String(dayNum));
       }
 
+      // Check for middle name in parameter or state
+      const middleNameToUse = customMiddleName !== undefined ? customMiddleName : middleNameInput;
+      if (middleNameToUse !== undefined && middleNameToUse !== null && middleNameToUse !== "") {
+        queryParams.set("middleName", middleNameToUse.trim());
+      }
+
       const res = await fetch(`/api/v1/work-assignment/lookup?${queryParams.toString()}`);
       const json = await res.json();
 
       if (res.ok && json.success) {
         setData(json);
+        setAuthChallenge(null);
         setSelectedDay(json.workDay.dayNumber);
+      } else if (json.requiresAuth) {
+        // Beneficiary found but requires middle name authentication
+        setAuthChallenge(json.challenge);
+        setData(null);
+        setError(null);
       } else {
         setError(json.error || "Failed to find assignment details for this QR code.");
         setData(null);
@@ -80,13 +96,20 @@ function AssignmentContent() {
   const handleScan = (scannedText: string) => {
     setScannerOpen(false);
     setInputToken(scannedText);
-    performLookup(scannedText);
+    setMiddleNameInput("");
+    setAuthChallenge(null);
+    performLookup(scannedText, undefined, "");
+  };
+
+  const handleVerifyMiddleName = (e: React.FormEvent) => {
+    e.preventDefault();
+    performLookup(inputToken, selectedDay || undefined, middleNameInput);
   };
 
   const handleDayChange = (newDay: number) => {
     setSelectedDay(newDay);
     if (inputToken) {
-      performLookup(inputToken, newDay);
+      performLookup(inputToken, newDay, middleNameInput);
     }
   };
 
@@ -122,6 +145,7 @@ function AssignmentContent() {
           <form
             onSubmit={(e) => {
               e.preventDefault();
+              setAuthChallenge(null);
               performLookup(inputToken);
             }}
             className="flex flex-col sm:flex-row gap-2.5"
@@ -169,7 +193,83 @@ function AssignmentContent() {
           </div>
         )}
 
-        {/* Beneficiary Assignment Details Card */}
+        {/* IDENTITY VERIFICATION CHALLENGE MODAL / CARD (MIDDLE NAME AUTHENTICATION) */}
+        {authChallenge && !data && (
+          <div className="bg-slate-950 border-2 border-amber-500/50 rounded-2xl p-5 sm:p-6 shadow-2xl space-y-4 animate-fadeIn">
+            <div className="flex items-start space-x-3 border-b border-slate-800 pb-4">
+              <div className="w-10 h-10 rounded-xl bg-amber-500/20 text-amber-400 border border-amber-500/40 flex items-center justify-center flex-shrink-0">
+                <Lock className="w-5 h-5" />
+              </div>
+              <div className="space-y-0.5">
+                <div className="inline-flex items-center space-x-1 text-[10px] font-bold text-amber-400 uppercase tracking-wider">
+                  <ShieldCheck className="w-3 h-3" />
+                  <span>Data Privacy Authentication</span>
+                </div>
+                <h3 className="text-sm sm:text-base font-bold text-white">
+                  Enter Registered Middle Name to Verify Identity
+                </h3>
+                <p className="text-xs text-slate-400">
+                  To protect your personal data under the Data Privacy Act, please enter your registered middle name.
+                </p>
+              </div>
+            </div>
+
+            {/* Hint Box with Masked Identity */}
+            <div className="p-3.5 bg-slate-900 rounded-xl border border-slate-800 flex items-center justify-between text-xs">
+              <div className="space-y-0.5">
+                <span className="text-[10px] text-slate-500 font-bold uppercase">Registered Beneficiary Record</span>
+                <p className="text-sm font-bold text-white tracking-wide">{authChallenge.maskedName}</p>
+                <p className="text-[11px] text-gov-goldLight font-mono">
+                  Slot #{authChallenge.designatedNumber} • Brgy. {authChallenge.barangay}
+                </p>
+              </div>
+              <div className="px-2.5 py-1 bg-amber-950/60 border border-amber-800/60 rounded-lg text-amber-300 font-bold text-[10px]">
+                Authentication Required
+              </div>
+            </div>
+
+            <form onSubmit={handleVerifyMiddleName} className="space-y-3">
+              <div className="space-y-1.5">
+                <label className="block text-xs font-bold text-slate-300">
+                  Beneficiary&apos;s Middle Name <span className="text-slate-500 font-normal">(Not case sensitive)</span>:
+                </label>
+                <div className="relative">
+                  <KeyRound className="w-4 h-4 text-slate-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                  <input
+                    type="text"
+                    autoFocus
+                    value={middleNameInput}
+                    onChange={(e) => setMiddleNameInput(e.target.value)}
+                    placeholder="Enter Middle Name (or 'N/A' / 'None' if no middle name)"
+                    className="w-full bg-slate-900 border border-slate-700 text-white rounded-xl pl-10 pr-4 py-3 text-xs sm:text-sm font-semibold placeholder-slate-500 focus:outline-none focus:border-amber-400 focus:ring-1 focus:ring-amber-400"
+                  />
+                </div>
+                <p className="text-[10px] text-slate-400 italic">
+                  Examples: <strong>Santos</strong>, <strong>DELA CRUZ</strong>, <strong>de guzman</strong>, or <strong>N/A</strong> if you have no middle name.
+                </p>
+              </div>
+
+              <div className="pt-2 flex gap-2">
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="w-full py-3 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-black rounded-xl text-xs sm:text-sm transition flex items-center justify-center space-x-2 shadow-lg"
+                >
+                  {loading ? (
+                    <RefreshCw className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <>
+                      <ShieldCheck className="w-4 h-4" />
+                      <span>Verify &amp; Unlock Work Assignment</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
+        )}
+
+        {/* Beneficiary Assignment Details Card (Unlocked upon successful authentication) */}
         {data && (
           <div className="space-y-4 animate-fadeIn">
             {/* Beneficiary Header Badge */}
@@ -205,8 +305,9 @@ function AssignmentContent() {
                       PWD
                     </span>
                   )}
-                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-400/40">
-                    Active Participant
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-400/40 flex items-center space-x-1">
+                    <ShieldCheck className="w-3 h-3" />
+                    <span>Verified</span>
                   </span>
                 </div>
               </div>

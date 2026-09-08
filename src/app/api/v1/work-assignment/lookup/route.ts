@@ -2,6 +2,68 @@ import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { format } from "date-fns";
 import { assignBeneficiaryWorkArea, WorkProgramItemAllocation } from "@/lib/work-assignment";
+import { getCurrentUser } from "@/lib/auth";
+
+/**
+ * Normalizes and verifies the entered middle name against the beneficiary's record (case-insensitive).
+ */
+function verifyMiddleName(
+  entered: string = "",
+  beneficiary: {
+    middleName?: string | null;
+    fullName?: string | null;
+    firstName?: string | null;
+    lastName?: string | null;
+  }
+): boolean {
+  const cleanEntered = (entered || "").trim().toLowerCase().replace(/[^a-z0-9]/g, "");
+
+  // 1. Direct match with beneficiary.middleName
+  const dbMiddle = (beneficiary.middleName || "").trim().toLowerCase().replace(/[^a-z0-9]/g, "");
+  if (dbMiddle) {
+    if (cleanEntered === dbMiddle) return true;
+  }
+
+  // 2. If beneficiary has no middle name in DB, accept standard empty / N/A tokens
+  const noMiddleTokens = new Set(["", "na", "none", "wala", "no", "notapplicable"]);
+  if (!dbMiddle && noMiddleTokens.has(cleanEntered)) {
+    return true;
+  }
+
+  // 3. Fallback: Parse from fullName if middleName was embedded in fullName string
+  if (beneficiary.fullName) {
+    const rawName = beneficiary.fullName.trim();
+    // Format A: "LAST, FIRST MIDDLE EXT"
+    if (rawName.includes(",")) {
+      const parts = rawName.split(",")[1]?.trim().split(/\s+/) || [];
+      if (parts.length >= 2) {
+        const candidateMiddle = parts[parts.length - 1].toLowerCase().replace(/[^a-z0-9]/g, "");
+        if (cleanEntered === candidateMiddle) return true;
+      }
+    } else {
+      // Format B: "FIRST MIDDLE LAST"
+      const parts = rawName.split(/\s+/);
+      if (parts.length >= 3) {
+        const candidateMiddle = parts[parts.length - 2].toLowerCase().replace(/[^a-z0-9]/g, "");
+        if (cleanEntered === candidateMiddle) return true;
+      }
+    }
+  }
+
+  return false;
+}
+
+/**
+ * Masks a full name for unauthenticated privacy preview.
+ * Example: "JUAN SANTOS DELA CRUZ" -> "J*** S***** D*** C***"
+ */
+function maskFullName(fullName: string = ""): string {
+  if (!fullName) return "***";
+  return fullName
+    .split(/\s+/)
+    .map((word) => (word.length > 1 ? word[0] + "*".repeat(Math.min(word.length - 1, 4)) : word))
+    .join(" ");
+}
 
 export async function POST(request: Request) {
   try {
@@ -28,6 +90,7 @@ export async function GET(request: Request) {
 async function handleLookup(params: any) {
   const rawQrToken = (params.qrToken || params.token || params.code || "").toString().trim();
   const designatedNumber = params.designatedNumber ? String(params.designatedNumber).trim() : null;
+  const enteredMiddleName = (params.middleName || params.authKey || "").toString();
   const programIdParam = params.programId || null;
   const explicitDayNumber = params.dayNumber ? parseInt(params.dayNumber, 10) : null;
   const targetDate = params.targetDate || format(new Date(), "yyyy-MM-dd");
@@ -38,6 +101,10 @@ async function handleLookup(params: any) {
       { status: 400 }
     );
   }
+
+  // Check if staff/admin is authenticated in current session (bypasses middle-name prompt for official scanners)
+  const sessionUser = await getCurrentUser();
+  const isStaffSession = Boolean(sessionUser);
 
   // Clean token if URL
   let cleanToken = rawQrToken;
@@ -174,6 +241,42 @@ async function handleLookup(params: any) {
   const program = pb.program;
   const beneficiary = pb.beneficiary;
 
+  // =========================================================================
+  // MIDDLE NAME AUTHENTICATION (DATA PRIVACY PROTECTION)
+  // =========================================================================
+  const isAuthProvided = params.hasOwnProperty("middleName") || params.hasOwnProperty("authKey");
+
+  if (!isStaffSession) {
+    if (!isAuthProvided) {
+      // Return challenge response requiring Middle Name authentication
+      return NextResponse.json({
+        requiresAuth: true,
+        authenticated: false,
+        challenge: {
+          designatedNumber: pb.designatedNumber,
+          maskedName: maskFullName(beneficiary.fullName),
+          barangay: beneficiary.barangay || "Dingalan",
+          programName: program.programName,
+          prompt: "Please enter your registered Middle Name to verify your identity and view your assigned work area.",
+        },
+      });
+    }
+
+    // Verify entered middle name (case-insensitive)
+    const isMiddleNameValid = verifyMiddleName(enteredMiddleName, beneficiary);
+    if (!isMiddleNameValid) {
+      return NextResponse.json(
+        {
+          error: "Middle name verification failed. Please enter your registered middle name (or 'N/A' if none on record).",
+          authFailed: true,
+          designatedNumber: pb.designatedNumber,
+          maskedName: maskFullName(beneficiary.fullName),
+        },
+        { status: 403 }
+      );
+    }
+  }
+
   // Resolve active WorkDay
   let activeWorkDay = null;
   if (explicitDayNumber) {
@@ -233,10 +336,12 @@ async function handleLookup(params: any) {
 
   return NextResponse.json({
     success: true,
+    authenticated: true,
     beneficiary: {
       id: beneficiary.id,
       designatedNumber: pb.designatedNumber,
       fullName: beneficiary.fullName,
+      middleName: beneficiary.middleName || "",
       sex: beneficiary.sex || "UNSPECIFIED",
       birthday: beneficiary.birthday,
       age: beneficiary.age,
