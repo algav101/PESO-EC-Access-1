@@ -483,10 +483,54 @@ async function runTests() {
     assert(foundCandidate.beneficiary.middleName === "SANTOS", "Candidate has matching middleName");
     assert(verifyMiddleNameTest("santos", foundCandidate.beneficiary) === true, "Case-insensitive DPA middle name consent matches");
 
-    // Clean up test records
-    await prisma.programBeneficiary.delete({ where: { id: dpaProgBene.id } });
-    await prisma.beneficiary.delete({ where: { id: dpaBeneRecord.id } });
-    assert(true, "Test candidate cleaned up safely");
+    // TEST 12: Field Scanner Hub Designated QR Code Pass Generation & Direct Routing Payload
+    console.log("\n[TEST 12] Field Scanner Hub Designated QR Code Pass Generation & Direct Routing");
+    const testQrBene = await prisma.beneficiary.create({
+      data: {
+        beneficiaryNumber: `TEST-QR-${Date.now()}`,
+        fullName: "ASTORGA, JONEL TALENTO",
+        lastName: "ASTORGA",
+        firstName: "JONEL",
+        middleName: "TALENTO",
+        birthday: "1995-05-12",
+        sex: "FEMALE",
+        barangay: "Aplaya",
+        sitio: "Purok Lapu-Lapu",
+        status: "ACTIVE",
+      },
+    });
+
+    const testPb = await prisma.programBeneficiary.create({
+      data: {
+        programId: sampleProg.id,
+        beneficiaryId: testQrBene.id,
+        designatedNumber: "1",
+        tableNumber: "Table 1",
+        participationStatus: "ACTIVE",
+      },
+    });
+
+    // Generate Token and QR payload URL
+    const tokenObj = generateBeneficiaryToken(sampleProg.id, testPb.designatedNumber);
+    const createdQr = await prisma.qrCode.create({
+      data: {
+        programId: sampleProg.id,
+        programBeneficiaryId: testPb.id,
+        publicToken: tokenObj.publicToken,
+        tokenHash: tokenObj.tokenHash,
+        status: "ACTIVE",
+      },
+    });
+
+    const directRoutingUrl = `https://peso-ec-access-1.onrender.com/my-assignment?token=${encodeURIComponent(createdQr.publicToken)}`;
+    assert(directRoutingUrl.includes("/my-assignment?token="), "Direct camera scannable routing URL formed correctly");
+    assert(directRoutingUrl.includes(createdQr.publicToken), "Routing URL embeds unique beneficiary publicToken");
+
+    // Clean up
+    await prisma.qrCode.delete({ where: { id: createdQr.id } });
+    await prisma.programBeneficiary.delete({ where: { id: testPb.id } });
+    await prisma.beneficiary.delete({ where: { id: testQrBene.id } });
+    assert(true, "Field QR Pass generation test candidate cleaned up safely");
 
     console.log("\n==================================================================");
     console.log(`TEST SUMMARY: ${passed} PASSED, ${failed} FAILED`);

@@ -97,6 +97,7 @@ export function Sidebar({ isMobile = false, onClose }: SidebarProps) {
     {
       title: "Field Scanner Hub",
       items: [
+        { label: "Field Hub & QR Pass Studio", href: "/field", icon: Sparkles, permission: "dashboard.view" },
         { label: "Stub Distribution & Affirmation", href: "/field/stub-distribution", icon: QrCode, permission: "stub.distribution.scan" },
         { label: "Orientation Verification", href: "/field/orientation", icon: CalendarCheck, permission: "orientation.scan" },
         { label: "Daily Attendance (AM/PM)", href: "/field/attendance", icon: Clock, permission: "attendance.scan" },

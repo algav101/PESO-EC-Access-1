@@ -14,6 +14,7 @@ import {
   User,
 } from "lucide-react";
 import { QrScannerModal } from "@/components/scanner/QrScannerModal";
+import { FieldQrPassGeneratorModal } from "@/components/field/FieldQrPassGeneratorCard";
 import { useOffline } from "@/context/OfflineContext";
 import { offlineDb, queueOfflineTransaction } from "@/lib/dexie";
 import { format } from "date-fns";
@@ -22,6 +23,7 @@ export default function PayoutScannerPage() {
   const { isOnline } = useOffline();
 
   const [scannerOpen, setScannerOpen] = useState(false);
+  const [qrGeneratorOpen, setQrGeneratorOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [scannedBeneficiary, setScannedBeneficiary] = useState<any | null>(null);
@@ -130,14 +132,27 @@ export default function PayoutScannerPage() {
   return (
     <div className="max-w-md mx-auto space-y-6">
       {/* Header */}
-      <div className="text-center space-y-1">
+      <div className="text-center space-y-2">
         <h1 className="text-lg sm:text-xl font-black text-slate-900 tracking-tight flex items-center justify-center space-x-2">
           <Banknote className="w-6 h-6 text-gov-blue" />
           <span>Payout Verification Scanner</span>
         </h1>
         <p className="text-xs text-slate-500">
-          Verify wages payout & trigger automatic 365-day program restriction lockout
+          Verify wages payout &amp; trigger automatic 365-day program restriction lockout
         </p>
+
+        {/* Quick QR Generator Trigger Button */}
+        <div className="flex items-center justify-center gap-2 pt-1">
+          <button
+            type="button"
+            onClick={() => setQrGeneratorOpen(true)}
+            className="px-3.5 py-1.5 bg-gradient-to-r from-gov-gold/20 to-amber-100 hover:from-gov-gold/30 hover:to-amber-200 text-gov-dark border border-gov-gold/50 rounded-xl text-xs font-black transition flex items-center space-x-1.5 shadow-xs"
+            title="Generate and screenshot official QR code of any beneficiary"
+          >
+            <QrCode className="w-3.5 h-3.5 text-amber-700" />
+            <span>Generate / Screenshot Beneficiary QR</span>
+          </button>
+        </div>
       </div>
 
       {/* Main Scan Trigger */}
@@ -299,6 +314,12 @@ export default function PayoutScannerPage() {
         onClose={() => setScannerOpen(false)}
         title="Payout QR Scanner"
         subtitle="Align beneficiary QR code inside viewfinder"
+      />
+
+      {/* Beneficiary QR Pass Generator & Screenshot Modal */}
+      <FieldQrPassGeneratorModal
+        isOpen={qrGeneratorOpen}
+        onClose={() => setQrGeneratorOpen(false)}
       />
     </div>
   );

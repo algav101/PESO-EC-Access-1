@@ -27,6 +27,7 @@ import {
   Info,
 } from "lucide-react";
 import { StatusBadge } from "@/components/common/StatusBadge";
+import { FieldQrPassGeneratorModal } from "@/components/field/FieldQrPassGeneratorCard";
 import { formatDate } from "@/lib/utils";
 
 export default function PhotosPage() {
@@ -45,6 +46,7 @@ export default function PhotosPage() {
 
   // Photo viewer modal
   const [viewingPhoto, setViewingPhoto] = useState<any | null>(null);
+  const [qrGeneratorOpen, setQrGeneratorOpen] = useState(false);
 
   // Camera & Capture Modal state
   const [isUploadOpen, setIsUploadOpen] = useState(false);
@@ -445,6 +447,17 @@ export default function PhotosPage() {
         </div>
 
         <div className="flex flex-wrap items-center gap-2 self-start sm:self-auto">
+          {/* Quick QR Generator Trigger Button */}
+          <button
+            type="button"
+            onClick={() => setQrGeneratorOpen(true)}
+            className="px-3.5 py-2 bg-gradient-to-r from-gov-gold/20 to-amber-100 hover:from-gov-gold/30 hover:to-amber-200 text-gov-dark border border-gov-gold/50 rounded-xl text-xs font-black transition flex items-center space-x-1.5 shadow-xs"
+            title="Generate and screenshot official QR code of any beneficiary"
+          >
+            <QrCode className="w-3.5 h-3.5 text-amber-700" />
+            <span>Generate / Screenshot QR</span>
+          </button>
+
           {/* Admin Storage Optimization Button */}
           {isAdmin && (
             <button
@@ -1058,6 +1071,12 @@ export default function PhotosPage() {
           </div>
         </div>
       )}
+
+      {/* Beneficiary QR Pass Generator & Screenshot Modal */}
+      <FieldQrPassGeneratorModal
+        isOpen={qrGeneratorOpen}
+        onClose={() => setQrGeneratorOpen(false)}
+      />
     </div>
   );
 }

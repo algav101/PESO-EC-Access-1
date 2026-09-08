@@ -27,6 +27,7 @@ import {
   ArrowRight,
 } from "lucide-react";
 import { QrScannerModal } from "@/components/scanner/QrScannerModal";
+import { FieldQrPassGeneratorModal } from "@/components/field/FieldQrPassGeneratorCard";
 import { useOffline } from "@/context/OfflineContext";
 import { offlineDb, queueOfflineTransaction } from "@/lib/dexie";
 import { formatDate, normalizeBarangayName } from "@/lib/utils";
@@ -50,6 +51,7 @@ function StubDistributionContent() {
 
   // Scanner States
   const [scannerOpen, setScannerOpen] = useState(false);
+  const [qrGeneratorOpen, setQrGeneratorOpen] = useState(false);
   const [scannedData, setScannedData] = useState<any | null>(null);
   const [birthdayPin, setBirthdayPin] = useState("");
   const [isFlaggingModalOpen, setIsFlaggingModalOpen] = useState(false);
@@ -337,30 +339,42 @@ function StubDistributionContent() {
           </p>
         </div>
 
-        {/* Tab Switcher */}
-        <div className="flex bg-slate-200 p-1 rounded-xl space-x-1 self-start sm:self-auto">
+        {/* Tab & Action Switcher */}
+        <div className="flex flex-wrap items-center gap-2 self-start sm:self-auto">
           <button
-            onClick={() => setActiveTab("scanner")}
-            className={`px-4 py-2 rounded-lg text-xs font-black transition flex items-center space-x-1.5 ${
-              activeTab === "scanner"
-                ? "bg-gov-blue text-white shadow"
-                : "text-slate-700 hover:text-slate-900"
-            }`}
+            type="button"
+            onClick={() => setQrGeneratorOpen(true)}
+            className="px-3.5 py-2 bg-gradient-to-r from-gov-gold/20 to-amber-100 hover:from-gov-gold/30 hover:to-amber-200 text-gov-dark border border-gov-gold/50 rounded-xl text-xs font-black transition flex items-center space-x-1.5 shadow-xs"
+            title="Generate and screenshot official QR code of any beneficiary"
           >
-            <Camera className="w-4 h-4 text-gov-goldLight" />
-            <span>Field Scanner</span>
+            <QrCode className="w-3.5 h-3.5 text-amber-700" />
+            <span>Generate / Screenshot QR</span>
           </button>
-          <button
-            onClick={() => setActiveTab("monitoring")}
-            className={`px-4 py-2 rounded-lg text-xs font-black transition flex items-center space-x-1.5 ${
-              activeTab === "monitoring"
-                ? "bg-gov-blue text-white shadow"
-                : "text-slate-700 hover:text-slate-900"
-            }`}
-          >
-            <BarChart3 className="w-4 h-4 text-gov-goldLight" />
-            <span>Coverage Monitoring</span>
-          </button>
+
+          <div className="flex bg-slate-200 p-1 rounded-xl space-x-1">
+            <button
+              onClick={() => setActiveTab("scanner")}
+              className={`px-4 py-2 rounded-lg text-xs font-black transition flex items-center space-x-1.5 ${
+                activeTab === "scanner"
+                  ? "bg-gov-blue text-white shadow"
+                  : "text-slate-700 hover:text-slate-900"
+              }`}
+            >
+              <Camera className="w-4 h-4 text-gov-goldLight" />
+              <span>Field Scanner</span>
+            </button>
+            <button
+              onClick={() => setActiveTab("monitoring")}
+              className={`px-4 py-2 rounded-lg text-xs font-black transition flex items-center space-x-1.5 ${
+                activeTab === "monitoring"
+                  ? "bg-gov-blue text-white shadow"
+                  : "text-slate-700 hover:text-slate-900"
+              }`}
+            >
+              <BarChart3 className="w-4 h-4 text-gov-goldLight" />
+              <span>Coverage Monitoring</span>
+            </button>
+          </div>
         </div>
       </div>
 
@@ -934,6 +948,12 @@ function StubDistributionContent() {
         onClose={() => setScannerOpen(false)}
         title="Scan Format 1 Stub QR Code"
         subtitle="Align printed verification stub QR in camera viewfinder"
+      />
+
+      {/* Beneficiary QR Pass Generator & Screenshot Modal */}
+      <FieldQrPassGeneratorModal
+        isOpen={qrGeneratorOpen}
+        onClose={() => setQrGeneratorOpen(false)}
       />
     </div>
   );

@@ -30,6 +30,7 @@ import {
   FileCheck,
 } from "lucide-react";
 import { QrScannerModal } from "@/components/scanner/QrScannerModal";
+import { FieldQrPassGeneratorModal } from "@/components/field/FieldQrPassGeneratorCard";
 import { useOffline } from "@/context/OfflineContext";
 import { offlineDb, queueOfflineTransaction } from "@/lib/dexie";
 import { formatDate, normalizeBarangayName } from "@/lib/utils";
@@ -53,6 +54,7 @@ function OrientationContent() {
 
   // Scanner States
   const [scannerOpen, setScannerOpen] = useState(false);
+  const [qrGeneratorOpen, setQrGeneratorOpen] = useState(false);
   const [manualSlot, setManualSlot] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -298,8 +300,18 @@ function OrientationContent() {
           </p>
         </div>
 
-        {/* Program Selector */}
-        <div className="flex items-center space-x-2">
+        {/* Program Selector & QR Generator */}
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setQrGeneratorOpen(true)}
+            className="px-3.5 py-2 bg-gradient-to-r from-gov-gold/20 to-amber-100 hover:from-gov-gold/30 hover:to-amber-200 text-gov-dark border border-gov-gold/50 rounded-xl text-xs font-black transition flex items-center space-x-1.5 shadow-xs"
+            title="Generate and screenshot official QR code of any beneficiary"
+          >
+            <QrCode className="w-3.5 h-3.5 text-amber-700" />
+            <span>Generate / Screenshot QR</span>
+          </button>
+
           <label className="text-xs font-bold text-slate-600 whitespace-nowrap hidden sm:inline">
             Work Program:
           </label>
@@ -1004,6 +1016,12 @@ function OrientationContent() {
         onClose={() => setScannerOpen(false)}
         title="Orientation QR Scanner"
         subtitle="Align beneficiary QR code inside viewfinder"
+      />
+
+      {/* Beneficiary QR Pass Generator & Screenshot Modal */}
+      <FieldQrPassGeneratorModal
+        isOpen={qrGeneratorOpen}
+        onClose={() => setQrGeneratorOpen(false)}
       />
     </div>
   );
