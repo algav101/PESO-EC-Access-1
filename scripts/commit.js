@@ -10,19 +10,12 @@ async function doCommit() {
 
     // List of files to add / track
     const filesToStage = [
-      "src/lib/qr.ts",
-      "src/lib/qr-client-cache.ts",
       "src/lib/work-assignment.ts",
       "src/app/api/v1/work-assignment/lookup/route.ts",
       "src/app/my-assignment/page.tsx",
       "src/app/reports/page.tsx",
-      "src/app/page.tsx",
-      "src/components/public/PublicWorkAssignmentScannerCard.tsx",
-      "src/components/layout/LandingNavDrawer.tsx",
-      "src/components/layout/Sidebar.tsx",
       "src/lib/excel-exporter.ts",
       "test/test-suite.mjs",
-      "test/verify-qr-flow.mjs",
       "scripts/commit.js",
     ];
 
@@ -45,7 +38,7 @@ async function doCommit() {
         name: "PESO Dingalan",
         email: "peso@dingalan.gov.ph",
       },
-      message: "feat(stubs): lock and retain original Format 2 e-TUPAD CARD design and raw token QR encoding",
+      message: "feat(accomplishment): add QR code work area routing and proximity/gender allocation engine",
     });
 
     console.log("\n[SUCCESS] Committed successfully!");
