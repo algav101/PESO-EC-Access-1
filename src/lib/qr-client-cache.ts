@@ -1,10 +1,12 @@
 import QRCode from "qrcode";
+import { formatBeneficiaryQrPayload } from "./qr";
 
 // Global in-memory cache for QR code data URLs
 const qrDataUrlCache = new Map<string, string>();
 
 /**
  * Returns a cached QR Data URL or generates a new one.
+ * Automatically wraps the token into a smartphone-scannable direct routing link.
  */
 export async function getQrDataUrl(
   token: string,
@@ -16,7 +18,8 @@ export async function getQrDataUrl(
   if (existing) return existing;
 
   try {
-    const dataUrl = await QRCode.toDataURL(token, {
+    const payload = formatBeneficiaryQrPayload(token);
+    const dataUrl = await QRCode.toDataURL(payload, {
       width: 220,
       margin: 1,
       color: { dark: darkColor, light: "#ffffff" },
