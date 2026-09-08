@@ -54,7 +54,7 @@ export function FieldQrPassGeneratorCard({
   onClose,
   isModal = false,
 }: FieldQrPassGeneratorCardProps) {
-  const [searchTerm, setSearchTerm] = useState(initialSlot || "1");
+  const [searchTerm, setSearchTerm] = useState(initialSlot || "");
   const [selectedBarangay, setSelectedBarangay] = useState(initialBarangay || "ALL");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -67,7 +67,7 @@ export function FieldQrPassGeneratorCard({
   const passCardRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    fetchQrPasses(searchTerm || "1", selectedBarangay);
+    fetchQrPasses(initialSlot || "", selectedBarangay);
   }, []);
 
   const fetchQrPasses = async (query: string, brgy: string) => {
