@@ -25,6 +25,7 @@ import {
   Maximize2,
   FileImage,
   Info,
+  QrCode,
 } from "lucide-react";
 import { StatusBadge } from "@/components/common/StatusBadge";
 import { FieldQrPassGeneratorModal } from "@/components/field/FieldQrPassGeneratorCard";

@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { AuthProvider } from "@/context/AuthContext";
 import { OfflineProvider } from "@/context/OfflineContext";
@@ -6,11 +6,14 @@ import { ClientLayout } from "@/components/layout/ClientLayout";
 
 import { ServiceWorkerRegister } from "@/components/common/ServiceWorkerRegister";
 
+export const viewport: Viewport = {
+  themeColor: "#1e3a8a",
+};
+
 export const metadata: Metadata = {
   title: "LGU Dingalan - PESO EC Access",
   description: "Official PESO EC Access portal for LGU Dingalan and DOLE programs.",
   manifest: "/manifest.json",
-  themeColor: "#1e3a8a",
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
