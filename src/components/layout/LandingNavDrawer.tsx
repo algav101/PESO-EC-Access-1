@@ -24,6 +24,21 @@ import {
   FileText,
 } from "lucide-react";
 
+interface NavDrawerItem {
+  title: string;
+  href: string;
+  icon: React.ComponentType<{ className?: string }>;
+  badge?: string;
+  status?: string;
+  highlight?: boolean;
+  isExternal?: boolean;
+}
+
+interface NavDrawerCategory {
+  category: string;
+  links: NavDrawerItem[];
+}
+
 export function LandingNavDrawer() {
   const [isOpen, setIsOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
@@ -51,7 +66,7 @@ export function LandingNavDrawer() {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [isOpen]);
 
-  const menuItems = [
+  const menuItems: NavDrawerCategory[] = [
     {
       category: "Pangunahing Pahina",
       links: [
