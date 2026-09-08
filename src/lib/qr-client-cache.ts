@@ -4,24 +4,9 @@ import QRCode from "qrcode";
 const qrDataUrlCache = new Map<string, string>();
 
 /**
- * Resolves the mobile routing URL while preserving the exact original token.
- */
-export function getPublicAssignmentUrl(token: string): string {
-  if (!token) return "";
-  if (token.startsWith("http://") || token.startsWith("https://")) {
-    return token;
-  }
-  const baseUrl =
-    typeof window !== "undefined" && window.location.origin
-      ? window.location.origin
-      : process.env.NEXT_PUBLIC_APP_URL || "https://peso-ec-access-1.onrender.com";
-  return `${baseUrl}/my-assignment?token=${encodeURIComponent(token)}`;
-}
-
-/**
  * Returns a cached QR Data URL or generates a new one.
- * Encodes the direct mobile web routing link with the original token preserved,
- * allowing any smartphone built-in camera to open the link directly.
+ * Encodes the exact raw cryptographic token with H error correction level,
+ * ensuring 100% visual and structural identity with physical stubs currently held by beneficiaries.
  */
 export async function getQrDataUrl(
   token: string,
@@ -32,14 +17,12 @@ export async function getQrDataUrl(
   const existing = qrDataUrlCache.get(key);
   if (existing) return existing;
 
-  const payload = getPublicAssignmentUrl(token);
-
   try {
-    const dataUrl = await QRCode.toDataURL(payload, {
+    const dataUrl = await QRCode.toDataURL(token, {
       width: 220,
       margin: 1,
       color: { dark: darkColor, light: "#ffffff" },
-      errorCorrectionLevel: "M", // M level is 2.5x faster to render than H and delivers crystal-clear scan accuracy
+      errorCorrectionLevel: "H",
     });
     qrDataUrlCache.set(key, dataUrl);
     return dataUrl;

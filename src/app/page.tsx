@@ -4,6 +4,7 @@ import { PesoLogo } from "@/components/layout/PesoLogo";
 import { LandingNavDrawer } from "@/components/layout/LandingNavDrawer";
 import { PublicStatusInquiryCard } from "@/components/public/PublicStatusInquiryCard";
 import { PublicInquiryMessageForm } from "@/components/public/PublicInquiryMessageForm";
+import { PublicWorkAssignmentScannerCard } from "@/components/public/PublicWorkAssignmentScannerCard";
 import {
   ShieldCheck,
   MapPin,
@@ -203,7 +204,7 @@ export default async function LandingPage() {
                 <li className="flex items-start gap-2 bg-slate-50 p-2.5 rounded-lg border border-slate-100 hover:border-slate-300 transition-colors">
                   <span className="text-purple-700 font-bold">✔</span>
                   <span>
-                    <a href="/my-assignment" className="hover:underline font-bold text-slate-900">
+                    <a href="#work-assignment-scanner" className="hover:underline font-bold text-slate-900">
                       Work Area &amp; Schedule QR Scanner
                     </a>{" "}
                     para malaman ang iyong nakatalagang lugar at 10-araw na schedule
@@ -330,8 +331,13 @@ export default async function LandingPage() {
             Mabilis at Transparent na Serbisyong Publiko
           </h2>
           <p className="text-xs sm:text-sm text-slate-600">
-            I-check ang estado ng iyong aplikasyon o magpadala ng direktang mensahe at mungkahi sa Tanggapan ng PESO Dingalan.
+            I-scan ang iyong QR code para sa work program schedule, i-check ang estado ng aplikasyon, o magpadala ng direktang mensahe sa Tanggapan ng PESO Dingalan.
           </p>
+        </div>
+
+        {/* Feature 0: TUPAD Beneficiary Work Area & 10-Day Schedule QR Scanner Hub */}
+        <div id="work-assignment-scanner" className="scroll-mt-28">
+          <PublicWorkAssignmentScannerCard />
         </div>
 
         {/* Feature 1: Public Status Inquiry Card */}
