@@ -37,7 +37,6 @@ import {
   Layers,
   Construction,
   Info,
-  CheckCircle2,
 } from "lucide-react";
 
 interface SidebarProps {
@@ -58,8 +57,7 @@ export function Sidebar({ isMobile = false, onClose }: SidebarProps) {
   const pathname = usePathname();
   const { user, can, logout } = useAuth();
 
-  // State for toggling dropdown menus
-  // EC TUPAD is open by default or if the user is in any TUPAD route
+  // Active route checking for TUPAD features
   const isTupadRoute =
     pathname.startsWith("/programs") ||
     pathname.startsWith("/beneficiaries") ||
@@ -67,11 +65,9 @@ export function Sidebar({ isMobile = false, onClose }: SidebarProps) {
     pathname.startsWith("/apply") ||
     pathname.startsWith("/field") ||
     pathname.startsWith("/replacements") ||
-    pathname.startsWith("/restrictions") ||
-    pathname.startsWith("/reports") ||
-    pathname.startsWith("/admin") ||
-    pathname.startsWith("/sync");
+    pathname.startsWith("/restrictions");
 
+  // State for toggling dropdown menus
   const [tupadDropdownOpen, setTupadDropdownOpen] = useState<boolean>(true);
   const [openDummyModules, setOpenDummyModules] = useState<Record<string, boolean>>({});
   const [selectedDevModule, setSelectedDevModule] = useState<{
@@ -87,7 +83,7 @@ export function Sidebar({ isMobile = false, onClose }: SidebarProps) {
     }));
   };
 
-  // TUPAD Sub-Sections
+  // Module 1: EC TUPAD Management System Sub-Sections
   const tupadSections = [
     {
       title: "Core Operations",
@@ -116,6 +112,75 @@ export function Sidebar({ isMobile = false, onClose }: SidebarProps) {
         { label: "Eligibility Checker", href: "/restrictions/checker", icon: Search, permission: "dashboard.view" },
       ],
     },
+  ];
+
+  // Additional Modules (Under Development)
+  const dummyModules: DummyModule[] = [
+    {
+      id: "dama-trabaho",
+      name: "2 - DAMA E-Trabaho Job Matching",
+      icon: Briefcase,
+      status: "under development",
+      description: "Automated LGU job matching platform connecting Dingalan jobseekers with local, regional, and overseas employers.",
+      subItems: [
+        { title: "Job Vacancies & Employer Matching", desc: "Real-time registry of open job orders and automated candidate matching." },
+        { title: "Skills Registry & Talent Pool", desc: "Barangay-level database of skilled laborers and professional jobseekers." },
+        { title: "NSRP Integration & Referrals", desc: "DOLE National Skills Registration Program linkage and job referral slips." },
+      ],
+    },
+    {
+      id: "tech-skills",
+      name: "3 - Technical Skills Accreditation",
+      icon: Award,
+      status: "under development",
+      description: "TESDA and LGU technical-vocational skills training management, competency assessments, and certification tracking.",
+      subItems: [
+        { title: "TESDA Course & Training Registry", desc: "Active tech-voc courses, training centers, and batch schedules." },
+        { title: "Assessment Center Schedules", desc: "Competency assessment bookings and candidate pre-qualification." },
+        { title: "Certification & NCII Verification", desc: "Digital verification of National Certificates and PESO accreditations." },
+      ],
+    },
+    {
+      id: "spes-gip-dileep",
+      name: "4 - SPES, GIP, DILEEP, Career Guidance",
+      icon: Compass,
+      status: "under development",
+      description: "Youth employment facilitation, student assistance programs, government internships, and livelihood grants.",
+      subItems: [
+        { title: "SPES Student Payout & Monitoring", desc: "Special Program for Employment of Students records and stipend disbursement." },
+        { title: "GIP Government Internship Roster", desc: "Government Internship Program placement, attendance, and evaluation." },
+        { title: "DILEEP Livelihood Grant Tracking", desc: "DOLE Integrated Livelihood and Emergency Employment Program beneficiaries." },
+        { title: "Youth Career Guidance & Profiling", desc: "High school and college labor market counseling modules." },
+      ],
+    },
+    {
+      id: "migrants-corner",
+      name: "5 - Migrants' Corner (OFW Helpdesk)",
+      icon: HeartHandshake,
+      status: "under development",
+      description: "Dedicated assistance hub for Dingaleño Overseas Filipino Workers (OFWs), seafarers, and their families.",
+      subItems: [
+        { title: "OFW & Seafarer Case Assistance", desc: "Welfare case intake, grievance tracking, and DMW coordination." },
+        { title: "Balik Pinas Balik Hanapbuhay Portal", desc: "Reintegration assistance and livelihood startup capital for returning OFWs." },
+        { title: "OFW Family Circle Registry", desc: "Community support groups and financial literacy program schedules." },
+      ],
+    },
+    {
+      id: "peso-govtech",
+      name: "6 - Public Services Digitalization (PESO GovTech)",
+      icon: Cpu,
+      status: "under development",
+      description: "Cross-departmental data interoperability, smart citizen kiosks, and automated public service delivery systems.",
+      subItems: [
+        { title: "LGU Multi-Agency Data Interoperability", desc: "Unified citizen records linking PESO, MSWDO, and Barangay databases." },
+        { title: "Automated SMS / Push Dispatcher", desc: "Broadcast alerts for payout schedules, job fairs, and urgent advisories." },
+        { title: "Smart Citizen Barangay Kiosk Network", desc: "Self-service touchscreen terminals deployed across all 11 Dingalan barangays." },
+      ],
+    },
+  ];
+
+  // General System Utility Sections (Reports & Auditing, System Administration)
+  const systemUtilitySections = [
     {
       title: "Reports & Auditing",
       items: [
@@ -149,71 +214,6 @@ export function Sidebar({ isMobile = false, onClose }: SidebarProps) {
           },
         ]
       : []),
-  ];
-
-  // Dummy dropdown modules with "under development" status
-  const dummyModules: DummyModule[] = [
-    {
-      id: "dama-trabaho",
-      name: "DAMA E-Trabaho Job Matching",
-      icon: Briefcase,
-      status: "Under Development",
-      description: "Automated LGU job matching platform connecting Dingalan jobseekers with local, regional, and overseas employers.",
-      subItems: [
-        { title: "Job Vacancies & Employer Matching", desc: "Real-time registry of open job orders and automated candidate matching." },
-        { title: "Skills Registry & Talent Pool", desc: "Barangay-level database of skilled laborers and professional jobseekers." },
-        { title: "NSRP Integration & Referrals", desc: "DOLE National Skills Registration Program linkage and job referral slips." },
-      ],
-    },
-    {
-      id: "tech-skills",
-      name: "Technical Skills Accreditation",
-      icon: Award,
-      status: "Under Development",
-      description: "TESDA and LGU technical-vocational skills training management, competency assessments, and certification tracking.",
-      subItems: [
-        { title: "TESDA Course & Training Registry", desc: "Active tech-voc courses, training centers, and batch schedules." },
-        { title: "Assessment Center Schedules", desc: "Competency assessment bookings and candidate pre-qualification." },
-        { title: "Certification & NCII Verification", desc: "Digital verification of National Certificates and PESO accreditations." },
-      ],
-    },
-    {
-      id: "spes-gip-dileep",
-      name: "SPES, GIP, DILEEP, Career Guidance",
-      icon: Compass,
-      status: "Under Development",
-      description: "Youth employment facilitation, student assistance programs, government internships, and livelihood grants.",
-      subItems: [
-        { title: "SPES Student Payout & Monitoring", desc: "Special Program for Employment of Students records and stipend disbursement." },
-        { title: "GIP Government Internship Roster", desc: "Government Internship Program placement, attendance, and evaluation." },
-        { title: "DILEEP Livelihood Grant Tracking", desc: "DOLE Integrated Livelihood and Emergency Employment Program beneficiaries." },
-        { title: "Youth Career Guidance & Profiling", desc: "High school and college labor market counseling modules." },
-      ],
-    },
-    {
-      id: "migrants-corner",
-      name: "Migrants' Corner (OFW Helpdesk)",
-      icon: HeartHandshake,
-      status: "Under Development",
-      description: "Dedicated assistance hub for Dingaleño Overseas Filipino Workers (OFWs), seafarers, and their families.",
-      subItems: [
-        { title: "OFW & Seafarer Case Assistance", desc: "Welfare case intake, grievance tracking, and DMW coordination." },
-        { title: "Balik Pinas Balik Hanapbuhay Portal", desc: "Reintegration assistance and livelihood startup capital for returning OFWs." },
-        { title: "OFW Family Circle Registry", desc: "Community support groups and financial literacy program schedules." },
-      ],
-    },
-    {
-      id: "peso-govtech",
-      name: "Public Services Digitalization (PESO GovTech)",
-      icon: Cpu,
-      status: "Under Development",
-      description: "Cross-departmental data interoperability, smart citizen kiosks, and automated public service delivery systems.",
-      subItems: [
-        { title: "LGU Multi-Agency Data Interoperability", desc: "Unified citizen records linking PESO, MSWDO, and Barangay databases." },
-        { title: "Automated SMS / Push Dispatcher", desc: "Broadcast alerts for payout schedules, job fairs, and urgent advisories." },
-        { title: "Smart Citizen Barangay Kiosk Network", desc: "Self-service touchscreen terminals deployed across all 11 Dingalan barangays." },
-      ],
-    },
   ];
 
   return (
@@ -283,10 +283,10 @@ export function Sidebar({ isMobile = false, onClose }: SidebarProps) {
 
           <div className="pt-2 border-t border-slate-800/60">
             <p className="text-[10px] font-black uppercase tracking-wider text-slate-400 px-2 pb-2">
-              PESO Management Systems
+              PESO Service Modules
             </p>
 
-            {/* 1. EC TUPAD MANAGEMENT SYSTEM DROPDOWN BUTTON */}
+            {/* MODULE 1: EC TUPAD MANAGEMENT SYSTEM DROPDOWN BUTTON */}
             <div className="rounded-xl border border-slate-800 bg-slate-950/40 overflow-hidden mb-2.5 transition-all shadow-sm">
               <button
                 type="button"
@@ -301,13 +301,13 @@ export function Sidebar({ isMobile = false, onClose }: SidebarProps) {
                 aria-expanded={tupadDropdownOpen}
               >
                 <div className="flex items-center space-x-2.5 min-w-0 pr-2">
-                  <div className="w-6 h-6 rounded-lg bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 flex items-center justify-center flex-shrink-0">
-                    <Layers className="w-3.5 h-3.5" />
+                  <div className="w-6 h-6 rounded-lg bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 flex items-center justify-center flex-shrink-0 font-black text-[11px]">
+                    1
                   </div>
                   <div className="min-w-0">
-                    <div className="flex items-center space-x-1.5">
-                      <span className="text-xs font-black truncate text-white">EC TUPAD Management System</span>
-                    </div>
+                    <p className="text-xs font-black truncate text-white leading-tight">
+                      1 - EC TUPAD Management System
+                    </p>
                     <span className="inline-block text-[9px] font-bold text-emerald-400 bg-emerald-950/60 border border-emerald-800/50 px-1.5 py-0.2 rounded mt-0.5">
                       Operational
                     </span>
@@ -322,20 +322,20 @@ export function Sidebar({ isMobile = false, onClose }: SidebarProps) {
                 </div>
               </button>
 
-              {/* TUPAD Collapsible Content: Screenshot Features */}
+              {/* TUPAD Collapsible Content: Core Operations, Field Scanner Hub, Integrity & Compliance */}
               {tupadDropdownOpen && (
-                <div className="p-2 space-y-4 bg-slate-950/20 animate-fadeIn">
+                <div className="p-2 space-y-3.5 bg-slate-950/30 animate-fadeIn">
                   {tupadSections.map((section, idx) => {
                     const visibleItems = section.items.filter((item) => !item.permission || can(item.permission));
                     if (visibleItems.length === 0) return null;
 
                     return (
                       <div key={idx} className="space-y-1">
-                        <h4 className="text-[10px] font-extrabold uppercase tracking-wider text-slate-500 px-2 pt-1 flex items-center space-x-1.5">
-                          <span className="w-1 h-1 rounded-full bg-slate-600"></span>
+                        <h4 className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400 px-2 pt-1 flex items-center space-x-1.5">
+                          <span className="text-gov-goldLight font-black">•</span>
                           <span>{section.title}</span>
                         </h4>
-                        <div className="space-y-0.5 pl-1.5 border-l border-slate-800/80 ml-2">
+                        <div className="space-y-0.5 pl-2 border-l border-slate-700/60 ml-2.5">
                           {visibleItems.map((item) => {
                             const Icon = item.icon;
                             const isActive =
@@ -354,7 +354,7 @@ export function Sidebar({ isMobile = false, onClose }: SidebarProps) {
                                 className={`flex items-center space-x-2.5 px-2.5 py-2 rounded-lg text-xs font-semibold transition ${
                                   isActive
                                     ? "bg-gov-blue text-white shadow-sm font-bold border border-blue-400/40"
-                                    : "text-slate-400 hover:text-slate-100 hover:bg-slate-800/70 active:bg-slate-800"
+                                    : "text-slate-300 hover:text-white hover:bg-slate-800/80 active:bg-slate-800"
                                 }`}
                               >
                                 <Icon
@@ -374,7 +374,7 @@ export function Sidebar({ isMobile = false, onClose }: SidebarProps) {
               )}
             </div>
 
-            {/* DUMMY DROPDOWN BUTTONS (UNDER DEVELOPMENT) */}
+            {/* MODULES 2-6: DUMMY DROPDOWN BUTTONS (UNDER DEVELOPMENT) */}
             <div className="space-y-2">
               {dummyModules.map((module) => {
                 const Icon = module.icon;
@@ -403,7 +403,7 @@ export function Sidebar({ isMobile = false, onClose }: SidebarProps) {
                           </p>
                           <span className="inline-flex items-center space-x-1 text-[9px] font-bold text-amber-400 bg-amber-950/60 border border-amber-800/40 px-1.5 py-0.2 rounded mt-0.5">
                             <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse"></span>
-                            <span>{module.status}</span>
+                            <span className="capitalize">{module.status}</span>
                           </span>
                         </div>
                       </div>
@@ -464,6 +464,55 @@ export function Sidebar({ isMobile = false, onClose }: SidebarProps) {
                 );
               })}
             </div>
+          </div>
+
+          {/* GENERAL SYSTEM UTILITIES: REPORTS & AUDITING, SYSTEM ADMINISTRATION */}
+          <div className="pt-2 border-t border-slate-800/60 space-y-3.5">
+            {systemUtilitySections.map((section, idx) => {
+              const visibleItems = section.items.filter((item) => !item.permission || can(item.permission));
+              if (visibleItems.length === 0) return null;
+
+              return (
+                <div key={idx} className="space-y-1">
+                  <h4 className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400 px-2 pt-1 flex items-center space-x-1.5">
+                    <span className="text-slate-500 font-black">•</span>
+                    <span>{section.title}</span>
+                  </h4>
+                  <div className="space-y-0.5 pl-2 border-l border-slate-700/60 ml-2.5">
+                    {visibleItems.map((item) => {
+                      const Icon = item.icon;
+                      const isActive =
+                        pathname === item.href ||
+                        (item.href !== "/dashboard" && pathname.startsWith(item.href));
+
+                      return (
+                        <a
+                          key={item.href}
+                          href={item.href}
+                          onClick={() => {
+                            if (isMobile && onClose) {
+                              onClose();
+                            }
+                          }}
+                          className={`flex items-center space-x-2.5 px-2.5 py-2 rounded-lg text-xs font-semibold transition ${
+                            isActive
+                              ? "bg-gov-blue text-white shadow-sm font-bold border border-blue-400/40"
+                              : "text-slate-300 hover:text-white hover:bg-slate-800/80 active:bg-slate-800"
+                          }`}
+                        >
+                          <Icon
+                            className={`w-3.5 h-3.5 flex-shrink-0 ${
+                              isActive ? "text-gov-goldLight" : "text-slate-400"
+                            }`}
+                          />
+                          <span className="truncate">{item.label}</span>
+                        </a>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </div>
 
