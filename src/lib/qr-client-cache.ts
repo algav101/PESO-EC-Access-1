@@ -4,8 +4,24 @@ import QRCode from "qrcode";
 const qrDataUrlCache = new Map<string, string>();
 
 /**
+ * Resolves the mobile routing URL while preserving the exact original token.
+ */
+export function getPublicAssignmentUrl(token: string): string {
+  if (!token) return "";
+  if (token.startsWith("http://") || token.startsWith("https://")) {
+    return token;
+  }
+  const baseUrl =
+    typeof window !== "undefined" && window.location.origin
+      ? window.location.origin
+      : process.env.NEXT_PUBLIC_APP_URL || "https://peso-ec-access-1.onrender.com";
+  return `${baseUrl}/my-assignment?token=${encodeURIComponent(token)}`;
+}
+
+/**
  * Returns a cached QR Data URL or generates a new one.
- * Retains exact raw cryptographic token encoding for 100% fidelity with physical printed stubs.
+ * Encodes the direct mobile web routing link with the original token preserved,
+ * allowing any smartphone built-in camera to open the link directly.
  */
 export async function getQrDataUrl(
   token: string,
@@ -16,8 +32,10 @@ export async function getQrDataUrl(
   const existing = qrDataUrlCache.get(key);
   if (existing) return existing;
 
+  const payload = getPublicAssignmentUrl(token);
+
   try {
-    const dataUrl = await QRCode.toDataURL(token, {
+    const dataUrl = await QRCode.toDataURL(payload, {
       width: 220,
       margin: 1,
       color: { dark: darkColor, light: "#ffffff" },
