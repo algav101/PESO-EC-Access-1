@@ -1,6 +1,7 @@
 import ExcelJS from "exceljs";
 import prisma from "./prisma";
 import { format } from "date-fns";
+import { assignBeneficiaryWorkArea, WorkProgramItemAllocation } from "./work-assignment";
 
 export async function generateAttendanceExcel(programId: string): Promise<Buffer> {
   const program = await prisma.program.findUnique({
@@ -266,9 +267,12 @@ export async function generateAccomplishmentExcel(programId: string): Promise<Bu
     where: { id: programId },
     include: {
       programBeneficiaries: {
-        include: { beneficiary: true },
+        include: {
+          beneficiary: true,
+          qrCodes: true,
+        },
       },
-      workDays: true,
+      workDays: { orderBy: { dayNumber: "asc" } },
       accomplishmentPhotos: true,
       programBarangays: true,
       tupadWorkPrograms: {
@@ -300,12 +304,12 @@ export async function generateAccomplishmentExcel(programId: string): Promise<Bu
       (w) => w.barangay.toUpperCase() === brgyName
     );
 
-    ws.mergeCells("A1:F1");
+    ws.mergeCells("A1:H1");
     ws.getCell("A1").value = "DOLE - TUPAD PROGRAM ACCOMPLISHMENT REPORT";
     ws.getCell("A1").font = { bold: true, size: 14 };
     ws.getCell("A1").alignment = { horizontal: "center" };
 
-    ws.mergeCells("A2:F2");
+    ws.mergeCells("A2:H2");
     ws.getCell("A2").value = `BARANGAY: ${brgyName} | MUNICIPALITY: DINGALAN, AURORA`;
     ws.getCell("A2").font = { bold: true, size: 11 };
     ws.getCell("A2").alignment = { horizontal: "center" };
@@ -328,7 +332,8 @@ export async function generateAccomplishmentExcel(programId: string): Promise<Bu
     ws.getCell("C10").value = "ASSIGNED WORK AREA";
     ws.getCell("D10").value = "MALE";
     ws.getCell("E10").value = "FEMALE";
-    ws.getCell("F10").value = "TOTAL";
+    ws.getCell("F10").value = "SC/PWD";
+    ws.getCell("G10").value = "TOTAL";
 
     ws.getRow(10).font = { bold: true, size: 9, color: { argb: "FFFFFFFF" } };
     ws.getRow(10).fill = {
@@ -338,15 +343,29 @@ export async function generateAccomplishmentExcel(programId: string): Promise<Bu
     };
 
     let rIdx = 11;
+    const workItemsList: WorkProgramItemAllocation[] = [];
     if (wp && wp.items.length > 0) {
       for (const it of wp.items) {
+        workItemsList.push({
+          id: it.id,
+          dayNumber: it.dayNumber,
+          specificActivities: it.specificActivities,
+          area: it.area,
+          maleCount: it.maleCount,
+          femaleCount: it.femaleCount,
+          scPwdMaleCount: it.scPwdMaleCount,
+          scPwdFemaleCount: it.scPwdFemaleCount,
+          totalCount: it.totalCount,
+        });
+
         const row = ws.getRow(rIdx);
         row.getCell(1).value = `Day ${it.dayNumber}`;
         row.getCell(2).value = it.specificActivities;
         row.getCell(3).value = it.area;
         row.getCell(4).value = it.maleCount || "";
         row.getCell(5).value = it.femaleCount || "";
-        row.getCell(6).value = it.totalCount || it.maleCount + it.femaleCount || "";
+        row.getCell(6).value = (it.scPwdMaleCount || 0) + (it.scPwdFemaleCount || 0) || "";
+        row.getCell(7).value = it.totalCount || it.maleCount + it.femaleCount || "";
         row.font = { size: 9 };
         rIdx++;
       }
@@ -354,23 +373,26 @@ export async function generateAccomplishmentExcel(programId: string): Promise<Bu
       const row = ws.getRow(rIdx);
       row.getCell(2).value = "General Community Cleaning & Greening";
       row.getCell(3).value = "Barangay Public Areas";
-      row.getCell(6).value = brgyBeneficiaries.length;
+      row.getCell(7).value = brgyBeneficiaries.length;
       rIdx++;
     }
 
     rIdx += 2;
 
-    // Section 2: Beneficiary Roster
-    ws.getCell(`A${rIdx}`).value = "BENEFICIARY ATTENDANCE & PARTICIPATION ROSTER";
+    // Section 2: Beneficiary Roster with Smart Work Area and Activity Assignment
+    ws.getCell(`A${rIdx}`).value = "BENEFICIARY ATTENDANCE, WORK AREA & PARTICIPATION ROSTER";
     ws.getCell(`A${rIdx}`).font = { bold: true, size: 10, color: { argb: "FF0C3B6D" } };
     rIdx++;
 
     ws.getCell(`A${rIdx}`).value = "#";
     ws.getCell(`B${rIdx}`).value = "DESIGNATED NO.";
     ws.getCell(`C${rIdx}`).value = "BENEFICIARY NAME";
-    ws.getCell(`D${rIdx}`).value = "SITIO / ADDRESS";
-    ws.getCell(`E${rIdx}`).value = "STATUS";
-    ws.getCell(`F${rIdx}`).value = "REMARKS";
+    ws.getCell(`D${rIdx}`).value = "SEX";
+    ws.getCell(`E${rIdx}`).value = "SITIO / ADDRESS";
+    ws.getCell(`F${rIdx}`).value = "ASSIGNED WORK AREA";
+    ws.getCell(`G${rIdx}`).value = "DESIGNATED SPECIFIC ACTIVITY";
+    ws.getCell(`H${rIdx}`).value = "STATUS";
+    ws.getCell(`I${rIdx}`).value = "QR TOKEN REF";
 
     ws.getRow(rIdx).font = { bold: true, size: 9, color: { argb: "FFFFFFFF" } };
     ws.getRow(rIdx).fill = {
@@ -381,13 +403,34 @@ export async function generateAccomplishmentExcel(programId: string): Promise<Bu
 
     rIdx++;
     brgyBeneficiaries.forEach((b, idx) => {
+      const activeQr = b.qrCodes?.find((q: any) => q.status === "ACTIVE") || b.qrCodes?.[0];
+
+      // Calculate smart work assignment for Day 1 schedule
+      const assignment = assignBeneficiaryWorkArea(
+        {
+          id: b.beneficiary.id,
+          designatedNumber: b.designatedNumber,
+          fullName: b.beneficiary.fullName,
+          sex: b.beneficiary.sex,
+          sitio: b.beneficiary.sitio,
+          barangay: b.beneficiary.barangay,
+          isSenior: b.beneficiary.isSenior,
+          isPwd: b.beneficiary.isPwd,
+        },
+        workItemsList.filter((it) => it.dayNumber === 1 || workItemsList.length <= 1),
+        1
+      );
+
       const row = ws.getRow(rIdx);
       row.getCell(1).value = idx + 1;
       row.getCell(2).value = b.designatedNumber;
       row.getCell(3).value = b.beneficiary.fullName;
-      row.getCell(4).value = b.beneficiary.sitio || "";
-      row.getCell(5).value = b.participationStatus;
-      row.getCell(6).value = b.originalBeneficiary ? "Original" : "Replacement";
+      row.getCell(4).value = b.beneficiary.sex || "UNSPECIFIED";
+      row.getCell(5).value = b.beneficiary.sitio || "";
+      row.getCell(6).value = assignment.area;
+      row.getCell(7).value = assignment.specificActivity;
+      row.getCell(8).value = b.participationStatus;
+      row.getCell(9).value = activeQr?.publicToken || `SLOT-${b.designatedNumber}`;
       row.font = { size: 9 };
       rIdx++;
     });
@@ -395,27 +438,31 @@ export async function generateAccomplishmentExcel(programId: string): Promise<Bu
     // Signature section
     rIdx += 3;
     ws.getCell(`A${rIdx}`).value = "Prepared by:";
-    ws.getCell(`D${rIdx}`).value = "Verified by:";
+    ws.getCell(`E${rIdx}`).value = "Verified by:";
 
     rIdx += 3;
     ws.getCell(`A${rIdx}`).value = "_________________________";
-    ws.getCell(`D${rIdx}`).value = "_________________________";
+    ws.getCell(`E${rIdx}`).value = "_________________________";
 
     rIdx += 1;
     ws.getCell(`A${rIdx}`).value = "TUPAD Coordinator / Focal Person";
-    ws.getCell(`D${rIdx}`).value = "PESO Manager / DOLE Coordinator";
+    ws.getCell(`E${rIdx}`).value = "PESO Manager / DOLE Coordinator";
 
-    ws.getColumn(1).width = 8;
-    ws.getColumn(2).width = 36;
-    ws.getColumn(3).width = 32;
-    ws.getColumn(4).width = 16;
-    ws.getColumn(5).width = 14;
-    ws.getColumn(6).width = 16;
+    ws.getColumn(1).width = 6;
+    ws.getColumn(2).width = 16;
+    ws.getColumn(3).width = 30;
+    ws.getColumn(4).width = 10;
+    ws.getColumn(5).width = 24;
+    ws.getColumn(6).width = 34;
+    ws.getColumn(7).width = 38;
+    ws.getColumn(8).width = 14;
+    ws.getColumn(9).width = 28;
   }
 
   const buffer = await workbook.xlsx.writeBuffer();
   return Buffer.from(buffer);
 }
+
 
 function getColLetter(colIndex: number): string {
   let temp = "";

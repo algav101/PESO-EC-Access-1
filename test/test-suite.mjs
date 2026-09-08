@@ -332,6 +332,71 @@ async function runTests() {
     await prisma.programBeneficiary.delete({ where: { id: testEditProgBene.id } });
     await prisma.beneficiary.delete({ where: { id: testEditBene.id } });
 
+    // TEST 9: Proximity & Gender-Balanced Work Area Allocation Engine
+    console.log("\n[TEST 9] Proximity & Gender-Balanced Work Area Allocation Engine");
+    
+    // Test pure logic helpers
+    const { extractAddressTokens, calculateProximityScore, assignBeneficiaryWorkArea } = await import("../src/lib/work-assignment.ts");
+    
+    const tokens = extractAddressTokens("Purok 2, Sitio Maligaya");
+    assert(tokens.numbers.includes(2), "Address token extraction finds Purok 2");
+    assert(tokens.words.includes("maligaya"), "Address token extraction finds Sitio Maligaya");
+
+    const exactMatch = calculateProximityScore("Purok 2", "Purok 1 to Purok 3 Canal Drainage");
+    assert(exactMatch.score >= 90, "Purok 2 matches range 'Purok 1 to Purok 3' with high score");
+    assert(exactMatch.isPurokMatch === true, "isPurokMatch flag is true for range match");
+
+    const testDayItems = [
+      {
+        id: "ITEM-A",
+        dayNumber: 1,
+        area: "Purok 1 to 2 Seashore",
+        specificActivities: "Coastal Clean-up",
+        maleCount: 5,
+        femaleCount: 5,
+        scPwdMaleCount: 1,
+        scPwdFemaleCount: 1,
+        totalCount: 10,
+      },
+      {
+        id: "ITEM-B",
+        dayNumber: 1,
+        area: "Purok 4 to 5 Main Road",
+        specificActivities: "De-clogging and Canal Cleaning",
+        maleCount: 10,
+        femaleCount: 5,
+        scPwdMaleCount: 0,
+        scPwdFemaleCount: 0,
+        totalCount: 15,
+      },
+    ];
+
+    const maleFromPurok2 = {
+      id: "BENE-M1",
+      designatedNumber: "1",
+      fullName: "Juan Dela Cruz",
+      sex: "MALE",
+      sitio: "Purok 2",
+      barangay: "Paltic",
+    };
+
+    const femaleFromPurok5 = {
+      id: "BENE-F1",
+      designatedNumber: "2",
+      fullName: "Maria Santos",
+      sex: "FEMALE",
+      sitio: "Purok 5",
+      barangay: "Paltic",
+    };
+
+    const assignmentMale = assignBeneficiaryWorkArea(maleFromPurok2, testDayItems, 1);
+    assert(assignmentMale.assignedItem.id === "ITEM-A", "Male from Purok 2 assigned to nearest Purok 1-2 area");
+    assert(assignmentMale.allocationMethod === "EXACT_PUROK", "Allocation method is EXACT_PUROK");
+
+    const assignmentFemale = assignBeneficiaryWorkArea(femaleFromPurok5, testDayItems, 1);
+    assert(assignmentFemale.assignedItem.id === "ITEM-B", "Female from Purok 5 assigned to nearest Purok 4-5 area");
+    assert(assignmentFemale.allocationMethod === "EXACT_PUROK", "Allocation method is EXACT_PUROK");
+
     console.log("\n==================================================================");
     console.log(`TEST SUMMARY: ${passed} PASSED, ${failed} FAILED`);
     console.log("==================================================================");
@@ -346,3 +411,4 @@ async function runTests() {
 }
 
 runTests();
+

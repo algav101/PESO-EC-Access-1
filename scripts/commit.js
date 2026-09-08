@@ -10,11 +10,13 @@ async function doCommit() {
 
     // List of files to add / track
     const filesToStage = [
-      "src/components/layout/Sidebar.tsx",
-      "src/components/layout/LandingNavDrawer.tsx",
-      "src/app/globals.css",
-      "package.json",
-      "package-lock.json",
+      "src/lib/work-assignment.ts",
+      "src/app/api/v1/work-assignment/lookup/route.ts",
+      "src/app/my-assignment/page.tsx",
+      "src/app/reports/page.tsx",
+      "src/lib/excel-exporter.ts",
+      "test/test-suite.mjs",
+      "scripts/commit.js",
     ];
 
     for (const filepath of filesToStage) {
@@ -36,7 +38,7 @@ async function doCommit() {
         name: "PESO Dingalan",
         email: "peso@dingalan.gov.ph",
       },
-      message: "feat: wrap sidebar into EC TUPAD Management System dropdown and add under-development module buttons",
+      message: "feat(accomplishment): add QR code work area routing and proximity/gender allocation engine",
     });
 
     console.log("\n[SUCCESS] Committed successfully!");
