@@ -21,6 +21,7 @@ async function doCommit() {
       "src/components/layout/Sidebar.tsx",
       "src/lib/excel-exporter.ts",
       "test/test-suite.mjs",
+      "test/verify-qr-flow.mjs",
       "scripts/commit.js",
     ];
 
@@ -43,7 +44,7 @@ async function doCommit() {
         name: "PESO Dingalan",
         email: "peso@dingalan.gov.ph",
       },
-      message: "feat(accomplishment): add QR code work area routing and proximity/gender allocation engine",
+      message: "feat(privacy): retain original QR codes and enforce middle-name auth for work area and schedule routing",
     });
 
     console.log("\n[SUCCESS] Committed successfully!");
