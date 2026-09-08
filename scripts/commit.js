@@ -16,6 +16,7 @@ async function doCommit() {
       "src/app/api/v1/work-assignment/lookup/route.ts",
       "src/app/my-assignment/page.tsx",
       "src/app/reports/page.tsx",
+      "src/app/page.tsx",
       "src/components/layout/LandingNavDrawer.tsx",
       "src/components/layout/Sidebar.tsx",
       "src/lib/excel-exporter.ts",

@@ -203,6 +203,15 @@ export default async function LandingPage() {
                 <li className="flex items-start gap-2 bg-slate-50 p-2.5 rounded-lg border border-slate-100 hover:border-slate-300 transition-colors">
                   <span className="text-purple-700 font-bold">✔</span>
                   <span>
+                    <a href="/my-assignment" className="hover:underline font-bold text-slate-900">
+                      Work Area &amp; Schedule QR Scanner
+                    </a>{" "}
+                    para malaman ang iyong nakatalagang lugar at 10-araw na schedule
+                  </span>
+                </li>
+                <li className="flex items-start gap-2 bg-slate-50 p-2.5 rounded-lg border border-slate-100 hover:border-slate-300 transition-colors">
+                  <span className="text-purple-700 font-bold">✔</span>
+                  <span>
                     <strong className="font-bold text-slate-900">Mabilis na QR Verification</strong> sa stubs, orientation, at attendance
                   </span>
                 </li>
