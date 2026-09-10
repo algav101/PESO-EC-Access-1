@@ -150,7 +150,7 @@ export default function LoginPage() {
         className="fixed inset-0 pointer-events-none z-0 flex items-center justify-center overflow-hidden"
       >
         <img
-          src="https://i.ibb.co/N6fmXdPX/Untitled-design.gif"
+          src="/images/peso-ec-access-emblem.gif"
           alt="PESO EC Access Official Emblem Watermark"
           className="w-[90vw] max-w-[700px] object-contain opacity-[0.06] select-none scale-105 filter blur-[0.2px]"
         />
@@ -183,7 +183,7 @@ export default function LoginPage() {
           <div className="text-center space-y-3 pb-6 border-b border-slate-100">
             <div className="flex items-center justify-center">
               <img
-                src="https://i.ibb.co/N6fmXdPX/Untitled-design.gif"
+                src="/images/peso-ec-access-emblem.gif"
                 alt="Official PESO EC Access Emblem Logo"
                 className="h-24 sm:h-28 w-auto object-contain drop-shadow-md rounded-2xl hover:scale-105 transition-transform"
               />

@@ -15,7 +15,7 @@ export function PesoLogo({ className = "h-10 w-10", size = 44 }: PesoLogoProps) 
       title="PESO e access"
     >
       <img
-        src="https://i.ibb.co/N6fmXdPX/Untitled-design.gif"
+        src="/images/peso-ec-access-emblem.gif"
         alt="PESO EC Access Official Emblem Logo"
         className="w-full h-full object-contain rounded-xl transition-transform duration-200 group-hover:scale-105"
       />

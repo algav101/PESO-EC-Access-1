@@ -60,7 +60,7 @@ export default async function LandingPage() {
         className="fixed inset-0 pointer-events-none z-0 flex items-center justify-center overflow-hidden"
       >
         <img
-          src="https://i.ibb.co/N6fmXdPX/Untitled-design.gif"
+          src="/images/peso-ec-access-emblem.gif"
           alt="PESO EC Access Official Emblem Watermark"
           className="w-[90vw] max-w-[850px] object-contain opacity-[0.045] select-none scale-110 filter blur-[0.2px]"
         />
@@ -134,7 +134,7 @@ export default async function LandingPage() {
           {/* Authentic PESO Official Seal & Official PESO EC Access Emblem Logo */}
           <div className="flex items-center gap-3 shrink-0">
             <img
-              src="https://i.ibb.co/N6fmXdPX/Untitled-design.gif"
+              src="/images/peso-ec-access-emblem.gif"
               alt="Official PESO EC Access Emblem Logo"
               className="w-14 h-14 sm:w-16 sm:h-16 object-contain rounded-2xl shadow-xs border border-slate-200 hover:scale-105 transition-transform"
             />

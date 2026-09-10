@@ -212,7 +212,7 @@ export function LandingNavDrawer() {
               <img
                 alt="Official PESO EC Access Emblem Logo"
                 className="w-9 h-9 object-contain rounded-lg shadow-xs"
-                src="https://i.ibb.co/N6fmXdPX/Untitled-design.gif"
+                src="/images/peso-ec-access-emblem.gif"
               />
               <div>
                 <span className="text-xs font-bold text-emerald-400 uppercase tracking-wider">
@@ -327,7 +327,7 @@ export function LandingNavDrawer() {
               <img
                 alt="Official PESO EC Access Emblem Logo"
                 className="w-10 h-10 object-contain shrink-0 rounded-lg"
-                src="https://i.ibb.co/N6fmXdPX/Untitled-design.gif"
+                src="/images/peso-ec-access-emblem.gif"
               />
               <div className="text-xs">
                 <div className="font-bold text-slate-800">PESO Dingalan Aurora</div>
