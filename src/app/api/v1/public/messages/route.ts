@@ -3,6 +3,8 @@ export const dynamic = "force-dynamic";
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 
+import { verifyCaptchaChallenge } from "@/lib/auth";
+
 // Generate unique tracking code e.g. MSG-2026-A8K9Z
 function generateTrackingCode(): string {
   const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
@@ -26,6 +28,7 @@ export async function POST(request: Request) {
       subject,
       message,
       captchaAnswer,
+      captchaToken,
       captchaExpected,
     } = body;
 
@@ -51,14 +54,28 @@ export async function POST(request: Request) {
       );
     }
 
-    // 2. CAPTCHA Security Verification
-    if (captchaExpected !== undefined && captchaAnswer !== undefined) {
+    // 2. Cryptographic Server-Signed CAPTCHA Security Verification
+    if (captchaToken) {
+      const isValid = verifyCaptchaChallenge(captchaAnswer, captchaToken);
+      if (!isValid) {
+        return NextResponse.json(
+          { error: "Maling CAPTCHA Security Code o nag-expire na ito. Pakisubukan muli." },
+          { status: 400 }
+        );
+      }
+    } else if (captchaExpected !== undefined && captchaAnswer !== undefined) {
+      // Legacy fallback
       if (String(captchaAnswer).trim() !== String(captchaExpected).trim()) {
         return NextResponse.json(
           { error: "Maling CAPTCHA Security Code. Pakisubukan muli upang mapatunayang hindi ka robot." },
           { status: 400 }
         );
       }
+    } else {
+      return NextResponse.json(
+        { error: "Kinakailangan ang pagsagot sa CAPTCHA Security Check." },
+        { status: 400 }
+      );
     }
 
     // 3. Create Ticket

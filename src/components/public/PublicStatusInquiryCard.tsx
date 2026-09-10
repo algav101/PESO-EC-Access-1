@@ -111,13 +111,14 @@ export function PublicStatusInquiryCard() {
 
       {/* Inquiry Form */}
       <div className="p-6 sm:p-8 space-y-6">
-        <form onSubmit={handleSearch} className="space-y-4">
+        <form onSubmit={handleSearch} className="space-y-4" aria-label="TUPAD Application Inquiry Form">
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
             <div>
-              <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
+              <label htmlFor="inquiry-last-name" className="block text-xs font-bold text-slate-700 uppercase mb-1">
                 Last Name (Apelyido) <span className="text-rose-500">*</span>
               </label>
               <input
+                id="inquiry-last-name"
                 type="text"
                 required
                 value={lastName}
@@ -128,10 +129,11 @@ export function PublicStatusInquiryCard() {
             </div>
 
             <div>
-              <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
+              <label htmlFor="inquiry-first-name" className="block text-xs font-bold text-slate-700 uppercase mb-1">
                 First Name (Pangalan) <span className="text-rose-500">*</span>
               </label>
               <input
+                id="inquiry-first-name"
                 type="text"
                 required
                 value={firstName}
@@ -142,10 +144,11 @@ export function PublicStatusInquiryCard() {
             </div>
 
             <div>
-              <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
+              <label htmlFor="inquiry-middle-name" className="block text-xs font-bold text-slate-700 uppercase mb-1">
                 Middle Name (Gitnang Pangalan)
               </label>
               <input
+                id="inquiry-middle-name"
                 type="text"
                 value={middleName}
                 onChange={(e) => setMiddleName(e.target.value)}
@@ -155,10 +158,11 @@ export function PublicStatusInquiryCard() {
             </div>
 
             <div>
-              <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
+              <label htmlFor="inquiry-ext-name" className="block text-xs font-bold text-slate-700 uppercase mb-1">
                 Ext. Name (JR, SR, III)
               </label>
               <input
+                id="inquiry-ext-name"
                 type="text"
                 value={extensionName}
                 onChange={(e) => setExtensionName(e.target.value)}
@@ -170,11 +174,12 @@ export function PublicStatusInquiryCard() {
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 items-end pt-1">
             <div className="sm:col-span-2">
-              <label className="block text-xs font-bold text-slate-700 uppercase mb-1 flex items-center space-x-1.5">
-                <Calendar className="w-3.5 h-3.5 text-gov-blue" />
-                <span>Birthday / Kaarawan (MM-DD-YYYY) bilang Kumpirmasyon</span>
+              <label htmlFor="inquiry-birthday" className="block text-xs font-bold text-slate-700 uppercase mb-1 flex items-center space-x-1.5">
+                <Calendar className="w-3.5 h-3.5 text-gov-blue" aria-hidden="true" />
+                <span>Birthday / Kaarawan (Opsyonal bilang Kumpirmasyon)</span>
               </label>
               <input
+                id="inquiry-birthday"
                 type="date"
                 value={birthday}
                 onChange={(e) => setBirthday(e.target.value)}
@@ -188,7 +193,7 @@ export function PublicStatusInquiryCard() {
                 disabled={loading}
                 className="flex-1 py-2.5 px-6 bg-gov-blue hover:bg-gov-light text-white font-extrabold text-xs rounded-xl shadow-md transition flex items-center justify-center space-x-2 disabled:opacity-50"
               >
-                <Search className="w-4 h-4 text-gov-gold" />
+                <Search className="w-4 h-4 text-gov-gold" aria-hidden="true" />
                 <span>{loading ? "Sinisiyasat..." : "Suriin ang Aplikasyon"}</span>
               </button>
 
@@ -206,8 +211,12 @@ export function PublicStatusInquiryCard() {
         </form>
 
         {error && (
-          <div className="p-4 bg-rose-50 border border-rose-200 rounded-2xl flex items-center space-x-3 text-xs text-rose-800 font-medium">
-            <AlertTriangle className="w-5 h-5 text-rose-600 flex-shrink-0" />
+          <div 
+            role="alert"
+            aria-live="assertive"
+            className="p-4 bg-rose-50 border border-rose-200 rounded-2xl flex items-center space-x-3 text-xs text-rose-800 font-medium"
+          >
+            <AlertTriangle className="w-5 h-5 text-rose-600 flex-shrink-0" aria-hidden="true" />
             <span>{error}</span>
           </div>
         )}
@@ -336,26 +345,33 @@ export function PublicStatusInquiryCard() {
 
             {/* Additional Details Grid if Found */}
             {result.found && result.applicant && (
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs bg-slate-50 p-4 rounded-2xl border border-slate-200">
-                <div>
-                  <span className="text-slate-400 text-[10px] font-bold uppercase block">Barangay / Sitio</span>
-                  <p className="font-bold text-slate-800">
-                    {result.applicant.barangay} - {result.applicant.streetSitio || "Centro"}
-                  </p>
+              <div className="space-y-2">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs bg-slate-50 p-4 rounded-2xl border border-slate-200">
+                  <div>
+                    <span className="text-slate-400 text-[10px] font-bold uppercase block">Barangay / Komunidad</span>
+                    <p className="font-bold text-slate-800">
+                      Brgy. {result.applicant.barangay}
+                    </p>
+                  </div>
+                  <div>
+                    <span className="text-slate-400 text-[10px] font-bold uppercase block">Contact No. (Masked)</span>
+                    <p className="font-mono font-bold text-slate-800">{result.applicant.contactNumber}</p>
+                  </div>
+                  <div>
+                    <span className="text-slate-400 text-[10px] font-bold uppercase block">Katibayan ng ID</span>
+                    <p className="font-bold text-slate-800">
+                      {result.applicant.idPresented} <span className="font-mono text-[11px] text-slate-500">({result.applicant.idNumber})</span>
+                    </p>
+                  </div>
+                  <div>
+                    <span className="text-slate-400 text-[10px] font-bold uppercase block">Dependent (Masked)</span>
+                    <p className="font-bold text-slate-800">{result.applicant.dependentFullName}</p>
+                  </div>
                 </div>
-                <div>
-                  <span className="text-slate-400 text-[10px] font-bold uppercase block">Contact No.</span>
-                  <p className="font-bold text-slate-800">{result.applicant.contactNumber}</p>
-                </div>
-                <div>
-                  <span className="text-slate-400 text-[10px] font-bold uppercase block">Valid ID Presented</span>
-                  <p className="font-bold text-slate-800">
-                    {result.applicant.idPresented} {result.applicant.idNumber ? `(${result.applicant.idNumber})` : ""}
-                  </p>
-                </div>
-                <div>
-                  <span className="text-slate-400 text-[10px] font-bold uppercase block">Dependent</span>
-                  <p className="font-bold text-slate-800">{result.applicant.dependentFullName}</p>
+
+                <div className="px-3 py-1.5 bg-blue-50 border border-blue-200 rounded-xl text-[10px] text-blue-900 font-medium flex items-center justify-between">
+                  <span>🔒 <strong>Data Privacy Act (R.A. 10173):</strong> Naka-mask ang mga personal na detalye para sa seguridad ng aplikante.</span>
+                  <span className="font-bold text-gov-blue">PESO Dingalan DPO</span>
                 </div>
               </div>
             )}

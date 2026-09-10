@@ -18,6 +18,14 @@ function parsePayoutDateToTimestamp(payoutDateStr: string): number {
   return 0;
 }
 
+function maskFullName(fullName: string = ""): string {
+  if (!fullName) return "***";
+  return fullName
+    .split(/\s+/)
+    .map((word) => (word.length > 1 ? word[0] + "*".repeat(Math.min(word.length - 1, 4)) : word))
+    .join(" ");
+}
+
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
@@ -25,15 +33,18 @@ export async function GET(request: Request) {
     const isSuggestions = searchParams.get("suggestions") === "1" || searchParams.get("type") === "suggestions";
     const isCountOnly = searchParams.get("countOnly") === "1";
 
+    // Public count of reference entries
     if (isCountOnly) {
       const totalCount = await prisma.beneficiaryRestriction.count();
       return NextResponse.json({ totalCount });
     }
 
+    const user = await getCurrentUser();
+
+    // Masked suggestions for public eligibility lookup dropdown
     if (isSuggestions && query) {
       const qUpper = query.toUpperCase();
 
-      // Find at least 5 matching suggestions across Beneficiary and Restrictions
       const restrictions = await prisma.beneficiaryRestriction.findMany({
         where: {
           OR: [
@@ -52,23 +63,32 @@ export async function GET(request: Request) {
 
       const suggestions = restrictions.map((r) => {
         const b = r.beneficiary;
+        const isAuthStaff = Boolean(user);
         return {
           id: r.id,
-          fullName: b?.fullName || "",
+          fullName: isAuthStaff ? (b?.fullName || "") : maskFullName(b?.fullName || ""),
           firstName: b?.firstName || "",
           middleName: b?.middleName || "",
           lastName: b?.lastName || "",
           extensionName: b?.extensionName || "",
-          adlNo: r.adlNo || "",
-          workDate: r.workDate || "",
-          payoutDate: r.payoutDate || "",
-          barangay: r.barangay || b?.barangay || "",
+          adlNo: isAuthStaff ? (r.adlNo || "") : (r.adlNo ? `${r.adlNo.slice(0, 4)}****` : "Historical"),
+          workDate: isAuthStaff ? (r.workDate || "") : "Recorded Duration",
+          payoutDate: isAuthStaff ? (r.payoutDate || "") : (r.payoutDate ? r.payoutDate.slice(0, 4) + " (Recorded)" : "Recorded"),
+          barangay: r.barangay || b?.barangay || "Dingalan",
           municipality: r.municipality || b?.municipality || "Dingalan",
           isAppointive: r.isAppointivePersonnel,
         };
       });
 
       return NextResponse.json({ suggestions });
+    }
+
+    // Full table dumps require authentication
+    if (!user) {
+      return NextResponse.json(
+        { error: "Unauthorized: Viewing the complete restrictions registry requires staff authentication." },
+        { status: 401 }
+      );
     }
 
     const whereClause: any = {};

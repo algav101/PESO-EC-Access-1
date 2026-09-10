@@ -159,34 +159,60 @@ export async function POST(request: Request) {
       statusMessage = "Maedup! Ang inyong aplikasyon ay kasalukuyang nakapila para susunod na batch ng TUPAD Beneficiary";
     }
 
+// Helper functions for Data Privacy Act (RA 10173) compliant masking
+function maskFullName(fullName: string = ""): string {
+  if (!fullName) return "***";
+  return fullName
+    .split(/\s+/)
+    .map((word) => (word.length > 1 ? word[0] + "*".repeat(Math.min(word.length - 1, 4)) : word))
+    .join(" ");
+}
+
+function maskPhoneNumber(phone?: string | null): string {
+  if (!phone || String(phone).trim().length < 7) return "Nakatala (Masked)";
+  const clean = String(phone).trim();
+  if (clean.length <= 4) return "****";
+  return clean.slice(0, 4) + "****" + clean.slice(-3);
+}
+
+function maskIdNumber(idNum?: string | null): string {
+  if (!idNum || String(idNum).trim().length < 4) return "Nakatala (Masked)";
+  const clean = String(idNum).trim();
+  return clean.slice(0, Math.min(3, clean.length)) + "-****-" + clean.slice(-2);
+}
+
+function maskDependentName(name?: string | null): string {
+  if (!name || String(name).trim().length < 2) return "May Nakatalang Dependent";
+  return maskFullName(String(name).trim());
+}
+
     return NextResponse.json({
       found: true,
       applicant: {
         id: matchedApplicant.id,
-        fullName: matchedApplicant.fullName,
-        lastName: matchedApplicant.lastName,
-        firstName: matchedApplicant.firstName,
-        middleName: matchedApplicant.middleName,
-        extensionName: matchedApplicant.extensionName,
-        birthday: matchedApplicant.birthday || `${matchedApplicant.birthMonth || ""}-${matchedApplicant.birthDay || ""}-${matchedApplicant.birthYear || ""}`,
-        civilStatus: matchedApplicant.civilStatus || "-",
+        fullName: maskFullName(matchedApplicant.fullName),
+        lastName: matchedApplicant.lastName ? matchedApplicant.lastName[0] + "****" : "****",
+        firstName: matchedApplicant.firstName ? matchedApplicant.firstName[0] + "****" : "****",
         barangay: matchedApplicant.barangay || "-",
-        streetSitio: matchedApplicant.streetSitio || "-",
-        contactNumber: matchedApplicant.contactNumber || "None Provided",
-        idPresented: matchedApplicant.idPresented || "None Provided",
-        idNumber: matchedApplicant.idNumber || "None Provided",
-        is4ps: matchedApplicant.is4ps || "N",
-        isIp: matchedApplicant.isIp || "N",
-        occupation: matchedApplicant.occupation || "-",
-        dependentFullName: matchedApplicant.dependentFullName || "None Listed",
-        remarks: matchedApplicant.remarks || "Standard Application Entry",
+        streetSitio: matchedApplicant.streetSitio ? `Purok / Sitio sa Brgy. ${matchedApplicant.barangay || "Dingalan"}` : "-",
+        contactNumber: maskPhoneNumber(matchedApplicant.contactNumber),
+        idPresented: matchedApplicant.idPresented ? `${matchedApplicant.idPresented} (Naberipika)` : "Nakatala",
+        idNumber: maskIdNumber(matchedApplicant.idNumber),
+        dependentFullName: maskDependentName(matchedApplicant.dependentFullName),
         status: matchedApplicant.status,
       },
       isLackingDetails: isLacking,
       lackingFields,
       message: statusMessage,
-      sourceRemarks: matchedApplicant.remarks || "No remarks on file",
-      lastAvailment,
+      sourceRemarks: isLacking ? "Kulang ang ilang kinakailangang dokumento/detalye. Mangyaring kumpletuhin sa tanggapan." : "Kumpleto ang mga pangunahing detalye sa talaan.",
+      lastAvailment: lastAvailment ? {
+        adlNo: lastAvailment.adlNo ? `${lastAvailment.adlNo.slice(0, 4)}****` : "Historical TUPAD",
+        payoutDate: lastAvailment.payoutDate || "Recorded",
+        workDate: lastAvailment.workDate || "Past Program",
+        barangay: lastAvailment.barangay,
+        status: lastAvailment.status,
+        reason: lastAvailment.reason,
+      } : null,
     });
   } catch (error: any) {
     console.error("POST /api/v1/public/inquiry error:", error);

@@ -8,30 +8,49 @@ async function doCommit() {
   try {
     console.log("Checking Git status in:", dir);
 
-    // List of files to add / track
-    const filesToStage = [
-      "src/components/layout/Navbar.tsx",
-      "src/app/field/page.tsx",
-      "src/components/field/FieldQrPassGeneratorCard.tsx",
-      "src/components/stubs/Format4SchedulePass.tsx",
-      "src/app/stubs/page.tsx",
-      "src/app/api/v1/programs/[id]/qr/generate-designated/route.ts",
-      "src/app/api/v1/programs/[id]/beneficiaries/route.ts",
-      "src/lib/qr-client-cache.ts",
-      "test/test-suite.mjs",
-      "scripts/commit.js",
-    ];
+    // Scan all modified, added, and deleted files
+    const FILE = 0, HEAD = 1, WORKDIR = 2, STAGE = 3;
+    const matrix = await git.statusMatrix({ fs, dir });
 
-    for (const filepath of filesToStage) {
-      if (fs.existsSync(path.join(dir, filepath))) {
+    let stagedCount = 0;
+    for (const row of matrix) {
+      const filepath = row[FILE];
+      // Skip node_modules, .next, etc. if not ignored
+      if (filepath.startsWith("node_modules") || filepath.startsWith(".next") || filepath.startsWith(".git/")) {
+        continue;
+      }
+
+      const head = row[HEAD];
+      const workdir = row[WORKDIR];
+      const stage = row[STAGE];
+
+      if (workdir === 0 && head !== 0) {
+        // File deleted
+        await git.remove({ fs, dir, filepath });
+        console.log(`  - Removed: ${filepath}`);
+        stagedCount++;
+      } else if (workdir !== 0 && (head !== workdir || stage !== workdir)) {
+        // File created or modified
         await git.add({ fs, dir, filepath });
         console.log(`  + Staged: ${filepath}`);
+        stagedCount++;
       }
+    }
+
+    console.log(`\nTotal files staged: ${stagedCount}`);
+
+    if (stagedCount === 0) {
+      console.log("Nothing to commit (working tree clean).");
+      return;
     }
 
     // Check current branch
     const branch = await git.currentBranch({ fs, dir, fullname: false });
     console.log("Current branch:", branch || "main");
+
+    const commitMsg =
+      process.argv[2] ||
+      "feat(compliance): apply data privacy (RA 10173), unbundled consent, accessibility (WCAG 2.1 AA), security hardening & claims adjustments";
 
     // Commit
     const commitSha = await git.commit({
@@ -41,10 +60,10 @@ async function doCommit() {
         name: "PESO Dingalan",
         email: "peso@dingalan.gov.ph",
       },
-      message: "fix(field): fix client-side runtime exception and feat(stubs): add batch designated QR code generation & Format 4 schedule pass",
+      message: commitMsg,
     });
 
-    console.log("\n[SUCCESS] Committed successfully!");
+    console.log("\n[SUCCESS] Committed successfully to local Git repository!");
     console.log("Commit SHA:", commitSha);
 
     // Log the latest commit
@@ -60,3 +79,4 @@ async function doCommit() {
 }
 
 doCommit();
+

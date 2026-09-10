@@ -483,7 +483,7 @@ export default async function LandingPage() {
               </div>
 
               <div className="relative z-10 pt-2 flex items-center justify-between border-t border-white/20 text-xs font-bold text-amber-300">
-                <span>100% Cash Payout Compliance</span>
+                <span>DOLE Standard Payout Verification Protocol</span>
                 <Award className="w-4 h-4 text-amber-400" />
               </div>
 
@@ -521,7 +521,7 @@ export default async function LandingPage() {
 
       {/* 11. Official Philippine DICT Government Web Template (GWT) Footer */}
       <footer className="bg-slate-950 text-slate-300 text-xs border-t-4 border-emerald-500 mt-auto" data-purpose="dict-gwt-official-footer">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 sm:py-14 space-y-10">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 sm:py-14 space-y-8">
           <div className="grid grid-cols-1 md:grid-cols-12 gap-8 items-start">
             {/* Left: Official Dingalan & Republic Seal */}
             <div className="md:col-span-4 flex items-start gap-4">
@@ -568,8 +568,14 @@ export default async function LandingPage() {
                 </ul>
               </div>
               <div>
-                <h6 className="font-bold text-white uppercase tracking-wider mb-2 text-xs">Government Portals</h6>
+                <h6 className="font-bold text-white uppercase tracking-wider mb-2 text-xs">Data Privacy & Portals</h6>
                 <ul className="space-y-1.5 text-slate-400">
+                  <li>
+                    <a href="mailto:dpo@dingalan.gov.ph" className="hover:text-white hover:underline transition flex items-center space-x-1 text-emerald-300">
+                      <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
+                      <span>DPO Contact: dpo@dingalan.gov.ph</span>
+                    </a>
+                  </li>
                   <li>
                     <a href="https://dole.gov.ph" target="_blank" rel="noopener noreferrer" className="hover:text-white hover:underline transition flex items-center space-x-1">
                       <span>DOLE Philippines</span>
@@ -610,9 +616,18 @@ export default async function LandingPage() {
             </div>
           </div>
 
-          <div className="pt-6 border-t border-slate-800/80 flex flex-col sm:flex-row items-center justify-between text-[11px] text-slate-400 gap-2">
-            <p>© 2026 PESO Dingalan • PESO EC Access • Municipality of Dingalan, Aurora. All Rights Reserved.</p>
-            <p className="font-mono text-emerald-400 font-semibold">DOLE Aurora Field Office Partner Portal</p>
+          {/* Privacy & Cookie Notice Banner in Footer */}
+          <div className="pt-4 border-t border-slate-800/80 text-[11px] text-slate-400 space-y-2">
+            <div className="p-3 bg-slate-900 rounded-xl border border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <p className="leading-relaxed">
+                🔒 <strong>Paunawa ukol sa Data Privacy & Cookies:</strong> Ang PESO EC Access portal ay sumusunod sa <em>Data Privacy Act of 2012 (R.A. 10173)</em>. Gumagamit lamang ang sistemang ito ng <em>strictly functional cookies</em> at local browser storage (IndexedDB) para sa offline attendance scanning at session authentication. Para sa mga katanungan, makipag-ugnayan sa ating Data Protection Officer sa <a href="mailto:dpo@dingalan.gov.ph" className="text-emerald-400 underline">dpo@dingalan.gov.ph</a>.
+              </p>
+            </div>
+
+            <div className="flex flex-col sm:flex-row items-center justify-between text-[10px] text-slate-500 gap-2 pt-1">
+              <p>© 2026 PESO Dingalan • PESO EC Access • Municipality of Dingalan, Aurora. All Rights Reserved.</p>
+              <p className="font-mono text-emerald-400 font-semibold">DOLE Aurora Field Office Partner Portal • NPC Compliant</p>
+            </div>
           </div>
         </div>
       </footer>

@@ -337,8 +337,8 @@ export default function EligibilityCheckerPage() {
             <User className="w-4 h-4 text-gov-blue" />
             <span>Beneficiary Inquiring Information</span>
           </span>
-          <span className="text-[10px] text-slate-400 font-semibold bg-slate-100 px-2 py-0.5 rounded">
-            No Birthday Required
+          <span className="text-[10px] text-gov-blue font-bold bg-blue-50 border border-blue-200 px-2 py-0.5 rounded">
+            320-Day Lockout Verification
           </span>
         </div>
 
@@ -473,6 +473,8 @@ export default function EligibilityCheckerPage() {
       {/* Return Data Display Card */}
       {result && (
         <div
+          role="region"
+          aria-live="polite"
           className={`gov-card p-6 shadow-2xl border-t-4 animate-fadeIn space-y-5 ${
             result.disqualified ? "border-t-rose-600 bg-white" : "border-t-emerald-600 bg-white"
           }`}

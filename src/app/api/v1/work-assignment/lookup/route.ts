@@ -25,6 +25,9 @@ function verifyMiddleName(
     .replace(/[\u0300-\u036f]/g, "")
     .replace(/[^a-z0-9]/g, "");
 
+  // Require at least 2 characters unless exact match
+  if (!cleanEntered) return false;
+
   // 1. Direct match with beneficiary.middleName
   const dbMiddle = (beneficiary.middleName || "")
     .trim()
@@ -35,13 +38,12 @@ function verifyMiddleName(
 
   if (dbMiddle) {
     if (cleanEntered === dbMiddle) return true;
+    if (cleanEntered.length >= 2 && dbMiddle.startsWith(cleanEntered)) return true;
     if (cleanEntered.length >= 3 && (dbMiddle.includes(cleanEntered) || cleanEntered.includes(dbMiddle))) return true;
-    // Single letter initial match
-    if (cleanEntered.length === 1 && dbMiddle.startsWith(cleanEntered)) return true;
   }
 
-  // 2. If beneficiary has no middle name in DB, accept standard empty / N/A tokens
-  const noMiddleTokens = new Set(["", "na", "none", "wala", "no", "notapplicable"]);
+  // 2. If beneficiary has no middle name in DB, accept standard empty / N/A tokens only if explicitly entered
+  const noMiddleTokens = new Set(["na", "none", "wala", "no", "notapplicable"]);
   if (!dbMiddle && noMiddleTokens.has(cleanEntered)) {
     return true;
   }
@@ -59,8 +61,8 @@ function verifyMiddleName(
           .replace(/[\u0300-\u036f]/g, "")
           .replace(/[^a-z0-9]/g, "");
         if (cleanEntered === candidateMiddle) return true;
+        if (cleanEntered.length >= 2 && candidateMiddle.startsWith(cleanEntered)) return true;
         if (cleanEntered.length >= 3 && (candidateMiddle.includes(cleanEntered) || cleanEntered.includes(candidateMiddle))) return true;
-        if (cleanEntered.length === 1 && candidateMiddle.startsWith(cleanEntered)) return true;
       }
     } else {
       // Format B: "FIRST MIDDLE LAST"
@@ -72,8 +74,8 @@ function verifyMiddleName(
           .replace(/[\u0300-\u036f]/g, "")
           .replace(/[^a-z0-9]/g, "");
         if (cleanEntered === candidateMiddle) return true;
+        if (cleanEntered.length >= 2 && candidateMiddle.startsWith(cleanEntered)) return true;
         if (cleanEntered.length >= 3 && (candidateMiddle.includes(cleanEntered) || cleanEntered.includes(candidateMiddle))) return true;
-        if (cleanEntered.length === 1 && candidateMiddle.startsWith(cleanEntered)) return true;
       }
     }
   }

@@ -33,17 +33,25 @@ export function PublicInquiryMessageForm() {
   const [senderContact, setSenderContact] = useState("");
   const [senderBarangay, setSenderBarangay] = useState("Paltic");
 
-  // CAPTCHA State
-  const [num1, setNum1] = useState(7);
-  const [num2, setNum2] = useState(5);
+  // CAPTCHA State (Server-Signed Challenge)
+  const [captchaQuestion, setCaptchaQuestion] = useState("7 + 5 = ?");
+  const [captchaToken, setCaptchaToken] = useState("");
   const [captchaInput, setCaptchaInput] = useState("");
 
-  const refreshCaptcha = () => {
-    const a = Math.floor(Math.random() * 20) + 5;
-    const b = Math.floor(Math.random() * 15) + 3;
-    setNum1(a);
-    setNum2(b);
-    setCaptchaInput("");
+  const refreshCaptcha = async () => {
+    try {
+      setCaptchaInput("");
+      const res = await fetch("/api/v1/public/captcha");
+      if (res.ok) {
+        const data = await res.json();
+        setCaptchaQuestion(data.question || "8 + 4 = ?");
+        setCaptchaToken(data.token || "");
+      } else {
+        setCaptchaQuestion("6 + 7 = ?");
+      }
+    } catch {
+      setCaptchaQuestion("9 + 3 = ?");
+    }
   };
 
   useEffect(() => {
@@ -64,11 +72,8 @@ export function PublicInquiryMessageForm() {
     e.preventDefault();
     setError(null);
 
-    // Verify CAPTCHA locally
-    const expected = num1 + num2;
-    if (parseInt(captchaInput, 10) !== expected) {
-      setError("Maling CAPTCHA Security Code. Pakisagutan nang wasto ang simpleng math problem.");
-      refreshCaptcha();
+    if (!captchaInput.trim()) {
+      setError("Pakisagutan ang CAPTCHA Security problem.");
       return;
     }
 
@@ -96,8 +101,8 @@ export function PublicInquiryMessageForm() {
           senderName,
           senderContact,
           senderBarangay,
-          captchaAnswer: captchaInput,
-          captchaExpected: expected,
+          captchaAnswer: captchaInput.trim(),
+          captchaToken: captchaToken,
         }),
       });
 
@@ -113,6 +118,7 @@ export function PublicInquiryMessageForm() {
       refreshCaptcha();
     } catch (err: any) {
       setError(err.message);
+      refreshCaptcha();
     } finally {
       setLoading(false);
     }
@@ -399,7 +405,7 @@ export function PublicInquiryMessageForm() {
 
                   <div className="flex items-center space-x-2">
                     <div className="px-4 py-2 bg-white rounded-xl border border-amber-300 font-mono font-black text-sm text-slate-800 shadow-inner select-none">
-                      {num1} + {num2} = ?
+                      {captchaQuestion}
                     </div>
 
                     <input
@@ -416,15 +422,20 @@ export function PublicInquiryMessageForm() {
                       onClick={refreshCaptcha}
                       className="p-2 bg-white hover:bg-slate-100 rounded-xl border border-amber-200 text-slate-600 transition"
                       title="Palitan ang CAPTCHA"
+                      aria-label="Palitan ang CAPTCHA problem"
                     >
-                      <RotateCcw className="w-4 h-4" />
+                      <RotateCcw className="w-4 h-4" aria-hidden="true" />
                     </button>
                   </div>
                 </div>
 
                 {error && (
-                  <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl flex items-center space-x-2 text-xs text-rose-700 font-medium">
-                    <AlertTriangle className="w-4 h-4 text-rose-600 flex-shrink-0" />
+                  <div 
+                    role="alert"
+                    aria-live="assertive"
+                    className="p-3 bg-rose-50 border border-rose-200 rounded-xl flex items-center space-x-2 text-xs text-rose-700 font-medium"
+                  >
+                    <AlertTriangle className="w-4 h-4 text-rose-600 flex-shrink-0" aria-hidden="true" />
                     <span>{error}</span>
                   </div>
                 )}

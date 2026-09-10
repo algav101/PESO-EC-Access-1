@@ -59,8 +59,9 @@ export default function OnlineTupadApplicationPage() {
   const [dependentRelationship, setDependentRelationship] = useState("SPOUSE");
   const [remarks, setRemarks] = useState("");
 
-  // Step 4: Consent
-  const [agreedToTerms, setAgreedToTerms] = useState(false);
+  // Step 4: Unbundled Compliance & Data Privacy Consent
+  const [agreedToTruthfulness, setAgreedToTruthfulness] = useState(false);
+  const [agreedToDataPrivacy, setAgreedToDataPrivacy] = useState(false);
 
   // Submission State
   const [loading, setLoading] = useState(false);
@@ -222,7 +223,8 @@ export default function OnlineTupadApplicationPage() {
       setDependentAge("20");
       setDependentRelationship("CHILD");
       setRemarks("Randomized Test Submission");
-      setAgreedToTerms(true);
+      setAgreedToTruthfulness(true);
+      setAgreedToDataPrivacy(true);
     } else if (presetType === "CLEAR") {
       setLastName("");
       setFirstName("");
@@ -246,7 +248,8 @@ export default function OnlineTupadApplicationPage() {
       setDependentAge("");
       setDependentRelationship("SPOUSE");
       setRemarks("");
-      setAgreedToTerms(false);
+      setAgreedToTruthfulness(false);
+      setAgreedToDataPrivacy(false);
     }
   };
 
@@ -258,8 +261,8 @@ export default function OnlineTupadApplicationPage() {
       return;
     }
 
-    if (!agreedToTerms) {
-      setError("Pakisuyong basahin at lagyan ng tsek ang kasunduan / Data Privacy consent bago magsumite.");
+    if (!agreedToTruthfulness || !agreedToDataPrivacy) {
+      setError("Pakisuyong basahin at lagyan ng tsek ang Deklarasyon ng Katotohanan at ang Data Privacy Consent bago magsumite.");
       return;
     }
 
@@ -1037,28 +1040,57 @@ export default function OnlineTupadApplicationPage() {
                     </div>
                   </div>
 
-                  {/* Terms & Data Privacy Consent */}
-                  <div className="p-4 bg-blue-50/60 rounded-2xl border border-blue-200 space-y-3">
-                    <label className="flex items-start space-x-3 cursor-pointer select-none">
-                      <input
-                        type="checkbox"
-                        required
-                        checked={agreedToTerms}
-                        onChange={(e) => setAgreedToTerms(e.target.checked)}
-                        className="w-5 h-5 accent-gov-blue rounded mt-0.5"
-                      />
-                      <div className="text-xs text-slate-800 leading-relaxed font-medium">
-                        <strong className="block text-gov-blue font-bold">
-                          KAPAYAGAN AT DEKLARASYON (Data Privacy Act of 2012 & DOLE Compliance):
-                        </strong>
-                        Pinatutunayan ko na totoo at wasto ang lahat ng impormasyong aking inilagay sa aplikasyong ito. Pinapahintulutan ko ang Tanggapan ng PESO Dingalan at Kagawaran ng Paggawa at Empleo (DOLE) na iproseso ang aking impormasyon para sa pagpili, pag-insure, at monitoring ng programang TUPAD.
-                      </div>
-                    </label>
+                  {/* Unbundled Terms & Data Privacy Consent (NPC & DOLE Compliant) */}
+                  <div className="space-y-3">
+                    {/* Checkbox 1: Truthfulness & DOLE Guidelines Declaration */}
+                    <div className="p-4 bg-amber-50/70 rounded-2xl border border-amber-300 space-y-2">
+                      <label className="flex items-start space-x-3 cursor-pointer select-none">
+                        <input
+                          type="checkbox"
+                          required
+                          checked={agreedToTruthfulness}
+                          onChange={(e) => setAgreedToTruthfulness(e.target.checked)}
+                          className="w-5 h-5 accent-gov-blue rounded mt-0.5"
+                        />
+                        <div className="text-xs text-slate-800 leading-relaxed font-medium">
+                          <strong className="block text-amber-950 font-bold uppercase">
+                            1. Deklarasyon ng Katotohanan at Pagsunod sa Alituntunin ng DOLE:
+                          </strong>
+                          Pinatutunayan ko sa ilalim ng parusa ng batas na ang lahat ng impormasyong aking ibinigay ay totoo, wasto, at kumpleto. Nauunawaan ko na ang anumang maling pahayag o pagiging aktibong kawani ng pamahalaan (tulad ng Barangay Tanod, BHW, o appointive personnel) ay magiging sanhi ng agarang diskwalipikasyon alinsunod sa mga alituntunin ng DOLE at LGU Dingalan.
+                        </div>
+                      </label>
+                    </div>
+
+                    {/* Checkbox 2: RA 10173 Data Privacy Consent & Data Subject Rights */}
+                    <div className="p-4 bg-blue-50/70 rounded-2xl border border-blue-200 space-y-2">
+                      <label className="flex items-start space-x-3 cursor-pointer select-none">
+                        <input
+                          type="checkbox"
+                          required
+                          checked={agreedToDataPrivacy}
+                          onChange={(e) => setAgreedToDataPrivacy(e.target.checked)}
+                          className="w-5 h-5 accent-gov-blue rounded mt-0.5"
+                        />
+                        <div className="text-xs text-slate-800 leading-relaxed font-medium">
+                          <strong className="block text-gov-blue font-bold uppercase">
+                            2. Kusang-Loob na Pahintulot sa Data Privacy Act of 2012 (R.A. 10173):
+                          </strong>
+                          Kusang-loob kong ipinagkakaloob ang aking pahintulot sa Tanggapan ng PESO Dingalan at Department of Labor and Employment (DOLE) na kolektahin, i-verify, at iproseso ang aking personal at sensitibong impormasyon (kabilang ang ID number, kapanganakan, sektor tulad ng 4Ps/IP/PWD, at geotagged work accomplishment photos) para sa profiling, 320-day duplicate restriction check, group micro-insurance enrolment, at official audit reporting.
+                          <span className="block mt-1 text-[11px] text-slate-600">
+                            Nabatid ko ang aking mga karapatan bilang Data Subject (Right to Access, Rectify, Erase) at maaaring sumulat sa PESO Dingalan DPO sa <strong className="text-gov-blue">dpo@dingalan.gov.ph</strong>.
+                          </span>
+                        </div>
+                      </label>
+                    </div>
                   </div>
 
                   {error && (
-                    <div className="p-4 bg-rose-50 border border-rose-200 rounded-xl text-xs text-rose-800 font-medium flex items-center space-x-2">
-                      <AlertTriangle className="w-5 h-5 text-rose-600 flex-shrink-0" />
+                    <div 
+                      role="alert"
+                      aria-live="assertive"
+                      className="p-4 bg-rose-50 border border-rose-200 rounded-xl text-xs text-rose-800 font-medium flex items-center space-x-2"
+                    >
+                      <AlertTriangle className="w-5 h-5 text-rose-600 flex-shrink-0" aria-hidden="true" />
                       <span>{error}</span>
                     </div>
                   )}
