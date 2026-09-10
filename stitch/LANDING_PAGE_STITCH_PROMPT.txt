@@ -1,0 +1,44 @@
+Create an official, modern Philippine Local Government (LGU) and PESO portal landing page for 'PESO EC Access' in Dingalan, Aurora.
+
+Top DICT GWT Utility Header:
+- Dark navy top bar (#020617) with 'PESO Dingalan, Aurora', PST GMT+8 clock indicator, email 'peso@dingalan.gov.ph', and an amber quick action pill '365-Day Checker'.
+
+Official Municipal Masthead:
+- White header displaying Dingalan Municipal Seal, text 'REPUBLIC OF THE PHILIPPINES • PROVINCE OF AURORA', 'MUNICIPALITY OF DINGALAN', bold title 'Public Employment Service Office (PESO)', emerald badge 'PESO EC ACCESS', and official PESO emblem.
+
+Navigation Bar:
+- Clean navigation bar with links: 'Tahanan', 'Mag-apply', 'Status Inquiry', '365-Day Checker', 'Work Assignment', 'Feedback Desk', and high-contrast login button 'MAEDUP! Mag-login'.
+
+Hero Section:
+- Prominent white card with rounded-3xl corners and subtle border.
+- Tagalog Headline: 'Pagpapalakas ng Serbisyo ng PESO upang mas maipa-DAMA sa bawat Pamilyang DINGALEÑO'.
+- Subtitle: '🚀 DIGITAL NA ANG SERBISYO NG PESO DINGALAN! 💻📱'
+- Intro paragraph introducing PESO EC Access portal.
+- Warm amber local innovation highlight banner: '🌟 KAHANGA-HANGA AT PROUDLY LOCAL: Libreng nabuo at pinondohan ng sariling husay at talento ng PESO Dingalan team'.
+- 2-Column feature checklist with purple & emerald checkmarks: Online Application, Status Check, 365-Day Lockout Verification, QR Verification, Work Area Assignment Lookup, and Direct Feedback Desk.
+- Hashtag pills: #PESOECAccess, #SerbisyongDAMA, #DigitalGovernance, #Innovation.
+
+Live Telemetry Metric Strip:
+- Deep navy (#0F172A) stat strip with 4 metrics:
+  1. '1,420+' Verified Beneficiaries
+  2. '18,650+' Attendance Scans Logged
+  3. '1,380+' Completed Payouts
+  4. '11 / 11' Barangays Covered
+
+Public Status Inquiry Module (#inquiry):
+- Citizen-friendly tabbed search card: Query by Application Reference Code OR Full Name + Birthday.
+- Privacy notice badge indicating RA 10173 masked SPI protection.
+- Clean inputs and emerald 'Suriin ang Status' button.
+
+Work Area Assignment Lookup (#work-assignment):
+- Emerald-accented container to check assigned barangay, team schedule, supervisor contact, and work site.
+- Inputs for Last Name, First Name, Middle Name.
+
+Direct Feedback Desk (#inquiry-form):
+- Contact inquiry form with fields for Full Name, Mobile Number, Barangay, Subject, Message.
+- HMAC-signed arithmetic CAPTCHA anti-spam box.
+- Mandatory RA 10173 Data Privacy consent checkbox.
+- Emerald submission button 'Ipadala ang Mensahe'.
+
+DICT GWT Standard Footer:
+- Philippine Gov standard footer with President seal, LGU Dingalan address, DPO compliance contact (dpo@dingalan.gov.ph), and Cookie / Offline Storage Notice.
