@@ -143,8 +143,20 @@ export default function LoginPage() {
   const currentAccount = currentRoleObj?.accounts.find((a) => a.username === username);
 
   return (
-    <div className="min-h-[calc(100vh-4rem)] flex items-center justify-center p-4 sm:p-6 lg:p-8 bg-slate-100">
-      <div className="w-full max-w-md space-y-4">
+    <div className="min-h-[calc(100vh-4rem)] flex items-center justify-center p-4 sm:p-6 lg:p-8 bg-slate-100 relative overflow-hidden">
+      {/* Official PESO EC Access Emblem Logo Page Background Watermark */}
+      <div
+        aria-hidden="true"
+        className="fixed inset-0 pointer-events-none z-0 flex items-center justify-center overflow-hidden"
+      >
+        <img
+          src="https://i.ibb.co/N6fmXdPX/Untitled-design.gif"
+          alt="PESO EC Access Official Emblem Watermark"
+          className="w-[90vw] max-w-[700px] object-contain opacity-[0.06] select-none scale-105 filter blur-[0.2px]"
+        />
+      </div>
+
+      <div className="w-full max-w-md space-y-4 relative z-10">
         {/* Top Back Navigation Button */}
         <div className="flex items-center justify-between">
           <a
@@ -166,14 +178,14 @@ export default function LoginPage() {
         </div>
 
         {/* Card */}
-        <div className="gov-card p-6 sm:p-8 border-t-4 border-t-gov-gold shadow-xl bg-white">
+        <div className="gov-card p-6 sm:p-8 border-t-4 border-t-gov-gold shadow-xl bg-white/95 backdrop-blur-xs">
           {/* Header */}
           <div className="text-center space-y-3 pb-6 border-b border-slate-100">
             <div className="flex items-center justify-center">
               <img
-                src="/images/login-portal-badge.png"
-                alt="MAEDUP! e PESO access"
-                className="h-20 sm:h-24 w-auto object-contain drop-shadow-md"
+                src="https://i.ibb.co/N6fmXdPX/Untitled-design.gif"
+                alt="Official PESO EC Access Emblem Logo"
+                className="h-24 sm:h-28 w-auto object-contain drop-shadow-md rounded-2xl hover:scale-105 transition-transform"
               />
             </div>
             <div className="space-y-0.5">

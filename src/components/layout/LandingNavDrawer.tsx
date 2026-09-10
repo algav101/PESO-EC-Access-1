@@ -210,9 +210,9 @@ export function LandingNavDrawer() {
           <div className="p-4 sm:p-5 bg-slate-900 text-white flex items-center justify-between border-b border-slate-800">
             <div className="flex items-center gap-3">
               <img
-                alt="PESO e-access Logo"
-                className="w-9 h-9 object-contain"
-                src="https://lh3.googleusercontent.com/aida-public/AB6AXuAj1q8BH2iNh9KtYs8CRdUdk9X5cr1XGEYHBF0KtIfW7SiEKZCjkWtGZanoKud35gvZ7CJHrlsuFduLuZhrC1jNuxWeXijl6C8QV-difKhqPUsc60LMG5wcU5aDttRSD1t0nPlo7_D8gE8ETdVrwVK7mpu_GXRlqegfgKPXZUYjqYdI5dTjqRDPgw07PUfFwqNJERfismMSOpqMMUj-NyC1SI2RFSnrAONbP30b-dEfk62NXCbe5Nx_ojvd9o2TbtxI6BiGDZPS3gDYwYc"
+                alt="Official PESO EC Access Emblem Logo"
+                className="w-9 h-9 object-contain rounded-lg shadow-xs"
+                src="https://i.ibb.co/N6fmXdPX/Untitled-design.gif"
               />
               <div>
                 <span className="text-xs font-bold text-emerald-400 uppercase tracking-wider">
@@ -325,9 +325,9 @@ export function LandingNavDrawer() {
           <div className="p-4 bg-slate-50 border-t border-slate-200">
             <div className="flex items-center gap-3">
               <img
-                alt="PESO emblem"
-                className="w-10 h-10 object-contain shrink-0"
-                src="https://lh3.googleusercontent.com/aida-public/AB6AXuANBUA3BdYyqzNv4ams8ja9AUC4nmzO1ByHg1Jt2PDdsLZ71dm0ero1ICGiflRLiPHd6oOg5C87GKkyuCiHWovXBBEUPEU1XGBPznPBpscCUKBqHpMLhbZ1wFWabFsQX57wjSqwIF9qxPga9_ZHmV3_SPFVxamcxdLOzVBDjxGoXTyJ7FS44hNjyOMemLGdCPjD5RHsSiVGXr5ugApEjW8qpNeOOgdyaEyeHFNVJX8L1oN5LM3t4stlYg"
+                alt="Official PESO EC Access Emblem Logo"
+                className="w-10 h-10 object-contain shrink-0 rounded-lg"
+                src="https://i.ibb.co/N6fmXdPX/Untitled-design.gif"
               />
               <div className="text-xs">
                 <div className="font-bold text-slate-800">PESO Dingalan Aurora</div>

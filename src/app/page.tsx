@@ -53,9 +53,21 @@ export default async function LandingPage() {
   }
 
   return (
-    <div className="bg-slate-50 min-h-screen flex flex-col text-slate-800 selection:bg-blue-600 selection:text-white scroll-smooth font-sans">
+    <div className="bg-slate-50 min-h-screen flex flex-col text-slate-800 selection:bg-blue-600 selection:text-white scroll-smooth font-sans relative">
+      {/* Official PESO EC Access Emblem Logo Page Background Watermark */}
+      <div
+        aria-hidden="true"
+        className="fixed inset-0 pointer-events-none z-0 flex items-center justify-center overflow-hidden"
+      >
+        <img
+          src="https://i.ibb.co/N6fmXdPX/Untitled-design.gif"
+          alt="PESO EC Access Official Emblem Watermark"
+          className="w-[90vw] max-w-[850px] object-contain opacity-[0.045] select-none scale-110 filter blur-[0.2px]"
+        />
+      </div>
+
       {/* 1. DICT GWT Top Utility Bar */}
-      <section className="bg-slate-950 text-slate-300 text-xs py-2 px-4 border-b border-slate-800" data-purpose="dict-gwt-utility-bar">
+      <section className="bg-slate-950 text-slate-300 text-xs py-2 px-4 border-b border-slate-800 relative z-20" data-purpose="dict-gwt-utility-bar">
         <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-4 flex-wrap text-[11px] sm:text-xs">
             <span className="font-semibold text-white">PESO Dingalan, Aurora</span>
@@ -86,7 +98,7 @@ export default async function LandingPage() {
       </section>
 
       {/* 2. Official Government Masthead with Dingalan & PESO Seals */}
-      <header className="bg-white border-b border-slate-200 shadow-xs relative z-30" data-purpose="official-masthead">
+      <header className="bg-white/95 backdrop-blur-xs border-b border-slate-200 shadow-xs relative z-30" data-purpose="official-masthead">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3.5 sm:py-4 flex flex-col md:flex-row items-center justify-between gap-4">
           <div className="flex flex-col md:flex-row items-center gap-4 text-center md:text-left">
             {/* Dingalan Municipal Seal */}
@@ -119,17 +131,17 @@ export default async function LandingPage() {
             </div>
           </div>
 
-          {/* Authentic PESO Official Seal & PESO e-access Logo Marks */}
+          {/* Authentic PESO Official Seal & Official PESO EC Access Emblem Logo */}
           <div className="flex items-center gap-3 shrink-0">
+            <img
+              src="https://i.ibb.co/N6fmXdPX/Untitled-design.gif"
+              alt="Official PESO EC Access Emblem Logo"
+              className="w-14 h-14 sm:w-16 sm:h-16 object-contain rounded-2xl shadow-xs border border-slate-200 hover:scale-105 transition-transform"
+            />
             <img
               src="https://lh3.googleusercontent.com/aida-public/AB6AXuBtoUir3ZE52UnEYaw7AR9APtwPi3pEyJBFiuEUIbBsoGvXafd88xp6a33vjrxUZnUpw__3WElv2cDxVridP6KGVkxw4pCH5H73dbV9ZACrE_LxLpujsdC2YyxhXyLU6NoM26us_oh84MDWGwGKupSPueyvyDSFq_h_CBPp7KnSZHa0lU3LbmaZNQi-YTS7t-LeEFoUFFQtCMUJldN0DT-dRyjvhMqcBH6W4pv4DKMK5luQAc0nUsKvA5Vtq1gLHojM3qw"
               alt="PESO Public Employment Service Office Seal"
               className="w-14 h-14 sm:w-16 sm:h-16 object-contain rounded-full shadow-xs border border-slate-200 hover:scale-105 transition-transform"
-            />
-            <img
-              src="https://lh3.googleusercontent.com/aida-public/AB6AXuCItKj6QUue20tf4u2IqFvkQaalkEu69hmpiTtw3CZSSC-3h4zotuueIR2IUh1CQueexM-HvRtnavAPtigDgqsmzQ0drwmMCmjOWSIm2PLIHxowW15uzSuffJLpSmBqLNSFJ4sNZRYylydaqAQUjdiAtiHtrM2iZ742pQYg4VKQC7-NyxSlpIUdqpDbLDn46kxwyNliCAMwWcLj5JoLtDi0HuBvM_jWY9eUPZVChBIQFcfgy5p_K1HIQaNspZ6O35OuxhA"
-              alt="PESO e-access Logo"
-              className="w-14 h-14 sm:w-16 sm:h-16 object-contain hover:scale-105 transition-transform"
             />
           </div>
         </div>
@@ -139,7 +151,7 @@ export default async function LandingPage() {
       <LandingNavDrawer />
 
       {/* 4. EXACT Hero Section Matching User Screenshot */}
-      <section id="hero" className="py-8 sm:py-12 bg-gradient-to-b from-slate-100 via-white to-slate-50 border-b border-slate-200 scroll-mt-16">
+      <section id="hero" className="py-8 sm:py-12 bg-gradient-to-b from-slate-100/90 via-white/80 to-slate-50/90 border-b border-slate-200 scroll-mt-16 relative z-10">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="max-w-5xl mx-auto space-y-6 bg-white p-6 sm:p-10 lg:p-12 rounded-3xl border border-slate-200 shadow-sm">
             {/* Big Main Tagalog Headline */}
