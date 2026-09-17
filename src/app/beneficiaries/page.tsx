@@ -16,6 +16,14 @@ import {
   ChevronUp,
   ChevronDown,
   MapPin,
+  CheckSquare,
+  CheckCircle2,
+  GraduationCap,
+  Zap,
+  RotateCcw,
+  X,
+  Check,
+  Loader2,
 } from "lucide-react";
 import { StatusBadge } from "@/components/common/StatusBadge";
 import { formatDate } from "@/lib/utils";
@@ -38,6 +46,13 @@ export default function BeneficiariesMasterlistPage() {
   const [selectedStubStatus, setSelectedStubStatus] = useState<string>("ALL");
   const [searchQuery, setSearchQuery] = useState("");
   const [loading, setLoading] = useState(true);
+
+  // Manual Selection & Batch Action State
+  const [selectedPbIds, setSelectedPbIds] = useState<string[]>([]);
+  const [batchLoading, setBatchLoading] = useState(false);
+  const [confirmModalAction, setConfirmModalAction] = useState<string | null>(null);
+  const [batchRemarks, setBatchRemarks] = useState<string>("");
+  const [batchSuccessMsg, setBatchSuccessMsg] = useState<string | null>(null);
 
   // Redirect coordinators to field hub
   useEffect(() => {
@@ -289,6 +304,81 @@ export default function BeneficiariesMasterlistPage() {
     }
   };
 
+  // Selection Calculations & Handlers
+  const isAllFilteredSelected =
+    filtered.length > 0 && filtered.every((pb) => selectedPbIds.includes(pb.id));
+  const isSomeFilteredSelected =
+    filtered.some((pb) => selectedPbIds.includes(pb.id)) && !isAllFilteredSelected;
+
+  const handleToggleSelectAllFiltered = () => {
+    if (isAllFilteredSelected) {
+      const filteredIds = new Set(filtered.map((pb) => pb.id));
+      setSelectedPbIds((prev) => prev.filter((id) => !filteredIds.has(id)));
+    } else {
+      const newIds = new Set([...selectedPbIds, ...filtered.map((pb) => pb.id)]);
+      setSelectedPbIds(Array.from(newIds));
+    }
+  };
+
+  const handleToggleSelectRow = (id: string) => {
+    setSelectedPbIds((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
+    );
+  };
+
+  const handleSelectEntireProgram = () => {
+    setSelectedPbIds(beneficiaries.map((pb) => pb.id));
+  };
+
+  const handleClearSelection = () => {
+    setSelectedPbIds([]);
+  };
+
+  const handleExecuteBatchAction = async () => {
+    if (!confirmModalAction || selectedPbIds.length === 0) return;
+    setBatchLoading(true);
+    try {
+      const res = await fetch(`/api/v1/programs/${selectedProgram}/beneficiaries/batch-action`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          programBeneficiaryIds: selectedPbIds,
+          action: confirmModalAction,
+          remarks: batchRemarks.trim() || undefined,
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to process batch action");
+
+      const actionNames: Record<string, string> = {
+        APPROVE_STUB: "Stub Distribution / Affirmation Approval",
+        APPROVE_ORIENTATION: "Orientation Attendance Verification",
+        APPROVE_BOTH: "Stubs & Orientation Batch Approval",
+        RESET_STUB: "Stub Distribution Reset",
+        RESET_ORIENTATION: "Orientation Attendance Reset",
+        RESET_BOTH: "Stubs & Orientation Reset",
+      };
+
+      setBatchSuccessMsg(
+        `Successfully processed ${actionNames[confirmModalAction] || confirmModalAction} for ${
+          data.updatedCount || selectedPbIds.length
+        } beneficiaries.`
+      );
+      setTimeout(() => setBatchSuccessMsg(null), 6000);
+
+      // Refresh masterlist
+      await fetchBeneficiaries(selectedProgram);
+      setSelectedPbIds([]);
+      setConfirmModalAction(null);
+      setBatchRemarks("");
+    } catch (err: any) {
+      alert(`Batch action failed: ${err.message}`);
+    } finally {
+      setBatchLoading(false);
+    }
+  };
+
   const renderSortHeader = (label: string, field: string) => {
     const isActive = sortBy === field;
     return (
@@ -322,7 +412,7 @@ export default function BeneficiariesMasterlistPage() {
   ];
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 pb-24">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
@@ -344,6 +434,22 @@ export default function BeneficiariesMasterlistPage() {
           </a>
         )}
       </div>
+
+      {/* Success Notification Banner */}
+      {batchSuccessMsg && (
+        <div className="p-3 bg-emerald-50 border border-emerald-300 rounded-xl flex items-center justify-between text-xs text-emerald-900 font-bold animate-in fade-in slide-in-from-top-2">
+          <div className="flex items-center space-x-2">
+            <CheckCircle2 className="w-4 h-4 text-emerald-600 flex-shrink-0" />
+            <span>{batchSuccessMsg}</span>
+          </div>
+          <button
+            onClick={() => setBatchSuccessMsg(null)}
+            className="text-emerald-700 hover:text-emerald-950 p-1"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      )}
 
       {/* Coordinator Scoped Scope Banner */}
       {user?.role === "TUPAD_COORDINATOR" && user.assignedBarangay && (
@@ -511,27 +617,105 @@ export default function BeneficiariesMasterlistPage() {
         </div>
       </div>
 
-      {/* Masterlist Table */}
+      {/* Masterlist Table Card */}
       <div className="gov-card overflow-hidden">
-        <div className="p-4 bg-slate-50 border-b flex items-center justify-between">
-          <span className="text-xs font-bold text-slate-700 uppercase tracking-wider">
-            Showing {sortedBeneficiaries.length} of {beneficiaries.length} Beneficiaries
+        {/* Table Top Controls & Selection Actions */}
+        <div className="p-3 sm:p-4 bg-slate-50 border-b flex flex-col md:flex-row md:items-center justify-between gap-3">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+              Showing {sortedBeneficiaries.length} of {beneficiaries.length} Beneficiaries
+            </span>
+
+            {/* Quick Multi-Select Helpers */}
+            <div className="flex items-center gap-1.5 ml-1">
+              <button
+                type="button"
+                onClick={handleToggleSelectAllFiltered}
+                className="px-2 py-0.5 rounded text-[11px] font-bold border border-slate-300 bg-white hover:bg-slate-100 text-slate-700 transition"
+              >
+                {isAllFilteredSelected ? "Deselect Visible" : `Select Visible (${sortedBeneficiaries.length})`}
+              </button>
+
+              {beneficiaries.length > sortedBeneficiaries.length && (
+                <button
+                  type="button"
+                  onClick={handleSelectEntireProgram}
+                  className="px-2 py-0.5 rounded text-[11px] font-bold border border-blue-300 bg-blue-50 hover:bg-blue-100 text-gov-blue transition"
+                >
+                  Select All Program ({beneficiaries.length})
+                </button>
+              )}
+
+              {selectedPbIds.length > 0 && (
+                <button
+                  type="button"
+                  onClick={handleClearSelection}
+                  className="px-2 py-0.5 rounded text-[11px] font-bold border border-rose-200 bg-rose-50 hover:bg-rose-100 text-rose-700 transition"
+                >
+                  Clear ({selectedPbIds.length})
+                </button>
+              )}
+            </div>
+
             {sortBy === "sitio" && (
-              <span className="ml-2 px-2 py-0.5 rounded bg-blue-100 text-gov-blue font-bold text-[10px]">
+              <span className="px-2 py-0.5 rounded bg-blue-100 text-gov-blue font-bold text-[10px]">
                 Sorted by Purok / Sitio ({sortOrder})
               </span>
             )}
             {sortBy === "stubAffirmation" && (
-              <span className="ml-2 px-2 py-0.5 rounded bg-amber-100 text-amber-900 font-bold text-[10px]">
-                Sorted by Stub & Affirmation ({sortOrder === "ASC" ? "Affirmed → Pending → Flagged" : "Flagged → Pending → Affirmed"})
+              <span className="px-2 py-0.5 rounded bg-amber-100 text-amber-900 font-bold text-[10px]">
+                Sorted by Stub ({sortOrder === "ASC" ? "Affirmed → Pending → Flagged" : "Flagged → Pending → Affirmed"})
               </span>
             )}
             {sortBy === "orientation" && (
-              <span className="ml-2 px-2 py-0.5 rounded bg-emerald-100 text-emerald-900 font-bold text-[10px]">
+              <span className="px-2 py-0.5 rounded bg-emerald-100 text-emerald-900 font-bold text-[10px]">
                 Sorted by Orientation ({sortOrder === "ASC" ? "Present First" : "Pending First"})
               </span>
             )}
-          </span>
+          </div>
+
+          {/* Action Buttons Header Toolbar (When items selected) */}
+          {(isAdmin || can("stub.override") || can("orientation.correct")) && (
+            <div className="flex flex-wrap items-center gap-1.5">
+              {selectedPbIds.length > 0 ? (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => setConfirmModalAction("APPROVE_STUB")}
+                    className="px-2.5 py-1.5 bg-amber-600 hover:bg-amber-700 text-white font-bold text-[11px] rounded-lg shadow-xs transition flex items-center space-x-1"
+                    title="Bulk mark stub distribution as Affirmed and generate active QR codes"
+                  >
+                    <ShieldAlert className="w-3.5 h-3.5" />
+                    <span>Approve Stubs ({selectedPbIds.length})</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setConfirmModalAction("APPROVE_ORIENTATION")}
+                    className="px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[11px] rounded-lg shadow-xs transition flex items-center space-x-1"
+                    title="Bulk mark orientation as Present"
+                  >
+                    <GraduationCap className="w-3.5 h-3.5" />
+                    <span>Verify Orientation ({selectedPbIds.length})</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setConfirmModalAction("APPROVE_BOTH")}
+                    className="px-3 py-1.5 bg-gov-blue hover:bg-gov-light text-white font-black text-[11px] rounded-lg shadow-xs transition flex items-center space-x-1"
+                    title="Approve both Stubs & Orientation in 1 click"
+                  >
+                    <Zap className="w-3.5 h-3.5 text-amber-300" />
+                    <span>Approve Both ({selectedPbIds.length})</span>
+                  </button>
+                </>
+              ) : (
+                <div className="text-[11px] text-slate-500 italic">
+                  Select beneficiaries below or click &quot;Select Visible&quot; for bulk approvals
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         {loading && beneficiaries.length === 0 ? (
@@ -564,6 +748,19 @@ export default function BeneficiariesMasterlistPage() {
             <table className="w-full text-left text-xs">
               <thead className="bg-slate-100 text-slate-700 font-bold uppercase text-[10px] tracking-wider border-b">
                 <tr>
+                  {/* Master Checkbox Header */}
+                  <th className="px-3 py-3 w-10 text-center select-none">
+                    <input
+                      type="checkbox"
+                      className="w-4 h-4 rounded border-slate-300 text-gov-blue focus:ring-gov-blue cursor-pointer"
+                      checked={isAllFilteredSelected}
+                      ref={(el) => {
+                        if (el) el.indeterminate = isSomeFilteredSelected;
+                      }}
+                      onChange={handleToggleSelectAllFiltered}
+                      title={isAllFilteredSelected ? "Deselect all visible" : "Select all visible"}
+                    />
+                  </th>
                   {renderSortHeader("# Desig", "designatedNumber")}
                   {renderSortHeader("Full Name", "fullName")}
                   {renderSortHeader("Birthday", "birthday")}
@@ -579,6 +776,7 @@ export default function BeneficiariesMasterlistPage() {
               <tbody className="divide-y divide-slate-100">
                 {sortedBeneficiaries.map((pb) => {
                   if (!pb) return null;
+                  const isSelected = selectedPbIds.includes(pb.id);
                   const isOriented = Boolean(pb.orientationAttendance && pb.orientationAttendance.length > 0);
                   const attendCount = Array.isArray(pb.attendanceRecords) ? pb.attendanceRecords.length : 0;
                   const dist = Array.isArray(pb.stubDistributions)
@@ -598,7 +796,24 @@ export default function BeneficiariesMasterlistPage() {
                     : "";
 
                   return (
-                    <tr key={pb.id || Math.random()} className="hover:bg-slate-50 transition">
+                    <tr
+                      key={pb.id || Math.random()}
+                      onClick={() => handleToggleSelectRow(pb.id)}
+                      className={`transition cursor-pointer ${
+                        isSelected
+                          ? "bg-blue-50/80 border-l-4 border-l-gov-blue"
+                          : "hover:bg-slate-50"
+                      }`}
+                    >
+                      {/* Row Checkbox */}
+                      <td className="px-3 py-3 text-center" onClick={(e) => e.stopPropagation()}>
+                        <input
+                          type="checkbox"
+                          className="w-4 h-4 rounded border-slate-300 text-gov-blue focus:ring-gov-blue cursor-pointer"
+                          checked={isSelected}
+                          onChange={() => handleToggleSelectRow(pb.id)}
+                        />
+                      </td>
                       <td className="px-4 py-3 font-mono font-bold text-gov-blue">
                         {pb.designatedNumber || "-"}
                       </td>
@@ -666,7 +881,7 @@ export default function BeneficiariesMasterlistPage() {
                       <td className="px-4 py-3">
                         <StatusBadge status={pb.participationStatus || "ACTIVE"} />
                       </td>
-                      <td className="px-4 py-3 text-right space-x-1.5 whitespace-nowrap">
+                      <td className="px-4 py-3 text-right space-x-1.5 whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
                         {(isAdmin || can("stub.override")) && (
                           <button
                             onClick={() => setStubOverridePb(pb)}
@@ -715,6 +930,246 @@ export default function BeneficiariesMasterlistPage() {
           </div>
         )}
       </div>
+
+      {/* Floating Sticky Bulk Actions Bar (When 1+ beneficiaries selected) */}
+      {selectedPbIds.length > 0 && (isAdmin || can("stub.override") || can("orientation.correct")) && (
+        <div className="fixed bottom-6 inset-x-0 mx-auto max-w-4xl z-40 px-4 animate-in slide-in-from-bottom-5 duration-200">
+          <div className="bg-slate-900/95 backdrop-blur-md text-white rounded-2xl shadow-2xl p-3 sm:p-4 border border-slate-700 flex flex-col sm:flex-row items-center justify-between gap-3">
+            <div className="flex items-center space-x-3 w-full sm:w-auto justify-between sm:justify-start">
+              <div className="flex items-center space-x-2">
+                <span className="px-2.5 py-1 bg-gov-blue text-white font-black text-xs rounded-lg flex items-center space-x-1 shadow-sm">
+                  <CheckSquare className="w-3.5 h-3.5" />
+                  <span>{selectedPbIds.length} Selected</span>
+                </span>
+                {selectedPbIds.length < beneficiaries.length && (
+                  <button
+                    type="button"
+                    onClick={handleSelectEntireProgram}
+                    className="text-[11px] text-blue-300 hover:text-white underline font-semibold transition"
+                  >
+                    Select All ({beneficiaries.length})
+                  </button>
+                )}
+              </div>
+              <button
+                type="button"
+                onClick={handleClearSelection}
+                className="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800 transition"
+                title="Deselect all"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto justify-end">
+              {/* Approve Stubs */}
+              <button
+                type="button"
+                onClick={() => setConfirmModalAction("APPROVE_STUB")}
+                className="px-3 py-2 bg-amber-500 hover:bg-amber-600 text-slate-950 font-black text-xs rounded-xl shadow transition flex items-center space-x-1.5"
+              >
+                <ShieldAlert className="w-3.5 h-3.5 text-slate-950" />
+                <span>Approve Stubs ({selectedPbIds.length})</span>
+              </button>
+
+              {/* Verify Orientation */}
+              <button
+                type="button"
+                onClick={() => setConfirmModalAction("APPROVE_ORIENTATION")}
+                className="px-3 py-2 bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-black text-xs rounded-xl shadow transition flex items-center space-x-1.5"
+              >
+                <GraduationCap className="w-3.5 h-3.5 text-slate-950" />
+                <span>Verify Orientation ({selectedPbIds.length})</span>
+              </button>
+
+              {/* Approve Both */}
+              <button
+                type="button"
+                onClick={() => setConfirmModalAction("APPROVE_BOTH")}
+                className="px-3.5 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-black text-xs rounded-xl shadow-lg transition flex items-center space-x-1.5 ring-1 ring-white/20"
+              >
+                <Zap className="w-3.5 h-3.5 text-amber-300" />
+                <span>Approve Both</span>
+              </button>
+
+              {/* Reset Dropdown Trigger */}
+              <button
+                type="button"
+                onClick={() => setConfirmModalAction("RESET_BOTH")}
+                className="px-2.5 py-2 bg-slate-800 hover:bg-rose-900/80 text-slate-300 hover:text-rose-200 font-bold text-xs rounded-xl border border-slate-700 hover:border-rose-700 transition flex items-center space-x-1"
+                title="Reset or Undo distribution and orientation status"
+              >
+                <RotateCcw className="w-3.5 h-3.5" />
+                <span>Reset...</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Batch Action Confirmation Modal */}
+      {confirmModalAction && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 animate-in fade-in">
+          <div className="bg-white rounded-2xl max-w-lg w-full p-6 space-y-4 shadow-2xl border-t-4 border-t-gov-blue">
+            <div className="flex items-center space-x-3">
+              <div className={`p-2.5 rounded-full ${
+                confirmModalAction.startsWith("RESET") ? "bg-rose-100 text-rose-700" : "bg-blue-100 text-gov-blue"
+              }`}>
+                {confirmModalAction.startsWith("RESET") ? (
+                  <RotateCcw className="w-6 h-6" />
+                ) : confirmModalAction === "APPROVE_BOTH" ? (
+                  <Zap className="w-6 h-6 text-amber-600" />
+                ) : confirmModalAction === "APPROVE_STUB" ? (
+                  <ShieldAlert className="w-6 h-6 text-amber-600" />
+                ) : (
+                  <GraduationCap className="w-6 h-6 text-emerald-600" />
+                )}
+              </div>
+              <div>
+                <h3 className="text-base font-black text-slate-900">
+                  {confirmModalAction === "APPROVE_STUB" && "Bulk Approve Stub Distribution / Affirmation"}
+                  {confirmModalAction === "APPROVE_ORIENTATION" && "Bulk Verify Orientation Attendance"}
+                  {confirmModalAction === "APPROVE_BOTH" && "Bulk Approve Stubs & Orientation Attendance"}
+                  {confirmModalAction === "RESET_STUB" && "Reset Stub Distribution Status"}
+                  {confirmModalAction === "RESET_ORIENTATION" && "Reset Orientation Attendance Status"}
+                  {confirmModalAction === "RESET_BOTH" && "Reset Beneficiaries Distribution & Orientation"}
+                </h3>
+                <p className="text-xs text-slate-500 font-medium">
+                  Applying to <strong>{selectedPbIds.length}</strong> selected beneficiaries
+                </p>
+              </div>
+            </div>
+
+            {/* Action Details Card */}
+            <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-200 text-xs space-y-2">
+              <div className="font-bold text-slate-800">Operation Summary:</div>
+              <ul className="list-disc list-inside space-y-1 text-slate-600 text-[11px]">
+                {confirmModalAction === "APPROVE_STUB" && (
+                  <>
+                    <li>Sets stub distribution status to <strong>DISTRIBUTED / Affirmed</strong>.</li>
+                    <li>Generates active QR tokens for any beneficiaries lacking an active pass.</li>
+                    <li>Restores any flagged replacement status back to active status.</li>
+                  </>
+                )}
+                {confirmModalAction === "APPROVE_ORIENTATION" && (
+                  <>
+                    <li>Marks orientation verification attendance as <strong>PRESENT</strong>.</li>
+                    <li>Enables scanning eligibility during TUPAD work days.</li>
+                  </>
+                )}
+                {confirmModalAction === "APPROVE_BOTH" && (
+                  <>
+                    <li>Affirms & marks stub distribution as <strong>DISTRIBUTED</strong> with valid QR tokens.</li>
+                    <li>Marks orientation attendance as <strong>PRESENT</strong>.</li>
+                    <li>Fully qualifies all <strong>{selectedPbIds.length}</strong> beneficiaries for work day check-in.</li>
+                  </>
+                )}
+                {confirmModalAction.startsWith("RESET") && (
+                  <>
+                    <li className="text-rose-700 font-semibold">
+                      Clears previously recorded stub distribution and/or orientation check-ins.
+                    </li>
+                    <li>Allows re-verifying or re-distributing stubs from a clean state.</li>
+                  </>
+                )}
+              </ul>
+            </div>
+
+            {/* Reset Sub-action selector if in RESET mode */}
+            {confirmModalAction.startsWith("RESET") && (
+              <div className="space-y-1.5">
+                <label className="block text-[11px] font-bold text-slate-600 uppercase">Select Reset Scope:</label>
+                <div className="grid grid-cols-3 gap-2 text-xs">
+                  <button
+                    type="button"
+                    onClick={() => setConfirmModalAction("RESET_STUB")}
+                    className={`p-2 rounded-lg border font-bold text-center transition ${
+                      confirmModalAction === "RESET_STUB"
+                        ? "bg-rose-50 border-rose-500 text-rose-800 ring-2 ring-rose-200"
+                        : "bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100"
+                    }`}
+                  >
+                    Stubs Only
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setConfirmModalAction("RESET_ORIENTATION")}
+                    className={`p-2 rounded-lg border font-bold text-center transition ${
+                      confirmModalAction === "RESET_ORIENTATION"
+                        ? "bg-rose-50 border-rose-500 text-rose-800 ring-2 ring-rose-200"
+                        : "bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100"
+                    }`}
+                  >
+                    Orientation Only
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setConfirmModalAction("RESET_BOTH")}
+                    className={`p-2 rounded-lg border font-bold text-center transition ${
+                      confirmModalAction === "RESET_BOTH"
+                        ? "bg-rose-50 border-rose-500 text-rose-800 ring-2 ring-rose-200"
+                        : "bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100"
+                    }`}
+                  >
+                    Reset Both
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Optional Remarks input */}
+            <div>
+              <label className="block text-[11px] font-bold text-slate-600 uppercase mb-1">
+                Audit Remarks (Optional):
+              </label>
+              <input
+                type="text"
+                value={batchRemarks}
+                onChange={(e) => setBatchRemarks(e.target.value)}
+                placeholder="e.g., Approved via Beneficiaries Masterlist Bulk Action"
+                className="w-full px-3 py-1.5 text-xs border border-slate-300 rounded-lg focus:outline-none focus:border-gov-blue bg-white"
+              />
+            </div>
+
+            {/* Actions */}
+            <div className="flex flex-col sm:flex-row items-center justify-end gap-2 pt-2 border-t">
+              <button
+                type="button"
+                onClick={() => {
+                  setConfirmModalAction(null);
+                  setBatchRemarks("");
+                }}
+                disabled={batchLoading}
+                className="w-full sm:w-auto px-4 py-2 text-xs font-bold text-slate-700 hover:bg-slate-100 rounded-lg border transition"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleExecuteBatchAction}
+                disabled={batchLoading}
+                className={`w-full sm:w-auto px-5 py-2 text-white font-bold text-xs rounded-lg shadow transition flex items-center justify-center space-x-2 ${
+                  confirmModalAction.startsWith("RESET")
+                    ? "bg-rose-600 hover:bg-rose-700"
+                    : "bg-gov-blue hover:bg-gov-light"
+                }`}
+              >
+                {batchLoading ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    <span>Processing {selectedPbIds.length} Records...</span>
+                  </>
+                ) : (
+                  <>
+                    <Check className="w-4 h-4" />
+                    <span>Confirm & Apply to {selectedPbIds.length} Beneficiaries</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* PESO Admin Stub & Affirmation Override Modal */}
       {stubOverridePb && (
