@@ -10,15 +10,19 @@ import {
   RefreshCw,
 } from "lucide-react";
 import { useOffline } from "@/context/OfflineContext";
+import { useAuth } from "@/context/AuthContext";
+import { isFieldCoordinator } from "@/lib/permissions";
 
 export function BottomNav() {
   const pathname = usePathname();
+  const { user } = useAuth();
   const { pendingCount } = useOffline();
+  const isCoordinator = isFieldCoordinator(user);
 
   const links = [
-    { label: "Home", href: "/dashboard", icon: LayoutDashboard },
+    { label: isCoordinator ? "Field Hub" : "Home", href: isCoordinator ? "/field" : "/dashboard", icon: LayoutDashboard },
     { label: "Attendance", href: "/field/attendance", icon: Clock },
-    { label: "Scan Hub", href: "/field/stub-distribution", icon: QrCode, isPrimary: true },
+    { label: "Scan Hub", href: "/field", icon: QrCode, isPrimary: true },
     { label: "Photos", href: "/field/photos", icon: Camera },
     { label: "Sync", href: "/sync", icon: RefreshCw, badge: pendingCount > 0 ? pendingCount : undefined },
   ];

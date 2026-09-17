@@ -4,7 +4,7 @@ import React, { useState } from "react";
 import { usePathname } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 import { PesoLogo } from "./PesoLogo";
-import { isAdminUser } from "@/lib/permissions";
+import { isAdminUser, isFieldCoordinator } from "@/lib/permissions";
 import {
   LayoutDashboard,
   FolderKanban,
@@ -56,6 +56,7 @@ interface DummyModule {
 export function Sidebar({ isMobile = false, onClose }: SidebarProps) {
   const pathname = usePathname();
   const { user, can, logout } = useAuth();
+  const isCoordinator = isFieldCoordinator(user);
 
   // Active route checking for TUPAD features
   const isTupadRoute =
@@ -85,19 +86,23 @@ export function Sidebar({ isMobile = false, onClose }: SidebarProps) {
 
   // Module 1: EC TUPAD Management System Sub-Sections
   const tupadSections = [
-    {
-      title: "Core Operations",
-      items: [
-        { label: "Programs & Work Plans", href: "/programs", icon: FolderKanban, permission: "program.read" },
-        { label: "Beneficiaries Masterlist", href: "/beneficiaries", icon: Users, permission: "beneficiary.read" },
-        { label: "QR & Stub Designer", href: "/stubs", icon: Printer, permission: "stub.configure" },
-        { label: "Online Application Portal", href: "/apply", icon: Sparkles, permission: "dashboard.view" },
-      ],
-    },
+    ...(!isCoordinator
+      ? [
+          {
+            title: "Core Operations",
+            items: [
+              { label: "Programs & Work Plans", href: "/programs", icon: FolderKanban, permission: "program.read" },
+              { label: "Beneficiaries Masterlist", href: "/beneficiaries", icon: Users, permission: "beneficiary.read" },
+              { label: "QR & Stub Designer", href: "/stubs", icon: Printer, permission: "stub.configure" },
+              { label: "Online Application Portal", href: "/apply", icon: Sparkles, permission: "application.read" },
+            ],
+          },
+        ]
+      : []),
     {
       title: "Field Scanner Hub",
       items: [
-        { label: "Field Hub & QR Pass Studio", href: "/field", icon: Sparkles, permission: "dashboard.view" },
+        { label: "Field Hub & QR Pass Studio", href: "/field", icon: Sparkles, permission: "field.scan" },
         { label: "Stub Distribution & Affirmation", href: "/field/stub-distribution", icon: QrCode, permission: "stub.distribution.scan" },
         { label: "Orientation Verification", href: "/field/orientation", icon: CalendarCheck, permission: "orientation.scan" },
         { label: "Daily Attendance (AM/PM)", href: "/field/attendance", icon: Clock, permission: "attendance.scan" },
@@ -108,89 +113,99 @@ export function Sidebar({ isMobile = false, onClose }: SidebarProps) {
     {
       title: "Integrity & Compliance",
       items: [
-        { label: "Onsite Replacements", href: "/replacements", icon: UserPlus, permission: "replacement.read" },
-        { label: "365-Day Restriction Hub", href: "/restrictions", icon: ShieldAlert, permission: "restriction.read" },
-        { label: "Eligibility Checker", href: "/restrictions/checker", icon: Search, permission: "dashboard.view" },
+        ...(!isCoordinator
+          ? [
+              { label: "Onsite Replacements", href: "/replacements", icon: UserPlus, permission: "replacement.read" },
+              { label: "365-Day Restriction Hub", href: "/restrictions", icon: ShieldAlert, permission: "restriction.read" },
+            ]
+          : []),
+        { label: "Eligibility Checker", href: "/restrictions/checker", icon: Search, permission: "eligibility.check" },
       ],
     },
   ];
 
-  // Additional Modules (Under Development)
-  const dummyModules: DummyModule[] = [
-    {
-      id: "dama-trabaho",
-      name: "2 - DAMA E-Trabaho Job Matching",
-      icon: Briefcase,
-      status: "under development",
-      description: "Automated LGU job matching platform connecting Dingalan jobseekers with local, regional, and overseas employers.",
-      subItems: [
-        { title: "Job Vacancies & Employer Matching", desc: "Real-time registry of open job orders and automated candidate matching." },
-        { title: "Skills Registry & Talent Pool", desc: "Barangay-level database of skilled laborers and professional jobseekers." },
-        { title: "NSRP Integration & Referrals", desc: "DOLE National Skills Registration Program linkage and job referral slips." },
-      ],
-    },
-    {
-      id: "tech-skills",
-      name: "3 - Technical Skills Accreditation",
-      icon: Award,
-      status: "under development",
-      description: "TESDA and LGU technical-vocational skills training management, competency assessments, and certification tracking.",
-      subItems: [
-        { title: "TESDA Course & Training Registry", desc: "Active tech-voc courses, training centers, and batch schedules." },
-        { title: "Assessment Center Schedules", desc: "Competency assessment bookings and candidate pre-qualification." },
-        { title: "Certification & NCII Verification", desc: "Digital verification of National Certificates and PESO accreditations." },
-      ],
-    },
-    {
-      id: "spes-gip-dileep",
-      name: "4 - SPES, GIP, DILEEP, Career Guidance",
-      icon: Compass,
-      status: "under development",
-      description: "Youth employment facilitation, student assistance programs, government internships, and livelihood grants.",
-      subItems: [
-        { title: "SPES Student Payout & Monitoring", desc: "Special Program for Employment of Students records and stipend disbursement." },
-        { title: "GIP Government Internship Roster", desc: "Government Internship Program placement, attendance, and evaluation." },
-        { title: "DILEEP Livelihood Grant Tracking", desc: "DOLE Integrated Livelihood and Emergency Employment Program beneficiaries." },
-        { title: "Youth Career Guidance & Profiling", desc: "High school and college labor market counseling modules." },
-      ],
-    },
-    {
-      id: "migrants-corner",
-      name: "5 - Migrants' Corner (OFW Helpdesk)",
-      icon: HeartHandshake,
-      status: "under development",
-      description: "Dedicated assistance hub for Dingaleño Overseas Filipino Workers (OFWs), seafarers, and their families.",
-      subItems: [
-        { title: "OFW & Seafarer Case Assistance", desc: "Welfare case intake, grievance tracking, and DMW coordination." },
-        { title: "Balik Pinas Balik Hanapbuhay Portal", desc: "Reintegration assistance and livelihood startup capital for returning OFWs." },
-        { title: "OFW Family Circle Registry", desc: "Community support groups and financial literacy program schedules." },
-      ],
-    },
-    {
-      id: "peso-govtech",
-      name: "6 - Public Services Digitalization (PESO GovTech)",
-      icon: Cpu,
-      status: "under development",
-      description: "Cross-departmental data interoperability, smart citizen kiosks, and automated public service delivery systems.",
-      subItems: [
-        { title: "LGU Multi-Agency Data Interoperability", desc: "Unified citizen records linking PESO, MSWDO, and Barangay databases." },
-        { title: "Automated SMS / Push Dispatcher", desc: "Broadcast alerts for payout schedules, job fairs, and urgent advisories." },
-        { title: "Smart Citizen Barangay Kiosk Network", desc: "Self-service touchscreen terminals deployed across all 11 Dingalan barangays." },
-      ],
-    },
-  ];
+  // Additional Modules (Under Development) - Only for Admin / Non-Coordinators
+  const dummyModules: DummyModule[] = isCoordinator
+    ? []
+    : [
+        {
+          id: "dama-trabaho",
+          name: "2 - DAMA E-Trabaho Job Matching",
+          icon: Briefcase,
+          status: "under development",
+          description: "Automated LGU job matching platform connecting Dingalan jobseekers with local, regional, and overseas employers.",
+          subItems: [
+            { title: "Job Vacancies & Employer Matching", desc: "Real-time registry of open job orders and automated candidate matching." },
+            { title: "Skills Registry & Talent Pool", desc: "Barangay-level database of skilled laborers and professional jobseekers." },
+            { title: "NSRP Integration & Referrals", desc: "DOLE National Skills Registration Program linkage and job referral slips." },
+          ],
+        },
+        {
+          id: "tech-skills",
+          name: "3 - Technical Skills Accreditation",
+          icon: Award,
+          status: "under development",
+          description: "TESDA and LGU technical-vocational skills training management, competency assessments, and certification tracking.",
+          subItems: [
+            { title: "TESDA Course & Training Registry", desc: "Active tech-voc courses, training centers, and batch schedules." },
+            { title: "Assessment Center Schedules", desc: "Competency assessment bookings and candidate pre-qualification." },
+            { title: "Certification & NCII Verification", desc: "Digital verification of National Certificates and PESO accreditations." },
+          ],
+        },
+        {
+          id: "spes-gip-dileep",
+          name: "4 - SPES, GIP, DILEEP, Career Guidance",
+          icon: Compass,
+          status: "under development",
+          description: "Youth employment facilitation, student assistance programs, government internships, and livelihood grants.",
+          subItems: [
+            { title: "SPES Student Payout & Monitoring", desc: "Special Program for Employment of Students records and stipend disbursement." },
+            { title: "GIP Government Internship Roster", desc: "Government Internship Program placement, attendance, and evaluation." },
+            { title: "DILEEP Livelihood Grant Tracking", desc: "DOLE Integrated Livelihood and Emergency Employment Program beneficiaries." },
+            { title: "Youth Career Guidance & Profiling", desc: "High school and college labor market counseling modules." },
+          ],
+        },
+        {
+          id: "migrants-corner",
+          name: "5 - Migrants' Corner (OFW Helpdesk)",
+          icon: HeartHandshake,
+          status: "under development",
+          description: "Dedicated assistance hub for Dingaleño Overseas Filipino Workers (OFWs), seafarers, and their families.",
+          subItems: [
+            { title: "OFW & Seafarer Case Assistance", desc: "Welfare case intake, grievance tracking, and DMW coordination." },
+            { title: "Balik Pinas Balik Hanapbuhay Portal", desc: "Reintegration assistance and livelihood startup capital for returning OFWs." },
+            { title: "OFW Family Circle Registry", desc: "Community support groups and financial literacy program schedules." },
+          ],
+        },
+        {
+          id: "peso-govtech",
+          name: "6 - Public Services Digitalization (PESO GovTech)",
+          icon: Cpu,
+          status: "under development",
+          description: "Cross-departmental data interoperability, smart citizen kiosks, and automated public service delivery systems.",
+          subItems: [
+            { title: "LGU Multi-Agency Data Interoperability", desc: "Unified citizen records linking PESO, MSWDO, and Barangay databases." },
+            { title: "Automated SMS / Push Dispatcher", desc: "Broadcast alerts for payout schedules, job fairs, and urgent advisories." },
+            { title: "Smart Citizen Barangay Kiosk Network", desc: "Self-service touchscreen terminals deployed across all 11 Dingalan barangays." },
+          ],
+        },
+      ];
 
   // General System Utility Sections (Reports & Auditing, System Administration)
   const systemUtilitySections = [
     {
       title: "Reports & Auditing",
       items: [
-        { label: "Report Center", href: "/reports", icon: FileSpreadsheet, permission: "report.generate" },
-        { label: "Audit Trail Explorer", href: "/admin/audit", icon: History, permission: "audit.read" },
+        ...(!isCoordinator
+          ? [
+              { label: "Report Center", href: "/reports", icon: FileSpreadsheet, permission: "report.generate" },
+              { label: "Audit Trail Explorer", href: "/admin/audit", icon: History, permission: "audit.read" },
+            ]
+          : []),
         { label: "Offline Sync Center", href: "/sync", icon: RefreshCw, permission: "sync.read" },
       ],
     },
-    ...(can("user.read") || can("settings.read") || can("application.read") || can("inquiry.read") || isAdminUser(user)
+    ...(!isCoordinator && (can("user.read") || can("settings.read") || can("application.read") || can("inquiry.read") || isAdminUser(user))
       ? [
           {
             title: "System Administration",
@@ -233,7 +248,9 @@ export function Sidebar({ isMobile = false, onClose }: SidebarProps) {
               <PesoLogo className="h-8 w-8" size={32} />
               <div>
                 <h2 className="text-xs font-black text-white tracking-tight leading-tight">PESO DINGALAN</h2>
-                <p className="text-[10px] text-gov-goldLight font-bold uppercase">Navigation Menu</p>
+                <p className="text-[10px] text-gov-goldLight font-bold uppercase">
+                  {isCoordinator ? "Coordinator Portal" : "Navigation Menu"}
+                </p>
               </div>
             </div>
 
@@ -264,21 +281,25 @@ export function Sidebar({ isMobile = false, onClose }: SidebarProps) {
 
         {/* Navigation Content */}
         <div className="p-3 sm:p-4 space-y-4 flex-1 overflow-y-auto">
-          {/* Top Level: Main Dashboard */}
+          {/* Top Level: Main Dashboard / Field Hub */}
           <div className="space-y-1">
             <a
-              href="/dashboard"
+              href={isCoordinator ? "/field" : "/dashboard"}
               onClick={() => {
                 if (isMobile && onClose) onClose();
               }}
               className={`flex items-center space-x-3 px-3 py-2.5 rounded-xl text-xs font-bold transition ${
-                pathname === "/dashboard"
+                (isCoordinator ? pathname === "/field" : pathname === "/dashboard")
                   ? "bg-gov-blue text-white shadow-md border border-blue-400/30"
                   : "text-slate-300 hover:text-white hover:bg-slate-800/80"
               }`}
             >
-              <LayoutDashboard className={`w-4 h-4 flex-shrink-0 ${pathname === "/dashboard" ? "text-gov-goldLight" : "text-slate-400"}`} />
-              <span className="truncate">System Dashboard</span>
+              {isCoordinator ? (
+                <Sparkles className={`w-4 h-4 flex-shrink-0 ${pathname === "/field" ? "text-gov-goldLight" : "text-slate-400"}`} />
+              ) : (
+                <LayoutDashboard className={`w-4 h-4 flex-shrink-0 ${pathname === "/dashboard" ? "text-gov-goldLight" : "text-slate-400"}`} />
+              )}
+              <span className="truncate">{isCoordinator ? "Field Scanner Hub" : "System Dashboard"}</span>
             </a>
           </div>
 
@@ -323,7 +344,7 @@ export function Sidebar({ isMobile = false, onClose }: SidebarProps) {
                 </div>
               </button>
 
-              {/* TUPAD Collapsible Content: Core Operations, Field Scanner Hub, Integrity & Compliance */}
+              {/* TUPAD Collapsible Content: Field Scanner Hub, Integrity & Compliance */}
               {tupadDropdownOpen && (
                 <div className="p-2 space-y-3.5 bg-slate-950/30 animate-fadeIn">
                   {tupadSections.map((section, idx) => {
@@ -341,7 +362,7 @@ export function Sidebar({ isMobile = false, onClose }: SidebarProps) {
                             const Icon = item.icon;
                             const isActive =
                               pathname === item.href ||
-                              (item.href !== "/dashboard" && pathname.startsWith(item.href));
+                              (item.href !== "/dashboard" && item.href !== "/field" && pathname.startsWith(item.href));
 
                             return (
                               <a
@@ -375,96 +396,98 @@ export function Sidebar({ isMobile = false, onClose }: SidebarProps) {
               )}
             </div>
 
-            {/* MODULES 2-6: DUMMY DROPDOWN BUTTONS (UNDER DEVELOPMENT) */}
-            <div className="space-y-2">
-              {dummyModules.map((module) => {
-                const Icon = module.icon;
-                const isOpen = !!openDummyModules[module.id];
+            {/* MODULES 2-6: DUMMY DROPDOWN BUTTONS (UNDER DEVELOPMENT - HIDDEN FOR COORDINATORS) */}
+            {dummyModules.length > 0 && (
+              <div className="space-y-2">
+                {dummyModules.map((module) => {
+                  const Icon = module.icon;
+                  const isOpen = !!openDummyModules[module.id];
 
-                return (
-                  <div
-                    key={module.id}
-                    className="rounded-xl border border-slate-800/80 bg-slate-950/30 overflow-hidden transition-all hover:border-slate-700/80"
-                  >
-                    <button
-                      type="button"
-                      onClick={() => toggleDummyModule(module.id)}
-                      className={`w-full flex items-center justify-between px-3 py-2.5 text-left transition ${
-                        isOpen ? "bg-slate-800/70 text-white" : "text-slate-300 hover:bg-slate-800/40"
-                      }`}
-                      aria-expanded={isOpen}
+                  return (
+                    <div
+                      key={module.id}
+                      className="rounded-xl border border-slate-800/80 bg-slate-950/30 overflow-hidden transition-all hover:border-slate-700/80"
                     >
-                      <div className="flex items-center space-x-2.5 min-w-0 pr-2">
-                        <div className="w-6 h-6 rounded-lg bg-amber-500/10 text-amber-400 border border-amber-500/20 flex items-center justify-center flex-shrink-0">
-                          <Icon className="w-3.5 h-3.5" />
-                        </div>
-                        <div className="min-w-0">
-                          <p className="text-xs font-bold truncate text-slate-200 leading-snug">
-                            {module.name}
-                          </p>
-                          <span className="inline-flex items-center space-x-1 text-[9px] font-bold text-amber-400 bg-amber-950/60 border border-amber-800/40 px-1.5 py-0.2 rounded mt-0.5">
-                            <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse"></span>
-                            <span className="capitalize">{module.status}</span>
-                          </span>
-                        </div>
-                      </div>
-                      <div className="flex items-center flex-shrink-0 pl-1 text-slate-500">
-                        {isOpen ? (
-                          <ChevronDown className="w-4 h-4 text-amber-400 transition-transform duration-200" />
-                        ) : (
-                          <ChevronRight className="w-4 h-4 transition-transform duration-200" />
-                        )}
-                      </div>
-                    </button>
-
-                    {/* Collapsible Under Development Sub-items */}
-                    {isOpen && (
-                      <div className="p-2.5 bg-slate-950/60 border-t border-slate-800/70 space-y-2 animate-fadeIn text-xs">
-                        <p className="text-[11px] text-slate-400 leading-tight">
-                          {module.description}
-                        </p>
-
-                        <div className="space-y-1.5 pt-1">
-                          {module.subItems.map((sub, sIdx) => (
-                            <button
-                              key={sIdx}
-                              type="button"
-                              onClick={() =>
-                                setSelectedDevModule({
-                                  moduleName: module.name,
-                                  featureName: sub.title,
-                                  description: sub.desc,
-                                })
-                              }
-                              className="w-full text-left p-2 rounded-lg bg-slate-900/90 hover:bg-slate-800 border border-slate-800/60 hover:border-amber-500/30 transition group flex flex-col space-y-0.5"
-                            >
-                              <div className="flex items-center justify-between gap-1.5">
-                                <span className="font-semibold text-slate-300 group-hover:text-amber-300 text-[11px] truncate">
-                                  {sub.title}
-                                </span>
-                                <span className="text-[8.5px] font-bold text-amber-400 bg-amber-950/80 border border-amber-800/50 px-1 py-0.2 rounded shrink-0">
-                                  Under Dev
-                                </span>
-                              </div>
-                              <p className="text-[10px] text-slate-500 line-clamp-1 group-hover:text-slate-400">
-                                {sub.desc}
-                              </p>
-                            </button>
-                          ))}
-                        </div>
-
-                        <div className="pt-1 flex items-center justify-between text-[10px] text-amber-400/80 bg-amber-950/30 p-2 rounded-lg border border-amber-900/30">
-                          <div className="flex items-center space-x-1.5">
-                            <Construction className="w-3.5 h-3.5 text-amber-400 shrink-0" />
-                            <span>Scheduled for Phase 2 Rollout</span>
+                      <button
+                        type="button"
+                        onClick={() => toggleDummyModule(module.id)}
+                        className={`w-full flex items-center justify-between px-3 py-2.5 text-left transition ${
+                          isOpen ? "bg-slate-800/70 text-white" : "text-slate-300 hover:bg-slate-800/40"
+                        }`}
+                        aria-expanded={isOpen}
+                      >
+                        <div className="flex items-center space-x-2.5 min-w-0 pr-2">
+                          <div className="w-6 h-6 rounded-lg bg-amber-500/10 text-amber-400 border border-amber-500/20 flex items-center justify-center flex-shrink-0">
+                            <Icon className="w-3.5 h-3.5" />
+                          </div>
+                          <div className="min-w-0">
+                            <p className="text-xs font-bold truncate text-slate-200 leading-snug">
+                              {module.name}
+                            </p>
+                            <span className="inline-flex items-center space-x-1 text-[9px] font-bold text-amber-400 bg-amber-950/60 border border-amber-800/40 px-1.5 py-0.2 rounded mt-0.5">
+                              <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse"></span>
+                              <span className="capitalize">{module.status}</span>
+                            </span>
                           </div>
                         </div>
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
+                        <div className="flex items-center flex-shrink-0 pl-1 text-slate-500">
+                          {isOpen ? (
+                            <ChevronDown className="w-4 h-4 text-amber-400 transition-transform duration-200" />
+                          ) : (
+                            <ChevronRight className="w-4 h-4 transition-transform duration-200" />
+                          )}
+                        </div>
+                      </button>
+
+                      {/* Collapsible Under Development Sub-items */}
+                      {isOpen && (
+                        <div className="p-2.5 bg-slate-950/60 border-t border-slate-800/70 space-y-2 animate-fadeIn text-xs">
+                          <p className="text-[11px] text-slate-400 leading-tight">
+                            {module.description}
+                          </p>
+
+                          <div className="space-y-1.5 pt-1">
+                            {module.subItems.map((sub, sIdx) => (
+                              <button
+                                key={sIdx}
+                                type="button"
+                                onClick={() =>
+                                  setSelectedDevModule({
+                                    moduleName: module.name,
+                                    featureName: sub.title,
+                                    description: sub.desc,
+                                  })
+                                }
+                                className="w-full text-left p-2 rounded-lg bg-slate-900/90 hover:bg-slate-800 border border-slate-800/60 hover:border-amber-500/30 transition group flex flex-col space-y-0.5"
+                              >
+                                <div className="flex items-center justify-between gap-1.5">
+                                  <span className="font-semibold text-slate-300 group-hover:text-amber-300 text-[11px] truncate">
+                                    {sub.title}
+                                  </span>
+                                  <span className="text-[8.5px] font-bold text-amber-400 bg-amber-950/80 border border-amber-800/50 px-1 py-0.2 rounded shrink-0">
+                                    Under Dev
+                                  </span>
+                                </div>
+                                <p className="text-[10px] text-slate-500 line-clamp-1 group-hover:text-slate-400">
+                                  {sub.desc}
+                                </p>
+                              </button>
+                            ))}
+                          </div>
+
+                          <div className="pt-1 flex items-center justify-between text-[10px] text-amber-400/80 bg-amber-950/30 p-2 rounded-lg border border-amber-900/30">
+                            <div className="flex items-center space-x-1.5">
+                              <Construction className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                              <span>Scheduled for Phase 2 Rollout</span>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
 
           {/* GENERAL SYSTEM UTILITIES: REPORTS & AUDITING, SYSTEM ADMINISTRATION */}
@@ -484,7 +507,7 @@ export function Sidebar({ isMobile = false, onClose }: SidebarProps) {
                       const Icon = item.icon;
                       const isActive =
                         pathname === item.href ||
-                        (item.href !== "/dashboard" && pathname.startsWith(item.href));
+                        (item.href !== "/dashboard" && item.href !== "/field" && pathname.startsWith(item.href));
 
                       return (
                         <a

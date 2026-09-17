@@ -1,7 +1,9 @@
 "use client";
 
 import React, { useEffect, useState, useMemo, Suspense } from "react";
-import { useSearchParams } from "next/navigation";
+import { useSearchParams, useRouter } from "next/navigation";
+import { useAuth } from "@/context/AuthContext";
+import { isFieldCoordinator } from "@/lib/permissions";
 import {
   Printer,
   QrCode,
@@ -52,7 +54,16 @@ type PrintTemplateMode = "FULL_STUB" | "QR_CARD_ONLY" | "STICKER_LABEL" | "SCHED
 
 function StubsContent() {
   const searchParams = useSearchParams();
+  const router = useRouter();
+  const { user } = useAuth();
   const urlProgramId = searchParams.get("programId");
+
+  // Redirect coordinators to field hub
+  useEffect(() => {
+    if (isFieldCoordinator(user)) {
+      router.replace("/field");
+    }
+  }, [user, router]);
 
   const [programs, setPrograms] = useState<any[]>([]);
   const [selectedProgramId, setSelectedProgramId] = useState<string>(urlProgramId || "");

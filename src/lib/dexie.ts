@@ -498,7 +498,10 @@ export async function queueOfflineTransaction(
 export async function getPendingQueueCount(): Promise<number> {
   if (typeof window === "undefined") return 0;
   try {
-    return await offlineDb.offlineQueue.where("status").equals("PENDING").count();
+    return await offlineDb.offlineQueue
+      .where("status")
+      .anyOf(["PENDING", "FAILED"])
+      .count();
   } catch (e) {
     return 0;
   }
@@ -506,30 +509,54 @@ export async function getPendingQueueCount(): Promise<number> {
 
 export async function pushSyncQueue() {
   if (typeof window === "undefined") return { accepted: 0, failed: 0 };
-  const pending = await offlineDb.offlineQueue.where("status").equals("PENDING").toArray();
-  if (pending.length === 0) return { accepted: 0, failed: 0 };
+  const queueToSync = await offlineDb.offlineQueue
+    .where("status")
+    .anyOf(["PENDING", "FAILED"])
+    .toArray();
+  if (queueToSync.length === 0) return { accepted: 0, failed: 0 };
+
+  // Mark in-flight as SYNCING
+  for (const item of queueToSync) {
+    if (item.id) {
+      await offlineDb.offlineQueue.update(item.id, { status: "SYNCING" });
+    }
+  }
 
   try {
     const res = await fetch("/api/v1/sync/push", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ transactions: pending }),
+      body: JSON.stringify({ transactions: queueToSync }),
     });
 
-    if (!res.ok) throw new Error("Sync push failed with status " + res.status);
-    const result = await res.json();
+    if (!res.ok) {
+      const errData = await res.json().catch(() => ({}));
+      throw new Error(errData.error || `Sync push failed with status ${res.status}`);
+    }
 
-    // Mark accepted
-    for (const item of pending) {
-      if (result.accepted?.includes(item.clientTransactionId) || result.duplicates?.includes(item.clientTransactionId)) {
-        await offlineDb.offlineQueue.update(item.id!, { status: "SYNCED" });
+    const result = await res.json();
+    const errors = result.errors || {};
+
+    // Mark accepted / duplicates / conflicts / failed
+    for (const item of queueToSync) {
+      if (
+        result.accepted?.includes(item.clientTransactionId) ||
+        result.duplicates?.includes(item.clientTransactionId)
+      ) {
+        await offlineDb.offlineQueue.update(item.id!, {
+          status: "SYNCED",
+          lastError: undefined,
+        });
       } else if (result.conflicts?.includes(item.clientTransactionId)) {
-        await offlineDb.offlineQueue.update(item.id!, { status: "CONFLICT", lastError: "Conflict detected on server" });
+        await offlineDb.offlineQueue.update(item.id!, {
+          status: "CONFLICT",
+          lastError: errors[item.clientTransactionId] || "Conflict detected on server",
+        });
       } else {
         await offlineDb.offlineQueue.update(item.id!, {
           status: "FAILED",
-          retryCount: item.retryCount + 1,
-          lastError: "Failed during sync processing",
+          retryCount: (item.retryCount || 0) + 1,
+          lastError: errors[item.clientTransactionId] || "Failed during sync processing",
         });
       }
     }
@@ -537,7 +564,31 @@ export async function pushSyncQueue() {
     return result;
   } catch (error: any) {
     console.error("Sync push error:", error);
-    return { accepted: 0, failed: pending.length, error: error.message };
+    for (const item of queueToSync) {
+      await offlineDb.offlineQueue.update(item.id!, {
+        status: "FAILED",
+        retryCount: (item.retryCount || 0) + 1,
+        lastError: error.message || "Network or server connection error",
+      });
+    }
+    return { accepted: 0, failed: queueToSync.length, error: error.message };
+  }
+}
+
+export async function retryOfflineTransaction(id: number) {
+  if (typeof window === "undefined") return;
+  await offlineDb.offlineQueue.update(id, {
+    status: "PENDING",
+  });
+}
+
+export async function retryAllFailedTransactions() {
+  if (typeof window === "undefined") return;
+  const failedItems = await offlineDb.offlineQueue.where("status").equals("FAILED").toArray();
+  for (const item of failedItems) {
+    if (item.id) {
+      await offlineDb.offlineQueue.update(item.id, { status: "PENDING" });
+    }
   }
 }
 

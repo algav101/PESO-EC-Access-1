@@ -156,6 +156,7 @@ export async function PATCH(request: Request) {
 
     const photo = await prisma.accomplishmentPhoto.update({
       where: { id },
+      data: updateData,
     });
 
     await logAudit({

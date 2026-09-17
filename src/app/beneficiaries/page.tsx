@@ -23,10 +23,12 @@ import { EditBeneficiaryModal } from "@/components/beneficiaries/EditBeneficiary
 import { AdminStubOverrideModal } from "@/components/beneficiaries/AdminStubOverrideModal";
 import { useAuth } from "@/context/AuthContext";
 import { offlineDb } from "@/lib/dexie";
-import { isAdminUser } from "@/lib/permissions";
+import { isAdminUser, isFieldCoordinator } from "@/lib/permissions";
+import { useRouter } from "next/navigation";
 
 export default function BeneficiariesMasterlistPage() {
-  const { user } = useAuth();
+  const { user, can } = useAuth();
+  const router = useRouter();
   const isAdmin = isAdminUser(user);
   const [beneficiaries, setBeneficiaries] = useState<any[]>([]);
   const [programs, setPrograms] = useState<any[]>([]);
@@ -37,12 +39,12 @@ export default function BeneficiariesMasterlistPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [loading, setLoading] = useState(true);
 
-  // Set assigned barangay on load for TUPAD Coordinators
+  // Redirect coordinators to field hub
   useEffect(() => {
-    if (user?.role === "TUPAD_COORDINATOR" && user.assignedBarangay) {
-      setSelectedBarangay(user.assignedBarangay);
+    if (isFieldCoordinator(user)) {
+      router.replace("/field");
     }
-  }, [user]);
+  }, [user, router]);
 
   // Sorting State
   const [sortBy, setSortBy] = useState<string>("designatedNumber");

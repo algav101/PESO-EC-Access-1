@@ -21,11 +21,13 @@ import {
 import { StatusBadge } from "@/components/common/StatusBadge";
 import * as XLSX from "xlsx";
 import { useAuth } from "@/context/AuthContext";
-import { isAdminUser } from "@/lib/permissions";
+import { isAdminUser, isFieldCoordinator } from "@/lib/permissions";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 
 export default function RestrictionsPage() {
   const { user } = useAuth();
+  const router = useRouter();
   const isAdmin = isAdminUser(user);
   const [restrictions, setRestrictions] = useState<any[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
@@ -45,8 +47,12 @@ export default function RestrictionsPage() {
   const [clearSuccessMsg, setClearSuccessMsg] = useState<string | null>(null);
 
   useEffect(() => {
+    if (isFieldCoordinator(user)) {
+      router.replace("/restrictions/checker");
+      return;
+    }
     fetchRestrictions();
-  }, []);
+  }, [user, router]);
 
   const fetchRestrictions = async () => {
     try {

@@ -1,6 +1,7 @@
 import React from "react";
 import prisma from "@/lib/prisma";
 import { getCurrentUser, isAdminUser } from "@/lib/auth";
+import { redirect } from "next/navigation";
 import { format } from "date-fns";
 import {
   FolderKanban,
@@ -27,6 +28,10 @@ export const dynamic = "force-dynamic";
 
 export default async function DashboardPage() {
   const user = await getCurrentUser();
+  if (user?.role === "TUPAD_COORDINATOR") {
+    redirect("/field");
+  }
+
   const isPesoAdmin = isAdminUser(user);
 
   // Fetch all active, non-replaced program beneficiaries for exact arithmetic reconciliation

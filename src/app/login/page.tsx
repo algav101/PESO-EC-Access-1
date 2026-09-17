@@ -131,7 +131,7 @@ export default function LoginPage() {
       }
 
       login(data.user);
-      router.push("/dashboard");
+      router.push(data.user?.role === "TUPAD_COORDINATOR" ? "/field" : "/dashboard");
     } catch (err: any) {
       setError(err.message);
     } finally {

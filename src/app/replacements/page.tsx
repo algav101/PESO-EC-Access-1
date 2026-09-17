@@ -24,12 +24,21 @@ import {
 } from "lucide-react";
 import { StatusBadge } from "@/components/common/StatusBadge";
 import QRCode from "qrcode";
+import { useAuth } from "@/context/AuthContext";
+import { isFieldCoordinator } from "@/lib/permissions";
 
 function ReplacementsContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
+  const { user } = useAuth();
   const urlProgramId = searchParams.get("programId");
   const urlOriginalPbId = searchParams.get("originalPbId");
+
+  useEffect(() => {
+    if (isFieldCoordinator(user)) {
+      router.replace("/field");
+    }
+  }, [user, router]);
 
   const [programs, setPrograms] = useState<any[]>([]);
   const [selectedProgramId, setSelectedProgramId] = useState<string>(urlProgramId || "");

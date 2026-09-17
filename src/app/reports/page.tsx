@@ -26,11 +26,13 @@ import {
   Navigation,
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
-import { isAdminUser } from "@/lib/permissions";
+import { isAdminUser, isFieldCoordinator } from "@/lib/permissions";
 import { QrScannerModal } from "@/components/scanner/QrScannerModal";
+import { useRouter } from "next/navigation";
 
 export default function ReportCenterPage() {
   const { user } = useAuth();
+  const router = useRouter();
   const isPesoAdmin = isAdminUser(user);
 
   const [programs, setPrograms] = useState<any[]>([]);
@@ -47,8 +49,12 @@ export default function ReportCenterPage() {
   const [selectedDay, setSelectedDay] = useState<number>(1);
 
   useEffect(() => {
+    if (isFieldCoordinator(user)) {
+      router.replace("/field");
+      return;
+    }
     fetchPrograms();
-  }, []);
+  }, [user, router]);
 
   const fetchPrograms = async () => {
     try {

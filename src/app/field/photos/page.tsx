@@ -20,11 +20,7 @@ import {
   Download,
   AlertTriangle,
   RefreshCw,
-  SwitchCamera,
   X,
-  Maximize2,
-  FileImage,
-  Info,
   QrCode,
 } from "lucide-react";
 import { StatusBadge } from "@/components/common/StatusBadge";
@@ -59,16 +55,11 @@ export default function PhotosPage() {
   const [uploadSpecificActivity, setUploadSpecificActivity] = useState<string>("");
   const [submitting, setSubmitting] = useState(false);
 
-  // Camera Viewfinder & Geotag Preview state
-  const [cameraActive, setCameraActive] = useState(false);
-  const [cameraFacing, setCameraFacing] = useState<"environment" | "user">("environment");
-  const [cameraError, setCameraError] = useState<string | null>(null);
+  // System Unit Camera & Geotag Preview state
   const [capturedImagePreview, setCapturedImagePreview] = useState<string | null>(null);
   const [gpsCoords, setGpsCoords] = useState<{ lat: number; lng: number }>({ lat: 15.3941, lng: 121.3965 });
   const [gpsStatus, setGpsStatus] = useState<string>("Locating GPS...");
 
-  const videoRef = useRef<HTMLVideoElement | null>(null);
-  const streamRef = useRef<MediaStream | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const [workPrograms, setWorkPrograms] = useState<any[]>([]);
@@ -112,13 +103,10 @@ export default function PhotosPage() {
     }
   }, [isUploadOpen]);
 
-  // Clean up camera stream when modal closes
+  // Reset captured preview when modal closes
   useEffect(() => {
     if (!isUploadOpen) {
-      stopCamera();
       setCapturedImagePreview(null);
-      setCameraActive(false);
-      setCameraError(null);
     }
   }, [isUploadOpen]);
 
@@ -164,52 +152,31 @@ export default function PhotosPage() {
     }
   };
 
-  // Camera Management
-  const startCamera = async (facing: "environment" | "user" = cameraFacing) => {
-    stopCamera();
-    setCameraError(null);
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: {
-          facingMode: facing,
-          width: { ideal: 1280 },
-          height: { ideal: 720 },
-        },
-        audio: false,
-      });
-
-      streamRef.current = stream;
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-        videoRef.current.play();
-      }
-      setCameraActive(true);
-    } catch (err: any) {
-      console.error("Camera access error:", err);
-      setCameraError("Camera access unavailable. You can use the Native Device Camera button below.");
-      setCameraActive(false);
+  // Trigger system unit camera directly
+  const triggerSystemCamera = () => {
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+      fileInputRef.current.click();
     }
-  };
-
-  const stopCamera = () => {
-    if (streamRef.current) {
-      streamRef.current.getTracks().forEach((t) => t.stop());
-      streamRef.current = null;
-    }
-    setCameraActive(false);
-  };
-
-  const toggleCameraFacing = () => {
-    const nextFacing = cameraFacing === "environment" ? "user" : "environment";
-    setCameraFacing(nextFacing);
-    startCamera(nextFacing);
   };
 
   // Burn Geotag Data Directly into Image Canvas
-  const processAndBurnGeotag = (sourceElement: HTMLVideoElement | HTMLImageElement) => {
+  const processAndBurnGeotag = (sourceElement: HTMLImageElement) => {
     const canvas = document.createElement("canvas");
-    const width = sourceElement instanceof HTMLVideoElement ? sourceElement.videoWidth || 1280 : sourceElement.naturalWidth || 1280;
-    const height = sourceElement instanceof HTMLVideoElement ? sourceElement.videoHeight || 720 : sourceElement.naturalHeight || 720;
+    let width = sourceElement.naturalWidth || 1280;
+    let height = sourceElement.naturalHeight || 720;
+
+    // Scale down if extremely high-res to keep upload payloads and base64 strings smooth
+    const maxDim = 1920;
+    if (width > maxDim || height > maxDim) {
+      if (width > height) {
+        height = Math.round((height * maxDim) / width);
+        width = maxDim;
+      } else {
+        width = Math.round((width * maxDim) / height);
+        height = maxDim;
+      }
+    }
 
     canvas.width = width;
     canvas.height = height;
@@ -220,8 +187,8 @@ export default function PhotosPage() {
     ctx.drawImage(sourceElement, 0, 0, width, height);
 
     // Dynamic sizing based on canvas width
-    const baseFontSize = Math.max(12, Math.round(width * 0.022));
-    const smallFontSize = Math.max(10, Math.round(width * 0.016));
+    const baseFontSize = Math.max(14, Math.round(width * 0.022));
+    const smallFontSize = Math.max(11, Math.round(width * 0.016));
     const padding = Math.round(width * 0.02);
 
     // 1. Top Header Banner
@@ -244,10 +211,9 @@ export default function PhotosPage() {
     const bottomY = height - bottomBannerHeight;
 
     ctx.fillStyle = "rgba(0, 0, 0, 0.88)";
-    ctx.fillRect(0, 0, width, bottomBannerHeight);
     ctx.fillRect(0, bottomY, width, bottomBannerHeight);
 
-    // Top gold accent line
+    // Top blue accent line
     ctx.fillStyle = "#3B82F6";
     ctx.fillRect(0, bottomY, width, 4);
 
@@ -287,14 +253,6 @@ export default function PhotosPage() {
 
     const dataUrl = canvas.toDataURL("image/jpeg", 0.85);
     setCapturedImagePreview(dataUrl);
-    stopCamera();
-  };
-
-  // Capture from live video feed
-  const snapLivePhoto = () => {
-    if (videoRef.current) {
-      processAndBurnGeotag(videoRef.current);
-    }
   };
 
   // Handle native mobile file input capture
@@ -713,261 +671,221 @@ export default function PhotosPage() {
         </div>
       )}
 
-      {/* Live Camera & Geotag Photo Modal */}
+      {/* System Unit Camera & Geotag Photo Modal */}
       {isUploadOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-3 sm:p-4 overflow-y-auto">
-          <form
-            onSubmit={handleSavePhoto}
-            className="bg-white rounded-2xl max-w-xl w-full p-5 sm:p-6 space-y-4 shadow-2xl animate-fadeIn my-auto max-h-[95vh] overflow-y-auto"
-          >
-            <div className="flex items-center justify-between border-b pb-3">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-2 sm:p-4 overflow-y-auto">
+          <div className="bg-white rounded-2xl max-w-lg w-full shadow-2xl animate-fadeIn flex flex-col max-h-[92dvh] sm:max-h-[90vh] overflow-hidden my-auto">
+            {/* Fixed Modal Header */}
+            <div className="flex items-center justify-between px-4 py-3 sm:px-5 sm:py-3.5 border-b bg-slate-50 flex-shrink-0">
               <div className="flex items-center space-x-2">
-                <Camera className="w-5 h-5 text-gov-blue" />
-                <h3 className="text-sm font-black text-slate-900 uppercase tracking-wider">
-                  Take Geotagged Accomplishment Photo
-                </h3>
+                <div className="p-1.5 bg-gov-blue/10 text-gov-blue rounded-lg">
+                  <Camera className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="text-xs sm:text-sm font-black text-slate-900 uppercase tracking-wider">
+                    Take Geotagged Accomplishment Photo
+                  </h3>
+                  <p className="text-[10px] text-slate-500 font-medium">
+                    System unit camera with automatic geotag & timestamp
+                  </p>
+                </div>
               </div>
               <button
                 type="button"
                 onClick={() => setIsUploadOpen(false)}
-                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100"
+                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-200 transition"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            {/* Step 1: Select Scope & Activity */}
-            <div className="space-y-3">
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-[11px] font-bold text-slate-700 uppercase mb-1">
-                    Work Day # *
-                  </label>
-                  <select
-                    value={uploadWorkDayNumber}
-                    onChange={(e) => {
-                      setUploadWorkDayNumber(parseInt(e.target.value, 10));
-                      setUploadWorkProgramItemId("");
-                    }}
-                    className="w-full px-3 py-2 text-xs border rounded-lg bg-slate-50 font-bold focus:border-gov-blue"
-                  >
-                    {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((d) => (
-                      <option key={d} value={d}>
-                        Day {d}
-                      </option>
-                    ))}
-                  </select>
+            {/* Scrollable Form Body */}
+            <form
+              id="photo-upload-form"
+              onSubmit={handleSavePhoto}
+              className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-3 sm:space-y-4 text-xs"
+            >
+              {/* Step 1: Select Scope & Activity */}
+              <div className="space-y-2.5">
+                <div className="grid grid-cols-2 gap-2.5">
+                  <div>
+                    <label className="block text-[11px] font-bold text-slate-700 uppercase mb-1">
+                      Work Day # *
+                    </label>
+                    <select
+                      value={uploadWorkDayNumber}
+                      onChange={(e) => {
+                        setUploadWorkDayNumber(parseInt(e.target.value, 10));
+                        setUploadWorkProgramItemId("");
+                      }}
+                      className="w-full px-2.5 py-1.5 sm:py-2 text-xs border rounded-lg bg-slate-50 font-bold focus:border-gov-blue"
+                    >
+                      {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((d) => (
+                        <option key={d} value={d}>
+                          Day {d}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-bold text-slate-700 uppercase mb-1">
+                      Barangay *
+                    </label>
+                    <select
+                      value={uploadBarangay}
+                      disabled={user?.role === "TUPAD_COORDINATOR" && !!user.assignedBarangay}
+                      onChange={(e) => {
+                        setUploadBarangay(e.target.value);
+                        setUploadWorkProgramItemId("");
+                      }}
+                      className="w-full px-2.5 py-1.5 sm:py-2 text-xs border rounded-lg bg-slate-50 font-bold disabled:bg-slate-100"
+                    >
+                      {[
+                        "Aplaya", "Butas na Bato", "Caragsacan", "Davildavilan",
+                        "Dikapanikian", "Ibona", "Matawe", "Paltic",
+                        "Poblacion", "Tanawan", "Umiray"
+                      ].map((b) => (
+                        <option key={b} value={b}>{b}</option>
+                      ))}
+                    </select>
+                  </div>
                 </div>
 
+                {/* Activity Selector */}
+                <div>
+                  <label className="block text-[11px] font-bold text-gov-blue uppercase mb-1 flex items-center justify-between">
+                    <span>Choose Scheduled Activity & Area *</span>
+                    <span className="text-[10px] text-slate-500 font-normal">From 10-Day Work Plan</span>
+                  </label>
+
+                  {availableActivitiesForModal.length > 0 ? (
+                    <select
+                      value={uploadWorkProgramItemId}
+                      onChange={(e) => {
+                        const itemId = e.target.value;
+                        setUploadWorkProgramItemId(itemId);
+                        const selectedItem = availableActivitiesForModal.find((it: any) => it.id === itemId);
+                        if (selectedItem) {
+                          setUploadWorkArea(selectedItem.area);
+                          setUploadSpecificActivity(selectedItem.specificActivities);
+                        }
+                      }}
+                      className="w-full px-2.5 py-1.5 sm:py-2 text-xs border border-blue-300 rounded-lg bg-blue-50/50 font-semibold focus:outline-none focus:border-gov-blue"
+                    >
+                      <option value="">-- Select Day {uploadWorkDayNumber} Activity --</option>
+                      {availableActivitiesForModal.map((it: any) => (
+                        <option key={it.id} value={it.id}>
+                          📍 [{it.area}] {it.specificActivities}
+                        </option>
+                      ))}
+                    </select>
+                  ) : (
+                    <input
+                      type="text"
+                      placeholder="Enter activity description (e.g. Declogging canals, clearing roads)"
+                      value={uploadSpecificActivity}
+                      onChange={(e) => setUploadSpecificActivity(e.target.value)}
+                      className="w-full px-2.5 py-1.5 sm:py-2 text-xs border rounded-lg focus:border-gov-blue"
+                    />
+                  )}
+                </div>
+
+                {/* Area Customization */}
                 <div>
                   <label className="block text-[11px] font-bold text-slate-700 uppercase mb-1">
-                    Barangay *
+                    Specific Work Area / Sitio / Purok
                   </label>
-                  <select
-                    value={uploadBarangay}
-                    disabled={user?.role === "TUPAD_COORDINATOR" && !!user.assignedBarangay}
-                    onChange={(e) => {
-                      setUploadBarangay(e.target.value);
-                      setUploadWorkProgramItemId("");
-                    }}
-                    className="w-full px-3 py-2 text-xs border rounded-lg bg-slate-50 font-bold disabled:bg-slate-100"
-                  >
-                    {[
-                      "Aplaya", "Butas na Bato", "Caragsacan", "Davildavilan",
-                      "Dikapanikian", "Ibona", "Matawe", "Paltic",
-                      "Poblacion", "Tanawan", "Umiray"
-                    ].map((b) => (
-                      <option key={b} value={b}>{b}</option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-
-              {/* Activity Selector */}
-              <div>
-                <label className="block text-[11px] font-bold text-gov-blue uppercase mb-1 flex items-center justify-between">
-                  <span>Choose Scheduled Activity & Area *</span>
-                  <span className="text-[10px] text-slate-500 font-normal">From 10-Day Work Plan</span>
-                </label>
-
-                {availableActivitiesForModal.length > 0 ? (
-                  <select
-                    value={uploadWorkProgramItemId}
-                    onChange={(e) => {
-                      const itemId = e.target.value;
-                      setUploadWorkProgramItemId(itemId);
-                      const selectedItem = availableActivitiesForModal.find((it: any) => it.id === itemId);
-                      if (selectedItem) {
-                        setUploadWorkArea(selectedItem.area);
-                        setUploadSpecificActivity(selectedItem.specificActivities);
-                      }
-                    }}
-                    className="w-full px-3 py-2 text-xs border border-blue-300 rounded-lg bg-blue-50/50 font-semibold focus:outline-none focus:border-gov-blue"
-                  >
-                    <option value="">-- Select Day {uploadWorkDayNumber} Activity --</option>
-                    {availableActivitiesForModal.map((it: any) => (
-                      <option key={it.id} value={it.id}>
-                        📍 [{it.area}] {it.specificActivities}
-                      </option>
-                    ))}
-                  </select>
-                ) : (
                   <input
                     type="text"
-                    placeholder="Enter activity description (e.g. Declogging canals, clearing roads)"
-                    value={uploadSpecificActivity}
-                    onChange={(e) => setUploadSpecificActivity(e.target.value)}
-                    className="w-full px-3 py-2 text-xs border rounded-lg focus:border-gov-blue"
+                    placeholder="e.g. Purok 1, Sitio Centro, Coastal shoreline"
+                    value={uploadWorkArea}
+                    onChange={(e) => setUploadWorkArea(e.target.value)}
+                    className="w-full px-2.5 py-1.5 sm:py-2 text-xs border rounded-lg focus:border-gov-blue"
                   />
-                )}
+                </div>
               </div>
 
-              {/* Area Customization */}
-              <div>
-                <label className="block text-[11px] font-bold text-slate-700 uppercase mb-1">
-                  Specific Work Area / Sitio / Purok
-                </label>
+              {/* Step 2: System Camera Capture & Geotag Preview */}
+              <div className="pt-2 border-t space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-slate-800 uppercase flex items-center space-x-1.5">
+                    <Camera className="w-3.5 h-3.5 text-gov-blue" />
+                    <span>Unit Camera Geotag</span>
+                  </span>
+                  <span className="text-[10px] font-mono text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
+                    {gpsStatus}
+                  </span>
+                </div>
+
+                {/* Viewfinder / Action Box */}
+                <div
+                  onClick={!capturedImagePreview ? triggerSystemCamera : undefined}
+                  className={`relative aspect-[16/9] max-h-[220px] sm:max-h-[250px] w-full bg-slate-950 rounded-xl overflow-hidden border-2 border-slate-800 shadow-inner flex flex-col items-center justify-center transition ${
+                    !capturedImagePreview ? "cursor-pointer hover:border-gov-blue/60 group" : ""
+                  }`}
+                >
+                  {capturedImagePreview ? (
+                    <div className="relative w-full h-full flex items-center justify-center bg-black">
+                      <img
+                        src={capturedImagePreview}
+                        alt="Geotagged Preview"
+                        className="w-full h-full object-contain"
+                      />
+                      <div className="absolute top-2 right-2 bg-emerald-600 text-white text-[10px] font-bold px-2.5 py-0.5 rounded-full shadow flex items-center space-x-1">
+                        <CheckCircle2 className="w-3 h-3" />
+                        <span>Geotag Applied</span>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="p-4 sm:p-5 text-center space-y-2">
+                      <div className="w-11 h-11 rounded-full bg-gov-blue/20 text-gov-goldLight border border-gov-blue/30 flex items-center justify-center mx-auto group-hover:scale-110 transition duration-300 shadow-md">
+                        <Camera className="w-5 h-5 text-gov-goldLight" />
+                      </div>
+                      <div className="space-y-0.5">
+                        <p className="text-xs sm:text-sm font-bold text-slate-100">
+                          Take Accomplishment Photo
+                        </p>
+                        <p className="text-[10px] sm:text-[11px] text-slate-400">
+                          Tap to open your device camera with automatic GPS burn-in
+                        </p>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          triggerSystemCamera();
+                        }}
+                        className="px-4 py-2 bg-gradient-to-r from-gov-blue to-gov-dark hover:from-blue-700 hover:to-slate-900 text-white text-xs font-black rounded-xl shadow-lg border border-blue-400/30 flex items-center space-x-2 mx-auto transition active:scale-95"
+                      >
+                        <Camera className="w-3.5 h-3.5 text-gov-goldLight" />
+                        <span>Open Unit Camera</span>
+                      </button>
+                    </div>
+                  )}
+                </div>
+
+                {/* Hidden Native File Input with capture="environment" for unit camera */}
                 <input
-                  type="text"
-                  placeholder="e.g. Purok 1, Sitio Centro, Coastal shoreline"
-                  value={uploadWorkArea}
-                  onChange={(e) => setUploadWorkArea(e.target.value)}
-                  className="w-full px-3 py-2 text-xs border rounded-lg focus:border-gov-blue"
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  capture="environment"
+                  onChange={handleNativeFileChange}
+                  className="hidden"
                 />
               </div>
-            </div>
+            </form>
 
-            {/* Step 2: Camera Viewfinder / Preview Section */}
-            <div className="pt-2 border-t space-y-3">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-slate-800 uppercase flex items-center space-x-1.5">
-                  <Camera className="w-4 h-4 text-gov-blue" />
-                  <span>Camera Viewfinder & Geotag Preview</span>
-                </span>
-                <span className="text-[10px] font-mono text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
-                  {gpsStatus}
-                </span>
-              </div>
-
-              {/* Viewfinder Box */}
-              <div className="relative aspect-video bg-slate-950 rounded-xl overflow-hidden border-2 border-slate-800 shadow-inner flex flex-col items-center justify-center">
-                {/* 1. Captured Preview */}
-                {capturedImagePreview ? (
-                  <div className="relative w-full h-full">
-                    <img
-                      src={capturedImagePreview}
-                      alt="Geotagged Preview"
-                      className="w-full h-full object-contain"
-                    />
-                    <div className="absolute top-2 right-2 bg-emerald-600 text-white text-[10px] font-bold px-2 py-0.5 rounded-full shadow">
-                      ✓ Geotag Applied
-                    </div>
-                  </div>
-                ) : cameraActive ? (
-                  /* 2. Live Video Feed */
-                  <div className="relative w-full h-full">
-                    <video
-                      ref={videoRef}
-                      playsInline
-                      muted
-                      className="w-full h-full object-cover"
-                    />
-                    {/* Live overlay guide */}
-                    <div className="absolute bottom-2 left-2 right-2 bg-black/70 text-white p-2 rounded text-[10px] font-mono flex justify-between">
-                      <span>LGU DINGALAN • BRGY. {uploadBarangay.toUpperCase()}</span>
-                      <span>GPS: {gpsCoords.lat.toFixed(4)}°N, {gpsCoords.lng.toFixed(4)}°E</span>
-                    </div>
-                  </div>
-                ) : (
-                  /* 3. Camera Start Prompt */
-                  <div className="p-6 text-center space-y-3">
-                    <div className="w-12 h-12 rounded-full bg-slate-800 text-slate-400 flex items-center justify-center mx-auto">
-                      <Camera className="w-6 h-6 text-gov-goldLight" />
-                    </div>
-                    <div className="space-y-1">
-                      <p className="text-xs font-bold text-slate-200">Ready to Document Field Proof</p>
-                      <p className="text-[11px] text-slate-400">
-                        Launch the live camera or snap directly using your phone's camera
-                      </p>
-                    </div>
-
-                    <div className="flex flex-wrap items-center justify-center gap-2 pt-1">
-                      <button
-                        type="button"
-                        onClick={() => startCamera("environment")}
-                        className="px-3.5 py-2 bg-gov-blue hover:bg-gov-dark text-white text-xs font-bold rounded-xl shadow flex items-center space-x-1.5 transition"
-                      >
-                        <Camera className="w-4 h-4 text-gov-goldLight" />
-                        <span>Open Live Camera</span>
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={() => fileInputRef.current?.click()}
-                        className="px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-slate-100 text-xs font-bold rounded-xl border border-slate-600 shadow flex items-center space-x-1.5 transition"
-                      >
-                        <FileImage className="w-4 h-4 text-emerald-400" />
-                        <span>Phone Camera / Gallery</span>
-                      </button>
-                    </div>
-
-                    {cameraError && (
-                      <p className="text-[11px] text-rose-400 font-semibold">{cameraError}</p>
-                    )}
-                  </div>
-                )}
-              </div>
-
-              {/* Hidden Native File Input for Mobile Capture */}
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/*"
-                capture="environment"
-                onChange={handleNativeFileChange}
-                className="hidden"
-              />
-
-              {/* Action Controls when Camera / Preview is Active */}
-              {cameraActive && !capturedImagePreview && (
-                <div className="flex items-center justify-between gap-2 pt-1">
+            {/* Fixed Modal Footer */}
+            <div className="p-3 sm:p-4 border-t bg-slate-50 flex items-center justify-between gap-2 flex-shrink-0">
+              {capturedImagePreview ? (
+                <>
                   <button
                     type="button"
-                    onClick={toggleCameraFacing}
-                    className="p-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-bold text-xs flex items-center space-x-1 transition"
-                  >
-                    <SwitchCamera className="w-4 h-4" />
-                    <span className="hidden sm:inline">Flip Camera</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={snapLivePhoto}
-                    className="flex-1 py-2.5 bg-rose-600 hover:bg-rose-700 text-white font-extrabold text-xs rounded-xl shadow-md flex items-center justify-center space-x-2 transition animate-pulse"
-                  >
-                    <Camera className="w-4 h-4" />
-                    <span>SNAP GEOTAGGED PICTURE</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={stopCamera}
-                    className="p-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-bold text-xs"
-                  >
-                    Cancel
-                  </button>
-                </div>
-              )}
-
-              {capturedImagePreview && (
-                <div className="flex items-center justify-between gap-2 pt-1">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setCapturedImagePreview(null);
-                      startCamera();
-                    }}
-                    className="py-2 px-3 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-bold text-xs flex items-center space-x-1.5 transition"
+                    onClick={triggerSystemCamera}
+                    className="py-2 px-3 sm:px-3.5 bg-slate-200 hover:bg-slate-300 text-slate-800 rounded-xl font-bold text-xs flex items-center space-x-1.5 transition"
                   >
                     <RefreshCw className="w-3.5 h-3.5" />
                     <span>Retake Photo</span>
@@ -975,29 +893,30 @@ export default function PhotosPage() {
 
                   <button
                     type="submit"
+                    form="photo-upload-form"
                     disabled={submitting}
-                    className="flex-1 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs rounded-xl shadow-md flex items-center justify-center space-x-2 transition"
+                    className="flex-1 py-2.5 px-3 sm:px-4 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs rounded-xl shadow-md flex items-center justify-center space-x-2 transition disabled:opacity-50"
                   >
                     <CheckCircle2 className="w-4 h-4" />
-                    <span>{submitting ? "Uploading Geotagged Proof..." : "CONFIRM & SUBMIT PHOTO"}</span>
+                    <span>{submitting ? "Uploading Proof..." : "CONFIRM & SUBMIT PHOTO"}</span>
+                  </button>
+                </>
+              ) : (
+                <div className="flex w-full justify-between items-center">
+                  <span className="text-[11px] text-slate-500 font-medium">
+                    Tap the camera box or button to snap photo
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setIsUploadOpen(false)}
+                    className="px-4 py-2 text-xs font-bold border border-slate-300 rounded-xl text-slate-700 hover:bg-white shadow-xs transition"
+                  >
+                    Close
                   </button>
                 </div>
               )}
             </div>
-
-            {/* Bottom Modal Actions */}
-            {!capturedImagePreview && !cameraActive && (
-              <div className="flex justify-end space-x-2 pt-3 border-t">
-                <button
-                  type="button"
-                  onClick={() => setIsUploadOpen(false)}
-                  className="px-4 py-2 text-xs font-bold border rounded-lg hover:bg-slate-50"
-                >
-                  Close
-                </button>
-              </div>
-            )}
-          </form>
+          </div>
         </div>
       )}
 

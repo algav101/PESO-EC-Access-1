@@ -20,10 +20,12 @@ import { EditProgramModal } from "@/components/programs/EditProgramModal";
 import { DeleteProgramModal } from "@/components/programs/DeleteProgramModal";
 
 import { useAuth } from "@/context/AuthContext";
-import { isAdminUser } from "@/lib/permissions";
+import { isAdminUser, isFieldCoordinator } from "@/lib/permissions";
+import { useRouter } from "next/navigation";
 
 export default function ProgramsPage() {
   const { user } = useAuth();
+  const router = useRouter();
   const isAdmin = isAdminUser(user);
 
   const [programs, setPrograms] = useState<any[]>([]);
@@ -36,8 +38,12 @@ export default function ProgramsPage() {
   const [deleteProgram, setDeleteProgram] = useState<any | null>(null);
 
   useEffect(() => {
+    if (isFieldCoordinator(user)) {
+      router.replace("/field");
+      return;
+    }
     fetchPrograms();
-  }, []);
+  }, [user, router]);
 
   const fetchPrograms = async () => {
     try {
