@@ -1,5 +1,5 @@
 import * as XLSX from "xlsx";
-import prisma from "./prisma";
+import prisma from "@/lib/prisma";
 
 export interface ParsedBeneficiaryRow {
   rowNumber: number;
@@ -260,42 +260,10 @@ export async function parseBeneficiaryExcelBuffer(
   const col4Ps = findCol("4p's", "4ps");
   const colIps = findCol("ip's", "ips");
 
-  // Fetch active restrictions from DB
-  const todayStr = new Date().toISOString().split("T")[0];
-  const activeRestrictions = await prisma.beneficiaryRestriction.findMany({
-    where: {
-      status: "ACTIVE",
-      restrictionEnd: { gte: todayStr },
-    },
-    include: {
-      beneficiary: true,
-    },
-  });
-
-  const restrictionMap = new Map<string, { end: string; reason: string }>();
-  for (const r of activeRestrictions) {
-    if (r.beneficiary?.fullName) {
-      const key = `${r.beneficiary.fullName.trim().toUpperCase()}_${r.beneficiary.birthday}`;
-      restrictionMap.set(key, { end: r.restrictionEnd, reason: r.reason });
-    }
-  }
-
-  // Fetch existing program beneficiaries
-  const existingProgramBeneficiaries = await prisma.programBeneficiary.findMany({
-    where: { programId: targetProgramId },
-    select: { designatedNumber: true },
-  });
-  const existingDesigSet = new Set(existingProgramBeneficiaries.map((b) => String(b.designatedNumber)));
-
-  const parsedRows: ParsedBeneficiaryRow[] = [];
-  const seenDesigInFile = new Set<string>();
-  const seenNameInFile = new Set<string>();
-  const barangaySummary: Record<string, number> = {};
-
-  let validCount = 0;
-  let duplicateCount = 0;
-  let restrictedCount = 0;
-  let invalidCount = 0;
+  // Step 1: Parse rows from file
+  const rawParsedItems: any[] = [];
+  const candidateNames = new Set<string>();
+  const candidateLastNames = new Set<string>();
 
   const startDataRow = subHeaderRowIndex !== -1 ? subHeaderRowIndex + 1 : headerRowIndex + 1;
 
@@ -337,6 +305,9 @@ export async function parseBeneficiaryExcelBuffer(
       const extPart = extensionName ? ` ${extensionName}` : "";
       fullName = `${lastName}, ${firstName}${midPart}${extPart}`;
     }
+
+    if (fullName) candidateNames.add(fullName);
+    if (lastName) candidateLastNames.add(lastName);
 
     // 3. Birthday Parsing (Split Columns: Month, Day, Year OR Single Column)
     let birthday = ""; // YYYY-MM-DD
@@ -458,51 +429,7 @@ export async function parseBeneficiaryExcelBuffer(
     const dependentRelationship = colDepRelationship !== -1 && row[colDepRelationship] ? String(row[colDepRelationship]).trim().toUpperCase() : undefined;
     const dependentAge = colDepAge !== -1 && row[colDepAge] ? parseInt(String(row[colDepAge]).trim(), 10) || undefined : undefined;
 
-    // 5. Validation Rules
-    let status: ParsedBeneficiaryRow["status"] = "VALID";
-    let validationError: string | undefined;
-    let restrictionEnd: string | undefined;
-
-    if (!fullName) {
-      status = "MISSING_REQUIRED_FIELD";
-      validationError = "Beneficiary full name is missing";
-      invalidCount++;
-    } else if (!birthday) {
-      status = "INVALID_BIRTHDAY";
-      validationError = "Birthdate (Month, Day, Year) is required for verification PIN";
-      invalidCount++;
-    } else if (seenDesigInFile.has(designated) || existingDesigSet.has(designated)) {
-      status = "DUPLICATE_DESIGNATED_NUMBER";
-      validationError = `Designated Number '${designated}' already exists in batch`;
-      invalidCount++;
-    } else if (seenNameInFile.has(`${fullName}_${birthday}`)) {
-      status = "DUPLICATE";
-      validationError = "Duplicate beneficiary row in file";
-      duplicateCount++;
-    } else {
-      // Check 365-Day restriction
-      const restriction = restrictionMap.get(`${fullName}_${birthday}`);
-      if (restriction) {
-        status = "RESTRICTED";
-        validationError = `Restricted until ${restriction.end}: ${restriction.reason}`;
-        restrictionEnd = restriction.end;
-        restrictedCount++;
-      } else {
-        status = "VALID";
-        validCount++;
-      }
-    }
-
-    seenDesigInFile.add(designated);
-    if (fullName && birthday) {
-      seenNameInFile.add(`${fullName}_${birthday}`);
-    }
-
-    if (barangay) {
-      barangaySummary[barangay] = (barangaySummary[barangay] || 0) + 1;
-    }
-
-    parsedRows.push({
+    rawParsedItems.push({
       rowNumber: r + 1,
       designatedNumber: designated,
       fullName,
@@ -537,6 +464,108 @@ export async function parseBeneficiaryExcelBuffer(
       dependentExtensionName: depExt,
       dependentRelationship,
       dependentAge,
+    });
+  }
+
+  // Step 2: Perform fast targeted DB queries only for candidate names in this file
+  const todayStr = new Date().toISOString().split("T")[0];
+  const restrictionMap = new Map<string, { end: string; reason: string }>();
+
+  if (candidateNames.size > 0) {
+    const activeRestrictions = await prisma.beneficiaryRestriction.findMany({
+      where: {
+        status: "ACTIVE",
+        OR: [
+          { beneficiary: { fullName: { in: Array.from(candidateNames) } } },
+          { beneficiary: { lastName: { in: Array.from(candidateLastNames) } } },
+        ],
+      },
+      select: {
+        restrictionEnd: true,
+        reason: true,
+        beneficiary: {
+          select: {
+            fullName: true,
+            birthday: true,
+          },
+        },
+      },
+    });
+
+    for (const r of activeRestrictions) {
+      if (r.beneficiary?.fullName) {
+        if (!r.restrictionEnd || r.restrictionEnd >= todayStr) {
+          const key = `${r.beneficiary.fullName.trim().toUpperCase()}_${r.beneficiary.birthday}`;
+          restrictionMap.set(key, { end: r.restrictionEnd || "Active Restriction", reason: r.reason || "365-day payout restriction" });
+        }
+      }
+    }
+  }
+
+  // Fetch existing program beneficiaries
+  const existingProgramBeneficiaries = await prisma.programBeneficiary.findMany({
+    where: { programId: targetProgramId },
+    select: { designatedNumber: true },
+  });
+  const existingDesigSet = new Set(existingProgramBeneficiaries.map((b) => String(b.designatedNumber)));
+
+  // Step 3: Classify and validate parsed items
+  const parsedRows: ParsedBeneficiaryRow[] = [];
+  const seenDesigInFile = new Set<string>();
+  const seenNameInFile = new Set<string>();
+  const barangaySummary: Record<string, number> = {};
+
+  let validCount = 0;
+  let duplicateCount = 0;
+  let restrictedCount = 0;
+  let invalidCount = 0;
+
+  for (const item of rawParsedItems) {
+    let status: ParsedBeneficiaryRow["status"] = "VALID";
+    let validationError: string | undefined;
+    let restrictionEnd: string | undefined;
+
+    if (!item.fullName) {
+      status = "MISSING_REQUIRED_FIELD";
+      validationError = "Beneficiary full name is missing";
+      invalidCount++;
+    } else if (!item.birthday) {
+      status = "INVALID_BIRTHDAY";
+      validationError = "Birthdate (Month, Day, Year) is required for verification PIN";
+      invalidCount++;
+    } else if (seenDesigInFile.has(item.designatedNumber) || existingDesigSet.has(item.designatedNumber)) {
+      status = "DUPLICATE_DESIGNATED_NUMBER";
+      validationError = `Designated Number '${item.designatedNumber}' already exists in batch`;
+      invalidCount++;
+    } else if (seenNameInFile.has(`${item.fullName}_${item.birthday}`)) {
+      status = "DUPLICATE";
+      validationError = "Duplicate beneficiary row in file";
+      duplicateCount++;
+    } else {
+      // Check 365-Day restriction from targeted map
+      const restriction = restrictionMap.get(`${item.fullName}_${item.birthday}`);
+      if (restriction) {
+        status = "RESTRICTED";
+        validationError = `Restricted until ${restriction.end}: ${restriction.reason}`;
+        restrictionEnd = restriction.end;
+        restrictedCount++;
+      } else {
+        status = "VALID";
+        validCount++;
+      }
+    }
+
+    seenDesigInFile.add(item.designatedNumber);
+    if (item.fullName && item.birthday) {
+      seenNameInFile.add(`${item.fullName}_${item.birthday}`);
+    }
+
+    if (item.barangay) {
+      barangaySummary[item.barangay] = (barangaySummary[item.barangay] || 0) + 1;
+    }
+
+    parsedRows.push({
+      ...item,
       status,
       validationError,
       restrictionEnd,
