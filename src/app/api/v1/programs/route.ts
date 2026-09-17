@@ -71,94 +71,94 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Program code and name are required" }, { status: 400 });
     }
 
-    // Create program transactionally
-    const program = await prisma.$transaction(async (tx) => {
-      const created = await tx.program.create({
-        data: {
-          programCode: programCode.trim().toUpperCase(),
-          batchNumber,
-          programName,
-          municipality,
-          province,
-          doleOffice,
-          projectLocation,
-          natureOfWork,
-          beneficiaryCount: Number(beneficiaryCount) || 0,
-          requiredWorkDays: Number(requiredWorkDays) || 10,
-          dailyHours: Number(dailyHours) || 8.0,
-          morningStart,
-          morningEnd,
-          afternoonStart,
-          afternoonEnd,
-          orientationDate,
-          orientationTime,
-          orientationVenue,
-          payoutDate,
-          payoutTime,
-          payoutVenue,
-          startDate,
-          endDate,
-          status: "DRAFT",
-          createdById: user.id,
-        },
-      });
+    // Add selected barangays or default 11 Dingalan barangays
+    const defaultBarangays = [
+      "Aplaya", "Butas na Bato", "Caragsacan", "Davildavilan",
+      "Dikapanikian", "Ibona", "Matawe", "Paltic",
+      "Poblacion", "Tanawan", "Umiray"
+    ];
+    const targetBarangays = Array.isArray(barangays) && barangays.length > 0 ? barangays : defaultBarangays;
 
-      // Initialize Photo Configuration
-      await tx.photoConfiguration.create({
-        data: {
-          programId: created.id,
-          showGps: true,
-          showDate: true,
-          showTime: true,
-          showBarangay: true,
-          showProgramName: true,
-        },
-      });
+    // Auto-generate Work Days (Day 1 to N)
+    const daysCount = Number(requiredWorkDays) || 10;
+    let startD = startDate ? parseISO(startDate) : new Date();
 
-      // Add selected barangays or default 11 Dingalan barangays
-      const defaultBarangays = [
-        "Aplaya", "Butas na Bato", "Caragsacan", "Davildavilan",
-        "Dikapanikian", "Ibona", "Matawe", "Paltic",
-        "Poblacion", "Tanawan", "Umiray"
-      ];
-      const targetBarangays = barangays.length > 0 ? barangays : defaultBarangays;
-
-      for (const brgy of targetBarangays) {
-        await tx.programBarangay.create({
-          data: {
-            programId: created.id,
-            barangayName: brgy,
-            projectLocation: `Barangay ${brgy}, Dingalan, Aurora`,
-          },
+    let currentD = startD;
+    let scheduledDays = 0;
+    const workDaysData: { dayNumber: number; workDate: string; description: string; status: string }[] = [];
+    while (scheduledDays < daysCount) {
+      // Skip Sundays if standard 6-day work week
+      const dayOfWeek = currentD.getDay();
+      if (dayOfWeek !== 0) { // 0 is Sunday
+        scheduledDays++;
+        workDaysData.push({
+          dayNumber: scheduledDays,
+          workDate: format(currentD, "yyyy-MM-dd"),
+          description: `Day ${scheduledDays} Community Work Activities`,
+          status: "SCHEDULED",
         });
       }
+      currentD = addDays(currentD, 1);
+    }
 
-      // Auto-generate Work Days (Day 1 to N)
-      const daysCount = Number(requiredWorkDays) || 10;
-      let startD = startDate ? parseISO(startDate) : new Date();
-
-      let currentD = startD;
-      let scheduledDays = 0;
-      while (scheduledDays < daysCount) {
-        // Skip Sundays if standard 6-day work week
-        const dayOfWeek = currentD.getDay();
-        if (dayOfWeek !== 0) { // 0 is Sunday
-          scheduledDays++;
-          await tx.workDay.create({
-            data: {
-              programId: created.id,
-              dayNumber: scheduledDays,
-              workDate: format(currentD, "yyyy-MM-dd"),
-              description: `Day ${scheduledDays} Community Work Activities`,
-              status: "SCHEDULED",
+    // Create program transactionally using nested relational write in a single atomic query
+    const program = await prisma.$transaction(
+      async (tx) => {
+        const created = await tx.program.create({
+          data: {
+            programCode: programCode.trim().toUpperCase(),
+            batchNumber,
+            programName,
+            municipality,
+            province,
+            doleOffice,
+            projectLocation,
+            natureOfWork,
+            beneficiaryCount: Number(beneficiaryCount) || 0,
+            requiredWorkDays: Number(requiredWorkDays) || 10,
+            dailyHours: Number(dailyHours) || 8.0,
+            morningStart,
+            morningEnd,
+            afternoonStart,
+            afternoonEnd,
+            orientationDate,
+            orientationTime,
+            orientationVenue,
+            payoutDate,
+            payoutTime,
+            payoutVenue,
+            startDate,
+            endDate,
+            status: "DRAFT",
+            createdById: user.id,
+            photoConfig: {
+              create: {
+                showGps: true,
+                showDate: true,
+                showTime: true,
+                showBarangay: true,
+                showProgramName: true,
+              },
             },
-          });
-        }
-        currentD = addDays(currentD, 1);
-      }
+            programBarangays: {
+              create: targetBarangays.map((brgy: string) => ({
+                barangayName: brgy,
+                projectLocation: `Barangay ${brgy}, Dingalan, Aurora`,
+              })),
+            },
+            workDays: {
+              create: workDaysData,
+            },
+          },
+        });
 
-      return created;
-    });
+        return created;
+      },
+      {
+        maxWait: 15000,
+        timeout: 30000,
+      }
+    );
 
     await logAudit({
       userId: user.id,

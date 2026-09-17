@@ -114,35 +114,46 @@ export async function PATCH(request: Request, { params }: { params: { id: string
     if (payoutTime !== undefined) updateData.payoutTime = payoutTime;
     if (payoutVenue !== undefined) updateData.payoutVenue = payoutVenue;
 
-    const updated = await prisma.$transaction(async (tx) => {
-      const prog = await tx.program.update({
-        where: { id: params.id },
-        data: updateData,
-      });
-
-      // Update participating barangays if array provided
-      if (Array.isArray(participatingBarangays)) {
-        await tx.programBarangay.deleteMany({
-          where: { programId: params.id },
+    const updated = await prisma.$transaction(
+      async (tx) => {
+        const prog = await tx.program.update({
+          where: { id: params.id },
+          data: updateData,
         });
 
-        for (const brgy of participatingBarangays) {
-          const brgyName = typeof brgy === "string" ? brgy : brgy.barangayName;
-          if (brgyName) {
-            await tx.programBarangay.create({
-              data: {
+        // Update participating barangays if array provided
+        if (Array.isArray(participatingBarangays)) {
+          await tx.programBarangay.deleteMany({
+            where: { programId: params.id },
+          });
+
+          const barangayRecords = participatingBarangays
+            .map((brgy) => {
+              const brgyName = typeof brgy === "string" ? brgy : brgy.barangayName;
+              if (!brgyName) return null;
+              return {
                 programId: params.id,
                 barangayName: brgyName,
                 projectLocation: typeof brgy === "object" ? brgy.projectLocation : null,
                 beneficiaryTarget: typeof brgy === "object" ? brgy.beneficiaryTarget || 0 : 0,
-              },
+              };
+            })
+            .filter(Boolean);
+
+          if (barangayRecords.length > 0) {
+            await tx.programBarangay.createMany({
+              data: barangayRecords as any[],
             });
           }
         }
-      }
 
-      return prog;
-    });
+        return prog;
+      },
+      {
+        maxWait: 15000,
+        timeout: 30000,
+      }
+    );
 
     await logAudit({
       userId: user.id,
@@ -184,34 +195,40 @@ export async function DELETE(request: Request, { params }: { params: { id: strin
     }
 
     // Safely delete program and all cascade relations in transaction
-    await prisma.$transaction(async (tx) => {
-      // 1. Delete associated attendance, photos, replacements, stubs, and QR tokens
-      await tx.attendanceRecord.deleteMany({ where: { programId: params.id } });
-      await tx.accomplishmentPhoto.deleteMany({ where: { programId: params.id } });
-      await tx.beneficiaryReplacement.deleteMany({ where: { programId: params.id } });
-      await tx.orientationAttendance.deleteMany({ where: { programId: params.id } });
-      await tx.payout.deleteMany({ where: { programId: params.id } });
-      await tx.beneficiaryRestriction.deleteMany({ where: { sourceProgramId: params.id } });
-      await tx.stubDistribution.deleteMany({
-        where: { programBeneficiary: { programId: params.id } },
-      });
-      await tx.qrPrintLog.deleteMany({
-        where: { qr: { programId: params.id } },
-      });
-      await tx.qrCode.deleteMany({ where: { programId: params.id } });
-      await tx.qrPrintBatch.deleteMany({ where: { programId: params.id } });
-      await tx.tableAssignmentRule.deleteMany({ where: { programId: params.id } });
-      await tx.photoConfiguration.deleteMany({ where: { programId: params.id } });
-      await tx.tupadWorkProgram.deleteMany({ where: { programId: params.id } });
-      await tx.workDay.deleteMany({ where: { programId: params.id } });
-      await tx.programBarangay.deleteMany({ where: { programId: params.id } });
+    await prisma.$transaction(
+      async (tx) => {
+        // 1. Delete associated attendance, photos, replacements, stubs, and QR tokens
+        await tx.attendanceRecord.deleteMany({ where: { programId: params.id } });
+        await tx.accomplishmentPhoto.deleteMany({ where: { programId: params.id } });
+        await tx.beneficiaryReplacement.deleteMany({ where: { programId: params.id } });
+        await tx.orientationAttendance.deleteMany({ where: { programId: params.id } });
+        await tx.payout.deleteMany({ where: { programId: params.id } });
+        await tx.beneficiaryRestriction.deleteMany({ where: { sourceProgramId: params.id } });
+        await tx.stubDistribution.deleteMany({
+          where: { programBeneficiary: { programId: params.id } },
+        });
+        await tx.qrPrintLog.deleteMany({
+          where: { qr: { programId: params.id } },
+        });
+        await tx.qrCode.deleteMany({ where: { programId: params.id } });
+        await tx.qrPrintBatch.deleteMany({ where: { programId: params.id } });
+        await tx.tableAssignmentRule.deleteMany({ where: { programId: params.id } });
+        await tx.photoConfiguration.deleteMany({ where: { programId: params.id } });
+        await tx.tupadWorkProgram.deleteMany({ where: { programId: params.id } });
+        await tx.workDay.deleteMany({ where: { programId: params.id } });
+        await tx.programBarangay.deleteMany({ where: { programId: params.id } });
 
-      // 2. Delete program beneficiaries
-      await tx.programBeneficiary.deleteMany({ where: { programId: params.id } });
+        // 2. Delete program beneficiaries
+        await tx.programBeneficiary.deleteMany({ where: { programId: params.id } });
 
-      // 3. Delete program itself
-      await tx.program.delete({ where: { id: params.id } });
-    });
+        // 3. Delete program itself
+        await tx.program.delete({ where: { id: params.id } });
+      },
+      {
+        maxWait: 15000,
+        timeout: 30000,
+      }
+    );
 
     await logAudit({
       userId: user.id,
