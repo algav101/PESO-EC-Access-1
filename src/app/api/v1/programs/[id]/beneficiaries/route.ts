@@ -4,6 +4,7 @@ import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getCurrentUser, isAdminUser, hasPermission } from "@/lib/auth";
 import { logAudit } from "@/lib/audit";
+import { generateBeneficiaryToken } from "@/lib/qr";
 import { assignBeneficiaryWorkArea, WorkProgramItemAllocation } from "@/lib/work-assignment";
 import { format } from "date-fns";
 

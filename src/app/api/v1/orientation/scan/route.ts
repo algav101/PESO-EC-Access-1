@@ -98,7 +98,7 @@ export async function POST(request: Request) {
 
       pb = await prisma.programBeneficiary.findFirst({
         where: whereClause,
-        orderBy: { createdAt: "desc" },
+        orderBy: { joinedAt: "desc" },
         include: {
           beneficiary: true,
           program: true,
@@ -130,7 +130,7 @@ export async function POST(request: Request) {
 
       pb = await prisma.programBeneficiary.findFirst({
         where: whereClause,
-        orderBy: { createdAt: "desc" },
+        orderBy: { joinedAt: "desc" },
         include: {
           beneficiary: true,
           program: true,

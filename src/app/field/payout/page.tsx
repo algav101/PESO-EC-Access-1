@@ -16,7 +16,7 @@ import {
 import { QrScannerModal } from "@/components/scanner/QrScannerModal";
 import { FieldQrPassGeneratorModal } from "@/components/field/FieldQrPassGeneratorCard";
 import { useOffline } from "@/context/OfflineContext";
-import { offlineDb, queueOfflineTransaction } from "@/lib/dexie";
+import { offlineDb, queueOfflineTransaction, findBeneficiaryOffline, extractCleanQrToken } from "@/lib/dexie";
 import { format } from "date-fns";
 
 export default function PayoutScannerPage() {
@@ -39,35 +39,48 @@ export default function PayoutScannerPage() {
 
     try {
       if (isOnline) {
-        // Look up beneficiary details and validate sequence + anti-double payout checks
-        const res = await fetch("/api/v1/payout/scan", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ qrToken: token, isLookupOnly: true }),
-        });
+        try {
+          // Look up beneficiary details and validate sequence + anti-double payout checks
+          const res = await fetch("/api/v1/payout/scan", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ qrToken: token, isLookupOnly: true }),
+          });
 
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.error || "Payout scan validation failed");
+          const data = await res.json();
+          if (!res.ok) throw new Error(data.error || "Payout scan validation failed");
 
-        setScannedBeneficiary({
-          ...data.data,
-          qrToken: token,
-        });
-      } else {
-        // Offline lookup
-        const bene = await offlineDb.cachedBeneficiaries.where("qrToken").equals(token).first();
-        if (!bene) throw new Error("QR Token not found in offline database");
-
-        setScannedBeneficiary({
-          programBeneficiaryId: bene.id,
-          designatedNumber: bene.designatedNumber,
-          fullName: bene.fullName,
-          barangay: bene.barangay,
-          tableNumber: bene.tableNumber,
-          qrToken: token,
-          programId: bene.programId,
-        });
+          setScannedBeneficiary({
+            ...data.data,
+            qrToken: token,
+          });
+          return;
+        } catch (onlineErr: any) {
+          if (
+            onlineErr.message &&
+            (onlineErr.message.includes("ALREADY") ||
+              onlineErr.message.includes("CANNOT") ||
+              onlineErr.message.includes("SEQUENCE"))
+          ) {
+            throw onlineErr;
+          }
+          console.warn("Online payout scan failed, switching to local offline engine:", onlineErr);
+        }
       }
+
+      // Offline lookup with universal token resolution
+      const bene = await findBeneficiaryOffline(token);
+      if (!bene) throw new Error(`QR Token or Beneficiary "${token}" not found in offline database cache.`);
+
+      setScannedBeneficiary({
+        programBeneficiaryId: bene.id,
+        designatedNumber: bene.designatedNumber,
+        fullName: bene.fullName,
+        barangay: bene.barangay,
+        tableNumber: bene.tableNumber || "Table 1",
+        qrToken: bene.qrToken || token,
+        programId: bene.programId,
+      });
     } catch (err: any) {
       setError(err.message);
     } finally {

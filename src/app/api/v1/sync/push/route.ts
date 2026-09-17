@@ -43,7 +43,19 @@ export async function POST(request: Request) {
 
       try {
         if (entityType === "ATTENDANCE") {
-          const { programId, workDayId, programBeneficiaryId, attendanceDate, morningTimeIn, morningTimeOut, afternoonTimeIn, afternoonTimeOut } = payload;
+          const {
+            programId,
+            workDayId,
+            programBeneficiaryId,
+            attendanceDate,
+            morningTimeIn,
+            morningTimeOut,
+            afternoonTimeIn,
+            afternoonTimeOut,
+            workProgramItemId,
+            workArea,
+            activityName,
+          } = payload;
           await prisma.attendanceRecord.upsert({
             where: {
               programId_workDayId_programBeneficiaryId: {
@@ -57,6 +69,9 @@ export async function POST(request: Request) {
               morningTimeOut: morningTimeOut ? new Date(morningTimeOut) : undefined,
               afternoonTimeIn: afternoonTimeIn ? new Date(afternoonTimeIn) : undefined,
               afternoonTimeOut: afternoonTimeOut ? new Date(afternoonTimeOut) : undefined,
+              workProgramItemId: workProgramItemId || undefined,
+              workArea: workArea || undefined,
+              activityName: activityName || undefined,
               syncStatus: "SYNCED",
             },
             create: {
@@ -68,6 +83,9 @@ export async function POST(request: Request) {
               morningTimeOut: morningTimeOut ? new Date(morningTimeOut) : null,
               afternoonTimeIn: afternoonTimeIn ? new Date(afternoonTimeIn) : null,
               afternoonTimeOut: afternoonTimeOut ? new Date(afternoonTimeOut) : null,
+              workProgramItemId: workProgramItemId || null,
+              workArea: workArea || null,
+              activityName: activityName || null,
               status: "PRESENT",
               source: "QR_SCAN_OFFLINE",
               deviceId,

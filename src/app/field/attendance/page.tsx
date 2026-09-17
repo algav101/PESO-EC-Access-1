@@ -18,7 +18,7 @@ import {
 import { QrScannerModal } from "@/components/scanner/QrScannerModal";
 import { FieldQrPassGeneratorModal } from "@/components/field/FieldQrPassGeneratorCard";
 import { useOffline } from "@/context/OfflineContext";
-import { offlineDb, queueOfflineTransaction } from "@/lib/dexie";
+import { offlineDb, queueOfflineTransaction, recordOfflineAttendance } from "@/lib/dexie";
 import { format } from "date-fns";
 
 export default function DailyAttendancePage() {
@@ -61,29 +61,78 @@ export default function DailyAttendancePage() {
 
   const fetchPrograms = async () => {
     try {
-      const res = await fetch("/api/v1/programs");
-      if (res.ok) {
-        const data = await res.json();
-        const progs = data.programs || [];
-        setPrograms(progs);
-        if (progs.length > 0) {
-          setSelectedProgramId(progs[0].id);
+      if (typeof navigator === "undefined" || navigator.onLine) {
+        const res = await fetch("/api/v1/programs");
+        if (res.ok) {
+          const data = await res.json();
+          const progs = data.programs || [];
+          if (progs.length > 0) {
+            setPrograms(progs);
+            setSelectedProgramId((prev) => prev || progs[0].id);
+            return;
+          }
         }
       }
     } catch (e) {
-      console.error(e);
+      console.warn("Online programs fetch failed, falling back to offline storage:", e);
+    }
+
+    // Offline fallback from IndexedDB on installed unit
+    try {
+      const cachedProgs = await offlineDb.cachedPrograms.toArray();
+      const allCachedWorkDays = await offlineDb.cachedWorkDays.toArray();
+
+      const progsWithDays = cachedProgs.map((p) => ({
+        ...p,
+        workDays: allCachedWorkDays
+          .filter((w) => w.programId === p.id)
+          .sort((a, b) => a.dayNumber - b.dayNumber),
+      }));
+
+      if (progsWithDays.length > 0) {
+        setPrograms(progsWithDays);
+        setSelectedProgramId((prev) => prev || progsWithDays[0].id);
+      }
+    } catch (err) {
+      console.error("Failed to load offline programs from IndexedDB:", err);
     }
   };
 
   const fetchWorkPrograms = async (progId: string) => {
     try {
-      const res = await fetch(`/api/v1/programs/${progId}/work-program`);
-      if (res.ok) {
-        const data = await res.json();
-        setWorkPrograms(data.workPrograms || []);
+      if (typeof navigator === "undefined" || navigator.onLine) {
+        const res = await fetch(`/api/v1/programs/${progId}/work-program`);
+        if (res.ok) {
+          const data = await res.json();
+          if (data.workPrograms && data.workPrograms.length > 0) {
+            setWorkPrograms(data.workPrograms);
+            return;
+          }
+        }
       }
     } catch (e) {
-      console.error(e);
+      console.warn("Online work programs fetch failed, falling back to offline cache:", e);
+    }
+
+    // Offline fallback from Dexie
+    try {
+      const cachedItems = await offlineDb.cachedWorkProgramItems.where("programId").equals(progId).toArray();
+      if (cachedItems.length > 0) {
+        const grouped: Record<string, any[]> = {};
+        cachedItems.forEach((it) => {
+          if (!grouped[it.barangay]) grouped[it.barangay] = [];
+          grouped[it.barangay].push(it);
+        });
+
+        const wpList = Object.entries(grouped).map(([brgy, items]) => ({
+          id: `WP-${brgy}`,
+          barangay: brgy,
+          items,
+        }));
+        setWorkPrograms(wpList);
+      }
+    } catch (err) {
+      console.error("Failed to load offline work programs:", err);
     }
   };
 
@@ -111,63 +160,55 @@ export default function DailyAttendancePage() {
 
     try {
       if (isOnline) {
-        const res = await fetch("/api/v1/attendance/scan", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            qrToken: token,
-            workDayId: selectedWorkDayId,
-            shiftMode,
-            workProgramItemId: selectedAreaItemId !== "AUTO" ? selectedAreaItemId : undefined,
-            deviceId: localStorage.getItem("tupad_device_id") || "MOBILE_SCANNER",
-          }),
-        });
+        try {
+          const res = await fetch("/api/v1/attendance/scan", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              qrToken: token,
+              workDayId: selectedWorkDayId,
+              shiftMode,
+              workProgramItemId: selectedAreaItemId !== "AUTO" ? selectedAreaItemId : undefined,
+              deviceId: localStorage.getItem("tupad_device_id") || "MOBILE_SCANNER",
+            }),
+          });
 
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.error || "Attendance scan failed");
+          const data = await res.json();
+          if (!res.ok) throw new Error(data.error || "Attendance scan failed");
 
-        setScanResult({
-          isDuplicate: data.isDuplicate,
-          slotRecorded: data.slotRecorded,
-          message: data.message,
-          data: data.data,
-          isOffline: false,
-        });
-      } else {
-        // Offline Attendance
-        const bene = await offlineDb.cachedBeneficiaries.where("qrToken").equals(token).first();
-        if (!bene) throw new Error("QR Token not recognized in offline cache");
-
-        const selectedWd = workDays.find((w) => w.id === selectedWorkDayId);
-
-        const now = new Date();
-        await queueOfflineTransaction("ATTENDANCE", "CREATE", {
-          programId: selectedProgramId,
-          workDayId: selectedWorkDayId,
-          programBeneficiaryId: bene.id,
-          attendanceDate: selectedWd?.workDate || format(now, "yyyy-MM-dd"),
-          morningTimeIn: shiftMode === "MORNING_IN" || (shiftMode === "AUTO" && now.getHours() < 12) ? now.toISOString() : undefined,
-          morningTimeOut: shiftMode === "MORNING_OUT" ? now.toISOString() : undefined,
-          afternoonTimeIn: shiftMode === "AFTERNOON_IN" || (shiftMode === "AUTO" && now.getHours() >= 12 && now.getHours() < 15) ? now.toISOString() : undefined,
-          afternoonTimeOut: shiftMode === "AFTERNOON_OUT" || (shiftMode === "AUTO" && now.getHours() >= 15) ? now.toISOString() : undefined,
-        });
-
-        setScanResult({
-          isDuplicate: false,
-          slotRecorded: `Attendance (${shiftMode})`,
-          message: "Recorded & Saved Offline (Queued for Sync)",
-          data: {
-            designatedNumber: bene.designatedNumber,
-            fullName: bene.fullName,
-            barangay: bene.barangay,
-            sitio: bene.sitio,
-            tableNumber: bene.tableNumber,
-            dayNumber: selectedWd?.dayNumber || 1,
-            workDate: selectedWd?.workDate || format(now, "yyyy-MM-dd"),
-          },
-          isOffline: true,
-        });
+          setScanResult({
+            isDuplicate: data.isDuplicate,
+            slotRecorded: data.slotRecorded,
+            message: data.message,
+            data: data.data,
+            isOffline: false,
+          });
+          return;
+        } catch (onlineErr: any) {
+          // If sequence blocked or already scanned reported by server, rethrow error to user
+          if (
+            onlineErr.message &&
+            (onlineErr.message.includes("ALREADY SCANNED") ||
+              onlineErr.message.includes("SEQUENCE BLOCKED") ||
+              onlineErr.message.includes("CANNOT"))
+          ) {
+            throw onlineErr;
+          }
+          console.warn("Online scan request failed, switching to local offline unit engine:", onlineErr);
+        }
       }
+
+      // Offline Attendance Engine (Stored to Installed Unit)
+      const offlineResult = await recordOfflineAttendance({
+        rawToken: token,
+        programId: selectedProgramId,
+        workDayId: selectedWorkDayId,
+        shiftMode,
+        workProgramItemId: selectedAreaItemId !== "AUTO" ? selectedAreaItemId : undefined,
+        deviceId: localStorage.getItem("tupad_device_id") || "MOBILE_SCANNER",
+      });
+
+      setScanResult(offlineResult);
     } catch (err: any) {
       setError(err.message);
     } finally {

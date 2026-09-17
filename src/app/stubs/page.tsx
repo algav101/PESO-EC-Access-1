@@ -29,6 +29,7 @@ import {
   RotateCcw,
   ChevronDown,
   ChevronUp,
+  ShieldCheck,
   MapPin,
   Type,
   Maximize2,

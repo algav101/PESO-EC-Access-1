@@ -34,6 +34,8 @@ export default function SyncCenterPage() {
 
   const [cachedBeneCount, setCachedBeneCount] = useState(0);
   const [cachedProgramCount, setCachedProgramCount] = useState(0);
+  const [cachedWpCount, setCachedWpCount] = useState(0);
+  const [cachedAttendanceCount, setCachedAttendanceCount] = useState(0);
   const [queueItems, setQueueItems] = useState<OfflineTransaction[]>([]);
   const [activeScope, setActiveScope] = useState<string>("Municipality-wide");
 
@@ -55,8 +57,12 @@ export default function SyncCenterPage() {
     try {
       const bCount = await offlineDb.cachedBeneficiaries.count();
       const pCount = await offlineDb.cachedPrograms.count();
+      const wpCount = await offlineDb.cachedWorkProgramItems.count();
+      const attCount = await offlineDb.offlineAttendanceRecords.count();
       setCachedBeneCount(bCount);
       setCachedProgramCount(pCount);
+      setCachedWpCount(wpCount);
+      setCachedAttendanceCount(attCount);
 
       const items = await offlineDb.offlineQueue.reverse().limit(50).toArray();
       setQueueItems(items);
@@ -148,42 +154,52 @@ export default function SyncCenterPage() {
       </div>
 
       {/* Connectivity & Status Banners */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <div
-          className={`gov-card p-5 border-l-4 flex items-center space-x-4 shadow ${
+          className={`gov-card p-4 border-l-4 flex items-center space-x-3.5 shadow ${
             isOnline ? "border-l-emerald-600 bg-white" : "border-l-rose-600 bg-rose-50/40"
           }`}
         >
           <div
-            className={`p-3 rounded-xl ${
+            className={`p-2.5 rounded-xl ${
               isOnline ? "bg-emerald-100 text-emerald-800" : "bg-rose-100 text-rose-800"
             }`}
           >
-            {isOnline ? <Wifi className="w-6 h-6" /> : <WifiOff className="w-6 h-6" />}
+            {isOnline ? <Wifi className="w-5 h-5" /> : <WifiOff className="w-5 h-5" />}
           </div>
           <div>
             <p className="text-[10px] font-bold uppercase text-slate-400">Connection State</p>
-            <p className="text-lg font-black text-slate-900">{isOnline ? "Online (Auto-Sync)" : "Offline Mode"}</p>
+            <p className="text-sm font-black text-slate-900">{isOnline ? "Online (Auto-Sync)" : "Offline Mode"}</p>
           </div>
         </div>
 
-        <div className="gov-card p-5 border-l-4 border-l-gov-gold bg-white flex items-center space-x-4 shadow">
-          <div className="p-3 bg-amber-100 text-amber-800 rounded-xl">
-            <Layers className="w-6 h-6" />
+        <div className="gov-card p-4 border-l-4 border-l-gov-gold bg-white flex items-center space-x-3.5 shadow">
+          <div className="p-2.5 bg-amber-100 text-amber-800 rounded-xl">
+            <Layers className="w-5 h-5" />
           </div>
           <div>
             <p className="text-[10px] font-bold uppercase text-slate-400">Pending Sync Queue</p>
-            <p className="text-lg font-black text-slate-900">{pendingCount} Offline Action(s)</p>
+            <p className="text-sm font-black text-slate-900">{pendingCount} Offline Action(s)</p>
           </div>
         </div>
 
-        <div className="gov-card p-5 border-l-4 border-l-gov-blue bg-white flex items-center space-x-4 shadow">
-          <div className="p-3 bg-blue-100 text-gov-blue rounded-xl">
-            <Database className="w-6 h-6" />
+        <div className="gov-card p-4 border-l-4 border-l-gov-blue bg-white flex items-center space-x-3.5 shadow">
+          <div className="p-2.5 bg-blue-100 text-gov-blue rounded-xl">
+            <Database className="w-5 h-5" />
           </div>
           <div>
-            <p className="text-[10px] font-bold uppercase text-slate-400">Local Cache Depth</p>
-            <p className="text-lg font-black text-slate-900">{cachedBeneCount} Beneficiaries</p>
+            <p className="text-[10px] font-bold uppercase text-slate-400">Installed Unit Roster</p>
+            <p className="text-sm font-black text-slate-900">{cachedBeneCount} Beneficiaries</p>
+          </div>
+        </div>
+
+        <div className="gov-card p-4 border-l-4 border-l-purple-600 bg-white flex items-center space-x-3.5 shadow">
+          <div className="p-2.5 bg-purple-100 text-purple-800 rounded-xl">
+            <ShieldCheck className="w-5 h-5" />
+          </div>
+          <div>
+            <p className="text-[10px] font-bold uppercase text-slate-400">Local Attendance Logs</p>
+            <p className="text-sm font-black text-slate-900">{cachedAttendanceCount} Scanned Logs</p>
           </div>
         </div>
       </div>

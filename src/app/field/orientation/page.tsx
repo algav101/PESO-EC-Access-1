@@ -32,7 +32,7 @@ import {
 import { QrScannerModal } from "@/components/scanner/QrScannerModal";
 import { FieldQrPassGeneratorModal } from "@/components/field/FieldQrPassGeneratorCard";
 import { useOffline } from "@/context/OfflineContext";
-import { offlineDb, queueOfflineTransaction } from "@/lib/dexie";
+import { offlineDb, queueOfflineTransaction, findBeneficiaryOffline, extractCleanQrToken } from "@/lib/dexie";
 import { formatDate, normalizeBarangayName } from "@/lib/utils";
 
 export default function OrientationPage() {
@@ -95,33 +95,87 @@ function OrientationContent() {
 
   const fetchPrograms = async () => {
     try {
-      const res = await fetch("/api/v1/programs");
-      if (res.ok) {
-        const data = await res.json();
-        const progs = data.programs || [];
-        setPrograms(progs);
-        if (progs.length > 0 && !selectedProgramId) {
-          setSelectedProgramId(progs[0].id);
+      if (typeof navigator === "undefined" || navigator.onLine) {
+        const res = await fetch("/api/v1/programs");
+        if (res.ok) {
+          const data = await res.json();
+          const progs = data.programs || [];
+          if (progs.length > 0) {
+            setPrograms(progs);
+            if (!selectedProgramId) {
+              setSelectedProgramId(progs[0].id);
+            }
+            return;
+          }
         }
       }
     } catch (e) {
-      console.error("Failed to load programs:", e);
+      console.warn("Failed to load online programs, checking offline storage:", e);
+    }
+
+    // Offline fallback from IndexedDB
+    try {
+      const cachedProgs = await offlineDb.cachedPrograms.toArray();
+      if (cachedProgs.length > 0) {
+        setPrograms(cachedProgs);
+        if (!selectedProgramId) {
+          setSelectedProgramId(cachedProgs[0].id);
+        }
+      }
+    } catch (err) {
+      console.error("Failed to load offline programs:", err);
     }
   };
 
   const fetchMonitoringData = async (progId: string, silent = false) => {
     if (!silent) setMonitoringLoading(true);
     try {
-      const res = await fetch(`/api/v1/orientation/monitoring?programId=${progId}`);
-      if (res.ok) {
-        const data = await res.json();
-        setMonitoringData(data);
-        setLastRefreshedAt(new Date());
+      if (typeof navigator === "undefined" || navigator.onLine) {
+        const res = await fetch(`/api/v1/orientation/monitoring?programId=${progId}`);
+        if (res.ok) {
+          const data = await res.json();
+          setMonitoringData(data);
+          setLastRefreshedAt(new Date());
+          return;
+        }
       }
     } catch (e) {
-      console.error("Failed to load orientation monitoring data:", e);
+      console.warn("Online orientation monitoring fetch failed, checking offline storage:", e);
     } finally {
       if (!silent) setMonitoringLoading(false);
+    }
+
+    // Offline monitoring summary
+    try {
+      const cachedBeneficiaries = await offlineDb.cachedBeneficiaries
+        .where("programId")
+        .equals(progId)
+        .toArray();
+
+      if (cachedBeneficiaries.length > 0) {
+        const attendedCount = cachedBeneficiaries.filter((b) => b.orientationStatus === "PRESENT").length;
+        setMonitoringData({
+          stats: {
+            totalBeneficiaries: cachedBeneficiaries.length,
+            attendedCount,
+            absentCount: cachedBeneficiaries.length - attendedCount,
+            attendanceRate: Math.round((attendedCount / cachedBeneficiaries.length) * 100),
+          },
+          beneficiaries: cachedBeneficiaries.map((b) => ({
+            id: b.id,
+            designatedNumber: b.designatedNumber,
+            fullName: b.fullName,
+            barangay: b.barangay,
+            sitio: b.sitio,
+            tableNumber: b.tableNumber || "Table 1",
+            status: b.orientationStatus === "PRESENT" ? "PRESENT" : "ABSENT",
+            qrToken: b.qrToken,
+          })),
+        });
+        setLastRefreshedAt(new Date());
+      }
+    } catch (err) {
+      console.error("Failed to build offline orientation monitoring:", err);
     }
   };
 
@@ -133,60 +187,74 @@ function OrientationContent() {
 
     try {
       if (isOnline) {
-        const res = await fetch("/api/v1/orientation/scan", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            qrToken: tokenOrSlot,
-            programId: selectedProgramId,
-            deviceId: localStorage.getItem("tupad_device_id") || "MOBILE_BROWSER",
-          }),
-        });
+        try {
+          const res = await fetch("/api/v1/orientation/scan", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              qrToken: tokenOrSlot,
+              programId: selectedProgramId,
+              deviceId: localStorage.getItem("tupad_device_id") || "MOBILE_BROWSER",
+            }),
+          });
 
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.error || "Orientation verification failed");
+          const data = await res.json();
+          if (!res.ok) throw new Error(data.error || "Orientation verification failed");
 
-        setScanResult({
-          alreadyRecorded: data.alreadyScanned,
-          message: data.message,
-          data: data.data,
-          isOffline: false,
-        });
+          setScanResult({
+            alreadyRecorded: data.alreadyScanned,
+            message: data.message,
+            data: data.data,
+            isOffline: false,
+          });
 
-        // Refresh monitoring data in background
-        if (selectedProgramId) {
-          fetchMonitoringData(selectedProgramId, true);
+          // Refresh monitoring data in background
+          if (selectedProgramId) {
+            fetchMonitoringData(selectedProgramId, true);
+          }
+          return;
+        } catch (onlineErr: any) {
+          if (
+            onlineErr.message &&
+            (onlineErr.message.includes("ALREADY SCANNED") ||
+              onlineErr.message.includes("SEQUENCE BLOCKED") ||
+              onlineErr.message.includes("CANNOT"))
+          ) {
+            throw onlineErr;
+          }
+          console.warn("Online orientation scan failed, switching to local offline engine:", onlineErr);
         }
-      } else {
-        // Offline mode check
-        const bene = await offlineDb.cachedBeneficiaries
-          .where("qrToken")
-          .equals(tokenOrSlot)
-          .or("designatedNumber")
-          .equals(tokenOrSlot)
-          .first();
+      }
 
-        if (!bene) throw new Error("Beneficiary not found in offline database");
+      // Offline mode check with universal token resolution
+      const bene = await findBeneficiaryOffline(tokenOrSlot, selectedProgramId);
+      if (!bene) throw new Error(`Beneficiary or QR Token "${tokenOrSlot}" not found in offline database.`);
 
-        await queueOfflineTransaction("ORIENTATION", "CREATE", {
-          programId: bene.programId || selectedProgramId,
-          programBeneficiaryId: bene.id,
+      // Update orientation status in local cache
+      await offlineDb.cachedBeneficiaries.update(bene.id, { orientationStatus: "PRESENT" });
+
+      await queueOfflineTransaction("ORIENTATION", "CREATE", {
+        programId: bene.programId || selectedProgramId,
+        programBeneficiaryId: bene.id,
+        status: "PRESENT",
+      });
+
+      setScanResult({
+        alreadyRecorded: bene.orientationStatus === "PRESENT",
+        message: "✓ Orientation Attendance Stored to Installed Unit (Queued for Sync)",
+        data: {
+          designatedNumber: bene.designatedNumber,
+          fullName: bene.fullName,
+          barangay: normalizeBarangayName(bene.barangay),
+          tableNumber: bene.tableNumber || "Table 1",
           status: "PRESENT",
-        });
+          scannedAt: new Date().toISOString(),
+        },
+        isOffline: true,
+      });
 
-        setScanResult({
-          alreadyRecorded: false,
-          message: "Orientation Attendance Saved Offline (Queued for Sync)",
-          data: {
-            designatedNumber: bene.designatedNumber,
-            fullName: bene.fullName,
-            barangay: bene.barangay,
-            tableNumber: bene.tableNumber || "Table 1",
-            status: "PRESENT",
-            scannedAt: new Date().toISOString(),
-          },
-          isOffline: true,
-        });
+      if (selectedProgramId) {
+        fetchMonitoringData(selectedProgramId, true);
       }
     } catch (err: any) {
       setError(err.message);

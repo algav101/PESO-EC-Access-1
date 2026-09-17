@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
+import QRCode from "qrcode";
 import {
   QrCode,
   Search,
@@ -23,8 +24,11 @@ import {
   Compass,
   ArrowRight,
   Maximize2,
+  Navigation,
 } from "lucide-react";
 import { PesoLogo } from "@/components/layout/PesoLogo";
+import { offlineDb, extractCleanQrToken } from "@/lib/dexie";
+import { formatBeneficiaryQrPayload } from "@/lib/qr";
 
 const DINGALAN_BARANGAYS = [
   "ALL",
@@ -74,37 +78,95 @@ export function FieldQrPassGeneratorCard({
     setLoading(true);
     setError(null);
     try {
-      const params = new URLSearchParams();
-      if (query && query.trim()) params.set("query", query.trim());
-      if (brgy && brgy !== "ALL") params.set("barangay", brgy);
+      if (typeof navigator === "undefined" || navigator.onLine) {
+        const params = new URLSearchParams();
+        if (query && query.trim()) params.set("query", query.trim());
+        if (brgy && brgy !== "ALL") params.set("barangay", brgy);
 
-      const res = await fetch(`/api/v1/field/qr-pass?${params.toString()}`);
-      if (!res.ok) {
-        const errorJson = await res.json().catch(() => ({}));
-        setError(errorJson.error || "Nabigong kunin ang QR pass mula sa server.");
+        const res = await fetch(`/api/v1/field/qr-pass?${params.toString()}`);
+        if (res.ok) {
+          const json = await res.json();
+          if (json.success && Array.isArray(json.beneficiaries) && json.beneficiaries.length > 0) {
+            setBeneficiariesList(json.beneficiaries);
+            setSelectedBeneficiary(json.beneficiaries[0]);
+            setSelectedDay(1);
+            return;
+          }
+        }
+      }
+    } catch (err: any) {
+      console.warn("Online QR pass fetch failed, falling back to offline cache:", err);
+    }
+
+    // Offline QR Pass Fallback from IndexedDB
+    try {
+      let cached = await offlineDb.cachedBeneficiaries.toArray();
+      if (brgy && brgy !== "ALL") {
+        cached = cached.filter((b) => b.barangay?.toUpperCase() === brgy.toUpperCase());
+      }
+      if (query && query.trim()) {
+        const clean = extractCleanQrToken(query).toUpperCase();
+        cached = cached.filter(
+          (b) =>
+            b.designatedNumber === clean ||
+            (parseInt(clean, 10) > 0 && parseInt(b.designatedNumber, 10) === parseInt(clean, 10)) ||
+            b.fullName?.toUpperCase().includes(clean) ||
+            b.qrToken?.toUpperCase().includes(clean)
+        );
+      }
+
+      if (cached.length === 0) {
+        setError("Walang nahanap na benepisyaryo sa offline database cache.");
         setBeneficiariesList([]);
         setSelectedBeneficiary(null);
         return;
       }
 
-      const json = await res.json();
+      const origin = typeof window !== "undefined" ? window.location.origin : "";
+      const formatted = await Promise.all(
+        cached.map(async (b) => {
+          const qrPayload = b.qrToken
+            ? formatBeneficiaryQrPayload(b.qrToken, origin)
+            : `${origin}/my-assignment?token=${b.designatedNumber}`;
+          let qrDataUrl = "";
+          try {
+            qrDataUrl = await QRCode.toDataURL(qrPayload, {
+              width: 250,
+              margin: 1,
+              color: { dark: "#0c3b6d", light: "#ffffff" },
+              errorCorrectionLevel: "H",
+            });
+          } catch {}
 
-      if (json.success && Array.isArray(json.beneficiaries)) {
-        setBeneficiariesList(json.beneficiaries);
-        if (json.beneficiaries.length > 0) {
-          setSelectedBeneficiary(json.beneficiaries[0]);
-          setSelectedDay(1);
-        } else {
-          setSelectedBeneficiary(null);
-          setError("Walang nahanap na benepisyaryo sa ibinigay na Slot # o Pangalan.");
-        }
-      } else {
-        setError(json.error || "Nabigong hanapin ang QR pass.");
-        setBeneficiariesList([]);
-        setSelectedBeneficiary(null);
-      }
+          return {
+            id: b.id,
+            designatedNumber: b.designatedNumber,
+            tableNumber: b.tableNumber || "Table 1",
+            beneficiary: {
+              fullName: b.fullName,
+              barangay: b.barangay,
+              sitio: b.sitio || "Centro",
+              birthday: b.birthday,
+            },
+            qr: {
+              publicToken: b.qrToken || `TUPAD-DGL-OFFLINE-${b.designatedNumber}`,
+              qrDataUrl,
+              qrPayloadUrl: qrPayload,
+            },
+            currentAssignment: {
+              area: `Brgy. ${b.barangay || "Dingalan"} Work Area`,
+              specificActivity: "Community Clearing & Environmental Protection",
+              workDate: "Day 1",
+            },
+          };
+        })
+      );
+
+      setBeneficiariesList(formatted);
+      setSelectedBeneficiary(formatted[0]);
+      setSelectedDay(1);
     } catch (err: any) {
-      setError("Network error: " + err.message);
+      setError("Nabigong ikarga ang offline QR pass: " + err.message);
       setBeneficiariesList([]);
       setSelectedBeneficiary(null);
     } finally {

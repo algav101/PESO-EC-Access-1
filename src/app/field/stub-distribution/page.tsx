@@ -29,7 +29,7 @@ import {
 import { QrScannerModal } from "@/components/scanner/QrScannerModal";
 import { FieldQrPassGeneratorModal } from "@/components/field/FieldQrPassGeneratorCard";
 import { useOffline } from "@/context/OfflineContext";
-import { offlineDb, queueOfflineTransaction } from "@/lib/dexie";
+import { offlineDb, queueOfflineTransaction, findBeneficiaryOffline, extractCleanQrToken } from "@/lib/dexie";
 import { formatDate, normalizeBarangayName } from "@/lib/utils";
 
 export default function StubDistributionPage() {
@@ -80,32 +80,84 @@ function StubDistributionContent() {
 
   const fetchPrograms = async () => {
     try {
-      const res = await fetch("/api/v1/programs");
-      if (res.ok) {
-        const data = await res.json();
-        const progs = data.programs || [];
-        setPrograms(progs);
-        if (progs.length > 0 && !selectedProgramId) {
-          setSelectedProgramId(progs[0].id);
+      if (typeof navigator === "undefined" || navigator.onLine) {
+        const res = await fetch("/api/v1/programs");
+        if (res.ok) {
+          const data = await res.json();
+          const progs = data.programs || [];
+          if (progs.length > 0) {
+            setPrograms(progs);
+            if (!selectedProgramId) {
+              setSelectedProgramId(progs[0].id);
+            }
+            return;
+          }
         }
       }
     } catch (e) {
-      console.error(e);
+      console.warn("Failed to load online programs, falling back to offline storage:", e);
+    }
+
+    // Offline fallback from IndexedDB
+    try {
+      const cachedProgs = await offlineDb.cachedPrograms.toArray();
+      if (cachedProgs.length > 0) {
+        setPrograms(cachedProgs);
+        if (!selectedProgramId) {
+          setSelectedProgramId(cachedProgs[0].id);
+        }
+      }
+    } catch (err) {
+      console.error("Failed to load offline programs:", err);
     }
   };
 
   const fetchMonitoringData = async (progId: string) => {
     setMonitoringLoading(true);
     try {
-      const res = await fetch(`/api/v1/stub-distribution/monitoring?programId=${progId}`);
-      if (res.ok) {
-        const data = await res.json();
-        setMonitoringData(data);
+      if (typeof navigator === "undefined" || navigator.onLine) {
+        const res = await fetch(`/api/v1/stub-distribution/monitoring?programId=${progId}`);
+        if (res.ok) {
+          const data = await res.json();
+          setMonitoringData(data);
+          return;
+        }
       }
     } catch (e) {
-      console.error("Fetch monitoring error:", e);
+      console.warn("Online stub monitoring fetch failed, falling back to offline storage:", e);
     } finally {
       setMonitoringLoading(false);
+    }
+
+    // Offline stub monitoring fallback
+    try {
+      const cachedBeneficiaries = await offlineDb.cachedBeneficiaries
+        .where("programId")
+        .equals(progId)
+        .toArray();
+
+      if (cachedBeneficiaries.length > 0) {
+        setMonitoringData({
+          stats: {
+            totalBeneficiaries: cachedBeneficiaries.length,
+            distributedCount: cachedBeneficiaries.filter((b) => b.status === "ACTIVE").length,
+            pendingCount: 0,
+            distributionRate: 100,
+          },
+          beneficiaries: cachedBeneficiaries.map((b) => ({
+            id: b.id,
+            designatedNumber: b.designatedNumber,
+            fullName: b.fullName,
+            barangay: b.barangay,
+            sitio: b.sitio,
+            tableNumber: b.tableNumber,
+            status: "DISTRIBUTED",
+            qrToken: b.qrToken,
+          })),
+        });
+      }
+    } catch (err) {
+      console.error("Failed to build offline stub monitoring:", err);
     }
   };
 
@@ -118,33 +170,39 @@ function StubDistributionContent() {
 
     try {
       if (isOnline) {
-        const res = await fetch("/api/v1/stub-distribution/scan", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ qrToken: token }),
-        });
+        try {
+          const res = await fetch("/api/v1/stub-distribution/scan", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ qrToken: token }),
+          });
 
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.error || "Invalid QR Stub");
+          const data = await res.json();
+          if (!res.ok) throw new Error(data.error || "Invalid QR Stub");
 
-        setScannedData(data.data);
-      } else {
-        const bene = await offlineDb.cachedBeneficiaries.where("qrToken").equals(token).first();
-        if (!bene) throw new Error("QR Stub not found in offline database cache");
-
-        setScannedData({
-          qrId: "offline_qr",
-          programBeneficiaryId: bene.id,
-          designatedNumber: bene.designatedNumber,
-          fullName: bene.fullName,
-          barangay: bene.barangay,
-          sitio: bene.sitio,
-          tableNumber: bene.tableNumber,
-          programName: "Cached TUPAD Program",
-          isDistributed: false,
-          offlineExpectedPin: bene.birthdayPin,
-        });
+          setScannedData(data.data);
+          return;
+        } catch (onlineErr: any) {
+          console.warn("Online stub scan failed, switching to local offline engine:", onlineErr);
+        }
       }
+
+      // Offline mode check with universal token resolution
+      const bene = await findBeneficiaryOffline(token, selectedProgramId);
+      if (!bene) throw new Error(`QR Stub or Beneficiary "${token}" not found in offline database cache.`);
+
+      setScannedData({
+        qrId: bene.qrToken || "offline_qr",
+        programBeneficiaryId: bene.id,
+        designatedNumber: bene.designatedNumber,
+        fullName: bene.fullName,
+        barangay: normalizeBarangayName(bene.barangay),
+        sitio: bene.sitio,
+        tableNumber: bene.tableNumber,
+        programName: "Cached TUPAD Program",
+        isDistributed: false,
+        offlineExpectedPin: bene.birthdayPin,
+      });
     } catch (err: any) {
       setError(err.message);
     } finally {
