@@ -95,7 +95,21 @@ export async function parseBeneficiaryExcelBuffer(
   fileName: string,
   targetProgramId: string
 ): Promise<ImportPreviewResult> {
-  const workbook = XLSX.read(buffer, { type: "buffer", cellDates: true });
+  let workbook: XLSX.WorkBook;
+  try {
+    workbook = XLSX.read(buffer, { type: "buffer", cellDates: true, raw: false });
+  } catch (e: any) {
+    try {
+      workbook = XLSX.read(buffer.toString("utf-8"), { type: "string", cellDates: true });
+    } catch (e2: any) {
+      throw new Error(`Unable to read spreadsheet file: ${e.message}`);
+    }
+  }
+
+  if (!workbook || !workbook.SheetNames || workbook.SheetNames.length === 0) {
+    throw new Error("No worksheets found in uploaded file");
+  }
+
   const sheetName = workbook.SheetNames[0];
   const worksheet = workbook.Sheets[sheetName];
   const rawRows: any[] = XLSX.utils.sheet_to_json(worksheet, { header: 1, defval: "" });
@@ -115,8 +129,12 @@ export async function parseBeneficiaryExcelBuffer(
       rowStr.includes("no.") ||
       rowStr.includes("formula full name") ||
       rowStr.includes("name of beneficiary") ||
+      rowStr.includes("beneficiary name") ||
+      rowStr.includes("full name") ||
       rowStr.includes("birthdate") ||
-      rowStr.includes("address (beneficiary)")
+      rowStr.includes("birthday") ||
+      rowStr.includes("address") ||
+      rowStr.includes("barangay")
     ) {
       headerRowIndex = i;
       // Check if next row contains sub-headers like "first name", "montrh", "day", "brgy"
@@ -362,11 +380,34 @@ export async function parseBeneficiaryExcelBuffer(
         }
       } else {
         const strVal = String(val).trim();
-        const dateObj = new Date(strVal);
-        if (!isNaN(dateObj.getTime())) {
-          birthday = dateObj.toISOString().split("T")[0];
-          const [y, m, d] = birthday.split("-");
+        if (/^\d{4}-\d{1,2}-\d{1,2}$/.test(strVal)) {
+          const parts = strVal.split("-");
+          const y = parts[0];
+          const m = parts[1].padStart(2, "0");
+          const d = parts[2].padStart(2, "0");
+          birthday = `${y}-${m}-${d}`;
           birthdayPin = `${m}-${d}-${y}`;
+        } else if (/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(strVal)) {
+          const parts = strVal.split("/");
+          const m = parts[0].padStart(2, "0");
+          const d = parts[1].padStart(2, "0");
+          const y = parts[2];
+          birthday = `${y}-${m}-${d}`;
+          birthdayPin = `${m}-${d}-${y}`;
+        } else if (/^\d{1,2}-\d{1,2}-\d{4}$/.test(strVal)) {
+          const parts = strVal.split("-");
+          const m = parts[0].padStart(2, "0");
+          const d = parts[1].padStart(2, "0");
+          const y = parts[2];
+          birthday = `${y}-${m}-${d}`;
+          birthdayPin = `${m}-${d}-${y}`;
+        } else {
+          const dateObj = new Date(strVal);
+          if (!isNaN(dateObj.getTime())) {
+            birthday = dateObj.toISOString().split("T")[0];
+            const [y, m, d] = birthday.split("-");
+            birthdayPin = `${m}-${d}-${y}`;
+          }
         }
       }
     }

@@ -37,7 +37,13 @@ export default function ExcelImportPage() {
 
   const handleUploadPreview = async () => {
     if (!file) {
-      setError("Please select an Excel (.xlsx / .xls) spreadsheet.");
+      setError("Please select an Excel (.xlsx / .xls / .csv) spreadsheet.");
+      return;
+    }
+
+    const programId = Array.isArray(params?.id) ? params.id[0] : params?.id;
+    if (!programId) {
+      setError("Program ID is missing from URL. Please return to the program dashboard.");
       return;
     }
 
@@ -48,17 +54,28 @@ export default function ExcelImportPage() {
       const formData = new FormData();
       formData.append("file", file);
 
-      const res = await fetch(`/api/v1/programs/${params.id}/beneficiaries/import/preview`, {
+      const res = await fetch(`/api/v1/programs/${programId}/beneficiaries/import/preview`, {
         method: "POST",
         body: formData,
       });
 
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Failed to parse spreadsheet");
+      const responseText = await res.text();
+      let data: any = {};
+      try {
+        data = responseText ? JSON.parse(responseText) : {};
+      } catch (jsonErr) {
+        throw new Error(
+          `Server returned an invalid response (Status ${res.status}: ${res.statusText || "Error"}). Please ensure the file is a valid Excel spreadsheet (.xlsx / .xls / .csv).`
+        );
+      }
+
+      if (!res.ok) {
+        throw new Error(data.error || `Failed to parse spreadsheet (Status ${res.status})`);
+      }
 
       setPreview(data.preview);
     } catch (err: any) {
-      setError(err.message);
+      setError(err.message || "Failed to parse spreadsheet");
     } finally {
       setLoading(false);
     }
@@ -67,23 +84,38 @@ export default function ExcelImportPage() {
   const handleCommit = async () => {
     if (!preview || preview.validCount === 0) return;
 
+    const programId = Array.isArray(params?.id) ? params.id[0] : params?.id;
+    if (!programId) {
+      setError("Program ID is missing.");
+      return;
+    }
+
     setCommitting(true);
     setError(null);
 
     try {
-      const res = await fetch(`/api/v1/programs/${params.id}/beneficiaries/import/commit`, {
+      const res = await fetch(`/api/v1/programs/${programId}/beneficiaries/import/commit`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ rows: preview.rows }),
       });
 
-      const data = await res.json();
+      const responseText = await res.text();
+      let data: any = {};
+      try {
+        data = responseText ? JSON.parse(responseText) : {};
+      } catch (jsonErr) {
+        throw new Error(
+          `Server returned status ${res.status} (${res.statusText || "Error"}).`
+        );
+      }
+
       if (!res.ok) throw new Error(data.error || "Commit failed");
 
       alert(`Successfully imported ${data.importedCount} beneficiaries with QR tokens!`);
-      router.push(`/programs/${params.id}`);
+      router.push(`/programs/${programId}`);
     } catch (err: any) {
-      setError(err.message);
+      setError(err.message || "Failed to commit beneficiaries");
     } finally {
       setCommitting(false);
     }
