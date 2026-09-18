@@ -98,18 +98,42 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const getPresetPassword = (uname: string): string => {
+    if (uname === "admin") return "admin123";
+    if (uname === "coordinator") return "coord123";
+    if (uname === "documentor") return "doc123";
+    if (uname === "dole") return "dole123";
+    if (uname.includes("umiray")) return "UMIRAY123";
+    if (uname.includes("ibona")) return "IBONA123";
+    if (uname.includes("matawe")) return "MATAWE123";
+    if (uname.includes("bnb")) return "BUTAS NA BATO123";
+    if (uname.includes("aplaya")) return "APLAYA123";
+    if (uname.includes("poblacion")) return "POBLACION123";
+    if (uname.includes("davildavilan")) return "DAVILDAVILAN123";
+    if (uname.includes("caragsacan")) return "CARAGSACAN123";
+    if (uname.includes("tanawan")) return "TANAWAN123";
+    if (uname.includes("dika")) return "DIKAPANIKIAN123";
+    if (uname.includes("paltic")) return "PALTIC123";
+    if (uname.includes("dolefoaurora")) return "ALL BARANGAY123";
+    return "";
+  };
+
   // When role changes
   const handleRoleChange = (roleId: string) => {
     setSelectedRole(roleId);
     setSelectedAccountUsername("");
     if (!roleId) {
       setUsername("");
+      setPassword("");
       return;
     }
     const roleObj = PRESET_ROLES.find((r) => r.id === roleId);
     if (roleObj && roleObj.accounts.length === 1) {
-      setSelectedAccountUsername(roleObj.accounts[0].username);
-      setUsername(roleObj.accounts[0].username);
+      const uname = roleObj.accounts[0].username;
+      setSelectedAccountUsername(uname);
+      setUsername(uname);
+      const defPass = getPresetPassword(uname);
+      if (defPass) setPassword(defPass);
     }
   };
 
@@ -117,6 +141,8 @@ export default function LoginPage() {
   const handleAccountSelect = (uname: string) => {
     setSelectedAccountUsername(uname);
     setUsername(uname);
+    const defPass = getPresetPassword(uname);
+    if (defPass) setPassword(defPass);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -142,13 +168,17 @@ export default function LoginPage() {
       }
 
       login(data.user);
-      router.push(
+      const targetUrl =
         data.user?.role === "TUPAD_COORDINATOR" || data.user?.role === "TUPAD_ASSISTING_DOCUMENTOR"
           ? "/field"
-          : "/dashboard"
-      );
+          : "/dashboard";
+      window.location.href = targetUrl;
     } catch (err: any) {
-      setError(err.message);
+      if (err.message === "Failed to fetch" || err.name === "TypeError") {
+        setError("Network connection failed. Please ensure the local server is running and refresh the page.");
+      } else {
+        setError(err.message || "Login failed");
+      }
     } finally {
       setLoading(false);
     }
