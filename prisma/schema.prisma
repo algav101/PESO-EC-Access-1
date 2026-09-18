@@ -130,6 +130,10 @@ model Beneficiary {
   dependents           Dependent[]
   documents            BeneficiaryDocument[]
   restrictions         BeneficiaryRestriction[]
+
+  @@index([status])
+  @@index([barangay])
+  @@index([fullName])
 }
 
 model ProgramBeneficiary {
@@ -154,6 +158,9 @@ model ProgramBeneficiary {
   payouts              Payout[]
 
   @@index([programId, designatedNumber])
+  @@index([programId, participationStatus])
+  @@index([beneficiaryId])
+  @@index([participationStatus])
 }
 
 model Dependent {
@@ -264,6 +271,10 @@ model StubDistribution {
   latitude             Float?
   longitude            Float?
   deviceId             String?
+
+  @@index([programBeneficiaryId, status])
+  @@index([status])
+  @@index([distributedAt])
 }
 
 model OrientationAttendance {
@@ -280,6 +291,8 @@ model OrientationAttendance {
   syncStatus           String             @default("SYNCED")
 
   @@unique([programId, programBeneficiaryId])
+  @@index([programId, status])
+  @@index([programBeneficiaryId])
 }
 
 model BeneficiaryReplacement {
@@ -343,6 +356,9 @@ model AttendanceRecord {
   updatedAt            DateTime           @updatedAt
 
   @@unique([programId, workDayId, programBeneficiaryId])
+  @@index([programId, attendanceDate])
+  @@index([attendanceDate, status])
+  @@index([programBeneficiaryId])
 }
 
 model AccomplishmentPhoto {
@@ -372,6 +388,10 @@ model AccomplishmentPhoto {
   approvedBy        User?                 @relation("PhotoApprover", fields: [approvedById], references: [id])
   approvedAt        DateTime?
   rejectionReason   String?
+
+  @@index([programId, status])
+  @@index([uploadedAt])
+  @@index([barangay])
 }
 
 model PhotoConfiguration {
@@ -404,6 +424,8 @@ model Payout {
   createdAt            DateTime           @default(now())
 
   @@unique([programId, programBeneficiaryId])
+  @@index([programId, status])
+  @@index([status])
 }
 
 model BeneficiaryRestriction {
@@ -426,6 +448,11 @@ model BeneficiaryRestriction {
   reason           String       @default("320-day TUPAD payout restriction")
   status           String       @default("ACTIVE") // ACTIVE, OVERRIDDEN, EXPIRED
   createdAt        DateTime     @default(now())
+
+  @@index([status])
+  @@index([beneficiaryId])
+  @@index([payoutDate])
+  @@index([createdAt])
 }
 
 model AuditLog {
@@ -441,6 +468,9 @@ model AuditLog {
   ipAddress  String?
   deviceId   String?
   createdAt  DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([userId])
 }
 
 model SystemSetting {

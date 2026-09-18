@@ -26,6 +26,134 @@ import {
 
 export const dynamic = "force-dynamic";
 
+interface DashboardData {
+  totalBeneficiariesCount: number;
+  stubsConfirmedCount: number;
+  flaggedReplacementCount: number;
+  pendingUninformedCount: number;
+  orientationPresentCount: number;
+  activeProgramsCount: number;
+  todayAttendanceCount: number;
+  payoutPaidCount: number;
+  restrictedCount: number;
+  recentPrograms: any[];
+  recentAudits: any[];
+}
+
+let cachedDashboardData: DashboardData | null = null;
+let lastCacheTime = 0;
+const CACHE_TTL_MS = 15000; // 15 seconds cache
+
+async function getDashboardMetrics(isPesoAdmin: boolean): Promise<DashboardData> {
+  const now = Date.now();
+  if (cachedDashboardData && now - lastCacheTime < CACHE_TTL_MS) {
+    return cachedDashboardData;
+  }
+
+  const todayStr = format(new Date(), "yyyy-MM-dd");
+
+  const [
+    totalBeneficiariesCount,
+    stubsConfirmedCount,
+    flaggedReplacementCount,
+    orientationPresentCount,
+    activeProgramsCount,
+    todayAttendanceCount,
+    payoutPaidCount,
+    restrictedCount,
+    recentPrograms,
+    recentAudits,
+  ] = await Promise.all([
+    // Active Program Beneficiaries
+    prisma.programBeneficiary.count({
+      where: { participationStatus: { not: "REPLACED" } },
+    }),
+    // Stubs Confirmed (Distributed)
+    prisma.stubDistribution.count({
+      where: {
+        status: "DISTRIBUTED",
+        programBeneficiary: { participationStatus: { not: "REPLACED" } },
+      },
+    }),
+    // Flagged for Replacement
+    prisma.programBeneficiary.count({
+      where: { participationStatus: "FLAGGED_FOR_REPLACEMENT" },
+    }),
+    // Orientation Present
+    prisma.orientationAttendance.count({
+      where: {
+        status: "PRESENT",
+        programBeneficiary: { participationStatus: { not: "REPLACED" } },
+      },
+    }),
+    // Active Programs Count
+    prisma.program.count({ where: { status: "ACTIVE" } }),
+    // Today's Attendance
+    prisma.attendanceRecord.count({
+      where: {
+        attendanceDate: todayStr,
+        programBeneficiary: { participationStatus: { not: "REPLACED" } },
+      },
+    }),
+    // Payout Completed
+    prisma.payout.count({
+      where: {
+        status: "PAID",
+        programBeneficiary: { participationStatus: { not: "REPLACED" } },
+      },
+    }),
+    // 365-Day Restricted Count
+    prisma.beneficiaryRestriction.count({ where: { status: "ACTIVE" } }),
+    // Recent Programs
+    prisma.program.findMany({
+      orderBy: { createdAt: "desc" },
+      take: 4,
+      include: {
+        _count: {
+          select: {
+            programBeneficiaries: { where: { participationStatus: { not: "REPLACED" } } },
+            attendanceRecords: { where: { programBeneficiary: { participationStatus: { not: "REPLACED" } } } },
+            payouts: { where: { programBeneficiary: { participationStatus: { not: "REPLACED" } } } },
+          },
+        },
+      },
+    }),
+    // Recent Audits
+    isPesoAdmin
+      ? prisma.auditLog.findMany({
+          orderBy: { createdAt: "desc" },
+          take: 5,
+          include: {
+            user: { select: { fullName: true } },
+          },
+        })
+      : Promise.resolve([]),
+  ]);
+
+  const pendingUninformedCount = Math.max(
+    0,
+    totalBeneficiariesCount - (stubsConfirmedCount + flaggedReplacementCount)
+  );
+
+  const data: DashboardData = {
+    totalBeneficiariesCount,
+    stubsConfirmedCount,
+    flaggedReplacementCount,
+    pendingUninformedCount,
+    orientationPresentCount,
+    activeProgramsCount,
+    todayAttendanceCount,
+    payoutPaidCount,
+    restrictedCount,
+    recentPrograms,
+    recentAudits,
+  };
+
+  cachedDashboardData = data;
+  lastCacheTime = now;
+  return data;
+}
+
 export default async function DashboardPage() {
   const user = await getCurrentUser();
   if (user?.role === "TUPAD_COORDINATOR" || user?.role === "TUPAD_ASSISTING_DOCUMENTOR") {
@@ -33,103 +161,19 @@ export default async function DashboardPage() {
   }
 
   const isPesoAdmin = isAdminUser(user);
-
-  // Fetch all active, non-replaced program beneficiaries for exact arithmetic reconciliation
-  const activeProgramBeneficiaries = await prisma.programBeneficiary.findMany({
-    where: {
-      participationStatus: { not: "REPLACED" },
-    },
-    include: {
-      stubDistributions: {
-        orderBy: { distributedAt: "desc" },
-      },
-      orientationAttendance: {
-        where: { status: "PRESENT" },
-      },
-    },
-  });
-
-  const totalBeneficiariesCount = activeProgramBeneficiaries.length;
-
-  let stubsConfirmedCount = 0;
-  let flaggedReplacementCount = 0;
-
-  for (const pb of activeProgramBeneficiaries) {
-    const isFlagged =
-      pb.participationStatus === "FLAGGED_FOR_REPLACEMENT" ||
-      pb.stubDistributions?.some((d: any) => d.status === "FLAGGED_REPLACEMENT");
-    const isDist = Boolean(pb.stubDistributions?.some((d: any) => d.status === "DISTRIBUTED"));
-
-    if (isFlagged) {
-      flaggedReplacementCount++;
-    } else if (isDist) {
-      stubsConfirmedCount++;
-    }
-  }
-
-  // Exact Arithmetic: Pending (Uninformed) = Target - (Confirmed + Flagged for Replacement)
-  const pendingUninformedCount = Math.max(
-    0,
-    totalBeneficiariesCount - (stubsConfirmedCount + flaggedReplacementCount)
-  );
-
-  const orientationPresentCount = activeProgramBeneficiaries.filter(
-    (pb) => pb.orientationAttendance && pb.orientationAttendance.length > 0
-  ).length;
-
-  const [
+  const {
+    totalBeneficiariesCount,
+    stubsConfirmedCount,
+    flaggedReplacementCount,
+    pendingUninformedCount,
+    orientationPresentCount,
     activeProgramsCount,
-    qrGeneratedCount,
     todayAttendanceCount,
     payoutPaidCount,
     restrictedCount,
-  ] = await Promise.all([
-    prisma.program.count({ where: { status: "ACTIVE" } }),
-    prisma.qrCode.count({
-      where: {
-        status: "ACTIVE",
-        programBeneficiary: { participationStatus: { not: "REPLACED" } },
-      },
-    }),
-    prisma.attendanceRecord.count({
-      where: {
-        attendanceDate: format(new Date(), "yyyy-MM-dd"),
-        programBeneficiary: { participationStatus: { not: "REPLACED" } },
-      },
-    }),
-    prisma.payout.count({
-      where: {
-        status: "PAID",
-        programBeneficiary: { participationStatus: { not: "REPLACED" } },
-      },
-    }),
-    prisma.beneficiaryRestriction.count({ where: { status: "ACTIVE" } }),
-  ]);
-
-  const recentPrograms = await prisma.program.findMany({
-    orderBy: { createdAt: "desc" },
-    take: 4,
-    include: {
-      _count: {
-        select: {
-          programBeneficiaries: { where: { participationStatus: { not: "REPLACED" } } },
-          attendanceRecords: { where: { programBeneficiary: { participationStatus: { not: "REPLACED" } } } },
-          payouts: { where: { programBeneficiary: { participationStatus: { not: "REPLACED" } } } },
-        },
-      },
-    },
-  });
-
-  // Strict: Only fetch audit records if the user is a PESO Admin
-  const recentAudits = isPesoAdmin
-    ? await prisma.auditLog.findMany({
-        orderBy: { createdAt: "desc" },
-        take: 5,
-        include: {
-          user: { select: { fullName: true } },
-        },
-      })
-    : [];
+    recentPrograms,
+    recentAudits,
+  } = await getDashboardMetrics(isPesoAdmin);
 
   const metricCards = [
     {
