@@ -9,6 +9,7 @@ async function main() {
   // Password hashes
   const adminPass = await bcrypt.hash('admin123', 10);
   const coordPass = await bcrypt.hash('coord123', 10);
+  const docPass = await bcrypt.hash('doc123', 10);
   const dolePass = await bcrypt.hash('dole123', 10);
 
   // Users
@@ -16,6 +17,8 @@ async function main() {
     where: { username: 'admin' },
     update: {
       role: 'DOMAIN_MASTER',
+      passwordHash: adminPass,
+      status: 'ACTIVE',
     },
     create: {
       username: 'admin',
@@ -27,8 +30,13 @@ async function main() {
     },
   });
 
-  // Dingalan 11-Barangay Coordinators & DOLE Roster
+  // Dingalan 11-Barangay Coordinators, Assisting Documentors & DOLE Roster
   const coordinatorRoster = [
+    { fullName: 'General Field Coordinator', username: 'coordinator', role: 'TUPAD_COORDINATOR', brgy: null, pass: 'coord123' },
+    { fullName: 'Dingalan TUPAD Assisting Documentor', username: 'documentor', role: 'TUPAD_ASSISTING_DOCUMENTOR', brgy: null, pass: 'doc123' },
+    { fullName: 'MARIA (Brgy. Paltic Documentor)', username: 'peso_paltic_doc', role: 'TUPAD_ASSISTING_DOCUMENTOR', brgy: 'Paltic', pass: 'PALTIC123' },
+    { fullName: 'JUAN (Brgy. Umiray Documentor)', username: 'peso_umiray_doc', role: 'TUPAD_ASSISTING_DOCUMENTOR', brgy: 'Umiray', pass: 'UMIRAY123' },
+    { fullName: 'LIZA (Brgy. Aplaya Documentor)', username: 'peso_aplaya_doc', role: 'TUPAD_ASSISTING_DOCUMENTOR', brgy: 'Aplaya', pass: 'APLAYA123' },
     { fullName: 'NEDDIE', username: 'peso_umiray1', role: 'TUPAD_COORDINATOR', brgy: 'Umiray', pass: 'UMIRAY123' },
     { fullName: 'SHIELA', username: 'peso_umiray2', role: 'TUPAD_COORDINATOR', brgy: 'Umiray', pass: 'UMIRAY123' },
     { fullName: 'MARIAN', username: 'peso_umiray3', role: 'TUPAD_COORDINATOR', brgy: 'Umiray', pass: 'UMIRAY123' },
@@ -49,6 +57,7 @@ async function main() {
     { fullName: 'JESSICA', username: 'peso_tanawan2', role: 'TUPAD_COORDINATOR', brgy: 'Tanawan', pass: 'TANAWAN123' },
     { fullName: 'TERE C.', username: 'peso_dika', role: 'TUPAD_COORDINATOR', brgy: 'Dikapanikian', pass: 'DIKAPANIKIAN123' },
     { fullName: 'RAMONITA', username: 'peso_paltic', role: 'TUPAD_COORDINATOR', brgy: 'Paltic', pass: 'PALTIC123' },
+    { fullName: 'General DOLE Officer', username: 'dole', role: 'DOLE_COORDINATOR', brgy: null, pass: 'dole123' },
     { fullName: 'MARK', username: 'dolefoaurora_1', role: 'DOLE_COORDINATOR', brgy: null, pass: 'ALL BARANGAY123' },
     { fullName: 'ANGELO', username: 'dolefoaurora_2', role: 'DOLE_COORDINATOR', brgy: null, pass: 'ALL BARANGAY123' },
   ];
