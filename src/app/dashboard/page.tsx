@@ -28,7 +28,7 @@ export const dynamic = "force-dynamic";
 
 export default async function DashboardPage() {
   const user = await getCurrentUser();
-  if (user?.role === "TUPAD_COORDINATOR") {
+  if (user?.role === "TUPAD_COORDINATOR" || user?.role === "TUPAD_ASSISTING_DOCUMENTOR") {
     redirect("/field");
   }
 

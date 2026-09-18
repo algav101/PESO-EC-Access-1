@@ -14,7 +14,7 @@ model User {
   passwordHash  String
   fullName      String
   email         String?
-  role          String    @default("PESO_ADMIN") // PESO_ADMIN, TUPAD_COORDINATOR, DOLE_COORDINATOR
+  role          String    @default("PESO_ADMIN") // PESO_ADMIN, TUPAD_COORDINATOR, TUPAD_ASSISTING_DOCUMENTOR, DOLE_COORDINATOR, DOMAIN_MASTER, PESO_STAFF
   status        String    @default("ACTIVE")
   assignedBarangay String? // Assigned Barangay for TUPAD_COORDINATOR (e.g. Paltic, Aplaya)
   lastLoginAt   DateTime?

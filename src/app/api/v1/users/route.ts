@@ -64,7 +64,10 @@ export async function POST(request: Request) {
         email: email?.trim() || null,
         role,
         status: "ACTIVE",
-        assignedBarangay: role === "TUPAD_COORDINATOR" ? assignedBarangay?.trim() || null : null,
+        assignedBarangay:
+          role === "TUPAD_COORDINATOR" || role === "TUPAD_ASSISTING_DOCUMENTOR"
+            ? assignedBarangay?.trim() || null
+            : null,
       },
       select: {
         id: true,
@@ -122,7 +125,11 @@ export async function PATCH(request: Request) {
     if (role !== undefined) updateData.role = role;
     if (status !== undefined) updateData.status = status;
     if (assignedBarangay !== undefined) {
-      updateData.assignedBarangay = (role || existing.role) === "TUPAD_COORDINATOR" ? (assignedBarangay?.trim() || null) : null;
+      const activeRole = role || existing.role;
+      updateData.assignedBarangay =
+        activeRole === "TUPAD_COORDINATOR" || activeRole === "TUPAD_ASSISTING_DOCUMENTOR"
+          ? assignedBarangay?.trim() || null
+          : null;
     }
     if (password && password.trim().length > 0) {
       updateData.passwordHash = await bcrypt.hash(password.trim(), 10);

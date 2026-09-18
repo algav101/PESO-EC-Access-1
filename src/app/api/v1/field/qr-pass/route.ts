@@ -106,8 +106,8 @@ async function handleQrPassSearch(params: {
     participationStatus: { in: ["ACTIVE", "ENROLLED"] },
   };
 
-  // Enforce coordinator isolation if applicable
-  if (user?.role === "TUPAD_COORDINATOR" && user.assignedBarangay) {
+  // Enforce coordinator / assisting documentor isolation if applicable
+  if ((user?.role === "TUPAD_COORDINATOR" || user?.role === "TUPAD_ASSISTING_DOCUMENTOR") && user.assignedBarangay) {
     whereClause.beneficiary = { barangay: user.assignedBarangay };
   } else if (params.barangay && params.barangay !== "ALL") {
     whereClause.beneficiary = { barangay: { contains: params.barangay, mode: "insensitive" } };

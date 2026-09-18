@@ -17,8 +17,8 @@ export async function GET(request: Request) {
     const whereClause: any = {};
     if (programId) whereClause.programId = programId;
 
-    // Enforce coordinator barangay scope
-    if (user.role === "TUPAD_COORDINATOR" && user.assignedBarangay) {
+    // Enforce coordinator / assisting documentor barangay scope
+    if ((user.role === "TUPAD_COORDINATOR" || user.role === "TUPAD_ASSISTING_DOCUMENTOR") && user.assignedBarangay) {
       whereClause.barangay = user.assignedBarangay;
     } else if (barangay && barangay !== "ALL") {
       whereClause.barangay = barangay;
@@ -74,7 +74,9 @@ export async function POST(request: Request) {
     } = body;
 
     const actualBarangay =
-      user.role === "TUPAD_COORDINATOR" && user.assignedBarangay ? user.assignedBarangay : barangay;
+      (user.role === "TUPAD_COORDINATOR" || user.role === "TUPAD_ASSISTING_DOCUMENTOR") && user.assignedBarangay
+        ? user.assignedBarangay
+        : barangay;
 
     if (!programId || !actualBarangay) {
       return NextResponse.json({ error: "Program and Barangay are required" }, { status: 400 });

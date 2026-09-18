@@ -19,6 +19,8 @@ import {
   Crown,
   ShieldAlert,
   ShieldCheck,
+  Camera,
+  Clock,
 } from "lucide-react";
 import { StatusBadge } from "@/components/common/StatusBadge";
 import { formatDate } from "@/lib/utils";
@@ -58,6 +60,7 @@ MARICEL,PESO TANAWAN1,TUPAD COORDINATOR,TANAWAN,TANAWAN123,
 JESSICA,PESO TANAWAN2,TUPAD COORDINATOR,TANAWAN,TANAWAN123,
 TERE C.,PESO DIKA,TUPAD COORDINATOR,DIKAPANIKIAN,DIKAPANIKIAN123,
 RAMONITA,PESO PALTIC,TUPAD COORDINATOR,PALTIC,PALTIC123,
+MARIA DOC,PESO PALTIC_DOC,TUPAD ASSISTING DOCUMENTOR,PALTIC,PALTIC123,
 MARK,DOLEFOAURORA_1,DOLE COORDINATOR,ALL BARANGAY,ALL BARANGAY123,
 ANGELO,DOLEFOAURORA_2,DOLE COORDINATOR,ALL BARANGAY,ALL BARANGAY123,`;
 
@@ -121,7 +124,8 @@ export default function UserManagementPage() {
           fullName,
           email,
           role,
-          assignedBarangay: role === "TUPAD_COORDINATOR" ? assignedBarangay : null,
+          assignedBarangay:
+            role === "TUPAD_COORDINATOR" || role === "TUPAD_ASSISTING_DOCUMENTOR" ? assignedBarangay : null,
         }),
       });
 
@@ -163,7 +167,8 @@ export default function UserManagementPage() {
         email: editEmail,
         role: editRole,
         status: editStatus,
-        assignedBarangay: editRole === "TUPAD_COORDINATOR" ? editBarangay : null,
+        assignedBarangay:
+          editRole === "TUPAD_COORDINATOR" || editRole === "TUPAD_ASSISTING_DOCUMENTOR" ? editBarangay : null,
       };
       if (editPassword.trim()) {
         payload.password = editPassword.trim();
@@ -350,6 +355,11 @@ export default function UserManagementPage() {
                         <ShieldCheck className="w-3 h-3 text-emerald-600" />
                         <span>PESO Operations Staff</span>
                       </span>
+                    ) : u.role === "TUPAD_ASSISTING_DOCUMENTOR" ? (
+                      <span className="inline-flex items-center space-x-1 px-2.5 py-0.5 bg-teal-50 text-teal-800 border border-teal-300 rounded-full font-black text-[11px] shadow-xs">
+                        <Camera className="w-3 h-3 text-teal-600" />
+                        <span>Tupad Assisting Documentor</span>
+                      </span>
                     ) : (
                       <span className="text-slate-700 font-medium">
                         {(u.role || "").replace(/_/g, " ")}
@@ -357,7 +367,7 @@ export default function UserManagementPage() {
                     )}
                   </td>
                   <td className="px-4 py-3">
-                    {u.role === "TUPAD_COORDINATOR" ? (
+                    {u.role === "TUPAD_COORDINATOR" || u.role === "TUPAD_ASSISTING_DOCUMENTOR" ? (
                       <span className="inline-flex items-center space-x-1 px-2.5 py-1 bg-amber-50 text-amber-900 border border-amber-200 rounded-lg font-bold text-[11px]">
                         <MapPin className="w-3 h-3 text-amber-600" />
                         <span>Brgy. {u.assignedBarangay || "All (Floating)"}</span>
@@ -604,6 +614,7 @@ export default function UserManagementPage() {
                 className="w-full px-3 py-2 text-xs border rounded-lg bg-slate-50 font-bold"
               >
                 <option value="TUPAD_COORDINATOR">TUPAD Field Coordinator (Barangay-Scoped)</option>
+                <option value="TUPAD_ASSISTING_DOCUMENTOR">Tupad Assisting Documentor (Photo & DTR Scanning Only)</option>
                 <option value="PESO_STAFF">PESO Operations Staff (Operational Access - No Bulk Import)</option>
                 <option value="PESO_ADMIN">PESO Admin (Full Operations Access)</option>
                 <option value="DOMAIN_MASTER">👑 Domain Master (Super Admin Access)</option>
@@ -611,15 +622,15 @@ export default function UserManagementPage() {
               </select>
             </div>
 
-            {/* Barangay Assignment (Only for TUPAD Coordinators) */}
-            {role === "TUPAD_COORDINATOR" && (
+            {/* Barangay Assignment (For TUPAD Coordinators and Assisting Documentors) */}
+            {(role === "TUPAD_COORDINATOR" || role === "TUPAD_ASSISTING_DOCUMENTOR") && (
               <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl space-y-1.5 animate-fadeIn">
                 <label className="block text-xs font-bold text-amber-950 uppercase flex items-center space-x-1">
                   <MapPin className="w-3.5 h-3.5 text-amber-600" />
                   <span>Assigned Barangay *</span>
                 </label>
                 <p className="text-[11px] text-amber-800 leading-tight">
-                  Coordinator will only be allowed to view Work Programs and Beneficiaries for this specific Barangay.
+                  User will only be allowed to view Work Programs, Beneficiaries, and Upload Photos for this specific Barangay.
                 </p>
                 <select
                   value={assignedBarangay}
@@ -693,6 +704,7 @@ export default function UserManagementPage() {
                   className="w-full px-3 py-2 text-xs border rounded-lg bg-slate-50 font-bold"
                 >
                   <option value="TUPAD_COORDINATOR">TUPAD Coordinator</option>
+                  <option value="TUPAD_ASSISTING_DOCUMENTOR">Tupad Assisting Documentor</option>
                   <option value="PESO_STAFF">PESO Operations Staff</option>
                   <option value="PESO_ADMIN">PESO Admin</option>
                   <option value="DOMAIN_MASTER">👑 Domain Master</option>
@@ -713,8 +725,8 @@ export default function UserManagementPage() {
               </div>
             </div>
 
-            {/* Barangay Assignment for Coordinator */}
-            {editRole === "TUPAD_COORDINATOR" && (
+            {/* Barangay Assignment for Coordinator / Assisting Documentor */}
+            {(editRole === "TUPAD_COORDINATOR" || editRole === "TUPAD_ASSISTING_DOCUMENTOR") && (
               <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl space-y-1.5">
                 <label className="block text-xs font-bold text-amber-950 uppercase flex items-center space-x-1">
                   <MapPin className="w-3.5 h-3.5 text-amber-600" />

@@ -26,6 +26,15 @@ function normalizeRole(rawRole?: string): string {
   if (r.includes("DOLE")) return "DOLE_COORDINATOR";
   if (r.includes("STAFF") || r.includes("OPERATIONS") || r.includes("PESO_STAFF")) return "PESO_STAFF";
   if (r.includes("ADMIN") || r.includes("PESO_ADMIN")) return "PESO_ADMIN";
+  if (
+    r.includes("DOC") ||
+    r.includes("ASSIST") ||
+    r.includes("PHOTO") ||
+    r.includes("DTR") ||
+    r.includes("ASSISTING")
+  ) {
+    return "TUPAD_ASSISTING_DOCUMENTOR";
+  }
   return "TUPAD_COORDINATOR";
 }
 
@@ -96,7 +105,10 @@ function parseCSVLines(csvContent: string): any[] {
     }
 
     const role = normalizeRole(rawRole);
-    const assignedBarangay = role === "TUPAD_COORDINATOR" ? normalizeBarangay(rawScope) : null;
+    const assignedBarangay =
+      role === "TUPAD_COORDINATOR" || role === "TUPAD_ASSISTING_DOCUMENTOR"
+        ? normalizeBarangay(rawScope)
+        : null;
 
     parsedUsers.push({
       fullName,

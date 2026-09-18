@@ -1,4 +1,4 @@
-export type UserRole = "DOMAIN_MASTER" | "PESO_ADMIN" | "PESO_STAFF" | "TUPAD_COORDINATOR" | "DOLE_COORDINATOR";
+export type UserRole = "DOMAIN_MASTER" | "PESO_ADMIN" | "PESO_STAFF" | "TUPAD_COORDINATOR" | "TUPAD_ASSISTING_DOCUMENTOR" | "DOLE_COORDINATOR";
 
 export interface AuthUser {
   id: string;
@@ -83,8 +83,17 @@ export const PERMISSIONS = {
     "orientation.scan",
     "attendance.scan",
     "photo.upload",
+    "photo.read",
     "payout.scan",
     "eligibility.check",
+    "sync.read"
+  ],
+  TUPAD_ASSISTING_DOCUMENTOR: [
+    "field.scan",
+    "qr.read", "qr.scan",
+    "attendance.scan",
+    "photo.upload",
+    "photo.read",
     "sync.read"
   ],
   DOLE_COORDINATOR: [
@@ -114,7 +123,11 @@ export function isAdminUser(user?: { role?: string } | null): boolean {
 }
 
 export function isFieldCoordinator(user?: { role?: string } | null): boolean {
-  return user?.role === "TUPAD_COORDINATOR";
+  return user?.role === "TUPAD_COORDINATOR" || user?.role === "TUPAD_ASSISTING_DOCUMENTOR";
+}
+
+export function isAssistingDocumentor(user?: { role?: string } | null): boolean {
+  return user?.role === "TUPAD_ASSISTING_DOCUMENTOR";
 }
 
 export function hasPermission(role: string, permission: string): boolean {

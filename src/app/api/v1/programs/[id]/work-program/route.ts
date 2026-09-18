@@ -17,7 +17,7 @@ export async function GET(request: Request, { params }: { params: { id: string }
     const dayNumber = searchParams.get("dayNumber");
 
     const whereClause: any = { programId: params.id };
-    if (user.role === "TUPAD_COORDINATOR" && user.assignedBarangay) {
+    if ((user.role === "TUPAD_COORDINATOR" || user.role === "TUPAD_ASSISTING_DOCUMENTOR") && user.assignedBarangay) {
       whereClause.barangay = { contains: user.assignedBarangay };
     } else if (barangay) {
       whereClause.barangay = { contains: barangay };

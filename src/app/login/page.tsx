@@ -65,6 +65,17 @@ const PRESET_ROLES: { id: string; label: string; description: string; accounts: 
     ],
   },
   {
+    id: "TUPAD_ASSISTING_DOCUMENTOR",
+    label: "📸 Tupad Assisting Documentor",
+    description: "Field role limited exclusively to Daily Accomplishment Photos and DTR (Attendance) scanning",
+    accounts: [
+      { label: "General Assisting Documentor", name: "Tupad Documentor", username: "documentor", role: "Tupad Assisting Documentor", barangay: "All Barangays" },
+      { label: "MARIA (Brgy. Paltic Documentor)", name: "Maria Documentor", username: "peso_paltic_doc", role: "Tupad Assisting Documentor", barangay: "Paltic" },
+      { label: "JUAN (Brgy. Umiray Documentor)", name: "Juan Documentor", username: "peso_umiray_doc", role: "Tupad Assisting Documentor", barangay: "Umiray" },
+      { label: "LIZA (Brgy. Aplaya Documentor)", name: "Liza Documentor", username: "peso_aplaya_doc", role: "Tupad Assisting Documentor", barangay: "Aplaya" },
+    ],
+  },
+  {
     id: "DOLE_COORDINATOR",
     label: "DOLE Regional Coordinator",
     description: "Auditing, compliance monitoring, and regional report inspection",
@@ -131,7 +142,11 @@ export default function LoginPage() {
       }
 
       login(data.user);
-      router.push(data.user?.role === "TUPAD_COORDINATOR" ? "/field" : "/dashboard");
+      router.push(
+        data.user?.role === "TUPAD_COORDINATOR" || data.user?.role === "TUPAD_ASSISTING_DOCUMENTOR"
+          ? "/field"
+          : "/dashboard"
+      );
     } catch (err: any) {
       setError(err.message);
     } finally {

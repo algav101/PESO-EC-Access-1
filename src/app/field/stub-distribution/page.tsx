@@ -27,7 +27,7 @@ import {
   ArrowRight,
 } from "lucide-react";
 import { QrScannerModal } from "@/components/scanner/QrScannerModal";
-import { FieldQrPassGeneratorModal } from "@/components/field/FieldQrPassGeneratorCard";
+import { useAuth } from "@/context/AuthContext";
 import { useOffline } from "@/context/OfflineContext";
 import { offlineDb, queueOfflineTransaction, findBeneficiaryOffline, extractCleanQrToken } from "@/lib/dexie";
 import { formatDate, normalizeBarangayName } from "@/lib/utils";
@@ -43,6 +43,7 @@ export default function StubDistributionPage() {
 function StubDistributionContent() {
   const searchParams = useSearchParams();
   const initialTab = searchParams.get("tab") === "monitoring" ? "monitoring" : "scanner";
+  const { user, can } = useAuth();
   const { isOnline } = useOffline();
 
   const [activeTab, setActiveTab] = useState<"scanner" | "monitoring">(initialTab);
@@ -382,6 +383,36 @@ function StubDistributionContent() {
 
     return matchesSearch && matchesStatus && matchesBarangay;
   });
+
+  if (user && !can("stub.distribution.scan")) {
+    return (
+      <div className="max-w-md mx-auto my-12 gov-card p-6 text-center space-y-4 border-t-4 border-t-amber-500 shadow-xl bg-white">
+        <div className="w-16 h-16 rounded-full bg-amber-100 text-amber-700 flex items-center justify-center mx-auto">
+          <ShieldCheck className="w-8 h-8" />
+        </div>
+        <div className="space-y-1">
+          <h2 className="text-base font-black text-slate-900">Access Restricted</h2>
+          <p className="text-xs text-slate-500">
+            Ang iyong user role ({(user.role || "").replace(/_/g, " ")}) ay para lamang sa <strong>Daily Accomplishment Photo</strong> at <strong>DTR Attendance Scanning</strong>. Ang Stub Distribution ay para sa authorized TUPAD Coordinators at PESO Officers lamang.
+          </p>
+        </div>
+        <div className="pt-2 flex flex-col gap-2">
+          <Link
+            href="/field/attendance"
+            className="w-full py-2.5 bg-gov-blue hover:bg-gov-light text-white font-bold text-xs rounded-xl shadow transition"
+          >
+            Pumunta sa Daily Attendance (DTR) Scanner
+          </Link>
+          <Link
+            href="/field/photos"
+            className="w-full py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl transition"
+          >
+            Pumunta sa Accomplishment Photos
+          </Link>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">

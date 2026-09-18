@@ -69,7 +69,7 @@ export default function PhotosPage() {
   }, []);
 
   useEffect(() => {
-    if (user?.role === "TUPAD_COORDINATOR" && user.assignedBarangay) {
+    if ((user?.role === "TUPAD_COORDINATOR" || user?.role === "TUPAD_ASSISTING_DOCUMENTOR") && user.assignedBarangay) {
       setUploadBarangay(user.assignedBarangay);
     }
   }, [user]);
@@ -288,7 +288,10 @@ export default function PhotosPage() {
           programId: selectedProgramId,
           workDayNumber: uploadWorkDayNumber,
           workProgramItemId: uploadWorkProgramItemId || undefined,
-          barangay: user?.role === "TUPAD_COORDINATOR" && user.assignedBarangay ? user.assignedBarangay : uploadBarangay,
+          barangay:
+            (user?.role === "TUPAD_COORDINATOR" || user?.role === "TUPAD_ASSISTING_DOCUMENTOR") && user.assignedBarangay
+              ? user.assignedBarangay
+              : uploadBarangay,
           sitio: uploadSitio,
           workArea: uploadWorkArea || uploadSitio,
           specificActivity: uploadSpecificActivity,
@@ -485,12 +488,12 @@ export default function PhotosPage() {
         </div>
       </div>
 
-      {/* Coordinator Scoped Scope Banner */}
-      {user?.role === "TUPAD_COORDINATOR" && user.assignedBarangay && (
+      {/* Coordinator & Documentor Scoped Scope Banner */}
+      {(user?.role === "TUPAD_COORDINATOR" || user?.role === "TUPAD_ASSISTING_DOCUMENTOR") && user.assignedBarangay && (
         <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl flex items-center justify-between text-xs text-amber-900 font-bold">
           <div className="flex items-center space-x-2">
             <MapPin className="w-4 h-4 text-amber-600" />
-            <span>Assigned Coordinator Scope: Showing photos for <strong>Barangay {user.assignedBarangay}</strong> only.</span>
+            <span>Assigned Scope: Showing photos for <strong>Barangay {user.assignedBarangay}</strong> only.</span>
           </div>
           <span className="text-[10px] px-2 py-0.5 bg-amber-200 text-amber-950 rounded uppercase tracking-wider">
             Barangay Restricted
@@ -734,7 +737,10 @@ export default function PhotosPage() {
                     </label>
                     <select
                       value={uploadBarangay}
-                      disabled={user?.role === "TUPAD_COORDINATOR" && !!user.assignedBarangay}
+                      disabled={
+                        (user?.role === "TUPAD_COORDINATOR" || user?.role === "TUPAD_ASSISTING_DOCUMENTOR") &&
+                        !!user.assignedBarangay
+                      }
                       onChange={(e) => {
                         setUploadBarangay(e.target.value);
                         setUploadWorkProgramItemId("");

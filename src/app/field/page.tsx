@@ -21,11 +21,14 @@ import {
 import { PesoLogo } from "@/components/layout/PesoLogo";
 import { FieldQrPassGeneratorCard } from "@/components/field/FieldQrPassGeneratorCard";
 
+import { useAuth } from "@/context/AuthContext";
+
 const FIELD_OPERATIONS = [
   {
     title: "Stub Distribution & Affirmation",
     href: "/field/stub-distribution",
     icon: QrCode,
+    permission: "stub.distribution.scan",
     color: "from-blue-600 to-blue-800",
     badge: "Day 0 • Issuance",
     description: "Scan stub QR codes upon releasing official TUPAD ID stubs, verify beneficiary identity, and record citizen affirmation.",
@@ -34,6 +37,7 @@ const FIELD_OPERATIONS = [
     title: "Orientation Verification",
     href: "/field/orientation",
     icon: CalendarCheck,
+    permission: "orientation.scan",
     color: "from-amber-600 to-amber-800",
     badge: "Day 1 • Briefing",
     description: "Verify beneficiary attendance during the official DOLE TUPAD pre-deployment orientation and safety protocol briefing.",
@@ -42,6 +46,7 @@ const FIELD_OPERATIONS = [
     title: "Daily Attendance (AM / PM)",
     href: "/field/attendance",
     icon: Clock,
+    permission: "attendance.scan",
     color: "from-emerald-600 to-emerald-800",
     badge: "Days 1–10 • Shifts",
     description: "Real-time morning and afternoon attendance scanning with automatic offline caching and work area matching.",
@@ -50,6 +55,7 @@ const FIELD_OPERATIONS = [
     title: "Accomplishment Photos",
     href: "/field/photos",
     icon: Camera,
+    permission: "photo.upload",
     color: "from-indigo-600 to-indigo-800",
     badge: "Field Evidence",
     description: "Upload geotagged daily work accomplishment photos per Barangay sector and Purok/Sitio project location.",
@@ -58,6 +64,7 @@ const FIELD_OPERATIONS = [
     title: "Payout Verification",
     href: "/field/payout",
     icon: Banknote,
+    permission: "payout.scan",
     color: "from-purple-600 to-purple-800",
     badge: "Wage Disbursal",
     description: "Final scanning and identification check during official DOLE wage release and payroll disbursement.",
@@ -80,7 +87,12 @@ export default function FieldScannerHubPage() {
 }
 
 function FieldScannerHubContent() {
+  const { user, can } = useAuth();
   const [activeTab, setActiveTab] = useState<"qr-generator" | "scanner-tools">("qr-generator");
+
+  const visibleOperations = FIELD_OPERATIONS.filter(
+    (op) => !op.permission || can(op.permission)
+  );
 
   return (
     <div className="space-y-6 max-w-6xl mx-auto pb-12">
@@ -95,14 +107,18 @@ function FieldScannerHubContent() {
                   PESO DINGALAN
                 </span>
                 <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
-                  Field Scanner Operations Hub
+                  {user?.role === "TUPAD_ASSISTING_DOCUMENTOR"
+                    ? "Tupad Assisting Documentor Hub"
+                    : "Field Scanner Operations Hub"}
                 </span>
               </div>
               <h1 className="text-xl sm:text-2xl lg:text-3xl font-black text-white tracking-tight mt-1">
                 TUPAD Field Scanner Hub &amp; QR Pass Studio
               </h1>
               <p className="text-xs sm:text-sm text-slate-300 max-w-2xl mt-0.5">
-                Sentro ng field operations para sa mga scanner coordinators: Mag-generate ng scannable QR pass para sa bawat benepisyaryo at magsagawa ng field scanning.
+                {user?.role === "TUPAD_ASSISTING_DOCUMENTOR"
+                  ? "Assisting Documentor Portal: Kumuha ng daily accomplishment photo documentation at magsagawa ng DTR attendance scanning sa field."
+                  : "Sentro ng field operations para sa mga scanner coordinators: Mag-generate ng scannable QR pass para sa bawat benepisyaryo at magsagawa ng field scanning."}
               </p>
             </div>
           </div>
@@ -131,7 +147,7 @@ function FieldScannerHubContent() {
               }`}
             >
               <QrCode className="w-4 h-4" />
-              <span>Scanner Hub Tools</span>
+              <span>Scanner Hub Tools ({visibleOperations.length})</span>
             </button>
           </div>
         </div>
@@ -147,7 +163,7 @@ function FieldScannerHubContent() {
         </div>
       )}
 
-      {/* 3. Secondary Tab View: 5 Field Scanner Operations Tools */}
+      {/* 3. Secondary Tab View: Filtered Field Scanner Operations Tools */}
       {activeTab === "scanner-tools" && (
         <div className="space-y-6 animate-fadeIn">
           <div className="space-y-1">
@@ -161,7 +177,7 @@ function FieldScannerHubContent() {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {FIELD_OPERATIONS.map((op) => {
+            {visibleOperations.map((op) => {
               const Icon = op.icon;
               return (
                 <Link

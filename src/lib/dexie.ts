@@ -664,9 +664,9 @@ export async function initializeUserOfflineCache(user?: {
         console.warn("Work program caching notice:", err);
       }
 
-      // 4. Fetch & Cache Beneficiaries (scoped if coordinator, or full roster)
+      // 4. Fetch & Cache Beneficiaries (scoped if coordinator / assisting documentor, or full roster)
       let beneUrl = `/api/v1/programs/${prog.id}/beneficiaries`;
-      if (user?.role === "TUPAD_COORDINATOR" && user.assignedBarangay) {
+      if ((user?.role === "TUPAD_COORDINATOR" || user?.role === "TUPAD_ASSISTING_DOCUMENTOR") && user.assignedBarangay) {
         beneUrl += `?barangay=${encodeURIComponent(user.assignedBarangay)}`;
       }
 
@@ -707,7 +707,7 @@ export async function initializeUserOfflineCache(user?: {
     localStorage.setItem("tupad_last_offline_sync", new Date().toISOString());
     localStorage.setItem(
       "tupad_offline_scope",
-      user?.role === "TUPAD_COORDINATOR" && user.assignedBarangay
+      (user?.role === "TUPAD_COORDINATOR" || user?.role === "TUPAD_ASSISTING_DOCUMENTOR") && user.assignedBarangay
         ? `Barangay ${user.assignedBarangay}`
         : "Municipality-wide"
     );

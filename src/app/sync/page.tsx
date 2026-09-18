@@ -55,7 +55,7 @@ export default function SyncCenterPage() {
     if (typeof window !== "undefined") {
       const scope = localStorage.getItem("tupad_offline_scope");
       if (scope) setActiveScope(scope);
-      else if (user?.role === "TUPAD_COORDINATOR" && user.assignedBarangay) {
+      else if ((user?.role === "TUPAD_COORDINATOR" || user?.role === "TUPAD_ASSISTING_DOCUMENTOR") && user.assignedBarangay) {
         setActiveScope(`Barangay ${user.assignedBarangay}`);
       }
     }

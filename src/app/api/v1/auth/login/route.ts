@@ -26,6 +26,7 @@ export async function POST(request: Request) {
       if (userCount === 0) {
         const adminPass = await bcrypt.hash("admin123", 10);
         const coordPass = await bcrypt.hash("coord123", 10);
+        const docPass = await bcrypt.hash("doc123", 10);
         const dolePass = await bcrypt.hash("dole123", 10);
 
         await prisma.user.createMany({
@@ -44,6 +45,14 @@ export async function POST(request: Request) {
               email: "coordinator@dingalan.gov.ph",
               passwordHash: coordPass,
               role: "TUPAD_COORDINATOR",
+              status: "ACTIVE",
+            },
+            {
+              username: "documentor",
+              fullName: "Dingalan TUPAD Assisting Documentor",
+              email: "documentor@dingalan.gov.ph",
+              passwordHash: docPass,
+              role: "TUPAD_ASSISTING_DOCUMENTOR",
               status: "ACTIVE",
             },
             {

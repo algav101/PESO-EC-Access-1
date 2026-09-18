@@ -25,8 +25,8 @@ export async function GET(request: Request, { params }: { params: { id: string }
       whereClause.participationStatus = { not: "REPLACED" };
     }
 
-    // Enforce coordinator barangay-level isolation
-    if (user.role === "TUPAD_COORDINATOR" && user.assignedBarangay) {
+    // Enforce coordinator / assisting documentor barangay-level isolation
+    if ((user.role === "TUPAD_COORDINATOR" || user.role === "TUPAD_ASSISTING_DOCUMENTOR") && user.assignedBarangay) {
       whereClause.beneficiary = { barangay: user.assignedBarangay };
     } else if (barangay) {
       whereClause.beneficiary = { barangay };

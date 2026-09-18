@@ -2,7 +2,7 @@ export const dynamic = "force-dynamic";
 
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
-import { getCurrentUser } from "@/lib/auth";
+import { getCurrentUser, hasPermission } from "@/lib/auth";
 import { logAudit } from "@/lib/audit";
 import { normalizeBarangayName } from "@/lib/utils";
 
@@ -10,6 +10,9 @@ export async function POST(request: Request) {
   try {
     const user = await getCurrentUser();
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    if (!hasPermission(user.role, "orientation.scan")) {
+      return NextResponse.json({ error: "Forbidden: insufficient permissions for orientation scanning" }, { status: 403 });
+    }
 
     const body = await request.json();
     const rawQrToken = (body.qrToken || body.token || "").toString().trim();

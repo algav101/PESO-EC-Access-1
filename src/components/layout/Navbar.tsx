@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useAuth } from "@/context/AuthContext";
 import { useOffline } from "@/context/OfflineContext";
 import { PesoLogo } from "./PesoLogo";
+import { isFieldCoordinator } from "@/lib/permissions";
 import {
   ShieldCheck,
   Wifi,
@@ -39,7 +40,7 @@ export function Navbar({ onToggleSidebar }: NavbarProps) {
               </button>
             )}
 
-            <a href={user?.role === "TUPAD_COORDINATOR" ? "/field" : "/dashboard"} className="flex items-center space-x-3 group">
+            <a href={isFieldCoordinator(user) ? "/field" : "/dashboard"} className="flex items-center space-x-3 group">
               <PesoLogo className="h-10 w-10" />
               <div className="flex flex-col">
                 <div className="flex items-center space-x-1.5">

@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
+import Link from "next/link";
 import {
   Banknote,
   QrCode,
@@ -15,11 +16,13 @@ import {
 } from "lucide-react";
 import { QrScannerModal } from "@/components/scanner/QrScannerModal";
 import { FieldQrPassGeneratorModal } from "@/components/field/FieldQrPassGeneratorCard";
+import { useAuth } from "@/context/AuthContext";
 import { useOffline } from "@/context/OfflineContext";
 import { offlineDb, queueOfflineTransaction, findBeneficiaryOffline, extractCleanQrToken } from "@/lib/dexie";
 import { format } from "date-fns";
 
 export default function PayoutScannerPage() {
+  const { user, can } = useAuth();
   const { isOnline } = useOffline();
 
   const [scannerOpen, setScannerOpen] = useState(false);
@@ -141,6 +144,36 @@ export default function PayoutScannerPage() {
       setLoading(false);
     }
   };
+
+  if (user && !can("payout.scan")) {
+    return (
+      <div className="max-w-md mx-auto my-12 gov-card p-6 text-center space-y-4 border-t-4 border-t-amber-500 shadow-xl bg-white">
+        <div className="w-16 h-16 rounded-full bg-amber-100 text-amber-700 flex items-center justify-center mx-auto">
+          <Banknote className="w-8 h-8" />
+        </div>
+        <div className="space-y-1">
+          <h2 className="text-base font-black text-slate-900">Access Restricted</h2>
+          <p className="text-xs text-slate-500">
+            Ang iyong user role ({(user.role || "").replace(/_/g, " ")}) ay para lamang sa <strong>Daily Accomplishment Photo</strong> at <strong>DTR Attendance Scanning</strong>. Ang Payout Verification ay para sa authorized Disbursing Officers at Admins lamang.
+          </p>
+        </div>
+        <div className="pt-2 flex flex-col gap-2">
+          <Link
+            href="/field/attendance"
+            className="w-full py-2.5 bg-gov-blue hover:bg-gov-light text-white font-bold text-xs rounded-xl shadow transition"
+          >
+            Pumunta sa Daily Attendance (DTR) Scanner
+          </Link>
+          <Link
+            href="/field/photos"
+            className="w-full py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl transition"
+          >
+            Pumunta sa Accomplishment Photos
+          </Link>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-md mx-auto space-y-6">
