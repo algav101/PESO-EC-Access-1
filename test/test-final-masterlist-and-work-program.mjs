@@ -97,18 +97,34 @@ async function run() {
   assert.ok(palticGroup1.length >= 1, "Paltic Group 1 should contain Kamagong");
   console.log("✅ 6. Verified Paltic Group 1 (Kamagong) correctly classified!");
 
-  // 5. Commit Masterlist
+  // 4b. Test Restriction Exemption flow
+  // Simulate a row with an active restriction and apply exemption
+  const rowsWithExemption = previewData.preview.rows.map((r, idx) => {
+    if (idx === 0) {
+      return {
+        ...r,
+        status: "EXEMPTED",
+        isExempted: true,
+        exemptionReason: "PESO Admin Authorized Exemption for Final Masterlist Implementation",
+      };
+    }
+    return r;
+  });
+
+  // 5. Commit Masterlist (including exempted beneficiary)
   const commitRes = await fetch(`${BASE_URL}/api/v1/beneficiaries/import/commit`, {
     method: "POST",
     headers: { "Content-Type": "application/json", Cookie: cookie },
     body: JSON.stringify({
-      rows: previewData.preview.rows,
+      rows: rowsWithExemption,
       programId: testProgramId,
     }),
   });
   const commitData = await commitRes.json();
   assert.equal(commitRes.status, 200, `Commit failed: ${JSON.stringify(commitData)}`);
-  console.log(`✅ 7. Committed ${commitData.importedCount} beneficiaries into program masterlist`);
+  assert.ok(commitData.importedCount >= 10, "Expected all 10 rows (including exempted) to be committed");
+  assert.equal(commitData.exemptedCount, 1, "Expected 1 exempted beneficiary count in commit response");
+  console.log(`✅ 7. Committed ${commitData.importedCount} beneficiaries (including ${commitData.exemptedCount} exempted) into program masterlist without transaction timeout`);
 
   // 6. Test Auto-Deploy Work Program logic according to Purok/Sitio groups
   const autoDeployRes = await fetch(`${BASE_URL}/api/v1/programs/${testProgramId}/work-program/auto-deploy`, {

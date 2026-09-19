@@ -16,8 +16,9 @@ import {
   Users,
   MapPin,
   Sparkles,
+  ShieldAlert,
+  RotateCcw,
 } from "lucide-react";
-import { StatusBadge } from "@/components/common/StatusBadge";
 import { ImportPreviewResult, ParsedBeneficiaryRow } from "@/lib/excel-importer";
 
 interface MasterlistUploadModalProps {
@@ -27,6 +28,13 @@ interface MasterlistUploadModalProps {
   defaultProgramId?: string;
   onSuccess: () => void;
 }
+
+const DEFAULT_EXEMPTION_REASONS = [
+  "PESO Admin Authorized Exemption for Final Masterlist Implementation",
+  "Mayor / LGU Special Directive for Community Employment",
+  "Emergency Calamity & Disaster Recovery Exemption",
+  "Designated Barangay Priority Community Laborer",
+];
 
 export function MasterlistUploadModal({
   isOpen,
@@ -43,7 +51,13 @@ export function MasterlistUploadModal({
   const [committing, setCommitting] = useState(false);
   const [preview, setPreview] = useState<ImportPreviewResult | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<"ALL" | "VALID" | "WARNINGS">("ALL");
+  const [activeTab, setActiveTab] = useState<"ALL" | "VALID" | "EXEMPTED" | "WARNINGS">("ALL");
+
+  // Exemption Modal State
+  const [isExemptionDialogOpen, setIsExemptionDialogOpen] = useState(false);
+  const [targetExemptionRow, setTargetExemptionRow] = useState<ParsedBeneficiaryRow | "ALL" | null>(null);
+  const [selectedReason, setSelectedReason] = useState<string>(DEFAULT_EXEMPTION_REASONS[0]);
+  const [customReasonText, setCustomReasonText] = useState<string>("");
 
   if (!isOpen) return null;
 
@@ -85,6 +99,95 @@ export function MasterlistUploadModal({
     }
   };
 
+  const recalculatePreviewCounts = (rows: ParsedBeneficiaryRow[]): ImportPreviewResult => {
+    const validCount = rows.filter(
+      (r) => r.status === "VALID" || r.status === "EXEMPTED" || Boolean(r.isExempted)
+    ).length;
+    const restrictedCount = rows.filter((r) => r.status === "RESTRICTED" && !r.isExempted).length;
+    const duplicateCount = rows.filter((r) => r.status === "DUPLICATE").length;
+    const invalidCount = rows.filter(
+      (r) =>
+        r.status === "MISSING_REQUIRED_FIELD" ||
+        r.status === "INVALID_BIRTHDAY" ||
+        r.status === "DUPLICATE_DESIGNATED_NUMBER"
+    ).length;
+
+    return {
+      fileName: preview?.fileName || "masterlist.csv",
+      totalRows: rows.length,
+      validCount,
+      restrictedCount,
+      duplicateCount,
+      invalidCount,
+      rows,
+      barangaySummary: preview?.barangaySummary || {},
+    };
+  };
+
+  const openExemptionDialog = (target: ParsedBeneficiaryRow | "ALL") => {
+    setTargetExemptionRow(target);
+    setSelectedReason(DEFAULT_EXEMPTION_REASONS[0]);
+    setCustomReasonText("");
+    setIsExemptionDialogOpen(true);
+  };
+
+  const confirmExemption = () => {
+    if (!preview) return;
+    const finalReason = customReasonText.trim() || selectedReason;
+
+    let updatedRows: ParsedBeneficiaryRow[];
+
+    if (targetExemptionRow === "ALL") {
+      updatedRows = preview.rows.map((r) => {
+        if (r.status === "RESTRICTED" || r.restrictionEnd) {
+          return {
+            ...r,
+            status: "EXEMPTED" as const,
+            isExempted: true,
+            exemptionReason: finalReason,
+          };
+        }
+        return r;
+      });
+    } else if (targetExemptionRow) {
+      updatedRows = preview.rows.map((r) => {
+        if (r.designatedNumber === targetExemptionRow.designatedNumber && r.fullName === targetExemptionRow.fullName) {
+          return {
+            ...r,
+            status: "EXEMPTED" as const,
+            isExempted: true,
+            exemptionReason: finalReason,
+          };
+        }
+        return r;
+      });
+    } else {
+      return;
+    }
+
+    setPreview(recalculatePreviewCounts(updatedRows));
+    setIsExemptionDialogOpen(false);
+    setTargetExemptionRow(null);
+  };
+
+  const handleRevokeExemption = (targetRow: ParsedBeneficiaryRow) => {
+    if (!preview) return;
+
+    const updatedRows = preview.rows.map((r) => {
+      if (r.designatedNumber === targetRow.designatedNumber && r.fullName === targetRow.fullName) {
+        return {
+          ...r,
+          status: "RESTRICTED" as const,
+          isExempted: false,
+          exemptionReason: undefined,
+        };
+      }
+      return r;
+    });
+
+    setPreview(recalculatePreviewCounts(updatedRows));
+  };
+
   const handleCommitMasterlist = async () => {
     if (!preview || preview.validCount === 0) return;
 
@@ -104,9 +207,11 @@ export function MasterlistUploadModal({
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed to commit masterlist");
 
-      alert(
-        `Successfully imported ${data.importedCount} beneficiaries into the Final Masterlist for Implementation!`
-      );
+      const msg = data.exemptedCount > 0
+        ? `Successfully committed ${data.importedCount} beneficiaries (including ${data.exemptedCount} authorized exemptions) into the Final Masterlist for Implementation!`
+        : `Successfully imported ${data.importedCount} beneficiaries into the Final Masterlist for Implementation!`;
+
+      alert(msg);
       onSuccess();
       onClose();
     } catch (err: any) {
@@ -116,9 +221,13 @@ export function MasterlistUploadModal({
     }
   };
 
+  const exemptedCount = preview?.rows.filter((r) => r.isExempted || r.status === "EXEMPTED").length || 0;
+  const activeRestrictedCount = preview?.rows.filter((r) => r.status === "RESTRICTED" && !r.isExempted).length || 0;
+
   const filteredPreviewRows = preview?.rows.filter((r) => {
-    if (activeTab === "VALID") return r.status === "VALID";
-    if (activeTab === "WARNINGS") return r.status !== "VALID";
+    if (activeTab === "VALID") return r.status === "VALID" || r.status === "EXEMPTED" || Boolean(r.isExempted);
+    if (activeTab === "EXEMPTED") return r.status === "EXEMPTED" || Boolean(r.isExempted);
+    if (activeTab === "WARNINGS") return r.status !== "VALID" && r.status !== "EXEMPTED" && !r.isExempted;
     return true;
   });
 
@@ -227,17 +336,57 @@ export function MasterlistUploadModal({
               </div>
               <div className="p-3 bg-emerald-50/70 border border-emerald-200 rounded-xl">
                 <span className="text-[10px] text-emerald-900 font-bold uppercase">Valid &amp; Ready</span>
-                <p className="text-xl font-black text-emerald-800">{preview.validCount}</p>
+                <p className="text-xl font-black text-emerald-800">
+                  {preview.validCount}
+                  {exemptedCount > 0 && (
+                    <span className="text-xs font-bold text-purple-700 ml-1">
+                      ({exemptedCount} Exempted)
+                    </span>
+                  )}
+                </p>
               </div>
               <div className="p-3 bg-amber-50/70 border border-amber-200 rounded-xl">
                 <span className="text-[10px] text-amber-900 font-bold uppercase">Duplicates Skipped</span>
                 <p className="text-xl font-black text-amber-900">{preview.duplicateCount}</p>
               </div>
-              <div className="p-3 bg-rose-50/70 border border-rose-200 rounded-xl">
-                <span className="text-[10px] text-rose-900 font-bold uppercase">365-Day Restricted</span>
-                <p className="text-xl font-black text-rose-800">{preview.restrictedCount}</p>
+              <div className={`p-3 rounded-xl border ${activeRestrictedCount > 0 ? "bg-rose-50/70 border-rose-200" : "bg-slate-50 border-slate-200"}`}>
+                <span className="text-[10px] text-slate-700 font-bold uppercase">365-Day Restricted</span>
+                <p className="text-xl font-black text-rose-800">
+                  {activeRestrictedCount}
+                  {exemptedCount > 0 && (
+                    <span className="text-xs font-bold text-emerald-700 ml-1">
+                      (0 remaining)
+                    </span>
+                  )}
+                </p>
               </div>
             </div>
+
+            {/* Restriction Alert & Exemption Override Banner */}
+            {activeRestrictedCount > 0 && (
+              <div className="p-3.5 bg-amber-50/90 border border-amber-300 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs">
+                <div className="flex items-start space-x-2.5">
+                  <ShieldAlert className="w-5 h-5 text-amber-700 flex-shrink-0 mt-0.5" />
+                  <div>
+                    <h4 className="text-xs font-black text-amber-950">
+                      {activeRestrictedCount} Restricted Beneficiaries Detected in Masterlist
+                    </h4>
+                    <p className="text-[11px] text-amber-800 font-medium">
+                      Under DOLE-TUPAD policy, beneficiaries are restricted within 365 days of previous payout. You may grant an authorized administrative exemption to include them in this implementation roster.
+                    </p>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => openExemptionDialog("ALL")}
+                  className="px-3.5 py-2 bg-purple-700 hover:bg-purple-800 text-white font-bold text-xs rounded-xl shadow flex items-center space-x-1.5 transition self-start sm:self-auto whitespace-nowrap"
+                >
+                  <ShieldCheck className="w-4 h-4 text-purple-200" />
+                  <span>Grant Exemption to All ({activeRestrictedCount})</span>
+                </button>
+              </div>
+            )}
 
             {/* Barangay & Group Distribution */}
             {preview.barangaySummary && Object.keys(preview.barangaySummary).length > 0 && (
@@ -260,8 +409,8 @@ export function MasterlistUploadModal({
             )}
 
             {/* Preview Filter Tabs */}
-            <div className="flex items-center justify-between">
-              <div className="flex space-x-1 bg-slate-100 p-1 rounded-xl">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="flex flex-wrap gap-1 bg-slate-100 p-1 rounded-xl">
                 <button
                   type="button"
                   onClick={() => setActiveTab("ALL")}
@@ -278,8 +427,20 @@ export function MasterlistUploadModal({
                     activeTab === "VALID" ? "bg-white text-emerald-800 shadow-xs" : "text-slate-500 hover:text-slate-900"
                   }`}
                 >
-                  Valid Ready ({preview.validCount})
+                  Valid &amp; Ready ({preview.validCount})
                 </button>
+                {exemptedCount > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab("EXEMPTED")}
+                    className={`px-3 py-1 text-xs font-bold rounded-lg transition flex items-center space-x-1 ${
+                      activeTab === "EXEMPTED" ? "bg-purple-100 text-purple-900 shadow-xs font-black" : "text-purple-700 hover:text-purple-900"
+                    }`}
+                  >
+                    <Sparkles className="w-3 h-3 text-purple-600" />
+                    <span>Exempted ({exemptedCount})</span>
+                  </button>
+                )}
                 <button
                   type="button"
                   onClick={() => setActiveTab("WARNINGS")}
@@ -287,7 +448,7 @@ export function MasterlistUploadModal({
                     activeTab === "WARNINGS" ? "bg-white text-rose-800 shadow-xs" : "text-slate-500 hover:text-slate-900"
                   }`}
                 >
-                  Warnings / Skipped ({preview.duplicateCount + preview.restrictedCount + preview.invalidCount})
+                  Warnings / Skipped ({preview.duplicateCount + activeRestrictedCount + preview.invalidCount})
                 </button>
               </div>
 
@@ -322,7 +483,7 @@ export function MasterlistUploadModal({
                     <th className="px-3 py-2">Assigned Deployment Group</th>
                     <th className="px-3 py-2">Sex &amp; Age</th>
                     <th className="px-3 py-2">Special Categories</th>
-                    <th className="px-3 py-2">Import Status</th>
+                    <th className="px-3 py-2">Import Status / Exemption</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
@@ -356,8 +517,46 @@ export function MasterlistUploadModal({
                             <CheckCircle2 className="w-3 h-3 text-emerald-600" />
                             <span>Ready</span>
                           </span>
+                        ) : r.status === "EXEMPTED" || r.isExempted ? (
+                          <div className="flex items-center space-x-1.5">
+                            <span
+                              className="inline-flex items-center space-x-1 px-2 py-0.5 bg-purple-50 text-purple-800 border border-purple-300 rounded-full font-bold text-[10px]"
+                              title={`Exemption Reason: ${r.exemptionReason || "Authorized"}`}
+                            >
+                              <ShieldCheck className="w-3 h-3 text-purple-600" />
+                              <span>Exempted</span>
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => handleRevokeExemption(r)}
+                              className="text-[10px] text-slate-400 hover:text-slate-600 underline font-semibold"
+                            >
+                              Revoke
+                            </button>
+                          </div>
+                        ) : r.status === "RESTRICTED" ? (
+                          <div className="flex items-center space-x-1.5">
+                            <span
+                              className="inline-flex items-center space-x-1 px-2 py-0.5 bg-rose-50 text-rose-700 border border-rose-200 rounded-full font-bold text-[10px]"
+                              title={r.validationError}
+                            >
+                              <AlertTriangle className="w-3 h-3 text-rose-600" />
+                              <span>Restricted</span>
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => openExemptionDialog(r)}
+                              className="px-2 py-0.5 bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200 rounded-md font-bold text-[10px] flex items-center space-x-0.5 transition"
+                            >
+                              <ShieldCheck className="w-2.5 h-2.5" />
+                              <span>Exempt</span>
+                            </button>
+                          </div>
                         ) : (
-                          <span className="inline-flex items-center space-x-1 px-2 py-0.5 bg-rose-50 text-rose-700 border border-rose-200 rounded-full font-bold text-[10px]" title={r.validationError}>
+                          <span
+                            className="inline-flex items-center space-x-1 px-2 py-0.5 bg-rose-50 text-rose-700 border border-rose-200 rounded-full font-bold text-[10px]"
+                            title={r.validationError}
+                          >
                             <AlertTriangle className="w-3 h-3 text-rose-600" />
                             <span>{r.status}</span>
                           </span>
@@ -370,7 +569,86 @@ export function MasterlistUploadModal({
             </div>
           </div>
         )}
+
+        {/* Exemption Confirmation Dialog */}
+        {isExemptionDialogOpen && (
+          <div className="fixed inset-0 z-60 flex items-center justify-center bg-black/50 p-4 animate-fadeIn">
+            <div className="bg-white rounded-2xl max-w-lg w-full p-5 space-y-4 shadow-2xl border border-slate-200">
+              <div className="flex items-center justify-between border-b pb-2">
+                <h4 className="text-sm font-black text-slate-900 flex items-center space-x-2">
+                  <ShieldCheck className="w-5 h-5 text-purple-600" />
+                  <span>
+                    {targetExemptionRow === "ALL"
+                      ? `Authorize Exemption for All (${activeRestrictedCount}) Beneficiaries`
+                      : `Authorize Exemption: ${(targetExemptionRow as ParsedBeneficiaryRow)?.fullName}`}
+                  </span>
+                </h4>
+                <button
+                  onClick={() => setIsExemptionDialogOpen(false)}
+                  className="p-1 text-slate-400 hover:text-slate-600 rounded-lg"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              <div className="space-y-3 text-xs">
+                <p className="text-slate-600">
+                  Granting this exemption overrides the 365-day restriction and authorizes inclusion in the final implementation masterlist. Please select or state the justification:
+                </p>
+
+                <div className="space-y-1.5">
+                  <label className="block font-bold text-slate-700 uppercase text-[10px]">
+                    Standard Justification Reason
+                  </label>
+                  <select
+                    value={selectedReason}
+                    onChange={(e) => setSelectedReason(e.target.value)}
+                    className="w-full px-3 py-2 text-xs border rounded-xl bg-slate-50 font-bold text-slate-800"
+                  >
+                    {DEFAULT_EXEMPTION_REASONS.map((reason) => (
+                      <option key={reason} value={reason}>
+                        {reason}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="block font-bold text-slate-700 uppercase text-[10px]">
+                    Or Specify Custom Exemption Note (Optional)
+                  </label>
+                  <input
+                    type="text"
+                    value={customReasonText}
+                    onChange={(e) => setCustomReasonText(e.target.value)}
+                    placeholder="e.g. Special Barangay Resolution / Council Recommendation"
+                    className="w-full px-3 py-2 text-xs border rounded-xl bg-white text-slate-800 font-medium"
+                  />
+                </div>
+              </div>
+
+              <div className="flex justify-end space-x-2 pt-2 border-t">
+                <button
+                  type="button"
+                  onClick={() => setIsExemptionDialogOpen(false)}
+                  className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={confirmExemption}
+                  className="px-4 py-2 bg-purple-700 hover:bg-purple-800 text-white font-bold text-xs rounded-xl shadow flex items-center space-x-1.5 transition"
+                >
+                  <ShieldCheck className="w-4 h-4 text-purple-200" />
+                  <span>Confirm &amp; Apply Exemption</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
 }
+

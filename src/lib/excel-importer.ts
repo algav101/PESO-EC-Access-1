@@ -20,7 +20,7 @@ export interface ParsedBeneficiaryRow {
   middleName?: string;
   extensionName?: string;
   birthday: string; // YYYY-MM-DD
-  birthdayPin: string; // MM-DD-YYYY
+  birthdayPin: string; // MMDD
   sex?: string;
   civilStatus?: string;
   age?: number;
@@ -29,7 +29,7 @@ export interface ParsedBeneficiaryRow {
   occupation?: string;
   idType?: string;
   idNumber?: string;
-  barangay: string;
+  barangay?: string;
   sitio?: string;
   municipality?: string;
   province?: string;
@@ -50,9 +50,19 @@ export interface ParsedBeneficiaryRow {
   groupName?: string;
   groupLabel?: string;
   designatedMainArea?: string;
-  status: "VALID" | "DUPLICATE" | "RESTRICTED" | "MISSING_REQUIRED_FIELD" | "INVALID_BIRTHDAY" | "DUPLICATE_DESIGNATED_NUMBER";
+  status:
+    | "VALID"
+    | "DUPLICATE"
+    | "RESTRICTED"
+    | "EXEMPTED"
+    | "MISSING_REQUIRED_FIELD"
+    | "INVALID_BIRTHDAY"
+    | "DUPLICATE_DESIGNATED_NUMBER";
   validationError?: string;
   restrictionEnd?: string;
+  restrictionReason?: string;
+  isExempted?: boolean;
+  exemptionReason?: string;
 }
 
 export interface ImportPreviewResult {
@@ -586,9 +596,22 @@ export async function parseBeneficiaryExcelBuffer(
         validationError = `Restricted until ${restriction.end}: ${restriction.reason}`;
         restrictionEnd = restriction.end;
         restrictedCount++;
+        parsedRows.push({
+          ...item,
+          status,
+          validationError,
+          restrictionEnd,
+          restrictionReason: restriction.reason,
+        });
       } else {
         status = "VALID";
         validCount++;
+        parsedRows.push({
+          ...item,
+          status,
+          validationError,
+          restrictionEnd,
+        });
       }
     }
 
@@ -600,13 +623,6 @@ export async function parseBeneficiaryExcelBuffer(
     if (item.barangay) {
       barangaySummary[item.barangay] = (barangaySummary[item.barangay] || 0) + 1;
     }
-
-    parsedRows.push({
-      ...item,
-      status,
-      validationError,
-      restrictionEnd,
-    });
   }
 
   return {

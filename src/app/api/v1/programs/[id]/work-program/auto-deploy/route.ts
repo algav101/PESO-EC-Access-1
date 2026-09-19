@@ -95,16 +95,7 @@ export async function POST(request: Request, { params }: { params: { id: string 
       }
 
       // Check if existing TupadWorkProgram exists
-      const existingWp = await prisma.tupadWorkProgram.findUnique({
-        where: {
-          programId_barangay: {
-            programId: params.id,
-            barangay: brgyName,
-          },
-        },
-        include: { items: { orderBy: { orderIndex: "asc" } } },
-      });
-
+      const existingWp = program.tupadWorkPrograms.find((w) => w.barangay === brgyName);
       let workProgramId: string;
 
       if (!existingWp) {
