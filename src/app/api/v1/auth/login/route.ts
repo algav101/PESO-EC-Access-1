@@ -43,6 +43,13 @@ export async function POST(request: Request) {
     if (!user) {
       const presetDefaults: Record<string, { fullName: string; role: any; brgy: string | null; pass: string }> = {
         admin: { fullName: "PESO Dingalan Admin Officer", role: "DOMAIN_MASTER", brgy: null, pass: "admin123" },
+        peso_admin: { fullName: "PESO Operations Administrator", role: "PESO_ADMIN", brgy: null, pass: "admin123" },
+        peso_head: { fullName: "PESO Division Head Officer", role: "PESO_ADMIN", brgy: null, pass: "admin123" },
+        peso_manager: { fullName: "PESO Program Manager", role: "PESO_ADMIN", brgy: null, pass: "admin123" },
+        pesostaff: { fullName: "Marcial Bonifacio (Operations Desk)", role: "PESO_STAFF", brgy: null, pass: "Dingalan123!" },
+        mcdo: { fullName: "PESO Operations Staff (MCDO)", role: "PESO_STAFF", brgy: null, pass: "Dingalan123!" },
+        ikoy: { fullName: "PESO Operations Staff (Ikoy)", role: "PESO_STAFF", brgy: null, pass: "Dingalan123!" },
+        staff: { fullName: "General PESO Staff Officer", role: "PESO_STAFF", brgy: null, pass: "staff123" },
         coordinator: { fullName: "Dingalan TUPAD Field Coordinator", role: "TUPAD_COORDINATOR", brgy: null, pass: "coord123" },
         documentor: { fullName: "Dingalan TUPAD Assisting Documentor", role: "TUPAD_ASSISTING_DOCUMENTOR", brgy: null, pass: "doc123" },
         dole: { fullName: "DOLE Aurora Field Officer", role: "DOLE_COORDINATOR", brgy: null, pass: "dole123" },

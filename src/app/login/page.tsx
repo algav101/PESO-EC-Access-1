@@ -32,10 +32,31 @@ interface PresetAccount {
 const PRESET_ROLES: { id: string; label: string; description: string; accounts: PresetAccount[] }[] = [
   {
     id: "DOMAIN_MASTER",
-    label: "👑 Domain Master",
+    label: "👑 Domain Master (Super Admin)",
     description: "Full system owner access, beneficiary profile editing, and administrative control",
     accounts: [
       { label: "PESO Dingalan Admin Officer", name: "PESO Dingalan Admin", username: "admin", role: "Domain Master", barangay: "Municipality-wide (Full Access)" },
+    ],
+  },
+  {
+    id: "PESO_ADMIN",
+    label: "🛡️ PESO Administrator",
+    description: "Full operational management, user administration, program creation, and report export",
+    accounts: [
+      { label: "PESO Operations Administrator", name: "PESO Administrator", username: "peso_admin", role: "PESO Admin", barangay: "Municipality-wide (Full Operations)" },
+      { label: "PESO Division Head", name: "PESO Head Officer", username: "peso_head", role: "PESO Admin", barangay: "Municipality-wide (Operations)" },
+      { label: "PESO Program Manager", name: "PESO Manager", username: "peso_manager", role: "PESO Admin", barangay: "Municipality-wide (Programs)" },
+    ],
+  },
+  {
+    id: "PESO_STAFF",
+    label: "💼 PESO Operations Staff",
+    description: "Front-desk operations, manual beneficiary entry, verification, and replacement requests",
+    accounts: [
+      { label: "MARCIAL BONIFACIO (Operations Desk)", name: "Marcial Bonifacio", username: "pesostaff", role: "PESO Operations Staff", barangay: "Municipality-wide (Desk)" },
+      { label: "PESO STAFF - MCDO Desk", name: "Staff MCDO", username: "mcdo", role: "PESO Operations Staff", barangay: "Municipality-wide (Desk)" },
+      { label: "PESO STAFF - IKOY Desk", name: "Staff Ikoy", username: "ikoy", role: "PESO Operations Staff", barangay: "Municipality-wide (Desk)" },
+      { label: "General PESO Staff Officer", name: "PESO Staff", username: "staff", role: "PESO Operations Staff", barangay: "Municipality-wide" },
     ],
   },
   {
@@ -47,12 +68,19 @@ const PRESET_ROLES: { id: string; label: string; description: string; accounts: 
       { label: "SHIELA (Brgy. Umiray)", name: "Shiela", username: "peso_umiray2", role: "Tupad Coordinator", barangay: "Umiray" },
       { label: "MARIAN (Brgy. Umiray)", name: "Marian", username: "peso_umiray3", role: "Tupad Coordinator", barangay: "Umiray" },
       { label: "NALYN (Brgy. Umiray)", name: "Nalyn", username: "peso_umiray4", role: "Tupad Coordinator", barangay: "Umiray" },
+      { label: "BERNLY (Brgy. Umiray - Pinamaypayan)", name: "Bernly", username: "coorpinamaypayan", role: "Tupad Coordinator", barangay: "Umiray" },
+      { label: "ROMELYN (Brgy. Umiray - Singawan)", name: "Romelyn", username: "coorsingawan", role: "Tupad Coordinator", barangay: "Umiray" },
+      { label: "JENELYN (Brgy. Umiray - Centro 1)", name: "Jenelyn", username: "coorumiraycentro1", role: "Tupad Coordinator", barangay: "Umiray" },
+      { label: "MARILYN (Brgy. Umiray - Centro 2)", name: "Marilyn", username: "coorumiraycentro2", role: "Tupad Coordinator", barangay: "Umiray" },
       { label: "GRACE (Brgy. Ibona)", name: "Grace", username: "peso_ibona1", role: "Tupad Coordinator", barangay: "Ibona" },
       { label: "VENGEL (Brgy. Ibona)", name: "Vengel", username: "peso_ibona2", role: "Tupad Coordinator", barangay: "Ibona" },
       { label: "MAY (Brgy. Matawe)", name: "May", username: "peso_matawe1", role: "Tupad Coordinator", barangay: "Matawe" },
       { label: "ANNALYN (Brgy. Matawe)", name: "Annalyn", username: "peso_matawe_2", role: "Tupad Coordinator", barangay: "Matawe" },
+      { label: "YOLLY (Brgy. Matawe)", name: "Yolly", username: "matawecoor", role: "Tupad Coordinator", barangay: "Matawe" },
+      { label: "TUPAD COORDINATOR (Brgy. Matawe)", name: "Coordinator Matawe", username: "coormatawe", role: "Tupad Coordinator", barangay: "Matawe" },
       { label: "ENA (Brgy. Butas na Bato)", name: "Ena", username: "peso_bnb", role: "Tupad Coordinator", barangay: "Butas na Bato" },
       { label: "JONA (Brgy. Aplaya)", name: "Jona", username: "peso_aplaya2", role: "Tupad Coordinator", barangay: "Aplaya" },
+      { label: "MAYLYN (Brgy. Aplaya)", name: "Maylyn", username: "aplaya1", role: "Tupad Coordinator", barangay: "Aplaya" },
       { label: "MOLLY (Brgy. Poblacion)", name: "Molly", username: "peso_poblacion_1", role: "Tupad Coordinator", barangay: "Poblacion" },
       { label: "IKOY (Brgy. Poblacion)", name: "Ikoy", username: "peso_poblacion_2", role: "Tupad Coordinator", barangay: "Poblacion" },
       { label: "NEMZ (Brgy. Davildavilan)", name: "Nemz", username: "peso_davildavilan1", role: "Tupad Coordinator", barangay: "Davildavilan" },
@@ -75,6 +103,17 @@ const PRESET_ROLES: { id: string; label: string; description: string; accounts: 
       { label: "MARIA (Brgy. Paltic Documentor)", name: "Maria Documentor", username: "peso_paltic_doc", role: "Tupad Assisting Documentor", barangay: "Paltic" },
       { label: "JUAN (Brgy. Umiray Documentor)", name: "Juan Documentor", username: "peso_umiray_doc", role: "Tupad Assisting Documentor", barangay: "Umiray" },
       { label: "LIZA (Brgy. Aplaya Documentor)", name: "Liza Documentor", username: "peso_aplaya_doc", role: "Tupad Assisting Documentor", barangay: "Aplaya" },
+      { label: "JENNIE (Brgy. Aplaya Documentor)", name: "Jennie Documentor", username: "peso_aplaya", role: "Tupad Assisting Documentor", barangay: "Aplaya" },
+      { label: "MONETTE (Brgy. Aplaya Documentor)", name: "Monette Documentor", username: "peso_aplaya_2", role: "Tupad Assisting Documentor", barangay: "Aplaya" },
+      { label: "SHEM (Brgy. Butas na Bato Documentor)", name: "Shem Documentor", username: "peso_bnb", role: "Tupad Assisting Documentor", barangay: "Butas na Bato" },
+      { label: "BEBANG (Brgy. Caragsacan Documentor)", name: "Bebang Documentor", username: "peso_caragsacan", role: "Tupad Assisting Documentor", barangay: "Caragsacan" },
+      { label: "MARVILYN (Brgy. Caragsacan Documentor)", name: "Marvilyn Documentor", username: "peso caragsacan", role: "Tupad Assisting Documentor", barangay: "Caragsacan" },
+      { label: "MARVILYN (Caragsacan Secondary)", name: "Marvilyn Coordinator", username: "tupad coordinator-marvilyn", role: "Tupad Assisting Documentor", barangay: "Caragsacan" },
+      { label: "IMELDA (Brgy. Ibona Documentor)", name: "Imelda Documentor", username: "peso_ibona", role: "Tupad Assisting Documentor", barangay: "Ibona" },
+      { label: "NHEMA (Brgy. Ibona Documentor)", name: "Nhema Documentor", username: "peso_ibona_2", role: "Tupad Assisting Documentor", barangay: "Ibona" },
+      { label: "GRACELYN (Brgy. Matawe Documentor)", name: "Gracelyn Documentor", username: "peso_matawe", role: "Tupad Assisting Documentor", barangay: "Matawe" },
+      { label: "DAISY (Brgy. Poblacion Documentor)", name: "Daisy Documentor", username: "peso_poblacion", role: "Tupad Assisting Documentor", barangay: "Poblacion" },
+      { label: "GENELYN (Brgy. Poblacion Documentor)", name: "Genelyn Documentor", username: "peso_poblacion_2", role: "Tupad Assisting Documentor", barangay: "Poblacion" },
     ],
   },
   {
@@ -102,23 +141,26 @@ export default function LoginPage() {
   const [error, setError] = useState<string | null>(null);
 
   const getPresetPassword = (uname: string): string => {
-    if (uname === "admin") return "admin123";
-    if (uname === "coordinator") return "coord123";
-    if (uname === "documentor") return "doc123";
-    if (uname === "dole") return "dole123";
-    if (uname.includes("umiray")) return "UMIRAY123";
-    if (uname.includes("ibona")) return "IBONA123";
-    if (uname.includes("matawe")) return "MATAWE123";
-    if (uname.includes("bnb")) return "BUTAS NA BATO123";
-    if (uname.includes("aplaya")) return "APLAYA123";
-    if (uname.includes("poblacion")) return "POBLACION123";
-    if (uname.includes("davildavilan")) return "DAVILDAVILAN123";
-    if (uname.includes("caragsacan")) return "CARAGSACAN123";
-    if (uname.includes("tanawan")) return "TANAWAN123";
-    if (uname.includes("dika")) return "DIKAPANIKIAN123";
-    if (uname.includes("paltic")) return "PALTIC123";
-    if (uname.includes("dolefoaurora")) return "ALL BARANGAY123";
-    return "";
+    const u = (uname || "").toLowerCase();
+    if (u === "admin" || u.startsWith("peso_admin") || u === "peso_head" || u === "peso_manager") return "admin123";
+    if (u === "coordinator") return "coord123";
+    if (u === "documentor") return "doc123";
+    if (u === "dole") return "dole123";
+    if (u === "staff") return "staff123";
+    if (u === "pesostaff" || u === "mcdo" || u === "ikoy") return "Dingalan123!";
+    if (u.includes("umiray") || u.includes("pinamaypayan") || u.includes("singawan")) return "UMIRAY123";
+    if (u.includes("ibona")) return "IBONA123";
+    if (u.includes("matawe")) return "MATAWE123";
+    if (u.includes("bnb") || u.includes("butas")) return "BUTAS NA BATO123";
+    if (u.includes("aplaya")) return "APLAYA123";
+    if (u.includes("poblacion")) return "POBLACION123";
+    if (u.includes("davildavilan")) return "DAVILDAVILAN123";
+    if (u.includes("caragsacan")) return "CARAGSACAN123";
+    if (u.includes("tanawan")) return "TANAWAN123";
+    if (u.includes("dika")) return "DIKAPANIKIAN123";
+    if (u.includes("paltic")) return "PALTIC123";
+    if (u.includes("dolefoaurora")) return "ALL BARANGAY123";
+    return "Dingalan123!";
   };
 
   // When role changes
