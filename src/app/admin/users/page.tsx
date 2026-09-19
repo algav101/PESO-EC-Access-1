@@ -21,6 +21,12 @@ import {
   ShieldCheck,
   Camera,
   Clock,
+  Eye,
+  EyeOff,
+  Copy,
+  Check,
+  Unlock,
+  Sparkles,
 } from "lucide-react";
 import { StatusBadge } from "@/components/common/StatusBadge";
 import { formatDate } from "@/lib/utils";
@@ -70,6 +76,15 @@ export default function UserManagementPage() {
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [editUser, setEditUser] = useState<any | null>(null);
 
+  // Password View & Visibility States (Domain Master & PESO Admin)
+  const [visiblePasswords, setVisiblePasswords] = useState<Record<string, boolean>>({});
+  const [showAllPasswords, setShowAllPasswords] = useState(false);
+  const [copiedUserId, setCopiedUserId] = useState<string | null>(null);
+  const [showCreatePassword, setShowCreatePassword] = useState(false);
+  const [showEditPassword, setShowEditPassword] = useState(false);
+  const [showEditCurrentPassword, setShowEditCurrentPassword] = useState(false);
+  const [showPreviewPasswords, setShowPreviewPasswords] = useState(false);
+
   // CSV Import State
   const [isImportOpen, setIsImportOpen] = useState(false);
   const [csvContent, setCsvContent] = useState(SAMPLE_CSV);
@@ -92,6 +107,46 @@ export default function UserManagementPage() {
   const [editBarangay, setEditBarangay] = useState("");
   const [editStatus, setEditStatus] = useState("ACTIVE");
   const [editPassword, setEditPassword] = useState("");
+
+  const togglePasswordVisibility = (userId: string) => {
+    setVisiblePasswords((prev) => ({
+      ...prev,
+      [userId]: !prev[userId],
+    }));
+  };
+
+  const toggleAllPasswords = () => {
+    const nextState = !showAllPasswords;
+    setShowAllPasswords(nextState);
+    const newMap: Record<string, boolean> = {};
+    users.forEach((u) => {
+      newMap[u.id] = nextState;
+    });
+    setVisiblePasswords(newMap);
+  };
+
+  const copyToClipboard = (text: string, id: string) => {
+    if (!text) return;
+    navigator.clipboard.writeText(text);
+    setCopiedUserId(id);
+    setTimeout(() => {
+      setCopiedUserId(null);
+    }, 2000);
+  };
+
+  const generateSuggestedPassword = (targetRole: string, targetBarangay?: string) => {
+    if (targetRole === "TUPAD_COORDINATOR" || targetRole === "TUPAD_ASSISTING_DOCUMENTOR") {
+      const b = targetBarangay || assignedBarangay || "PALTIC";
+      return `${b.toUpperCase().replace(/\s+/g, "_")}123`;
+    }
+    if (targetRole === "DOLE_COORDINATOR") {
+      return "ALL BARANGAY123";
+    }
+    if (targetRole === "DOMAIN_MASTER") {
+      return "admin123";
+    }
+    return "Dingalan2026!";
+  };
 
   useEffect(() => {
     fetchUsers();
@@ -307,17 +362,49 @@ export default function UserManagementPage() {
 
       {/* Users Table */}
       <div className="gov-card overflow-hidden shadow">
-        <div className="p-4 bg-slate-50 border-b flex items-center justify-between">
-          <span className="text-xs font-bold text-slate-800 uppercase tracking-wider">
-            Active Accounts ({users.length})
-          </span>
-          <button
-            onClick={fetchUsers}
-            className="p-1.5 text-slate-500 hover:text-gov-blue hover:bg-white rounded-lg transition"
-            title="Refresh User List"
-          >
-            <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
-          </button>
+        <div className="p-4 bg-slate-50 border-b flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+          <div className="flex items-center space-x-2">
+            <span className="text-xs font-black text-slate-800 uppercase tracking-wider">
+              Active Accounts ({users.length})
+            </span>
+            <span className="hidden md:inline-flex items-center space-x-1 px-2 py-0.5 bg-amber-50 text-amber-900 border border-amber-300 rounded text-[10px] font-bold">
+              <Key className="w-3 h-3 text-amber-600" />
+              <span>Password View: Domain Master &amp; PESO Admin</span>
+            </span>
+          </div>
+
+          <div className="flex items-center space-x-2 self-start sm:self-auto">
+            {/* Global Show/Hide All Passwords Toggle */}
+            <button
+              onClick={toggleAllPasswords}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition flex items-center space-x-1.5 shadow-xs ${
+                showAllPasswords
+                  ? "bg-amber-100 text-amber-950 border-amber-400 hover:bg-amber-200"
+                  : "bg-white text-slate-700 border-slate-300 hover:bg-slate-50 hover:text-gov-blue"
+              }`}
+              title={showAllPasswords ? "Hide all passwords" : "Show all passwords"}
+            >
+              {showAllPasswords ? (
+                <>
+                  <EyeOff className="w-3.5 h-3.5 text-amber-700" />
+                  <span>Hide All Passwords</span>
+                </>
+              ) : (
+                <>
+                  <Eye className="w-3.5 h-3.5 text-gov-blue" />
+                  <span>Show All Passwords</span>
+                </>
+              )}
+            </button>
+
+            <button
+              onClick={fetchUsers}
+              className="p-1.5 text-slate-500 hover:text-gov-blue hover:bg-white rounded-lg transition border border-slate-200"
+              title="Refresh User List"
+            >
+              <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
+            </button>
+          </div>
         </div>
 
         <div className="overflow-x-auto">
@@ -328,6 +415,12 @@ export default function UserManagementPage() {
                 <th className="px-4 py-3">Username</th>
                 <th className="px-4 py-3">Assigned Role</th>
                 <th className="px-4 py-3">Assigned Scope / Barangay</th>
+                <th className="px-4 py-3 bg-amber-50/70 border-x border-amber-200/60 text-amber-950">
+                  <div className="flex items-center space-x-1">
+                    <Key className="w-3 h-3 text-amber-600" />
+                    <span>Password (Admin View)</span>
+                  </div>
+                </th>
                 <th className="px-4 py-3">Email Address</th>
                 <th className="px-4 py-3">Last Login</th>
                 <th className="px-4 py-3">Status</th>
@@ -335,67 +428,112 @@ export default function UserManagementPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {users.map((u) => (
-                <tr key={u.id} className="hover:bg-slate-50">
-                  <td className="px-4 py-3 font-bold text-slate-900">{u.fullName}</td>
-                  <td className="px-4 py-3 font-mono text-slate-600">@{u.username}</td>
-                  <td className="px-4 py-3 font-semibold">
-                    {u.role === "DOMAIN_MASTER" ? (
-                      <span className="inline-flex items-center space-x-1 px-2.5 py-0.5 bg-gradient-to-r from-amber-500/10 to-purple-500/10 text-amber-900 border border-amber-400/60 rounded-full font-black text-[11px] shadow-xs">
-                        <Crown className="w-3.5 h-3.5 text-amber-600" />
-                        <span>Domain Master</span>
-                      </span>
-                    ) : u.role === "PESO_ADMIN" ? (
-                      <span className="inline-flex items-center space-x-1 px-2.5 py-0.5 bg-blue-50 text-gov-blue border border-blue-200 rounded-full font-bold text-[11px]">
-                        <ShieldAlert className="w-3 h-3" />
-                        <span>PESO Admin</span>
-                      </span>
-                    ) : u.role === "PESO_STAFF" ? (
-                      <span className="inline-flex items-center space-x-1 px-2.5 py-0.5 bg-emerald-50 text-emerald-800 border border-emerald-200 rounded-full font-bold text-[11px]">
-                        <ShieldCheck className="w-3 h-3 text-emerald-600" />
-                        <span>PESO Operations Staff</span>
-                      </span>
-                    ) : u.role === "TUPAD_ASSISTING_DOCUMENTOR" ? (
-                      <span className="inline-flex items-center space-x-1 px-2.5 py-0.5 bg-teal-50 text-teal-800 border border-teal-300 rounded-full font-black text-[11px] shadow-xs">
-                        <Camera className="w-3 h-3 text-teal-600" />
-                        <span>Tupad Assisting Documentor</span>
-                      </span>
-                    ) : (
-                      <span className="text-slate-700 font-medium">
-                        {(u.role || "").replace(/_/g, " ")}
-                      </span>
-                    )}
-                  </td>
-                  <td className="px-4 py-3">
-                    {u.role === "TUPAD_COORDINATOR" || u.role === "TUPAD_ASSISTING_DOCUMENTOR" ? (
-                      <span className="inline-flex items-center space-x-1 px-2.5 py-1 bg-amber-50 text-amber-900 border border-amber-200 rounded-lg font-bold text-[11px]">
-                        <MapPin className="w-3 h-3 text-amber-600" />
-                        <span>Brgy. {u.assignedBarangay || "All (Floating)"}</span>
-                      </span>
-                    ) : (
-                      <span className="text-slate-400 text-[11px] font-medium">
-                        Municipality-wide (All 11 Barangays)
-                      </span>
-                    )}
-                  </td>
-                  <td className="px-4 py-3 text-slate-500">{u.email || "-"}</td>
-                  <td className="px-4 py-3 text-slate-500 font-mono">
-                    {u.lastLoginAt ? formatDate(u.lastLoginAt, "MMM dd, yyyy HH:mm") : "Never"}
-                  </td>
-                  <td className="px-4 py-3">
-                    <StatusBadge status={u.status} />
-                  </td>
-                  <td className="px-4 py-3 text-right">
-                    <button
-                      onClick={() => openEditModal(u)}
-                      className="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-[11px] rounded-lg transition inline-flex items-center space-x-1"
-                    >
-                      <Edit className="w-3 h-3 text-slate-500" />
-                      <span>Edit</span>
-                    </button>
-                  </td>
-                </tr>
-              ))}
+              {users.map((u) => {
+                const isRevealed = visiblePasswords[u.id] || showAllPasswords;
+                const displayPass = u.plainPassword || generateSuggestedPassword(u.role, u.assignedBarangay);
+                return (
+                  <tr key={u.id} className="hover:bg-slate-50">
+                    <td className="px-4 py-3 font-bold text-slate-900">{u.fullName}</td>
+                    <td className="px-4 py-3 font-mono text-slate-600">@{u.username}</td>
+                    <td className="px-4 py-3 font-semibold">
+                      {u.role === "DOMAIN_MASTER" ? (
+                        <span className="inline-flex items-center space-x-1 px-2.5 py-0.5 bg-gradient-to-r from-amber-500/10 to-purple-500/10 text-amber-900 border border-amber-400/60 rounded-full font-black text-[11px] shadow-xs">
+                          <Crown className="w-3.5 h-3.5 text-amber-600" />
+                          <span>Domain Master</span>
+                        </span>
+                      ) : u.role === "PESO_ADMIN" ? (
+                        <span className="inline-flex items-center space-x-1 px-2.5 py-0.5 bg-blue-50 text-gov-blue border border-blue-200 rounded-full font-bold text-[11px]">
+                          <ShieldAlert className="w-3 h-3" />
+                          <span>PESO Admin</span>
+                        </span>
+                      ) : u.role === "PESO_STAFF" ? (
+                        <span className="inline-flex items-center space-x-1 px-2.5 py-0.5 bg-emerald-50 text-emerald-800 border border-emerald-200 rounded-full font-bold text-[11px]">
+                          <ShieldCheck className="w-3 h-3 text-emerald-600" />
+                          <span>PESO Operations Staff</span>
+                        </span>
+                      ) : u.role === "TUPAD_ASSISTING_DOCUMENTOR" ? (
+                        <span className="inline-flex items-center space-x-1 px-2.5 py-0.5 bg-teal-50 text-teal-800 border border-teal-300 rounded-full font-black text-[11px] shadow-xs">
+                          <Camera className="w-3 h-3 text-teal-600" />
+                          <span>Tupad Assisting Documentor</span>
+                        </span>
+                      ) : (
+                        <span className="text-slate-700 font-medium">
+                          {(u.role || "").replace(/_/g, " ")}
+                        </span>
+                      )}
+                    </td>
+                    <td className="px-4 py-3">
+                      {u.role === "TUPAD_COORDINATOR" || u.role === "TUPAD_ASSISTING_DOCUMENTOR" ? (
+                        <span className="inline-flex items-center space-x-1 px-2.5 py-1 bg-amber-50 text-amber-900 border border-amber-200 rounded-lg font-bold text-[11px]">
+                          <MapPin className="w-3 h-3 text-amber-600" />
+                          <span>Brgy. {u.assignedBarangay || "All (Floating)"}</span>
+                        </span>
+                      ) : (
+                        <span className="text-slate-400 text-[11px] font-medium">
+                          Municipality-wide (All 11 Barangays)
+                        </span>
+                      )}
+                    </td>
+                    {/* Password Cell */}
+                    <td className="px-4 py-3 bg-amber-50/30 border-x border-amber-100">
+                      <div className="flex items-center space-x-1.5 font-mono">
+                        <span
+                          className={`px-2.5 py-1 rounded-md text-[11px] font-semibold transition ${
+                            isRevealed
+                              ? "bg-amber-100/90 text-amber-950 border border-amber-300 font-bold"
+                              : "bg-slate-100 text-slate-400 tracking-widest"
+                          }`}
+                        >
+                          {isRevealed ? displayPass : "••••••••"}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => togglePasswordVisibility(u.id)}
+                          className="p-1 text-slate-400 hover:text-gov-blue hover:bg-slate-200 rounded transition"
+                          title={isRevealed ? "Hide password" : "Show password"}
+                        >
+                          {isRevealed ? (
+                            <EyeOff className="w-3.5 h-3.5 text-amber-700" />
+                          ) : (
+                            <Eye className="w-3.5 h-3.5" />
+                          )}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => copyToClipboard(displayPass, u.id)}
+                          className="p-1 text-slate-400 hover:text-emerald-700 hover:bg-emerald-50 rounded transition"
+                          title="Copy password to clipboard"
+                        >
+                          {copiedUserId === u.id ? (
+                            <span className="inline-flex items-center text-[10px] text-emerald-600 font-bold">
+                              <Check className="w-3.5 h-3.5 text-emerald-600 mr-0.5" />
+                              <span>Copied</span>
+                            </span>
+                          ) : (
+                            <Copy className="w-3.5 h-3.5" />
+                          )}
+                        </button>
+                      </div>
+                    </td>
+                    <td className="px-4 py-3 text-slate-500">{u.email || "-"}</td>
+                    <td className="px-4 py-3 text-slate-500 font-mono">
+                      {u.lastLoginAt ? formatDate(u.lastLoginAt, "MMM dd, yyyy HH:mm") : "Never"}
+                    </td>
+                    <td className="px-4 py-3">
+                      <StatusBadge status={u.status} />
+                    </td>
+                    <td className="px-4 py-3 text-right">
+                      <button
+                        onClick={() => openEditModal(u)}
+                        className="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-[11px] rounded-lg transition inline-flex items-center space-x-1"
+                      >
+                        <Edit className="w-3 h-3 text-slate-500" />
+                        <span>Edit</span>
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
@@ -476,11 +614,30 @@ export default function UserManagementPage() {
                   <CheckCircle2 className="w-4 h-4 text-emerald-600" />
                   <span>Parsed Accounts Preview ({previewRows.length} Rows Detected)</span>
                 </span>
-                {parsingPreview && (
-                  <span className="text-xs text-slate-500 font-semibold animate-pulse">
-                    Parsing rows...
-                  </span>
-                )}
+                <div className="flex items-center space-x-2">
+                  <button
+                    type="button"
+                    onClick={() => setShowPreviewPasswords(!showPreviewPasswords)}
+                    className="text-[11px] font-bold text-gov-blue hover:text-gov-dark flex items-center space-x-1 bg-slate-100 hover:bg-slate-200 px-2 py-1 rounded"
+                  >
+                    {showPreviewPasswords ? (
+                      <>
+                        <EyeOff className="w-3 h-3" />
+                        <span>Hide Passwords</span>
+                      </>
+                    ) : (
+                      <>
+                        <Eye className="w-3 h-3" />
+                        <span>Show Passwords</span>
+                      </>
+                    )}
+                  </button>
+                  {parsingPreview && (
+                    <span className="text-xs text-slate-500 font-semibold animate-pulse">
+                      Parsing rows...
+                    </span>
+                  )}
+                </div>
               </div>
 
               <div className="border rounded-xl max-h-56 overflow-y-auto bg-slate-50">
@@ -491,7 +648,7 @@ export default function UserManagementPage() {
                       <th className="px-3 py-2">Username</th>
                       <th className="px-3 py-2">Role</th>
                       <th className="px-3 py-2">Assigned Barangay</th>
-                      <th className="px-3 py-2">Password</th>
+                      <th className="px-3 py-2 bg-amber-50 text-amber-950">Password</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-200">
@@ -513,7 +670,9 @@ export default function UserManagementPage() {
                             <span className="text-slate-400">All (Municipality)</span>
                           )}
                         </td>
-                        <td className="px-3 py-2 font-mono text-slate-500">{r.password}</td>
+                        <td className="px-3 py-2 font-mono bg-amber-50/40 font-semibold text-amber-950">
+                          {showPreviewPasswords ? r.password : "••••••••"}
+                        </td>
                       </tr>
                     ))}
                   </tbody>
@@ -584,15 +743,45 @@ export default function UserManagementPage() {
             </div>
 
             <div>
-              <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Password *</label>
-              <input
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="••••••••"
-                className="w-full px-3 py-2 text-xs border rounded-lg"
-                required
-              />
+              <div className="flex items-center justify-between mb-1">
+                <label className="block text-xs font-bold text-slate-700 uppercase">Password *</label>
+                <div className="flex items-center space-x-2">
+                  <button
+                    type="button"
+                    onClick={() => setPassword(generateSuggestedPassword(role, assignedBarangay))}
+                    className="text-[10px] text-gov-blue hover:text-gov-dark font-bold flex items-center space-x-0.5"
+                  >
+                    <Sparkles className="w-3 h-3 text-amber-500" />
+                    <span>Auto-Suggest</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setShowCreatePassword(!showCreatePassword)}
+                    className="text-[10px] text-slate-500 hover:text-gov-blue font-semibold flex items-center space-x-0.5"
+                  >
+                    {showCreatePassword ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
+                    <span>{showCreatePassword ? "Hide" : "Show"}</span>
+                  </button>
+                </div>
+              </div>
+              <div className="relative">
+                <input
+                  type={showCreatePassword ? "text" : "password"}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="••••••••"
+                  className="w-full pl-3 pr-10 py-2 text-xs border rounded-lg font-mono"
+                  required
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowCreatePassword(!showCreatePassword)}
+                  className="absolute right-2.5 top-2.5 p-0.5 text-slate-400 hover:text-gov-blue"
+                  title={showCreatePassword ? "Hide password" : "Show password"}
+                >
+                  {showCreatePassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                </button>
+              </div>
             </div>
 
             <div>
@@ -610,7 +799,13 @@ export default function UserManagementPage() {
               <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Role *</label>
               <select
                 value={role}
-                onChange={(e) => setRole(e.target.value)}
+                onChange={(e) => {
+                  const newRole = e.target.value;
+                  setRole(newRole);
+                  if (password) {
+                    setPassword(generateSuggestedPassword(newRole, assignedBarangay));
+                  }
+                }}
                 className="w-full px-3 py-2 text-xs border rounded-lg bg-slate-50 font-bold"
               >
                 <option value="TUPAD_COORDINATOR">TUPAD Field Coordinator (Barangay-Scoped)</option>
@@ -634,7 +829,13 @@ export default function UserManagementPage() {
                 </p>
                 <select
                   value={assignedBarangay}
-                  onChange={(e) => setAssignedBarangay(e.target.value)}
+                  onChange={(e) => {
+                    const newBrgy = e.target.value;
+                    setAssignedBarangay(newBrgy);
+                    if (password) {
+                      setPassword(generateSuggestedPassword(role, newBrgy));
+                    }
+                  }}
                   className="w-full px-3 py-2 text-xs border border-amber-300 rounded-lg bg-white font-bold text-slate-800 mt-1"
                 >
                   {DINGALAN_BARANGAYS.map((b) => (
@@ -673,6 +874,53 @@ export default function UserManagementPage() {
               <Edit className="w-4 h-4 text-gov-blue" />
               <span>Edit User Account (@{editUser.username})</span>
             </h3>
+
+            {/* Current Active Password Card */}
+            <div className="p-3 bg-amber-50/80 border border-amber-300 rounded-xl space-y-1">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-black uppercase tracking-wider text-amber-900 flex items-center space-x-1">
+                  <Key className="w-3 h-3 text-amber-600" />
+                  <span>Current Active Password (Admin View)</span>
+                </span>
+                <div className="flex items-center space-x-1">
+                  <button
+                    type="button"
+                    onClick={() => setShowEditCurrentPassword(!showEditCurrentPassword)}
+                    className="p-1 text-slate-500 hover:text-gov-blue hover:bg-white rounded transition"
+                    title={showEditCurrentPassword ? "Hide password" : "Show password"}
+                  >
+                    {showEditCurrentPassword ? (
+                      <EyeOff className="w-3.5 h-3.5 text-amber-700" />
+                    ) : (
+                      <Eye className="w-3.5 h-3.5 text-slate-600" />
+                    )}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const cur = editUser.plainPassword || generateSuggestedPassword(editUser.role, editUser.assignedBarangay);
+                      copyToClipboard(cur, `edit-modal-${editUser.id}`);
+                    }}
+                    className="p-1 text-slate-500 hover:text-emerald-700 hover:bg-white rounded transition"
+                    title="Copy current password"
+                  >
+                    {copiedUserId === `edit-modal-${editUser.id}` ? (
+                      <span className="text-[10px] font-bold text-emerald-600 flex items-center">
+                        <Check className="w-3.5 h-3.5 mr-0.5" />
+                        <span>Copied</span>
+                      </span>
+                    ) : (
+                      <Copy className="w-3.5 h-3.5 text-slate-600" />
+                    )}
+                  </button>
+                </div>
+              </div>
+              <div className="font-mono text-xs font-extrabold text-amber-950 bg-white/80 px-2.5 py-1.5 rounded-lg border border-amber-200">
+                {showEditCurrentPassword
+                  ? (editUser.plainPassword || generateSuggestedPassword(editUser.role, editUser.assignedBarangay))
+                  : "••••••••••••"}
+              </div>
+            </div>
 
             <div>
               <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Full Name *</label>
@@ -747,17 +995,47 @@ export default function UserManagementPage() {
             )}
 
             <div>
-              <label className="block text-xs font-bold text-slate-700 uppercase mb-1 flex items-center space-x-1">
-                <Key className="w-3.5 h-3.5 text-slate-400" />
-                <span>Reset Password (Optional)</span>
-              </label>
-              <input
-                type="password"
-                value={editPassword}
-                onChange={(e) => setEditPassword(e.target.value)}
-                placeholder="Leave blank to keep existing password"
-                className="w-full px-3 py-2 text-xs border rounded-lg"
-              />
+              <div className="flex items-center justify-between mb-1">
+                <label className="block text-xs font-bold text-slate-700 uppercase flex items-center space-x-1">
+                  <Key className="w-3.5 h-3.5 text-slate-400" />
+                  <span>Reset / Change Password (Optional)</span>
+                </label>
+                <div className="flex items-center space-x-2">
+                  <button
+                    type="button"
+                    onClick={() => setEditPassword(generateSuggestedPassword(editRole, editBarangay))}
+                    className="text-[10px] text-gov-blue hover:text-gov-dark font-bold flex items-center space-x-0.5"
+                  >
+                    <Sparkles className="w-3 h-3 text-amber-500" />
+                    <span>Auto-Suggest</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setShowEditPassword(!showEditPassword)}
+                    className="text-[10px] text-slate-500 hover:text-gov-blue font-semibold flex items-center space-x-0.5"
+                  >
+                    {showEditPassword ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
+                    <span>{showEditPassword ? "Hide" : "Show"}</span>
+                  </button>
+                </div>
+              </div>
+              <div className="relative">
+                <input
+                  type={showEditPassword ? "text" : "password"}
+                  value={editPassword}
+                  onChange={(e) => setEditPassword(e.target.value)}
+                  placeholder="Leave blank to keep existing password"
+                  className="w-full pl-3 pr-10 py-2 text-xs border rounded-lg font-mono"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowEditPassword(!showEditPassword)}
+                  className="absolute right-2.5 top-2.5 p-0.5 text-slate-400 hover:text-gov-blue"
+                  title={showEditPassword ? "Hide password" : "Show password"}
+                >
+                  {showEditPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                </button>
+              </div>
             </div>
 
             <div className="flex justify-end space-x-2 pt-2">

@@ -62,6 +62,7 @@ export async function POST(request: Request) {
             role: preset.role,
             assignedBarangay: preset.brgy,
             passwordHash: hashed,
+            plainPassword: preset.pass,
             status: "ACTIVE",
           },
         });

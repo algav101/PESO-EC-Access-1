@@ -12,6 +12,7 @@ model User {
   id            String    @id @default(uuid())
   username      String    @unique
   passwordHash  String
+  plainPassword String?   // Saved/initial plaintext password viewable by Domain Master & PESO Admin
   fullName      String
   email         String?
   role          String    @default("PESO_ADMIN") // PESO_ADMIN, TUPAD_COORDINATOR, TUPAD_ASSISTING_DOCUMENTOR, DOLE_COORDINATOR, DOMAIN_MASTER, PESO_STAFF

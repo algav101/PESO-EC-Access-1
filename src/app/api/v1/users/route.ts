@@ -6,6 +6,28 @@ import { getCurrentUser, hasPermission } from "@/lib/auth";
 import bcrypt from "bcryptjs";
 import { logAudit } from "@/lib/audit";
 
+function getPresetPasswordFallback(uname?: string | null, brgy?: string | null, role?: string | null): string {
+  const u = (uname || "").toLowerCase();
+  if (u === "admin") return "admin123";
+  if (u === "coordinator") return "coord123";
+  if (u === "documentor") return "doc123";
+  if (u === "dole") return "dole123";
+  if (u.includes("umiray")) return "UMIRAY123";
+  if (u.includes("ibona")) return "IBONA123";
+  if (u.includes("matawe")) return "MATAWE123";
+  if (u.includes("bnb") || (brgy && brgy.toLowerCase().includes("butas"))) return "BUTAS NA BATO123";
+  if (u.includes("aplaya")) return "APLAYA123";
+  if (u.includes("poblacion")) return "POBLACION123";
+  if (u.includes("davildavilan")) return "DAVILDAVILAN123";
+  if (u.includes("caragsacan")) return "CARAGSACAN123";
+  if (u.includes("tanawan")) return "TANAWAN123";
+  if (u.includes("dika")) return "DIKAPANIKIAN123";
+  if (u.includes("paltic")) return "PALTIC123";
+  if (u.includes("dolefoaurora") || role === "DOLE_COORDINATOR") return "ALL BARANGAY123";
+  if (brgy) return `${brgy.toUpperCase()}123`;
+  return "Dingalan123!";
+}
+
 export async function GET() {
   try {
     const user = await getCurrentUser();
@@ -13,7 +35,9 @@ export async function GET() {
       return NextResponse.json({ error: "Forbidden: insufficient permissions" }, { status: 403 });
     }
 
-    const users = await prisma.user.findMany({
+    const isSuperAdmin = user.role === "DOMAIN_MASTER" || user.role === "PESO_ADMIN";
+
+    const rawUsers = await prisma.user.findMany({
       select: {
         id: true,
         username: true,
@@ -22,10 +46,21 @@ export async function GET() {
         role: true,
         status: true,
         assignedBarangay: true,
+        plainPassword: isSuperAdmin,
         lastLoginAt: true,
         createdAt: true,
       },
       orderBy: { createdAt: "desc" },
+    });
+
+    const users = rawUsers.map((u) => {
+      if (isSuperAdmin) {
+        return {
+          ...u,
+          plainPassword: u.plainPassword || getPresetPasswordFallback(u.username, u.assignedBarangay, u.role),
+        };
+      }
+      return u;
     });
 
     return NextResponse.json({ users });
@@ -54,12 +89,14 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Username, password, and full name are required" }, { status: 400 });
     }
 
-    const passwordHash = await bcrypt.hash(password, 10);
+    const trimmedPassword = String(password).trim();
+    const passwordHash = await bcrypt.hash(trimmedPassword, 10);
 
     const newUser = await prisma.user.create({
       data: {
         username: username.trim().toLowerCase(),
         passwordHash,
+        plainPassword: trimmedPassword,
         fullName: fullName.trim(),
         email: email?.trim() || null,
         role,
@@ -77,6 +114,7 @@ export async function POST(request: Request) {
         role: true,
         status: true,
         assignedBarangay: true,
+        plainPassword: true,
       },
     });
 
@@ -131,8 +169,10 @@ export async function PATCH(request: Request) {
           ? assignedBarangay?.trim() || null
           : null;
     }
-    if (password && password.trim().length > 0) {
-      updateData.passwordHash = await bcrypt.hash(password.trim(), 10);
+    if (password && String(password).trim().length > 0) {
+      const trimmed = String(password).trim();
+      updateData.passwordHash = await bcrypt.hash(trimmed, 10);
+      updateData.plainPassword = trimmed;
     }
 
     const updatedUser = await prisma.user.update({
@@ -146,6 +186,7 @@ export async function PATCH(request: Request) {
         role: true,
         status: true,
         assignedBarangay: true,
+        plainPassword: true,
         lastLoginAt: true,
       },
     });

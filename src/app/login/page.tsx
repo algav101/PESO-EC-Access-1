@@ -17,6 +17,8 @@ import {
   Building,
   MapPin,
   Sparkles,
+  Eye,
+  EyeOff,
 } from "lucide-react";
 
 interface PresetAccount {
@@ -95,6 +97,7 @@ export default function LoginPage() {
   const [selectedAccountUsername, setSelectedAccountUsername] = useState<string>("");
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -336,19 +339,51 @@ export default function LoginPage() {
 
             {/* 4. Password Input */}
             <div>
-              <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
-                Password
-              </label>
+              <div className="flex items-center justify-between mb-1">
+                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider">
+                  Password
+                </label>
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="text-[11px] font-bold text-gov-blue hover:text-gov-dark flex items-center space-x-1 focus:outline-none transition"
+                >
+                  {showPassword ? (
+                    <>
+                      <EyeOff className="w-3.5 h-3.5 text-gov-blue" />
+                      <span>Itago (Hide)</span>
+                    </>
+                  ) : (
+                    <>
+                      <Eye className="w-3.5 h-3.5 text-gov-blue" />
+                      <span>Ipakita (Show)</span>
+                    </>
+                  )}
+                </button>
+              </div>
               <div className="relative">
-                <Lock className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
+                <Lock className="w-4 h-4 text-slate-400 absolute left-3 top-3 pointer-events-none" />
                 <input
-                  type="password"
+                  type={showPassword ? "text" : "password"}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="••••••••"
-                  className="w-full pl-9 pr-3 py-2 text-xs border border-slate-300 rounded-lg focus:outline-none focus:border-gov-blue focus:ring-1 focus:ring-gov-blue bg-white"
+                  className="w-full pl-9 pr-10 py-2 text-xs border border-slate-300 rounded-lg focus:outline-none focus:border-gov-blue focus:ring-1 focus:ring-gov-blue bg-white font-medium"
                   required
                 />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-2.5 top-2.5 p-1 text-slate-400 hover:text-gov-blue focus:outline-none rounded transition"
+                  title={showPassword ? "Hide password" : "Show password"}
+                  aria-label={showPassword ? "Hide password" : "Show password"}
+                >
+                  {showPassword ? (
+                    <EyeOff className="w-4 h-4 text-gov-blue" />
+                  ) : (
+                    <Eye className="w-4 h-4" />
+                  )}
+                </button>
               </div>
             </div>
 

@@ -38,7 +38,7 @@ function normalizeRole(rawRole?: string): string {
   return "TUPAD_COORDINATOR";
 }
 
-function normalizeBarangay(rawBarangay?: string): string | null {
+function normalizeBarangay(rawBarangay?: string | null): string | null {
   if (!rawBarangay) return null;
   const bClean = rawBarangay.trim().toUpperCase().replace(/\s+/g, " ");
   if (bClean.includes("ALL") || bClean.includes("MUNICIPALITY") || bClean.includes("N/A") || bClean === "-") {
@@ -187,6 +187,7 @@ export async function POST(request: Request) {
             role: u.role,
             assignedBarangay: u.assignedBarangay,
             passwordHash,
+            plainPassword: u.password,
             status: "ACTIVE",
           },
           create: {
@@ -196,6 +197,7 @@ export async function POST(request: Request) {
             role: u.role,
             assignedBarangay: u.assignedBarangay,
             passwordHash,
+            plainPassword: u.password,
             status: "ACTIVE",
           },
           select: {
@@ -206,6 +208,7 @@ export async function POST(request: Request) {
             role: true,
             assignedBarangay: true,
             status: true,
+            plainPassword: true,
           },
         });
 
