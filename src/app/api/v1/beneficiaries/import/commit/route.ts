@@ -78,7 +78,15 @@ export async function POST(request: Request) {
       }),
       prisma.programBeneficiary.findMany({
         where: { programId: targetProgramId },
-        select: { id: true, beneficiaryId: true, designatedNumber: true },
+        select: {
+          id: true,
+          beneficiaryId: true,
+          designatedNumber: true,
+          participationStatus: true,
+          beneficiary: {
+            select: { id: true, fullName: true, birthday: true },
+          },
+        },
       }),
     ]);
 
@@ -105,7 +113,16 @@ export async function POST(request: Request) {
       }
     });
 
-    const existingPbBeneMap = new Map(existingPbs.map((pb) => [pb.beneficiaryId, pb]));
+    const existingPbDesigMap = new Map<string, any>();
+    const existingPbBeneMap = new Map<string, any>();
+
+    existingPbs.forEach((pb) => {
+      const d = String(pb.designatedNumber).trim();
+      if (d && pb.participationStatus !== "REPLACED") {
+        existingPbDesigMap.set(d, pb);
+      }
+      existingPbBeneMap.set(pb.beneficiaryId, pb);
+    });
 
     // Step 2: Separate new vs existing beneficiaries & assemble data in-memory
     const newBeneficiariesData: any[] = [];
@@ -213,12 +230,14 @@ export async function POST(request: Request) {
         : Promise.resolve(),
     ]);
 
-    // Step 4: Assemble program beneficiaries, QR codes, and PB updates
+    // Step 4: Assemble program beneficiaries with Designated Number reference slot resolution
     const progBeneficiariesToInsert: any[] = [];
     const qrCodesToInsert: any[] = [];
     const pbUpdateOps: any[] = [];
+    const replacementLogsToInsert: any[] = [];
 
     for (const r of validRows) {
+      const desigStr = String(r.designatedNumber).trim();
       const key = `${r.fullName.trim().toUpperCase()}_${r.birthday}`;
       const bene = beneMap.get(key) || beneMap.get(r.fullName.trim().toUpperCase());
       if (!bene) continue;
@@ -226,14 +245,48 @@ export async function POST(request: Request) {
       const desigNum = parseInt(r.designatedNumber, 10) || 1;
       const assignment = getTableNumber(desigNum);
 
-      const existingPb = existingPbBeneMap.get(bene.id);
-      if (existingPb) {
-        if (duplicateStrategy === "MERGE_AND_REPLACE") {
+      // Check if another beneficiary originally occupied this designated slot number
+      const existingPbAtSlot = existingPbDesigMap.get(desigStr);
+      const isDifferentPersonAtSlot =
+        existingPbAtSlot &&
+        existingPbAtSlot.beneficiaryId !== bene.id &&
+        existingPbAtSlot.beneficiary?.fullName?.trim().toUpperCase() !== bene.fullName.trim().toUpperCase();
+
+      if (isDifferentPersonAtSlot) {
+        // Newly uploaded beneficiary is considered the FINAL beneficiary for this slot number.
+        // Original beneficiary at this slot is marked REPLACED with replacement audit trail.
+        pbUpdateOps.push(
+          prisma.programBeneficiary.update({
+            where: { id: existingPbAtSlot.id },
+            data: {
+              participationStatus: "REPLACED",
+            },
+          })
+        );
+
+        replacementLogsToInsert.push({
+          id: crypto.randomUUID(),
+          programId: targetProgramId,
+          originalProgramBeneficiaryId: existingPbAtSlot.id,
+          reason: `Replaced by newly uploaded beneficiary in Final Masterlist: ${bene.fullName} (Slot #${desigStr})`,
+          status: "APPROVED",
+          approvedAt: new Date(),
+          approvedById: user.id,
+          initiatedById: user.id,
+        });
+      }
+
+      // Check if this beneficiary already has a program enrollment
+      const existingPbOfBene = existingPbBeneMap.get(bene.id);
+
+      if (existingPbOfBene) {
+        if (duplicateStrategy === "MERGE_AND_REPLACE" || isDifferentPersonAtSlot) {
           pbUpdateOps.push(
             prisma.programBeneficiary.update({
-              where: { id: existingPb.id },
+              where: { id: existingPbOfBene.id },
               data: {
-                designatedNumber: String(r.designatedNumber),
+                designatedNumber: desigStr,
+                participationStatus: "ACTIVE",
                 tableNumber: assignment.table,
                 slotGroup: assignment.slotGroup,
               },
@@ -247,14 +300,14 @@ export async function POST(request: Request) {
           id: progBeneId,
           programId: targetProgramId,
           beneficiaryId: bene.id,
-          designatedNumber: String(r.designatedNumber),
+          designatedNumber: desigStr,
           participationStatus: "ACTIVE",
           originalBeneficiary: true,
           tableNumber: assignment.table,
           slotGroup: assignment.slotGroup,
         });
 
-        const qrData = generateBeneficiaryToken(targetProgramId, String(r.designatedNumber));
+        const qrData = generateBeneficiaryToken(targetProgramId, desigStr);
         qrCodesToInsert.push({
           id: crypto.randomUUID(),
           programId: targetProgramId,
@@ -269,7 +322,15 @@ export async function POST(request: Request) {
       }
     }
 
-    // Step 5: Execute new PB & QR code bulk insertions and batch updates in parallel
+    // Step 5: Execute Program Beneficiary bulk insertions first to satisfy FK constraints
+    if (progBeneficiariesToInsert.length > 0) {
+      await prisma.programBeneficiary.createMany({
+        data: progBeneficiariesToInsert,
+        skipDuplicates: true,
+      });
+    }
+
+    // Step 6: Execute child insertions (QR Codes, Replacement logs), batch updates, and exemption updates in parallel
     const allUpdateOps = [...beneUpdateOps, ...pbUpdateOps];
     const updatePromises: Promise<any>[] = [];
 
@@ -280,15 +341,15 @@ export async function POST(request: Request) {
     }
 
     await Promise.all([
-      progBeneficiariesToInsert.length > 0
-        ? prisma.programBeneficiary.createMany({
-            data: progBeneficiariesToInsert,
-            skipDuplicates: true,
-          })
-        : Promise.resolve(),
       qrCodesToInsert.length > 0
         ? prisma.qrCode.createMany({
             data: qrCodesToInsert,
+            skipDuplicates: true,
+          })
+        : Promise.resolve(),
+      replacementLogsToInsert.length > 0
+        ? prisma.beneficiaryReplacement.createMany({
+            data: replacementLogsToInsert,
             skipDuplicates: true,
           })
         : Promise.resolve(),

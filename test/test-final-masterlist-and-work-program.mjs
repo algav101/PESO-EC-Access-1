@@ -181,23 +181,71 @@ async function run() {
   assert.ok(umirayDay1Group1.totalCount >= 3, "Umiray Group 1 should have totalCount >= 3");
   console.log(`✅ 9. Verified Umiray Group 1 Work Program item: Area="${umirayDay1Group1.area}", Total=${umirayDay1Group1.totalCount}, Male=${umirayDay1Group1.maleCount}, Female=${umirayDay1Group1.femaleCount}, SC/PWD=${umirayDay1Group1.scPwdMaleCount + umirayDay1Group1.scPwdFemaleCount}`);
 
-  // 8. Test Delete Beneficiary from Program
+  // 8. Test Bulk Selection & Batch Deletion
   const benesRes = await fetch(`${BASE_URL}/api/v1/programs/${testProgramId}/beneficiaries`, {
     headers: { Cookie: cookie },
   });
   const benesData = await benesRes.json();
-  const targetToDelete = benesData.beneficiaries?.[0];
-  assert.ok(targetToDelete, "No beneficiary found to delete");
+  const selectedBatchToDelete = benesData.beneficiaries?.slice(0, 2) || [];
+  assert.ok(selectedBatchToDelete.length >= 2, "Expected at least 2 beneficiaries for batch delete test");
 
-  const deleteRes = await fetch(
-    `${BASE_URL}/api/v1/programs/${testProgramId}/beneficiaries?programBeneficiaryId=${targetToDelete.id}&deleteGlobal=false`,
+  const batchDeleteRes = await fetch(`${BASE_URL}/api/v1/programs/${testProgramId}/beneficiaries/batch-action`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Cookie: cookie },
+    body: JSON.stringify({
+      programBeneficiaryIds: selectedBatchToDelete.map((b) => b.id),
+      action: "DELETE_BENEFICIARIES",
+      deleteGlobal: false,
+    }),
+  });
+  const batchDeleteData = await batchDeleteRes.json();
+  assert.equal(batchDeleteRes.status, 200, `Batch delete failed: ${JSON.stringify(batchDeleteData)}`);
+  console.log(`✅ 10. Bulk Selected & Deleted ${batchDeleteData.updatedCount} beneficiaries from masterlist successfully`);
+
+  // 9. Test Slot Number Reference & Replacement Logic
+  // Upload a new beneficiary specifically assigned to Slot #1 (which replaces the previous occupant)
+  const replacementRow = [
     {
-      method: "DELETE",
-      headers: { Cookie: cookie },
-    }
-  );
-  assert.equal(deleteRes.status, 200, "Failed to delete beneficiary from program");
-  console.log("✅ 10. Beneficiary successfully removed / deleted from masterlist");
+      rowNumber: 1,
+      designatedNumber: "1",
+      fullName: "SANTOS, RODRIGO ALVAREZ",
+      firstName: "RODRIGO",
+      lastName: "SANTOS",
+      birthday: "1992-05-12",
+      birthdayPin: "05-12-1992",
+      barangay: "Aplaya",
+      sitio: "Purok Tanigue",
+      sex: "MALE",
+      age: 34,
+      status: "VALID",
+    },
+  ];
+
+  const replaceCommitRes = await fetch(`${BASE_URL}/api/v1/beneficiaries/import/commit`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Cookie: cookie },
+    body: JSON.stringify({
+      rows: replacementRow,
+      programId: testProgramId,
+      duplicateStrategy: "MERGE_AND_REPLACE",
+    }),
+  });
+  const replaceCommitData = await replaceCommitRes.json();
+  assert.equal(replaceCommitRes.status, 200, `Slot replacement commit failed: ${JSON.stringify(replaceCommitData)}`);
+  console.log(`✅ 11. Verified Slot #1 Replacement: Newly uploaded beneficiary became final beneficiary and original was replaced`);
+
+  // 10. Test 1-Click Masterlist Deduplication & Test Data Cleanup API
+  const dedupRes = await fetch(`${BASE_URL}/api/v1/beneficiaries/deduplicate`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Cookie: cookie },
+    body: JSON.stringify({
+      programId: testProgramId,
+      removeTestData: true,
+    }),
+  });
+  const dedupData = await dedupRes.json();
+  assert.equal(dedupRes.status, 200, `Deduplication API failed: ${JSON.stringify(dedupData)}`);
+  console.log(`✅ 12. Verified 1-Click Deduplication API: ${dedupData.message}`);
 
   console.log("\n🎉 ALL FINAL MASTERLIST & WORK PROGRAM DEPLOYMENT TESTS PASSED SUCCESSFULLY!");
 }

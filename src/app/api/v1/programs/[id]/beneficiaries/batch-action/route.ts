@@ -172,6 +172,43 @@ export async function POST(request: Request, { params }: { params: { id: string 
             });
           }
         }
+
+        // 3. Handle DELETE BENEFICIARIES ACTION
+        if (action === "DELETE_BENEFICIARIES") {
+          const beneIds = Array.from(new Set(targetBeneficiaries.map((b) => b.beneficiaryId)));
+
+          for (let i = 0; i < targetPbIds.length; i += chunkSize) {
+            const chunk = targetPbIds.slice(i, i + chunkSize);
+            await Promise.all([
+              tx.attendanceRecord.deleteMany({ where: { programBeneficiaryId: { in: chunk } } }),
+              tx.orientationAttendance.deleteMany({ where: { programBeneficiaryId: { in: chunk } } }),
+              tx.stubDistribution.deleteMany({ where: { programBeneficiaryId: { in: chunk } } }),
+              tx.payout.deleteMany({ where: { programBeneficiaryId: { in: chunk } } }),
+              tx.qrCode.deleteMany({ where: { programBeneficiaryId: { in: chunk } } }),
+            ]);
+            await tx.programBeneficiary.deleteMany({ where: { id: { in: chunk } } });
+          }
+
+          if (body.deleteGlobal) {
+            for (let i = 0; i < beneIds.length; i += chunkSize) {
+              const chunk = beneIds.slice(i, i + chunkSize);
+              await Promise.all([
+                tx.dependent.deleteMany({ where: { beneficiaryId: { in: chunk } } }),
+                tx.beneficiaryRestriction.deleteMany({ where: { beneficiaryId: { in: chunk } } }),
+              ]);
+              await tx.beneficiary.deleteMany({ where: { id: { in: chunk } } });
+            }
+          }
+
+          // Recount program beneficiaries
+          const count = await tx.programBeneficiary.count({
+            where: { programId: params.id, participationStatus: { not: "REPLACED" } },
+          });
+          await tx.program.update({
+            where: { id: params.id },
+            data: { beneficiaryCount: count },
+          });
+        }
       },
       {
         timeout: 30000,
@@ -184,7 +221,7 @@ export async function POST(request: Request, { params }: { params: { id: string 
       action: `BENEFICIARY_BATCH_${action}`,
       entityType: "PROGRAM",
       entityId: params.id,
-      metadata: { count: targetBeneficiaries.length, action, remarks },
+      metadata: { count: targetBeneficiaries.length, action, remarks, deleteGlobal: Boolean(body.deleteGlobal) },
     });
 
     return NextResponse.json({
