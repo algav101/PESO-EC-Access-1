@@ -37,6 +37,7 @@ import { EditBeneficiaryModal } from "@/components/beneficiaries/EditBeneficiary
 import { AdminStubOverrideModal } from "@/components/beneficiaries/AdminStubOverrideModal";
 import { MasterlistUploadModal } from "@/components/beneficiaries/MasterlistUploadModal";
 import { DeploymentGroupingMatrix } from "@/components/beneficiaries/DeploymentGroupingMatrix";
+import { TableScrollWrapper } from "@/components/common/TableScrollWrapper";
 import { useAuth } from "@/context/AuthContext";
 import { offlineDb } from "@/lib/dexie";
 import { isAdminUser, isFieldCoordinator } from "@/lib/permissions";
@@ -107,48 +108,55 @@ export default function BeneficiariesMasterlistPage() {
   };
 
   useEffect(() => {
-    // 1. Instant Cache Load from local IndexedDB (takes < 15ms)
-    async function loadCachedFirst() {
-      try {
-        const [cachedProgs, cachedBenes] = await Promise.all([
-          offlineDb.cachedPrograms.toArray(),
-          offlineDb.cachedBeneficiaries.toArray(),
-        ]);
-
-        if (cachedProgs && cachedProgs.length > 0) {
-          setPrograms(cachedProgs);
-          setSelectedProgram((prev) => prev || cachedProgs[0].id);
-        }
-
-        if (cachedBenes && cachedBenes.length > 0) {
-          const mapped = cachedBenes.map((c) => ({
-            id: c.id,
-            designatedNumber: c.designatedNumber,
-            tableNumber: c.tableNumber,
-            participationStatus: c.status || "ACTIVE",
-            beneficiary: {
-              id: c.beneficiaryId,
-              fullName: c.fullName,
-              birthday: c.birthday,
-              barangay: c.barangay,
-              sitio: c.sitio,
-              beneficiaryNumber: c.designatedNumber,
-            },
-            qrCodes: c.qrToken ? [{ publicToken: c.qrToken, status: "ACTIVE" }] : [],
-            stubDistributions: [],
-            orientationAttendance: [],
-            attendanceRecords: [],
-            payouts: [],
-          }));
-          setBeneficiaries(mapped);
+    async function loadData() {
+      // 1. If currently offline, load cached data from IndexedDB as fallback
+      if (typeof window !== "undefined" && !navigator.onLine) {
+        try {
+          const cachedProgs = await offlineDb.cachedPrograms.toArray();
+          if (cachedProgs && cachedProgs.length > 0) {
+            setPrograms(cachedProgs);
+            const activeProgId = selectedProgram || cachedProgs[0].id;
+            setSelectedProgram(activeProgId);
+            const cachedBenes = await offlineDb.cachedBeneficiaries
+              .where("programId")
+              .equals(activeProgId)
+              .toArray();
+            if (cachedBenes && cachedBenes.length > 0) {
+              const mapped = cachedBenes.map((c) => ({
+                id: c.id,
+                designatedNumber: c.designatedNumber,
+                tableNumber: c.tableNumber,
+                participationStatus: c.status || "ACTIVE",
+                beneficiary: {
+                  id: c.beneficiaryId,
+                  fullName: c.fullName,
+                  birthday: c.birthday,
+                  barangay: c.barangay,
+                  sitio: c.sitio,
+                  beneficiaryNumber: c.designatedNumber,
+                },
+                qrCodes: c.qrToken ? [{ publicToken: c.qrToken, status: "ACTIVE" }] : [],
+                stubDistributions: [],
+                orientationAttendance: [],
+                attendanceRecords: [],
+                payouts: [],
+              }));
+              setBeneficiaries(mapped);
+            }
+          }
+        } catch (e) {
+          console.warn("Offline cache load error:", e);
+        } finally {
           setLoading(false);
         }
-      } catch (e) {}
-    }
-    loadCachedFirst();
+        return;
+      }
 
-    // 2. Background Network Sync
-    fetchProgramsAndBeneficiaries();
+      // 2. When online: Fetch authoritative live data directly from server
+      fetchProgramsAndBeneficiaries();
+    }
+
+    loadData();
   }, []);
 
   const fetchProgramsAndBeneficiaries = async () => {
@@ -177,7 +185,36 @@ export default function BeneficiariesMasterlistPage() {
       const res = await fetch(`/api/v1/programs/${programId}/beneficiaries`);
       if (res.ok) {
         const data = await res.json();
-        setBeneficiaries(data.beneficiaries || []);
+        const serverBenes = data.beneficiaries || [];
+        setBeneficiaries(serverBenes);
+
+        // Update IndexedDB cache so stale data (e.g. 1179 records) is purged
+        try {
+          await offlineDb.cachedBeneficiaries.where("programId").equals(programId).delete();
+          const toCache = serverBenes.map((pb: any) => {
+            const activeQr = pb.qrCodes?.find((q: any) => q.status === "ACTIVE") || pb.qrCodes?.[0];
+            return {
+              id: pb.id,
+              programId: programId,
+              beneficiaryId: pb.beneficiaryId,
+              designatedNumber: pb.designatedNumber,
+              fullName: pb.beneficiary?.fullName || "",
+              birthday: pb.beneficiary?.birthday || "",
+              birthdayPin: pb.beneficiary?.birthday || "",
+              barangay: pb.beneficiary?.barangay || "",
+              sitio: pb.beneficiary?.sitio || "",
+              tableNumber: pb.tableNumber || "",
+              qrToken: activeQr?.publicToken || "",
+              status: pb.participationStatus || "ACTIVE",
+              orientationStatus: pb.orientationAttendance && pb.orientationAttendance.length > 0 ? "PRESENT" : "ABSENT",
+            };
+          });
+          if (toCache.length > 0) {
+            await offlineDb.cachedBeneficiaries.bulkPut(toCache);
+          }
+        } catch (cacheErr) {
+          console.warn("Offline cache update warning:", cacheErr);
+        }
       }
     } catch (e) {
       console.error(e);
@@ -200,6 +237,10 @@ export default function BeneficiariesMasterlistPage() {
 
       setBeneficiaries((prev) => prev.filter((b) => b.id !== beneficiaryToDelete.id));
       setBeneficiaryToDelete(null);
+      // Also remove from offline cache
+      try {
+        await offlineDb.cachedBeneficiaries.delete(beneficiaryToDelete.id);
+      } catch (e) {}
     } catch (err: any) {
       alert(err.message);
     } finally {
@@ -210,6 +251,7 @@ export default function BeneficiariesMasterlistPage() {
   const handleProgramChange = (progId: string) => {
     setSelectedProgram(progId);
     setSelectedSitio("ALL");
+    setLoading(true);
     fetchBeneficiaries(progId);
   };
 
@@ -882,8 +924,8 @@ export default function BeneficiariesMasterlistPage() {
         ) : sortedBeneficiaries.length === 0 ? (
           <div className="p-12 text-center text-xs text-slate-400">No beneficiaries match criteria.</div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs">
+          <TableScrollWrapper>
+            <table className="w-full text-left text-xs min-w-[1050px]">
               <thead className="bg-slate-100 text-slate-700 font-bold uppercase text-[10px] tracking-wider border-b">
                 <tr>
                   {/* Master Checkbox Header */}
@@ -1065,7 +1107,7 @@ export default function BeneficiariesMasterlistPage() {
                 })}
               </tbody>
             </table>
-          </div>
+          </TableScrollWrapper>
         )}
       </div>
 

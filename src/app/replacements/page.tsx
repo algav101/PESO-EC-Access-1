@@ -23,6 +23,7 @@ import {
   Check,
 } from "lucide-react";
 import { StatusBadge } from "@/components/common/StatusBadge";
+import { TableScrollWrapper } from "@/components/common/TableScrollWrapper";
 import QRCode from "qrcode";
 import { useAuth } from "@/context/AuthContext";
 import { isFieldCoordinator } from "@/lib/permissions";
@@ -724,8 +725,8 @@ function ReplacementsContent() {
               No approved replacements recorded yet for this program.
             </div>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs">
+            <TableScrollWrapper>
+              <table className="w-full text-left text-xs min-w-[750px]">
                 <thead className="bg-slate-100 text-slate-700 font-bold uppercase text-[10px] border-b">
                   <tr>
                     <th className="px-4 py-3"># Slot</th>
@@ -761,7 +762,7 @@ function ReplacementsContent() {
                   ))}
                 </tbody>
               </table>
-            </div>
+            </TableScrollWrapper>
           )}
         </div>
       )}

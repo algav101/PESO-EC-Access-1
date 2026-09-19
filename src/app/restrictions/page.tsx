@@ -19,6 +19,7 @@ import {
   Trash2,
 } from "lucide-react";
 import { StatusBadge } from "@/components/common/StatusBadge";
+import { TableScrollWrapper } from "@/components/common/TableScrollWrapper";
 import * as XLSX from "xlsx";
 import { useAuth } from "@/context/AuthContext";
 import { isAdminUser, isFieldCoordinator } from "@/lib/permissions";
@@ -296,8 +297,8 @@ export default function RestrictionsPage() {
         ) : filtered.length === 0 ? (
           <div className="p-12 text-center text-xs text-slate-400">No active restrictions found.</div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs">
+          <TableScrollWrapper>
+            <table className="w-full text-left text-xs min-w-[850px]">
               <thead className="bg-slate-100 text-slate-700 font-bold uppercase text-[10px] border-b">
                 <tr>
                   <th className="px-4 py-3">Beneficiary Name</th>
@@ -331,7 +332,7 @@ export default function RestrictionsPage() {
                 ))}
               </tbody>
             </table>
-          </div>
+          </TableScrollWrapper>
         )}
       </div>
 

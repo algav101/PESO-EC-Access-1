@@ -16,6 +16,7 @@ import { formatTime } from "@/lib/utils";
 import { useAuth } from "@/context/AuthContext";
 import { isAdminUser } from "@/lib/permissions";
 import { AdminStubOverrideModal } from "@/components/beneficiaries/AdminStubOverrideModal";
+import { TableScrollWrapper } from "@/components/common/TableScrollWrapper";
 
 function AttendanceMatrixContent() {
   const searchParams = useSearchParams();
@@ -184,8 +185,8 @@ function AttendanceMatrixContent() {
         ) : filtered.length === 0 ? (
           <div className="p-12 text-center text-xs text-slate-400">No records found.</div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-[11px] border-collapse">
+          <TableScrollWrapper>
+            <table className="w-full text-left text-[11px] border-collapse min-w-[1200px]">
               <thead className="bg-slate-100 text-slate-700 font-bold border-b text-center">
                 {/* Row 1: Day Headers */}
                 <tr>
@@ -293,7 +294,7 @@ function AttendanceMatrixContent() {
                 ))}
               </tbody>
             </table>
-          </div>
+          </TableScrollWrapper>
         )}
       </div>
 
