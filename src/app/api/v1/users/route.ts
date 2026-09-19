@@ -205,3 +205,77 @@ export async function PATCH(request: Request) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }
+
+export async function DELETE(request: Request) {
+  try {
+    const user = await getCurrentUser();
+    if (!user || !hasPermission(user.role, "user.delete")) {
+      return NextResponse.json({ error: "Forbidden: insufficient permissions" }, { status: 403 });
+    }
+
+    const { searchParams } = new URL(request.url);
+    let id = searchParams.get("id");
+    if (!id) {
+      try {
+        const body = await request.json();
+        id = body?.id;
+      } catch (e) {}
+    }
+
+    if (!id) {
+      return NextResponse.json({ error: "User ID is required" }, { status: 400 });
+    }
+
+    // Safety checks
+    if (id === user.id) {
+      return NextResponse.json({ error: "Cannot delete your own active account" }, { status: 400 });
+    }
+
+    const targetUser = await prisma.user.findUnique({ where: { id } });
+    if (!targetUser) {
+      return NextResponse.json({ error: "User not found" }, { status: 404 });
+    }
+
+    if (targetUser.username === "admin") {
+      return NextResponse.json({ error: "The primary Domain Master (@admin) account is protected and cannot be deleted" }, { status: 400 });
+    }
+
+    // Safely clear/disassociate foreign key relations
+    await prisma.$transaction([
+      prisma.accomplishmentPhoto.updateMany({ where: { uploadedById: id }, data: { uploadedById: null } }),
+      prisma.accomplishmentPhoto.updateMany({ where: { approvedById: id }, data: { approvedById: null } }),
+      prisma.attendanceRecord.updateMany({ where: { scannedById: id }, data: { scannedById: null } }),
+      prisma.orientationAttendance.updateMany({ where: { scannedById: id }, data: { scannedById: null } }),
+      prisma.stubDistribution.updateMany({ where: { distributedById: id }, data: { distributedById: null } }),
+      prisma.beneficiaryReplacement.updateMany({ where: { initiatedById: id }, data: { initiatedById: null } }),
+      prisma.beneficiaryReplacement.updateMany({ where: { approvedById: id }, data: { approvedById: null } }),
+      prisma.payout.updateMany({ where: { verifiedById: id }, data: { verifiedById: null } }),
+      prisma.program.updateMany({ where: { createdById: id }, data: { createdById: null } }),
+      prisma.qrPrintBatch.updateMany({ where: { printedById: id }, data: { printedById: null } }),
+      prisma.qrPrintLog.updateMany({ where: { printedById: id }, data: { printedById: null } }),
+      prisma.auditLog.updateMany({ where: { userId: id }, data: { userId: null } }),
+      prisma.user.delete({ where: { id } }),
+    ]);
+
+    await logAudit({
+      userId: user.id,
+      action: "USER_DELETED",
+      entityType: "USER",
+      entityId: id,
+      oldData: {
+        username: targetUser.username,
+        fullName: targetUser.fullName,
+        role: targetUser.role,
+        assignedBarangay: targetUser.assignedBarangay,
+      },
+    });
+
+    return NextResponse.json({
+      success: true,
+      message: `User @${targetUser.username} (${targetUser.fullName}) deleted successfully`,
+    });
+  } catch (error: any) {
+    console.error("Delete user error:", error);
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+}

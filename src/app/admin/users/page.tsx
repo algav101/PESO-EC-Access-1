@@ -27,6 +27,8 @@ import {
   Check,
   Unlock,
   Sparkles,
+  Trash2,
+  AlertTriangle,
 } from "lucide-react";
 import { StatusBadge } from "@/components/common/StatusBadge";
 import { formatDate } from "@/lib/utils";
@@ -84,6 +86,10 @@ export default function UserManagementPage() {
   const [showEditPassword, setShowEditPassword] = useState(false);
   const [showEditCurrentPassword, setShowEditCurrentPassword] = useState(false);
   const [showPreviewPasswords, setShowPreviewPasswords] = useState(false);
+
+  // Delete User State
+  const [deleteTargetUser, setDeleteTargetUser] = useState<any | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   // CSV Import State
   const [isImportOpen, setIsImportOpen] = useState(false);
@@ -244,6 +250,30 @@ export default function UserManagementPage() {
       }
     } catch (e) {
       alert("Error updating user");
+    }
+  };
+
+  const handleDeleteUser = async () => {
+    if (!deleteTargetUser) return;
+    setDeleting(true);
+    try {
+      const res = await fetch(`/api/v1/users?id=${deleteTargetUser.id}`, {
+        method: "DELETE",
+      });
+      const data = await res.json();
+      if (res.ok) {
+        if (editUser?.id === deleteTargetUser.id) {
+          setEditUser(null);
+        }
+        setDeleteTargetUser(null);
+        fetchUsers();
+      } else {
+        alert(data.error || "Failed to delete user account");
+      }
+    } catch (e) {
+      alert("Error deleting user account");
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -523,13 +553,26 @@ export default function UserManagementPage() {
                       <StatusBadge status={u.status} />
                     </td>
                     <td className="px-4 py-3 text-right">
-                      <button
-                        onClick={() => openEditModal(u)}
-                        className="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-[11px] rounded-lg transition inline-flex items-center space-x-1"
-                      >
-                        <Edit className="w-3 h-3 text-slate-500" />
-                        <span>Edit</span>
-                      </button>
+                      <div className="flex items-center justify-end space-x-1.5">
+                        <button
+                          onClick={() => openEditModal(u)}
+                          className="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-[11px] rounded-lg transition inline-flex items-center space-x-1"
+                          title="Edit user details"
+                        >
+                          <Edit className="w-3 h-3 text-slate-500" />
+                          <span>Edit</span>
+                        </button>
+                        {u.username !== "admin" && (
+                          <button
+                            onClick={() => setDeleteTargetUser(u)}
+                            className="px-2 py-1 bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold text-[11px] rounded-lg border border-rose-200 transition inline-flex items-center space-x-1 shadow-2xs"
+                            title="Delete user account"
+                          >
+                            <Trash2 className="w-3 h-3 text-rose-600" />
+                            <span className="hidden sm:inline">Delete</span>
+                          </button>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 );
@@ -1038,22 +1081,117 @@ export default function UserManagementPage() {
               </div>
             </div>
 
-            <div className="flex justify-end space-x-2 pt-2">
+            <div className="flex items-center justify-between pt-3 border-t border-slate-100">
+              {editUser.username !== "admin" ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    const target = editUser;
+                    setDeleteTargetUser(target);
+                  }}
+                  className="px-3 py-2 bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold text-xs rounded-lg border border-rose-200 transition inline-flex items-center space-x-1"
+                >
+                  <Trash2 className="w-3.5 h-3.5 text-rose-600" />
+                  <span>Delete User</span>
+                </button>
+              ) : (
+                <span className="text-[10px] text-amber-700 font-bold bg-amber-50 px-2 py-1 rounded border border-amber-200">
+                  Protected Root Account
+                </span>
+              )}
+
+              <div className="flex space-x-2">
+                <button
+                  type="button"
+                  onClick={() => setEditUser(null)}
+                  className="px-4 py-2 text-xs font-bold border rounded-lg hover:bg-slate-50 transition"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-2 bg-gov-blue text-white font-bold text-xs rounded-lg shadow hover:bg-gov-light transition"
+                >
+                  Save Changes
+                </button>
+              </div>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {deleteTargetUser && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-4 animate-fadeIn">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 space-y-4 shadow-2xl border border-rose-100">
+            <div className="flex items-center space-x-3 text-rose-600">
+              <div className="p-3 bg-rose-100 rounded-full">
+                <AlertTriangle className="w-6 h-6 text-rose-600" />
+              </div>
+              <div>
+                <h3 className="text-sm font-black text-slate-900 uppercase tracking-wider">
+                  Confirm Account Deletion
+                </h3>
+                <p className="text-xs text-rose-600 font-bold">This action is permanent and cannot be undone</p>
+              </div>
+            </div>
+
+            <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-xl space-y-2 text-xs">
+              <div className="flex justify-between">
+                <span className="text-slate-500 font-medium">Full Name:</span>
+                <span className="font-bold text-slate-900">{deleteTargetUser.fullName}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-500 font-medium">Username:</span>
+                <span className="font-mono font-bold text-slate-800">@{deleteTargetUser.username}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-500 font-medium">Role:</span>
+                <span className="font-bold text-slate-800">{(deleteTargetUser.role || "").replace(/_/g, " ")}</span>
+              </div>
+              {deleteTargetUser.assignedBarangay && (
+                <div className="flex justify-between">
+                  <span className="text-slate-500 font-medium">Assigned Barangay:</span>
+                  <span className="font-bold text-amber-900 bg-amber-50 px-2 py-0.5 rounded border border-amber-200">
+                    Brgy. {deleteTargetUser.assignedBarangay}
+                  </span>
+                </div>
+              )}
+            </div>
+
+            <p className="text-xs text-slate-600 leading-relaxed">
+              Are you sure you want to delete this user account? All linked logs and records will be safely detached from this account.
+            </p>
+
+            <div className="flex justify-end space-x-2 pt-2 border-t">
               <button
                 type="button"
-                onClick={() => setEditUser(null)}
-                className="px-4 py-2 text-xs font-bold border rounded-lg"
+                disabled={deleting}
+                onClick={() => setDeleteTargetUser(null)}
+                className="px-4 py-2 text-xs font-bold border border-slate-300 rounded-lg hover:bg-slate-50 transition"
               >
                 Cancel
               </button>
               <button
-                type="submit"
-                className="px-4 py-2 bg-gov-blue text-white font-bold text-xs rounded-lg shadow hover:bg-gov-light transition"
+                type="button"
+                disabled={deleting}
+                onClick={handleDeleteUser}
+                className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs rounded-lg shadow flex items-center space-x-1.5 transition disabled:opacity-50"
               >
-                Save Changes
+                {deleting ? (
+                  <>
+                    <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                    <span>Deleting...</span>
+                  </>
+                ) : (
+                  <>
+                    <Trash2 className="w-3.5 h-3.5" />
+                    <span>Confirm &amp; Delete Account</span>
+                  </>
+                )}
               </button>
             </div>
-          </form>
+          </div>
         </div>
       )}
     </div>
