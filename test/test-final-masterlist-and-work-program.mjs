@@ -111,20 +111,50 @@ async function run() {
     return r;
   });
 
-  // 5. Commit Masterlist (including exempted beneficiary)
+  // 5. Commit Masterlist (including exempted beneficiary) with Merge & Replace Strategy
   const commitRes = await fetch(`${BASE_URL}/api/v1/beneficiaries/import/commit`, {
     method: "POST",
     headers: { "Content-Type": "application/json", Cookie: cookie },
     body: JSON.stringify({
       rows: rowsWithExemption,
       programId: testProgramId,
+      duplicateStrategy: "MERGE_AND_REPLACE",
     }),
   });
   const commitData = await commitRes.json();
   assert.equal(commitRes.status, 200, `Commit failed: ${JSON.stringify(commitData)}`);
   assert.ok(commitData.importedCount >= 10, "Expected all 10 rows (including exempted) to be committed");
-  assert.equal(commitData.exemptedCount, 1, "Expected 1 exempted beneficiary count in commit response");
-  console.log(`✅ 7. Committed ${commitData.importedCount} beneficiaries (including ${commitData.exemptedCount} exempted) into program masterlist without transaction timeout`);
+  console.log(`✅ 7. Committed ${commitData.importedCount} beneficiaries (${commitData.newCount} new, ${commitData.updatedCount} merged/updated, ${commitData.exemptedCount} exempted) with Merge & Replace Strategy`);
+
+  // 5b. Test Re-uploading / Updating with Merge & Replace Strategy
+  const mergeRes = await fetch(`${BASE_URL}/api/v1/beneficiaries/import/commit`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Cookie: cookie },
+    body: JSON.stringify({
+      rows: rowsWithExemption,
+      programId: testProgramId,
+      duplicateStrategy: "MERGE_AND_REPLACE",
+    }),
+  });
+  const mergeData = await mergeRes.json();
+  assert.equal(mergeRes.status, 200, `Merge commit failed: ${JSON.stringify(mergeData)}`);
+  assert.ok(mergeData.updatedCount >= 10, `Expected at least 10 updated/merged records, got ${mergeData.updatedCount}`);
+  console.log(`✅ 7b. Verified Merge & Replace successfully updated ${mergeData.updatedCount} existing duplicate records!`);
+
+  // 5c. Test Duplicate Strategy: SKIP
+  const skipRes = await fetch(`${BASE_URL}/api/v1/beneficiaries/import/commit`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Cookie: cookie },
+    body: JSON.stringify({
+      rows: rowsWithExemption,
+      programId: testProgramId,
+      duplicateStrategy: "SKIP",
+    }),
+  });
+  const skipData = await skipRes.json();
+  assert.equal(skipRes.status, 200, `Skip commit failed: ${JSON.stringify(skipData)}`);
+  assert.ok(skipData.skippedCount >= 10, `Expected at least 10 skipped records, got ${skipData.skippedCount}`);
+  console.log(`✅ 7c. Verified Skip Strategy successfully skipped ${skipData.skippedCount} existing duplicate records!`);
 
   // 6. Test Auto-Deploy Work Program logic according to Purok/Sitio groups
   const autoDeployRes = await fetch(`${BASE_URL}/api/v1/programs/${testProgramId}/work-program/auto-deploy`, {

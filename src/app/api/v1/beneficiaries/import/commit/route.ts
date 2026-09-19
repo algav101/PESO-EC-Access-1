@@ -15,7 +15,12 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Forbidden: insufficient permissions" }, { status: 403 });
     }
 
-    const { rows, programId: requestedProgramId } = await request.json();
+    const {
+      rows,
+      programId: requestedProgramId,
+      duplicateStrategy = "MERGE_AND_REPLACE",
+    } = await request.json();
+
     if (!Array.isArray(rows) || rows.length === 0) {
       return NextResponse.json({ error: "No rows provided for import" }, { status: 400 });
     }
@@ -74,6 +79,9 @@ export async function POST(request: Request) {
     };
 
     let importedCount = 0;
+    let newCount = 0;
+    let updatedCount = 0;
+    let skippedCount = 0;
     let exemptedCount = 0;
     const beneMap = new Map<string, any>();
     const chunkSize = 100;
@@ -136,6 +144,7 @@ export async function POST(request: Request) {
         };
         beneMap.set(key, beneObj);
         newBeneficiariesData.push(beneObj);
+        newCount++;
 
         if (r.dependentFullName) {
           newDependentsData.push({
@@ -151,7 +160,12 @@ export async function POST(request: Request) {
           });
         }
       } else {
-        existingToUpdate.push({ id: existing.id, r });
+        if (duplicateStrategy === "MERGE_AND_REPLACE") {
+          existingToUpdate.push({ id: existing.id, r });
+          updatedCount++;
+        } else {
+          skippedCount++;
+        }
       }
 
       if (r.isExempted || r.status === "EXEMPTED") {
@@ -219,13 +233,15 @@ export async function POST(request: Request) {
 
       const existingPb = existingPbBeneMap.get(bene.id);
       if (existingPb) {
-        pbsToUpdate.push({
-          id: existingPb.id,
-          designatedNumber: String(r.designatedNumber),
-          tableNumber: assignment.table,
-          slotGroup: assignment.slotGroup,
-        });
-        importedCount++;
+        if (duplicateStrategy === "MERGE_AND_REPLACE") {
+          pbsToUpdate.push({
+            id: existingPb.id,
+            designatedNumber: String(r.designatedNumber),
+            tableNumber: assignment.table,
+            slotGroup: assignment.slotGroup,
+          });
+          importedCount++;
+        }
       } else {
         const progBeneId = crypto.randomUUID();
         progBeneficiariesToInsert.push({
@@ -317,12 +333,15 @@ export async function POST(request: Request) {
       action: "FINAL_BENEFICIARIES_MASTERLIST_IMPORTED",
       entityType: "PROGRAM",
       entityId: targetProgramId,
-      metadata: { count: importedCount, exemptedCount },
+      metadata: { count: importedCount, newCount, updatedCount, skippedCount, exemptedCount, duplicateStrategy },
     });
 
     return NextResponse.json({
       success: true,
       importedCount,
+      newCount,
+      updatedCount,
+      skippedCount,
       exemptedCount,
       totalProgramBeneficiaries: totalProgramBenes,
       programId: targetProgramId,

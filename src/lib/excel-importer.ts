@@ -50,6 +50,11 @@ export interface ParsedBeneficiaryRow {
   groupName?: string;
   groupLabel?: string;
   designatedMainArea?: string;
+  isExistingInDb?: boolean;
+  isExistingInProgram?: boolean;
+  existingBeneficiaryId?: string;
+  existingBeneficiaryNumber?: string;
+  existingDesignatedNumber?: string;
   status:
     | "VALID"
     | "DUPLICATE"
@@ -72,6 +77,9 @@ export interface ImportPreviewResult {
   duplicateCount: number;
   restrictedCount: number;
   invalidCount: number;
+  existingInDbCount: number;
+  existingInProgramCount: number;
+  newBeneficiaryCount: number;
   rows: ParsedBeneficiaryRow[];
   barangaySummary: Record<string, number>;
 }
@@ -517,27 +525,50 @@ export async function parseBeneficiaryExcelBuffer(
   // Step 2: Perform fast targeted DB queries only for candidate names in this file
   const todayStr = new Date().toISOString().split("T")[0];
   const restrictionMap = new Map<string, { end: string; reason: string }>();
+  const existingBeneDbMap = new Map<string, any>();
 
   if (candidateNames.size > 0) {
-    const activeRestrictions = await prisma.beneficiaryRestriction.findMany({
-      where: {
-        status: "ACTIVE",
-        OR: [
-          { beneficiary: { fullName: { in: Array.from(candidateNames) } } },
-          { beneficiary: { lastName: { in: Array.from(candidateLastNames) } } },
-        ],
-      },
-      select: {
-        restrictionEnd: true,
-        reason: true,
-        beneficiary: {
-          select: {
-            fullName: true,
-            birthday: true,
+    const [activeRestrictions, existingDbBeneficiaries] = await Promise.all([
+      prisma.beneficiaryRestriction.findMany({
+        where: {
+          status: "ACTIVE",
+          OR: [
+            { beneficiary: { fullName: { in: Array.from(candidateNames) } } },
+            { beneficiary: { lastName: { in: Array.from(candidateLastNames) } } },
+          ],
+        },
+        select: {
+          restrictionEnd: true,
+          reason: true,
+          beneficiary: {
+            select: {
+              fullName: true,
+              birthday: true,
+            },
           },
         },
-      },
-    });
+      }),
+      prisma.beneficiary.findMany({
+        where: {
+          OR: [
+            { fullName: { in: Array.from(candidateNames) } },
+            { lastName: { in: Array.from(candidateLastNames) } },
+          ],
+        },
+        select: {
+          id: true,
+          fullName: true,
+          birthday: true,
+          beneficiaryNumber: true,
+          barangay: true,
+          sitio: true,
+          programBeneficiaries: {
+            where: { programId: targetProgramId },
+            select: { id: true, designatedNumber: true },
+          },
+        },
+      }),
+    ]);
 
     for (const r of activeRestrictions) {
       if (r.beneficiary?.fullName) {
@@ -547,14 +578,12 @@ export async function parseBeneficiaryExcelBuffer(
         }
       }
     }
-  }
 
-  // Fetch existing program beneficiaries
-  const existingProgramBeneficiaries = await prisma.programBeneficiary.findMany({
-    where: { programId: targetProgramId },
-    select: { designatedNumber: true },
-  });
-  const existingDesigSet = new Set(existingProgramBeneficiaries.map((b) => String(b.designatedNumber)));
+    for (const b of existingDbBeneficiaries) {
+      const key = `${b.fullName.trim().toUpperCase()}_${b.birthday}`;
+      existingBeneDbMap.set(key, b);
+    }
+  }
 
   // Step 3: Classify and validate parsed items
   const parsedRows: ParsedBeneficiaryRow[] = [];
@@ -566,11 +595,33 @@ export async function parseBeneficiaryExcelBuffer(
   let duplicateCount = 0;
   let restrictedCount = 0;
   let invalidCount = 0;
+  let existingInDbCount = 0;
+  let existingInProgramCount = 0;
+  let newBeneficiaryCount = 0;
 
   for (const item of rawParsedItems) {
     let status: ParsedBeneficiaryRow["status"] = "VALID";
     let validationError: string | undefined;
     let restrictionEnd: string | undefined;
+
+    // Check existing DB match
+    const existingDbRecord = item.fullName && item.birthday
+      ? existingBeneDbMap.get(`${item.fullName}_${item.birthday}`)
+      : undefined;
+
+    const isExistingInDb = Boolean(existingDbRecord);
+    const isExistingInProgram = Boolean(existingDbRecord?.programBeneficiaries?.length > 0);
+    const existingBeneficiaryId = existingDbRecord?.id;
+    const existingBeneficiaryNumber = existingDbRecord?.beneficiaryNumber;
+    const existingDesignatedNumber = existingDbRecord?.programBeneficiaries?.[0]?.designatedNumber;
+
+    if (isExistingInProgram) {
+      existingInProgramCount++;
+    } else if (isExistingInDb) {
+      existingInDbCount++;
+    } else {
+      newBeneficiaryCount++;
+    }
 
     if (!item.fullName) {
       status = "MISSING_REQUIRED_FIELD";
@@ -598,6 +649,11 @@ export async function parseBeneficiaryExcelBuffer(
         restrictedCount++;
         parsedRows.push({
           ...item,
+          isExistingInDb,
+          isExistingInProgram,
+          existingBeneficiaryId,
+          existingBeneficiaryNumber,
+          existingDesignatedNumber,
           status,
           validationError,
           restrictionEnd,
@@ -608,6 +664,11 @@ export async function parseBeneficiaryExcelBuffer(
         validCount++;
         parsedRows.push({
           ...item,
+          isExistingInDb,
+          isExistingInProgram,
+          existingBeneficiaryId,
+          existingBeneficiaryNumber,
+          existingDesignatedNumber,
           status,
           validationError,
           restrictionEnd,
@@ -632,6 +693,9 @@ export async function parseBeneficiaryExcelBuffer(
     duplicateCount,
     restrictedCount,
     invalidCount,
+    existingInDbCount,
+    existingInProgramCount,
+    newBeneficiaryCount,
     rows: parsedRows,
     barangaySummary,
   };

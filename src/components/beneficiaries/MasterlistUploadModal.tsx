@@ -18,6 +18,9 @@ import {
   Sparkles,
   ShieldAlert,
   RotateCcw,
+  Layers,
+  UserCheck,
+  UserPlus,
 } from "lucide-react";
 import { ImportPreviewResult, ParsedBeneficiaryRow } from "@/lib/excel-importer";
 
@@ -46,12 +49,13 @@ export function MasterlistUploadModal({
   const [selectedProgramId, setSelectedProgramId] = useState<string>(
     defaultProgramId || (programs.length > 0 ? programs[0].id : "AUTO")
   );
+  const [duplicateStrategy, setDuplicateStrategy] = useState<"MERGE_AND_REPLACE" | "SKIP">("MERGE_AND_REPLACE");
   const [file, setFile] = useState<File | null>(null);
   const [parsing, setParsing] = useState(false);
   const [committing, setCommitting] = useState(false);
   const [preview, setPreview] = useState<ImportPreviewResult | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<"ALL" | "VALID" | "EXEMPTED" | "WARNINGS">("ALL");
+  const [activeTab, setActiveTab] = useState<"ALL" | "VALID" | "NEW" | "EXISTING" | "EXEMPTED" | "WARNINGS">("ALL");
 
   // Exemption Modal State
   const [isExemptionDialogOpen, setIsExemptionDialogOpen] = useState(false);
@@ -112,6 +116,16 @@ export function MasterlistUploadModal({
         r.status === "DUPLICATE_DESIGNATED_NUMBER"
     ).length;
 
+    let existingInDbCount = 0;
+    let existingInProgramCount = 0;
+    let newBeneficiaryCount = 0;
+
+    for (const r of rows) {
+      if (r.isExistingInProgram) existingInProgramCount++;
+      else if (r.isExistingInDb) existingInDbCount++;
+      else newBeneficiaryCount++;
+    }
+
     return {
       fileName: preview?.fileName || "masterlist.csv",
       totalRows: rows.length,
@@ -119,6 +133,9 @@ export function MasterlistUploadModal({
       restrictedCount,
       duplicateCount,
       invalidCount,
+      existingInDbCount,
+      existingInProgramCount,
+      newBeneficiaryCount,
       rows,
       barangaySummary: preview?.barangaySummary || {},
     };
@@ -201,17 +218,19 @@ export function MasterlistUploadModal({
         body: JSON.stringify({
           rows: preview.rows,
           programId: selectedProgramId,
+          duplicateStrategy,
         }),
       });
 
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed to commit masterlist");
 
-      const msg = data.exemptedCount > 0
-        ? `Successfully committed ${data.importedCount} beneficiaries (including ${data.exemptedCount} authorized exemptions) into the Final Masterlist for Implementation!`
-        : `Successfully imported ${data.importedCount} beneficiaries into the Final Masterlist for Implementation!`;
+      const mergeMsg = data.updatedCount > 0 ? ` (${data.newCount} new, ${data.updatedCount} merged/updated)` : "";
+      const exemptMsg = data.exemptedCount > 0 ? ` with ${data.exemptedCount} authorized exemptions` : "";
 
-      alert(msg);
+      alert(
+        `Successfully committed ${data.importedCount} beneficiaries${mergeMsg}${exemptMsg} into the Final Masterlist for Implementation!`
+      );
       onSuccess();
       onClose();
     } catch (err: any) {
@@ -223,9 +242,13 @@ export function MasterlistUploadModal({
 
   const exemptedCount = preview?.rows.filter((r) => r.isExempted || r.status === "EXEMPTED").length || 0;
   const activeRestrictedCount = preview?.rows.filter((r) => r.status === "RESTRICTED" && !r.isExempted).length || 0;
+  const existingMatchesCount = (preview?.existingInDbCount || 0) + (preview?.existingInProgramCount || 0);
+  const newAdditionsCount = preview?.newBeneficiaryCount || 0;
 
   const filteredPreviewRows = preview?.rows.filter((r) => {
     if (activeTab === "VALID") return r.status === "VALID" || r.status === "EXEMPTED" || Boolean(r.isExempted);
+    if (activeTab === "NEW") return !r.isExistingInDb && !r.isExistingInProgram && (r.status === "VALID" || r.isExempted);
+    if (activeTab === "EXISTING") return (r.isExistingInDb || r.isExistingInProgram) && (r.status === "VALID" || r.isExempted);
     if (activeTab === "EXEMPTED") return r.status === "EXEMPTED" || Boolean(r.isExempted);
     if (activeTab === "WARNINGS") return r.status !== "VALID" && r.status !== "EXEMPTED" && !r.isExempted;
     return true;
@@ -265,7 +288,7 @@ export function MasterlistUploadModal({
           </div>
         </div>
 
-        {/* Target Program Selector & File Input */}
+        {/* Step 1 & 2: Target Program & Masterlist File */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div className="space-y-1">
             <label className="block text-xs font-bold text-slate-700 uppercase">
@@ -318,6 +341,71 @@ export function MasterlistUploadModal({
           </div>
         </div>
 
+        {/* Step 3: Duplicate & Existing Records Resolution Mode */}
+        <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-xl space-y-2">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-black text-slate-800 uppercase flex items-center space-x-1.5">
+              <Layers className="w-4 h-4 text-gov-blue" />
+              <span>3. Existing Beneficiaries &amp; Duplicate Resolution Strategy:</span>
+            </span>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+            <label
+              className={`p-3 rounded-xl border cursor-pointer transition flex items-start space-x-2.5 ${
+                duplicateStrategy === "MERGE_AND_REPLACE"
+                  ? "bg-blue-50/90 border-blue-400 ring-2 ring-blue-500/20 shadow-xs"
+                  : "bg-white border-slate-200 hover:bg-slate-50"
+              }`}
+            >
+              <input
+                type="radio"
+                name="duplicateStrategy"
+                value="MERGE_AND_REPLACE"
+                checked={duplicateStrategy === "MERGE_AND_REPLACE"}
+                onChange={() => setDuplicateStrategy("MERGE_AND_REPLACE")}
+                className="mt-0.5 text-gov-blue"
+              />
+              <div>
+                <span className="font-bold text-slate-900 flex items-center space-x-1.5">
+                  <span>🔄 Merge &amp; Replace Existing Data</span>
+                  <span className="text-[10px] bg-blue-100 text-blue-900 px-1.5 py-0.2 rounded font-black">
+                    Recommended
+                  </span>
+                </span>
+                <p className="text-[11px] text-slate-600 mt-0.5 leading-snug">
+                  Matches existing beneficiary records and updates them with newly uploaded details, contact info, address, dependents, and assigned designated numbers.
+                </p>
+              </div>
+            </label>
+
+            <label
+              className={`p-3 rounded-xl border cursor-pointer transition flex items-start space-x-2.5 ${
+                duplicateStrategy === "SKIP"
+                  ? "bg-amber-50/90 border-amber-400 ring-2 ring-amber-500/20 shadow-xs"
+                  : "bg-white border-slate-200 hover:bg-slate-50"
+              }`}
+            >
+              <input
+                type="radio"
+                name="duplicateStrategy"
+                value="SKIP"
+                checked={duplicateStrategy === "SKIP"}
+                onChange={() => setDuplicateStrategy("SKIP")}
+                className="mt-0.5 text-amber-600"
+              />
+              <div>
+                <span className="font-bold text-slate-900 flex items-center space-x-1.5">
+                  <span>⏭️ Skip Existing Duplicate Records</span>
+                </span>
+                <p className="text-[11px] text-slate-600 mt-0.5 leading-snug">
+                  Keeps existing beneficiary profiles unchanged and only imports brand new names not yet found in the system.
+                </p>
+              </div>
+            </label>
+          </div>
+        </div>
+
         {error && (
           <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-xs text-red-800 font-bold flex items-center space-x-2">
             <AlertTriangle className="w-4 h-4 text-red-600 flex-shrink-0" />
@@ -329,33 +417,51 @@ export function MasterlistUploadModal({
         {preview && (
           <div className="space-y-4 pt-2 border-t">
             {/* Summary KPI Cards */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-center">
+            <div className="grid grid-cols-2 sm:grid-cols-5 gap-2.5 text-center">
               <div className="p-3 bg-blue-50/70 border border-blue-200 rounded-xl">
                 <span className="text-[10px] text-blue-900 font-bold uppercase">Total Rows in File</span>
                 <p className="text-xl font-black text-blue-950">{preview.totalRows}</p>
               </div>
+
               <div className="p-3 bg-emerald-50/70 border border-emerald-200 rounded-xl">
                 <span className="text-[10px] text-emerald-900 font-bold uppercase">Valid &amp; Ready</span>
                 <p className="text-xl font-black text-emerald-800">
                   {preview.validCount}
                   {exemptedCount > 0 && (
                     <span className="text-xs font-bold text-purple-700 ml-1">
-                      ({exemptedCount} Exempted)
+                      (+{exemptedCount} Exempted)
                     </span>
                   )}
                 </p>
               </div>
-              <div className="p-3 bg-amber-50/70 border border-amber-200 rounded-xl">
-                <span className="text-[10px] text-amber-900 font-bold uppercase">Duplicates Skipped</span>
-                <p className="text-xl font-black text-amber-900">{preview.duplicateCount}</p>
+
+              <div className="p-3 bg-cyan-50/70 border border-cyan-200 rounded-xl">
+                <span className="text-[10px] text-cyan-900 font-bold uppercase">
+                  {duplicateStrategy === "MERGE_AND_REPLACE" ? "Existing to Merge" : "Existing to Skip"}
+                </span>
+                <p className="text-xl font-black text-cyan-900">{existingMatchesCount}</p>
+                <span className="text-[9px] font-bold text-cyan-700">
+                  {duplicateStrategy === "MERGE_AND_REPLACE" ? "🔄 Will Update" : "⏭️ Will Skip"}
+                </span>
               </div>
-              <div className={`p-3 rounded-xl border ${activeRestrictedCount > 0 ? "bg-rose-50/70 border-rose-200" : "bg-slate-50 border-slate-200"}`}>
+
+              <div className="p-3 bg-indigo-50/70 border border-indigo-200 rounded-xl">
+                <span className="text-[10px] text-indigo-900 font-bold uppercase">New Additions</span>
+                <p className="text-xl font-black text-indigo-900">{newAdditionsCount}</p>
+                <span className="text-[9px] font-bold text-indigo-700">✨ Brand New</span>
+              </div>
+
+              <div
+                className={`p-3 rounded-xl border ${
+                  activeRestrictedCount > 0 ? "bg-rose-50/70 border-rose-200" : "bg-slate-50 border-slate-200"
+                }`}
+              >
                 <span className="text-[10px] text-slate-700 font-bold uppercase">365-Day Restricted</span>
                 <p className="text-xl font-black text-rose-800">
                   {activeRestrictedCount}
                   {exemptedCount > 0 && (
                     <span className="text-xs font-bold text-emerald-700 ml-1">
-                      (0 remaining)
+                      (0 left)
                     </span>
                   )}
                 </p>
@@ -408,7 +514,7 @@ export function MasterlistUploadModal({
               </div>
             )}
 
-            {/* Preview Filter Tabs */}
+            {/* Preview Filter Tabs & Commit Action */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div className="flex flex-wrap gap-1 bg-slate-100 p-1 rounded-xl">
                 <button
@@ -429,6 +535,24 @@ export function MasterlistUploadModal({
                 >
                   Valid &amp; Ready ({preview.validCount})
                 </button>
+                <button
+                  type="button"
+                  onClick={() => setActiveTab("NEW")}
+                  className={`px-3 py-1 text-xs font-bold rounded-lg transition ${
+                    activeTab === "NEW" ? "bg-white text-indigo-900 shadow-xs font-black" : "text-slate-500 hover:text-slate-900"
+                  }`}
+                >
+                  ✨ New ({newAdditionsCount})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setActiveTab("EXISTING")}
+                  className={`px-3 py-1 text-xs font-bold rounded-lg transition ${
+                    activeTab === "EXISTING" ? "bg-white text-cyan-900 shadow-xs font-black" : "text-slate-500 hover:text-slate-900"
+                  }`}
+                >
+                  🔄 Merged ({existingMatchesCount})
+                </button>
                 {exemptedCount > 0 && (
                   <button
                     type="button"
@@ -448,7 +572,7 @@ export function MasterlistUploadModal({
                     activeTab === "WARNINGS" ? "bg-white text-rose-800 shadow-xs" : "text-slate-500 hover:text-slate-900"
                   }`}
                 >
-                  Warnings / Skipped ({preview.duplicateCount + activeRestrictedCount + preview.invalidCount})
+                  Warnings / Restricted ({preview.duplicateCount + activeRestrictedCount + preview.invalidCount})
                 </button>
               </div>
 
@@ -466,7 +590,10 @@ export function MasterlistUploadModal({
                 ) : (
                   <>
                     <CheckCircle2 className="w-4 h-4 text-emerald-200" />
-                    <span>Commit &amp; Implement Masterlist ({preview.validCount})</span>
+                    <span>
+                      Commit &amp; Implement ({preview.validCount})
+                      {duplicateStrategy === "MERGE_AND_REPLACE" ? " [Merge Active]" : ""}
+                    </span>
                   </>
                 )}
               </button>
@@ -483,14 +610,37 @@ export function MasterlistUploadModal({
                     <th className="px-3 py-2">Assigned Deployment Group</th>
                     <th className="px-3 py-2">Sex &amp; Age</th>
                     <th className="px-3 py-2">Special Categories</th>
-                    <th className="px-3 py-2">Import Status / Exemption</th>
+                    <th className="px-3 py-2">Record Match &amp; Status</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
                   {filteredPreviewRows?.map((r: ParsedBeneficiaryRow, i: number) => (
                     <tr key={i} className="hover:bg-slate-50 text-[11px]">
                       <td className="px-3 py-2 font-mono font-bold text-slate-700">{r.designatedNumber}</td>
-                      <td className="px-3 py-2 font-bold text-slate-900">{r.fullName}</td>
+                      <td className="px-3 py-2">
+                        <div className="font-bold text-slate-900 flex items-center space-x-1.5">
+                          <span>{r.fullName}</span>
+                          {r.isExistingInProgram ? (
+                            <span
+                              className="px-1.5 py-0.2 bg-blue-100 text-blue-900 border border-blue-300 rounded text-[9px] font-black"
+                              title="Already enrolled in this program. Will be merged & updated."
+                            >
+                              🔄 In Program
+                            </span>
+                          ) : r.isExistingInDb ? (
+                            <span
+                              className="px-1.5 py-0.2 bg-cyan-100 text-cyan-900 border border-cyan-300 rounded text-[9px] font-black"
+                              title="Existing in masterlist database. Profile will be merged."
+                            >
+                              🔄 In Masterlist
+                            </span>
+                          ) : (
+                            <span className="px-1.5 py-0.2 bg-emerald-50 text-emerald-800 border border-emerald-200 rounded text-[9px] font-bold">
+                              ✨ New
+                            </span>
+                          )}
+                        </div>
+                      </td>
                       <td className="px-3 py-2">
                         <span className="font-semibold text-slate-800">{r.barangay}</span>
                         {r.sitio && <span className="text-slate-500"> ({r.sitio})</span>}
@@ -515,7 +665,7 @@ export function MasterlistUploadModal({
                         {r.status === "VALID" ? (
                           <span className="inline-flex items-center space-x-1 px-2 py-0.5 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-full font-bold text-[10px]">
                             <CheckCircle2 className="w-3 h-3 text-emerald-600" />
-                            <span>Ready</span>
+                            <span>Ready {r.isExistingInDb ? "(Merge)" : ""}</span>
                           </span>
                         ) : r.status === "EXEMPTED" || r.isExempted ? (
                           <div className="flex items-center space-x-1.5">
@@ -651,4 +801,3 @@ export function MasterlistUploadModal({
     </div>
   );
 }
-
