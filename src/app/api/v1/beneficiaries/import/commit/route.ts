@@ -63,11 +63,24 @@ export async function POST(request: Request) {
       targetProgramId = prog.id;
     }
 
-    // Get Table Rules for the program
-    const tableRules = await prisma.tableAssignmentRule.findMany({
-      where: { programId: targetProgramId },
-      orderBy: { priority: "desc" },
-    });
+    // Step 1: Parallel upfront lookup for existing records and table rules
+    const candidateNames = Array.from(
+      new Set(validRows.map((r: any) => r.fullName?.trim().toUpperCase()).filter(Boolean))
+    );
+
+    const [tableRules, existingDbBeneficiaries, existingPbs] = await Promise.all([
+      prisma.tableAssignmentRule.findMany({
+        where: { programId: targetProgramId },
+        orderBy: { priority: "desc" },
+      }),
+      prisma.beneficiary.findMany({
+        where: { fullName: { in: candidateNames } },
+      }),
+      prisma.programBeneficiary.findMany({
+        where: { programId: targetProgramId },
+        select: { id: true, beneficiaryId: true, designatedNumber: true },
+      }),
+    ]);
 
     const getTableNumber = (num: number) => {
       for (const rule of tableRules) {
@@ -83,33 +96,26 @@ export async function POST(request: Request) {
     let updatedCount = 0;
     let skippedCount = 0;
     let exemptedCount = 0;
+
     const beneMap = new Map<string, any>();
-    const chunkSize = 100;
+    existingDbBeneficiaries.forEach((b) => {
+      beneMap.set(`${b.fullName}_${b.birthday}`, b);
+      if (!beneMap.has(b.fullName)) {
+        beneMap.set(b.fullName, b);
+      }
+    });
 
-    // Step 1: Query existing beneficiaries in chunks
-    for (let i = 0; i < validRows.length; i += chunkSize) {
-      const chunk = validRows.slice(i, i + chunkSize);
-      const found = await prisma.beneficiary.findMany({
-        where: {
-          OR: chunk.map((r: any) => ({
-            fullName: r.fullName.trim().toUpperCase(),
-            birthday: r.birthday,
-          })),
-        },
-      });
-      found.forEach((b) => {
-        beneMap.set(`${b.fullName}_${b.birthday}`, b);
-      });
-    }
+    const existingPbBeneMap = new Map(existingPbs.map((pb) => [pb.beneficiaryId, pb]));
 
-    // Step 2: Separate new vs existing beneficiaries
+    // Step 2: Separate new vs existing beneficiaries & assemble data in-memory
     const newBeneficiariesData: any[] = [];
     const newDependentsData: any[] = [];
-    const existingToUpdate: { id: string; r: any }[] = [];
+    const beneUpdateOps: any[] = [];
+    const exemptedBeneIds: string[] = [];
 
     for (const r of validRows) {
       const key = `${r.fullName.trim().toUpperCase()}_${r.birthday}`;
-      const existing = beneMap.get(key);
+      const existing = beneMap.get(key) || beneMap.get(r.fullName.trim().toUpperCase());
 
       if (!existing) {
         const newId = crypto.randomUUID();
@@ -143,6 +149,7 @@ export async function POST(request: Request) {
           status: "ACTIVE",
         };
         beneMap.set(key, beneObj);
+        beneMap.set(beneObj.fullName, beneObj);
         newBeneficiariesData.push(beneObj);
         newCount++;
 
@@ -161,7 +168,22 @@ export async function POST(request: Request) {
         }
       } else {
         if (duplicateStrategy === "MERGE_AND_REPLACE") {
-          existingToUpdate.push({ id: existing.id, r });
+          beneUpdateOps.push(
+            prisma.beneficiary.update({
+              where: { id: existing.id },
+              data: {
+                barangay: normalizeBarangayName(r.barangay),
+                sitio: r.sitio || undefined,
+                contactNumber: r.contactNumber || undefined,
+                civilStatus: r.civilStatus || undefined,
+                occupation: r.occupation || undefined,
+                isSenior: Boolean(r.isSenior),
+                isPwd: Boolean(r.isPwd),
+                is4Ps: Boolean(r.is4Ps),
+                isIp: Boolean(r.isIp),
+              },
+            })
+          );
           updatedCount++;
         } else {
           skippedCount++;
@@ -170,62 +192,35 @@ export async function POST(request: Request) {
 
       if (r.isExempted || r.status === "EXEMPTED") {
         exemptedCount++;
+        const beneId = existing ? existing.id : beneMap.get(key)?.id;
+        if (beneId) exemptedBeneIds.push(beneId);
       }
     }
 
-    // Step 3: Batch insert new beneficiaries and dependents
-    for (let i = 0; i < newBeneficiariesData.length; i += chunkSize) {
-      await prisma.beneficiary.createMany({
-        data: newBeneficiariesData.slice(i, i + chunkSize),
-        skipDuplicates: true,
-      });
-    }
-
-    for (let i = 0; i < newDependentsData.length; i += chunkSize) {
-      await prisma.dependent.createMany({
-        data: newDependentsData.slice(i, i + chunkSize),
-        skipDuplicates: true,
-      });
-    }
-
-    // Step 4: Batch update existing beneficiaries profile in parallel sub-batches
-    const updateBatchSize = 25;
-    for (let i = 0; i < existingToUpdate.length; i += updateBatchSize) {
-      const batch = existingToUpdate.slice(i, i + updateBatchSize);
-      await Promise.all(
-        batch.map(({ id, r }) =>
-          prisma.beneficiary.updateMany({
-            where: { id },
-            data: {
-              barangay: normalizeBarangayName(r.barangay),
-              sitio: r.sitio || undefined,
-              contactNumber: r.contactNumber || undefined,
-              civilStatus: r.civilStatus || undefined,
-              occupation: r.occupation || undefined,
-              isSenior: Boolean(r.isSenior),
-              isPwd: Boolean(r.isPwd),
-              is4Ps: Boolean(r.is4Ps),
-              isIp: Boolean(r.isIp),
-            },
+    // Step 3: Execute all insertions in parallel in a single network round-trip
+    await Promise.all([
+      newBeneficiariesData.length > 0
+        ? prisma.beneficiary.createMany({
+            data: newBeneficiariesData,
+            skipDuplicates: true,
           })
-        )
-      );
-    }
+        : Promise.resolve(),
+      newDependentsData.length > 0
+        ? prisma.dependent.createMany({
+            data: newDependentsData,
+            skipDuplicates: true,
+          })
+        : Promise.resolve(),
+    ]);
 
-    // Step 5: Handle program beneficiaries & QR codes
-    const existingPbs = await prisma.programBeneficiary.findMany({
-      where: { programId: targetProgramId },
-      select: { id: true, beneficiaryId: true, designatedNumber: true },
-    });
-    const existingPbBeneMap = new Map(existingPbs.map((pb) => [pb.beneficiaryId, pb]));
-
+    // Step 4: Assemble program beneficiaries, QR codes, and PB updates
     const progBeneficiariesToInsert: any[] = [];
     const qrCodesToInsert: any[] = [];
-    const pbsToUpdate: { id: string; designatedNumber: string; tableNumber: string; slotGroup: string }[] = [];
+    const pbUpdateOps: any[] = [];
 
     for (const r of validRows) {
       const key = `${r.fullName.trim().toUpperCase()}_${r.birthday}`;
-      const bene = beneMap.get(key);
+      const bene = beneMap.get(key) || beneMap.get(r.fullName.trim().toUpperCase());
       if (!bene) continue;
 
       const desigNum = parseInt(r.designatedNumber, 10) || 1;
@@ -234,12 +229,16 @@ export async function POST(request: Request) {
       const existingPb = existingPbBeneMap.get(bene.id);
       if (existingPb) {
         if (duplicateStrategy === "MERGE_AND_REPLACE") {
-          pbsToUpdate.push({
-            id: existingPb.id,
-            designatedNumber: String(r.designatedNumber),
-            tableNumber: assignment.table,
-            slotGroup: assignment.slotGroup,
-          });
+          pbUpdateOps.push(
+            prisma.programBeneficiary.update({
+              where: { id: existingPb.id },
+              data: {
+                designatedNumber: String(r.designatedNumber),
+                tableNumber: assignment.table,
+                slotGroup: assignment.slotGroup,
+              },
+            })
+          );
           importedCount++;
         }
       } else {
@@ -268,73 +267,64 @@ export async function POST(request: Request) {
 
         importedCount++;
       }
-
-      // If exempted, override any active restrictions for this beneficiary
-      if (r.isExempted || r.status === "EXEMPTED") {
-        await prisma.beneficiaryRestriction.updateMany({
-          where: {
-            beneficiaryId: bene.id,
-            status: "ACTIVE",
-          },
-          data: {
-            status: "OVERRIDDEN",
-            reason: r.exemptionReason
-              ? `Authorized Exemption: ${r.exemptionReason}`
-              : "Authorized Exemption for Final Masterlist Implementation",
-          },
-        });
-      }
     }
 
-    // Batch insert new program beneficiaries and QR codes
-    for (let i = 0; i < progBeneficiariesToInsert.length; i += chunkSize) {
-      await prisma.programBeneficiary.createMany({
-        data: progBeneficiariesToInsert.slice(i, i + chunkSize),
-        skipDuplicates: true,
-      });
+    // Step 5: Execute new PB & QR code bulk insertions and batch updates in parallel
+    const allUpdateOps = [...beneUpdateOps, ...pbUpdateOps];
+    const updatePromises: Promise<any>[] = [];
+
+    const TX_BATCH_SIZE = 250;
+    for (let i = 0; i < allUpdateOps.length; i += TX_BATCH_SIZE) {
+      const batch = allUpdateOps.slice(i, i + TX_BATCH_SIZE);
+      updatePromises.push(prisma.$transaction(batch));
     }
 
-    for (let i = 0; i < qrCodesToInsert.length; i += chunkSize) {
-      await prisma.qrCode.createMany({
-        data: qrCodesToInsert.slice(i, i + chunkSize),
-        skipDuplicates: true,
-      });
-    }
-
-    // Batch update existing program beneficiaries
-    for (let i = 0; i < pbsToUpdate.length; i += updateBatchSize) {
-      const batch = pbsToUpdate.slice(i, i + updateBatchSize);
-      await Promise.all(
-        batch.map((pb) =>
-          prisma.programBeneficiary.updateMany({
-            where: { id: pb.id },
+    await Promise.all([
+      progBeneficiariesToInsert.length > 0
+        ? prisma.programBeneficiary.createMany({
+            data: progBeneficiariesToInsert,
+            skipDuplicates: true,
+          })
+        : Promise.resolve(),
+      qrCodesToInsert.length > 0
+        ? prisma.qrCode.createMany({
+            data: qrCodesToInsert,
+            skipDuplicates: true,
+          })
+        : Promise.resolve(),
+      ...updatePromises,
+      exemptedBeneIds.length > 0
+        ? prisma.beneficiaryRestriction.updateMany({
+            where: {
+              beneficiaryId: { in: exemptedBeneIds },
+              status: "ACTIVE",
+            },
             data: {
-              designatedNumber: pb.designatedNumber,
-              tableNumber: pb.tableNumber,
-              slotGroup: pb.slotGroup,
+              status: "OVERRIDDEN",
+              reason: "Authorized Exemption for Final Masterlist Implementation",
             },
           })
-        )
-      );
-    }
+        : Promise.resolve(),
+    ]);
 
-    // Step 6: Update program total beneficiary count
+    // Step 6: Update program total beneficiary count & audit log
     const totalProgramBenes = await prisma.programBeneficiary.count({
       where: { programId: targetProgramId, participationStatus: { not: "REPLACED" } },
     });
 
-    await prisma.program.update({
-      where: { id: targetProgramId },
-      data: { beneficiaryCount: totalProgramBenes },
-    });
-
-    await logAudit({
-      userId: user.id,
-      action: "FINAL_BENEFICIARIES_MASTERLIST_IMPORTED",
-      entityType: "PROGRAM",
-      entityId: targetProgramId,
-      metadata: { count: importedCount, newCount, updatedCount, skippedCount, exemptedCount, duplicateStrategy },
-    });
+    await Promise.all([
+      prisma.program.update({
+        where: { id: targetProgramId },
+        data: { beneficiaryCount: totalProgramBenes },
+      }),
+      logAudit({
+        userId: user.id,
+        action: "FINAL_BENEFICIARIES_MASTERLIST_IMPORTED",
+        entityType: "PROGRAM",
+        entityId: targetProgramId,
+        metadata: { count: importedCount, newCount, updatedCount, skippedCount, exemptedCount, duplicateStrategy },
+      }),
+    ]);
 
     return NextResponse.json({
       success: true,

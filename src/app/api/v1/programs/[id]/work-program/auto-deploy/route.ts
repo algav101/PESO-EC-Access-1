@@ -70,16 +70,57 @@ export async function POST(request: Request, { params }: { params: { id: string 
       ? Object.keys(beneficiariesByBrgy)
       : Object.values(DINGALAN_BARANGAY_GROUPINGS).map((c) => c.barangay);
 
+    // 3. Batch prepare or update work programs for all target barangays
+    const existingWpMap = new Map(program.tupadWorkPrograms.map((w) => [w.barangay, w]));
+    const wpIdMap = new Map<string, string>();
+
+    // Delete existing items for all target barangays in one fast query
+    const existingWpIds = program.tupadWorkPrograms.map((w) => w.id);
+    if (existingWpIds.length > 0) {
+      await prisma.tupadWorkProgramItem.deleteMany({
+        where: { workProgramId: { in: existingWpIds } },
+      });
+    }
+
+    // Upsert TupadWorkProgram headers
+    for (const brgyName of targetBarangays) {
+      const brgyBeneficiaries = beneficiariesByBrgy[brgyName] || [];
+      const existingWp = existingWpMap.get(brgyName);
+
+      if (!existingWp) {
+        const createdWp = await prisma.tupadWorkProgram.create({
+          data: {
+            programId: params.id,
+            barangay: brgyName,
+            projectLocation: brgyName,
+            beneficiaryCount: brgyBeneficiaries.length,
+            natureOfWork: "Environmental Cleaning, Waste Management, Pathway Clearing & Community Greening",
+            workingHours: "Not Exceed Eight (8) Hours a day (8:00 AM–12:00 NN; 1:00 PM–5:00 PM)",
+          },
+        });
+        wpIdMap.set(brgyName, createdWp.id);
+      } else {
+        wpIdMap.set(brgyName, existingWp.id);
+        await prisma.tupadWorkProgram.update({
+          where: { id: existingWp.id },
+          data: { beneficiaryCount: brgyBeneficiaries.length },
+        });
+      }
+    }
+
+    // 4. Assemble all items across all barangays into one unified batch
+    const allItemsToInsert: any[] = [];
     let totalDeployedBarangays = 0;
-    let totalDeployedActivities = 0;
 
     for (const brgyName of targetBarangays) {
+      const workProgramId = wpIdMap.get(brgyName);
+      if (!workProgramId) continue;
+
       const bKey = getBarangayKey(brgyName);
       const config = DINGALAN_BARANGAY_GROUPINGS[bKey];
       const brgyBeneficiaries = beneficiariesByBrgy[brgyName] || [];
-
-      // Group beneficiaries within this barangay
       const groupBeneficiariesMap: Record<string, any[]> = {};
+
       if (config) {
         for (const g of config.groups) {
           groupBeneficiariesMap[g.groupName] = [];
@@ -94,38 +135,6 @@ export async function POST(request: Request, { params }: { params: { id: string 
         groupBeneficiariesMap[classification.groupName].push(pb);
       }
 
-      // Check if existing TupadWorkProgram exists
-      const existingWp = program.tupadWorkPrograms.find((w) => w.barangay === brgyName);
-      let workProgramId: string;
-
-      if (!existingWp) {
-        const createdWp = await prisma.tupadWorkProgram.create({
-          data: {
-            programId: params.id,
-            barangay: brgyName,
-            projectLocation: brgyName,
-            beneficiaryCount: brgyBeneficiaries.length,
-            natureOfWork: "Environmental Cleaning, Waste Management, Pathway Clearing & Community Greening",
-            workingHours: "Not Exceed Eight (8) Hours a day (8:00 AM–12:00 NN; 1:00 PM–5:00 PM)",
-          },
-        });
-        workProgramId = createdWp.id;
-      } else {
-        workProgramId = existingWp.id;
-        await prisma.tupadWorkProgram.update({
-          where: { id: workProgramId },
-          data: { beneficiaryCount: brgyBeneficiaries.length },
-        });
-        // Delete old items to rebuild with revised groups
-        await prisma.tupadWorkProgramItem.deleteMany({
-          where: { workProgramId },
-        });
-      }
-
-      // Build Day 1 to 10 activities for each group in this barangay
-      const itemsToInsert: any[] = [];
-      let orderIndex = 0;
-
       const definedGroups = config?.groups || [
         {
           groupName: `${brgyName.toUpperCase()} GROUP 1`,
@@ -135,8 +144,10 @@ export async function POST(request: Request, { params }: { params: { id: string 
         },
       ];
 
+      const existingWp = existingWpMap.get(brgyName);
+      let orderIndex = 0;
+
       for (let day = 1; day <= 10; day++) {
-        // Check if existing work program had an activity description for this day
         const existingDayItem = existingWp?.items.find((it) => it.dayNumber === day);
         const defaultDayObj = DEFAULT_10_DAY_ACTIVITIES.find((d) => d.day === day);
         const specificActivities =
@@ -147,11 +158,9 @@ export async function POST(request: Request, { params }: { params: { id: string 
         for (const group of definedGroups) {
           const groupBenes = groupBeneficiariesMap[group.groupName] || [];
           const demographics = computeGroupDemographics(groupBenes);
-
-          // Area format combining Group Label and Designated Main Area
           const area = `${group.groupLabel}: ${group.designatedMainArea}`;
 
-          itemsToInsert.push({
+          allItemsToInsert.push({
             workProgramId,
             dayNumber: day,
             specificActivities,
@@ -166,14 +175,18 @@ export async function POST(request: Request, { params }: { params: { id: string 
         }
       }
 
-      if (itemsToInsert.length > 0) {
-        await prisma.tupadWorkProgramItem.createMany({
-          data: itemsToInsert,
-        });
-        totalDeployedBarangays++;
-        totalDeployedActivities += itemsToInsert.length;
-      }
+      totalDeployedBarangays++;
     }
+
+    // Insert all items in bulk chunks
+    const CHUNK_SIZE = 250;
+    for (let i = 0; i < allItemsToInsert.length; i += CHUNK_SIZE) {
+      await prisma.tupadWorkProgramItem.createMany({
+        data: allItemsToInsert.slice(i, i + CHUNK_SIZE),
+      });
+    }
+
+    const totalDeployedActivities = allItemsToInsert.length;
 
     await logAudit({
       userId: user.id,

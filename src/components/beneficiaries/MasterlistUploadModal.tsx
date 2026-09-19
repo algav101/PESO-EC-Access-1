@@ -406,6 +406,20 @@ export function MasterlistUploadModal({
           </div>
         </div>
 
+        {committing && (
+          <div className="p-3.5 bg-blue-50 border border-blue-200 rounded-xl text-xs text-blue-900 font-bold flex items-center justify-between animate-pulse">
+            <div className="flex items-center space-x-2.5">
+              <RefreshCw className="w-4 h-4 text-gov-blue animate-spin" />
+              <span>
+                Fast Batch Committing {preview?.validCount} Records — Syncing database profiles, QR tokens, and program rosters...
+              </span>
+            </div>
+            <span className="text-[10px] bg-gov-blue text-white px-2 py-0.5 rounded-md font-mono">
+              High-Speed Batch Sync Active
+            </span>
+          </div>
+        )}
+
         {error && (
           <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-xs text-red-800 font-bold flex items-center space-x-2">
             <AlertTriangle className="w-4 h-4 text-red-600 flex-shrink-0" />
