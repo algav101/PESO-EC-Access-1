@@ -188,7 +188,7 @@ export default async function DashboardPage() {
     {
       label: "Target Beneficiaries",
       value: totalBeneficiariesCount,
-      sublabel: "Active Enrolled Roster",
+      sublabel: "Final Masterlist for Implementation",
       icon: Users,
       color: "text-indigo-700",
       bg: "bg-indigo-50",
@@ -259,6 +259,8 @@ export default async function DashboardPage() {
     },
   ];
 
+  const activeProgramId = recentPrograms[0]?.id || "";
+
   return (
     <div className="space-y-8">
       {/* Welcome Banner */}
@@ -324,6 +326,88 @@ export default async function DashboardPage() {
             </a>
           );
         })}
+      </div>
+
+      {/* Feature Section: Final List of Beneficiaries for Implementation */}
+      <div className="gov-card p-6 bg-gradient-to-r from-blue-950 via-slate-900 to-indigo-950 text-white shadow-xl rounded-2xl border-l-4 border-l-gov-gold space-y-4">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div className="space-y-1">
+            <div className="flex items-center space-x-2">
+              <span className="px-2.5 py-0.5 bg-gov-gold/20 text-gov-goldLight font-black text-[10px] uppercase rounded-full border border-gov-gold/40 tracking-wider">
+                Work Program Deployment Basis
+              </span>
+              <span className="text-[11px] text-blue-200 font-bold">Official Masterlist Roster</span>
+            </div>
+            <h2 className="text-lg sm:text-xl font-black tracking-tight text-white flex items-center space-x-2">
+              <Users className="w-5 h-5 text-gov-gold" />
+              <span>Final List of Beneficiaries for Implementation</span>
+            </h2>
+            <p className="text-xs text-blue-100 max-w-2xl leading-relaxed">
+              Manage the official 2026 TUPAD Implementation Masterlist. Upload CSV batches, view automatic grouping across all 11 Dingalan Barangays and Puroks/Sitios, edit beneficiary records, and sync directly to the 10-Day Work Program.
+            </p>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2 self-start md:self-auto">
+            <a
+              href="/api/v1/beneficiaries/template"
+              download="tupad_final_beneficiaries_template.csv"
+              className="px-3.5 py-2 bg-white/10 hover:bg-white/20 text-white font-bold text-xs rounded-xl border border-white/20 transition flex items-center space-x-1.5 shadow-sm"
+              title="Download standard CSV template"
+            >
+              <FileSpreadsheet className="w-3.5 h-3.5 text-gov-goldLight" />
+              <span>Template CSV</span>
+            </a>
+
+            <a
+              href="/beneficiaries"
+              className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-xl shadow-lg transition flex items-center space-x-1.5"
+            >
+              <FileSpreadsheet className="w-4 h-4 text-emerald-100" />
+              <span>Open Masterlist &amp; Upload</span>
+            </a>
+
+            {activeProgramId && (
+              <a
+                href={`/programs/${activeProgramId}/work-program`}
+                className="px-4 py-2 bg-gov-blue hover:bg-gov-light text-white font-bold text-xs rounded-xl shadow-lg transition flex items-center space-x-1.5"
+              >
+                <span>Work Program Deployment</span>
+                <ArrowRight className="w-3.5 h-3.5 text-gov-goldLight" />
+              </a>
+            )}
+          </div>
+        </div>
+
+        {/* 3 Value Pillars */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2 border-t border-white/10 text-xs">
+          <div className="p-3 bg-white/5 rounded-xl border border-white/10 space-y-1">
+            <span className="font-bold text-gov-goldLight flex items-center space-x-1 text-[11px]">
+              <ShieldCheck className="w-3.5 h-3.5" />
+              <span>Purok / Sitio Grouping</span>
+            </span>
+            <p className="text-[11px] text-blue-100 leading-snug">
+              Groups beneficiaries by official barangay clusters (e.g. Umiray Group 1: Singawan, Pinamaypayan &amp; Dugyan).
+            </p>
+          </div>
+          <div className="p-3 bg-white/5 rounded-xl border border-white/10 space-y-1">
+            <span className="font-bold text-gov-goldLight flex items-center space-x-1 text-[11px]">
+              <Users className="w-3.5 h-3.5" />
+              <span>Demographic Ratios</span>
+            </span>
+            <p className="text-[11px] text-blue-100 leading-snug">
+              Auto-calculates Gender (M/F), Senior Citizen (Age &ge; 60), PWD, and IP counts per designated work area.
+            </p>
+          </div>
+          <div className="p-3 bg-white/5 rounded-xl border border-white/10 space-y-1">
+            <span className="font-bold text-gov-goldLight flex items-center space-x-1 text-[11px]">
+              <QrCode className="w-3.5 h-3.5" />
+              <span>Biometric QR &amp; Editing</span>
+            </span>
+            <p className="text-[11px] text-blue-100 leading-snug">
+              Live editing of beneficiary profiles, duplicate prevention, 365-day lockout enforcement, and deletion options.
+            </p>
+          </div>
+        </div>
       </div>
 
       {/* Two Column Section */}

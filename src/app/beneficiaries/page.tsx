@@ -24,11 +24,19 @@ import {
   X,
   Check,
   Loader2,
+  FileSpreadsheet,
+  UploadCloud,
+  Download,
+  Layers,
+  LayoutGrid,
+  Sparkles,
 } from "lucide-react";
 import { StatusBadge } from "@/components/common/StatusBadge";
 import { formatDate } from "@/lib/utils";
 import { EditBeneficiaryModal } from "@/components/beneficiaries/EditBeneficiaryModal";
 import { AdminStubOverrideModal } from "@/components/beneficiaries/AdminStubOverrideModal";
+import { MasterlistUploadModal } from "@/components/beneficiaries/MasterlistUploadModal";
+import { DeploymentGroupingMatrix } from "@/components/beneficiaries/DeploymentGroupingMatrix";
 import { useAuth } from "@/context/AuthContext";
 import { offlineDb } from "@/lib/dexie";
 import { isAdminUser, isFieldCoordinator } from "@/lib/permissions";
@@ -64,6 +72,10 @@ export default function BeneficiariesMasterlistPage() {
   // Sorting State
   const [sortBy, setSortBy] = useState<string>("designatedNumber");
   const [sortOrder, setSortOrder] = useState<"ASC" | "DESC">("ASC");
+
+  // View Mode: Roster Table vs. Deployment Grouping Matrix
+  const [activeViewMode, setActiveViewMode] = useState<"ROSTER" | "GROUPING">("ROSTER");
+  const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
 
   // Editing, Override & Deletion state
   const [beneficiaryToEdit, setBeneficiaryToEdit] = useState<any | null>(null);
@@ -414,25 +426,82 @@ export default function BeneficiariesMasterlistPage() {
   return (
     <div className="space-y-6 pb-24">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
+          <div className="flex items-center space-x-2 text-gov-blue text-xs font-bold uppercase tracking-wider mb-0.5">
+            <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+            <span>TUPAD Implementation Command System</span>
+          </div>
           <h1 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight flex items-center space-x-2">
             <Users className="w-6 h-6 text-gov-blue" />
-            <span>Beneficiaries Masterlist</span>
+            <span>Final List of Beneficiaries for Implementation</span>
           </h1>
           <p className="text-xs text-slate-500">
-            Comprehensive TUPAD roster, Purok/Sitio sorting & filtering, table assignments, and attendance track
+            Authoritative Masterlist for TUPAD Deployment, Purok/Sitio Allocation, Biometric QR Verification &amp; Work Program Scheduling
           </p>
         </div>
 
-        {selectedProgram && (isAdmin || can("beneficiary.import")) && (
+        <div className="flex flex-wrap items-center gap-2 self-start md:self-auto">
           <a
-            href={`/programs/${selectedProgram}/import`}
-            className="px-3.5 py-2 bg-gov-blue hover:bg-gov-light text-white font-bold text-xs rounded-xl shadow transition"
+            href="/api/v1/beneficiaries/template"
+            download="tupad_final_beneficiaries_template.csv"
+            className="px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl border flex items-center space-x-1.5 transition shadow-xs"
+            title="Download standard CSV template for Final Masterlist"
           >
-            Import Excel Batch
+            <Download className="w-3.5 h-3.5" />
+            <span>Template CSV</span>
           </a>
-        )}
+
+          {(isAdmin || can("beneficiary.import")) && (
+            <button
+              onClick={() => setIsUploadModalOpen(true)}
+              className="px-3.5 py-2 bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-xs rounded-xl shadow flex items-center space-x-1.5 transition"
+            >
+              <UploadCloud className="w-4 h-4 text-emerald-200" />
+              <span>Upload CSV / Excel Masterlist</span>
+            </button>
+          )}
+
+          {selectedProgram && (
+            <a
+              href={`/programs/${selectedProgram}/work-program`}
+              className="px-3.5 py-2 bg-gov-blue hover:bg-gov-light text-white font-bold text-xs rounded-xl shadow flex items-center space-x-1.5 transition"
+            >
+              <FileSpreadsheet className="w-4 h-4 text-gov-goldLight" />
+              <span>Work Program Deployment</span>
+            </a>
+          )}
+        </div>
+      </div>
+
+      {/* View Switcher Tabs */}
+      <div className="flex items-center justify-between border-b pb-2">
+        <div className="flex space-x-2 bg-slate-100 p-1 rounded-xl">
+          <button
+            type="button"
+            onClick={() => setActiveViewMode("ROSTER")}
+            className={`px-4 py-2 text-xs font-bold rounded-lg transition flex items-center space-x-1.5 ${
+              activeViewMode === "ROSTER"
+                ? "bg-white text-gov-blue shadow-xs"
+                : "text-slate-600 hover:text-slate-900"
+            }`}
+          >
+            <LayoutGrid className="w-4 h-4" />
+            <span>Masterlist Implementation Roster ({beneficiaries.length})</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveViewMode("GROUPING")}
+            className={`px-4 py-2 text-xs font-bold rounded-lg transition flex items-center space-x-1.5 ${
+              activeViewMode === "GROUPING"
+                ? "bg-white text-gov-blue shadow-xs"
+                : "text-slate-600 hover:text-slate-900"
+            }`}
+          >
+            <Layers className="w-4 h-4 text-amber-600" />
+            <span>Purok &amp; Sitio Deployment Groupings</span>
+          </button>
+        </div>
       </div>
 
       {/* Success Notification Banner */}
@@ -464,8 +533,19 @@ export default function BeneficiariesMasterlistPage() {
         </div>
       )}
 
-      {/* Filter & Sort Bar */}
-      <div className="gov-card p-4 space-y-3">
+      {/* Conditional View: Deployment Grouping Matrix vs. Table Roster */}
+      {activeViewMode === "GROUPING" ? (
+        <DeploymentGroupingMatrix
+          beneficiaries={beneficiaries}
+          selectedBarangay={selectedBarangay}
+          onEditBeneficiary={(pb) => setBeneficiaryToEdit(pb)}
+          onDeleteBeneficiary={(pb) => setBeneficiaryToDelete(pb)}
+          programId={selectedProgram}
+        />
+      ) : (
+        <>
+          {/* Filter & Sort Bar */}
+          <div className="gov-card p-4 space-y-3">
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-3">
           {/* Select Program */}
           <div>
@@ -1170,6 +1250,8 @@ export default function BeneficiariesMasterlistPage() {
           </div>
         </div>
       )}
+      </>
+    )}
 
       {/* PESO Admin Stub & Affirmation Override Modal */}
       {stubOverridePb && (
@@ -1264,6 +1346,14 @@ export default function BeneficiariesMasterlistPage() {
           </div>
         </div>
       )}
+      {/* CSV / Excel Masterlist Upload Modal */}
+      <MasterlistUploadModal
+        isOpen={isUploadModalOpen}
+        onClose={() => setIsUploadModalOpen(false)}
+        programs={programs}
+        defaultProgramId={selectedProgram}
+        onSuccess={() => fetchBeneficiaries(selectedProgram)}
+      />
     </div>
   );
 }

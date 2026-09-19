@@ -43,6 +43,7 @@ export default function WorkProgramManagementPage() {
   const [file, setFile] = useState<File | null>(null);
   const [parsing, setParsing] = useState(false);
   const [committing, setCommitting] = useState(false);
+  const [autoDeploying, setAutoDeploying] = useState(false);
   const [preview, setPreview] = useState<WorkProgramPreviewResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
@@ -213,6 +214,33 @@ export default function WorkProgramManagementPage() {
     }
   };
 
+  const handleAutoDeployFromMasterlist = async () => {
+    if (
+      !confirm(
+        `Are you sure you want to revise and auto-deploy the TUPAD Work Program based on the Final Implementation Masterlist?\n\nThis will organize designated areas into official Purok/Sitio groups (e.g. Umiray Group 1: Singawan, Pinamaypayan, Dugyan) and recalculate exact demographic counts (Male, Female, SC, PWD, IP).`
+      )
+    )
+      return;
+
+    setAutoDeploying(true);
+    try {
+      const res = await fetch(`/api/v1/programs/${params.id}/work-program/auto-deploy`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ barangay: selectedBarangay }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to auto-deploy work program");
+
+      alert(data.message || "Successfully revised and deployed TUPAD Work Program from Masterlist!");
+      fetchProgramAndWorkPrograms();
+    } catch (err: any) {
+      alert(err.message || "Error deploying work program");
+    } finally {
+      setAutoDeploying(false);
+    }
+  };
+
   if (loading) {
     return <div className="py-20 text-center text-xs text-slate-400">Loading TUPAD Work Program Hub...</div>;
   }
@@ -246,9 +274,39 @@ export default function WorkProgramManagementPage() {
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
+          {isAdmin && (
+            <button
+              onClick={handleAutoDeployFromMasterlist}
+              disabled={autoDeploying}
+              className="px-3.5 py-2 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-slate-950 font-black text-xs rounded-xl shadow transition flex items-center space-x-1.5 disabled:opacity-50"
+              title="Auto-organize designated work areas according to official Purok & Sitio matrix and demographic tallies from Final Masterlist"
+            >
+              {autoDeploying ? (
+                <>
+                  <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                  <span>Auto-Deploying...</span>
+                </>
+              ) : (
+                <>
+                  <Sparkles className="w-3.5 h-3.5" />
+                  <span>Auto-Deploy from Masterlist</span>
+                </>
+              )}
+            </button>
+          )}
+
+          <a
+            href="/beneficiaries"
+            className="px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl transition border border-slate-300 flex items-center space-x-1.5"
+            title="View Final Implementation Masterlist"
+          >
+            <Users className="w-3.5 h-3.5 text-gov-blue" />
+            <span>Final Masterlist</span>
+          </a>
+
           <a
             href={`/api/v1/programs/${params.id}/work-program/template`}
-            className="px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-lg transition border border-slate-300 flex items-center space-x-1.5"
+            className="px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl transition border border-slate-300 flex items-center space-x-1.5"
             title="Download blank 10-day TUPAD work program spreadsheet template"
           >
             <Download className="w-3.5 h-3.5 text-slate-500" />
@@ -262,7 +320,7 @@ export default function WorkProgramManagementPage() {
                 setPreview(null);
                 setFile(null);
               }}
-              className="px-3.5 py-2 bg-gov-blue hover:bg-gov-light text-white font-bold text-xs rounded-lg transition shadow flex items-center space-x-1.5"
+              className="px-3.5 py-2 bg-gov-blue hover:bg-gov-light text-white font-bold text-xs rounded-xl transition shadow flex items-center space-x-1.5"
             >
               <UploadCloud className="w-4 h-4 text-gov-goldLight" />
               <span>Upload Work Program</span>
@@ -271,7 +329,7 @@ export default function WorkProgramManagementPage() {
 
           <a
             href={`/api/v1/reports/export?type=WORK_PROGRAM&programId=${params.id}`}
-            className="px-3.5 py-2 bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-xs rounded-lg transition shadow flex items-center space-x-1.5"
+            className="px-3.5 py-2 bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-xs rounded-xl transition shadow flex items-center space-x-1.5"
           >
             <Download className="w-3.5 h-3.5 text-emerald-200" />
             <span>Export 10-Day Plan</span>
@@ -279,7 +337,7 @@ export default function WorkProgramManagementPage() {
 
           <a
             href={`/programs/${params.id}`}
-            className="px-3 py-2 text-xs font-bold text-slate-600 hover:text-slate-900 border rounded-lg"
+            className="px-3 py-2 text-xs font-bold text-slate-600 hover:text-slate-900 border rounded-xl"
           >
             Back to Hub
           </a>

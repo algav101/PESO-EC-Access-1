@@ -1,5 +1,15 @@
 import * as XLSX from "xlsx";
 import prisma from "@/lib/prisma";
+import { classifyBeneficiaryGroup } from "@/lib/dingalan-groupings";
+
+export const FINAL_BENEFICIARIES_CSV_TEMPLATE = `No.,FORMULA FULL NAME,"FORMULA LAST NAME, FIRST NAME",Name of Beneficiary,,,,Birthdate,,,,Address (Beneficiary),,,,,Type of ID,ID No.,Contact No.,E-payment/,Type of Beneficiary,Occupation,Sex,Civil Status,Age,Average monthly income,DEPENDENT FULL NAME FORMULA,"DEPENDENT LAST NAME, FIRST NAME FORMULA ",Dependent (Name of Beneficiary of the Micro-insurance Holder),,,,RELATIONSHIP OF DEPENDEMT,AGE (18 ABOVE) OF DEPENDENT,Interested in wage employment or self-employment?,Skills Training Needed,"PWD
+(Please Indicate)","4P's
+(Y/N)","IP's
+(Y/N)"
+,,,First Name,Middle Name,Last Name,Extension Name,(YYYY/MM/DD),,,,Street,Brgy.,City/Municipality,Province,District,,,,Account No. ,,,,,,,,,First Name, Middle Name,Last Name,Extension Name,,,"(Yes/No, if Yes, please specify)",,,,
+1,"ASTORGA, JONEL TALENTO","ASTORGA, JONEL",JONEL,TALENTO,ASTORGA,,2000/11/08,11,8,2000,LAPU LAPU,APLAYA,DINGALAN,AURORA,LONE,NATIONAL ID,2406-3425-7582-9680,639979925136,,SELF-EMPLOYED,LABORER,F,M,25,,"PRONTO, KAILA NICOL","PRONTO, KAILA",KAILA,NICOL,PRONTO,,WIFE,31,,,,N,N
+2,"ATENTAR, OFELIA SARMIENTO","ATENTAR, OFELIA",OFELIA,SARMIENTO,ATENTAR,,1959/11/06,11,6,1959,PUROK TANIGUE,APLAYA,DINGALAN,AURORA,LONE,NATIONAL ID,6348-5468-2693-6042,639977003203,,SENIOR CITIZEN,PIGGERY FARM,F,M,66,,"ATENTAR, NICOLE SARMIENTO","ATENTAR, NICOLE",NICOLE,SARMIENTO,ATENTAR,,DAUGHTER,26,,,,N,N
+3,"AVELLANO, LOVIE TENA","AVELLANO, LOVIE",LOVIE,TENA,AVELLANO,,1979/11/08,11,8,1979,LAPU LAPU,APLAYA,DINGALAN,AURORA,LONE,NATIONAL ID,5684-1903-1870-8153,639852686649,,SELF-EMPLOYED,LABORER,M,M,46,,"AVELLANO, ANNA CHERRIE BALDERAMA","AVELLANO, ANNA CHERRIE",ANNA CHERRIE,BALDERAMA,AVELLANO,,WIFE,48,,,,N,N`;
 
 export interface ParsedBeneficiaryRow {
   rowNumber: number;
@@ -36,6 +46,10 @@ export interface ParsedBeneficiaryRow {
   dependentExtensionName?: string;
   dependentRelationship?: string;
   dependentAge?: number;
+  // Grouping fields
+  groupName?: string;
+  groupLabel?: string;
+  designatedMainArea?: string;
   status: "VALID" | "DUPLICATE" | "RESTRICTED" | "MISSING_REQUIRED_FIELD" | "INVALID_BIRTHDAY" | "DUPLICATE_DESIGNATED_NUMBER";
   validationError?: string;
   restrictionEnd?: string;
@@ -194,7 +208,7 @@ export async function parseBeneficiaryExcelBuffer(
     }
   }
 
-  // Birthdate sub-headers (Month, Day, Year)
+  // Birthdate sub-headers (Month, Day, Year, or Single Date Column)
   let colBdayMonth = -1;
   let colBdayDay = -1;
   let colBdayYear = -1;
@@ -203,12 +217,26 @@ export async function parseBeneficiaryExcelBuffer(
   for (let c = 0; c < maxCols; c++) {
     const sub = (subHeaders[c] || "").toLowerCase();
     const top = (topHeaders[c] || "").toLowerCase();
-    if (sub.includes("montrh") || sub.includes("month")) colBdayMonth = c;
-    if (sub.includes("day") && colBdayDay === -1) colBdayDay = c;
-    if (sub.includes("year") && colBdayYear === -1) colBdayYear = c;
-    if ((top.includes("birthday") || top.includes("birthdate") || top.includes("dob")) && !sub) {
-      colBdaySingle = c;
+    if (sub.includes("montrh") || sub.includes("month") || sub === "mm") colBdayMonth = c;
+    if (sub.includes("day") || sub === "dd") colBdayDay = c;
+    if (sub.includes("year") || sub === "yyyy") colBdayYear = c;
+    if (
+      top.includes("birthday") ||
+      top.includes("birthdate") ||
+      top.includes("dob") ||
+      sub.includes("yyyy/mm/dd") ||
+      sub.includes("yyyy-mm-dd") ||
+      sub.includes("mm/dd/yyyy")
+    ) {
+      if (colBdaySingle === -1) colBdaySingle = c;
     }
+  }
+
+  // If topHeader had "Birthdate" with multiple subsequent columns for Month, Day, Year
+  if (colBdaySingle !== -1) {
+    if (colBdayMonth === -1 && colBdaySingle + 1 < maxCols) colBdayMonth = colBdaySingle + 1;
+    if (colBdayDay === -1 && colBdaySingle + 2 < maxCols) colBdayDay = colBdaySingle + 2;
+    if (colBdayYear === -1 && colBdaySingle + 3 < maxCols) colBdayYear = colBdaySingle + 3;
   }
 
   // Address sub-headers (Sitio/Purok, Brgy, City/Municipality, Province)
@@ -306,14 +334,43 @@ export async function parseBeneficiaryExcelBuffer(
       fullName = `${lastName}, ${firstName}${midPart}${extPart}`;
     }
 
-    if (fullName) candidateNames.add(fullName);
-    if (lastName) candidateLastNames.add(lastName);
-
-    // 3. Birthday Parsing (Split Columns: Month, Day, Year OR Single Column)
+    // 3. Birthday Parsing (Single Column e.g. "2000/11/08" OR Split Columns: Month, Day, Year)
     let birthday = ""; // YYYY-MM-DD
     let birthdayPin = ""; // MM-DD-YYYY
 
-    if (colBdayMonth !== -1 && colBdayDay !== -1 && colBdayYear !== -1 &&
+    if (colBdaySingle !== -1 && row[colBdaySingle] !== undefined && String(row[colBdaySingle]).trim() !== "") {
+      const val = row[colBdaySingle];
+      const strVal = String(val).trim();
+
+      if (/^\d{4}[\/\-]\d{1,2}[\/\-]\d{1,2}$/.test(strVal)) {
+        const parts = strVal.split(/[\/\-]/);
+        const y = parts[0];
+        const m = parts[1].padStart(2, "0");
+        const d = parts[2].padStart(2, "0");
+        birthday = `${y}-${m}-${d}`;
+        birthdayPin = `${m}-${d}-${y}`;
+      } else if (/^\d{1,2}[\/\-]\d{1,2}[\/\-]\d{4}$/.test(strVal)) {
+        const parts = strVal.split(/[\/\-]/);
+        const m = parts[0].padStart(2, "0");
+        const d = parts[1].padStart(2, "0");
+        const y = parts[2];
+        birthday = `${y}-${m}-${d}`;
+        birthdayPin = `${m}-${d}-${y}`;
+      } else if (val instanceof Date && !isNaN(val.getTime())) {
+        birthday = val.toISOString().split("T")[0];
+        const [y, m, d] = birthday.split("-");
+        birthdayPin = `${m}-${d}-${y}`;
+      } else if (typeof val === "number") {
+        const parsedDate = new Date(Math.round((val - 25569) * 86400 * 1000));
+        if (!isNaN(parsedDate.getTime())) {
+          birthday = parsedDate.toISOString().split("T")[0];
+          const [y, m, d] = birthday.split("-");
+          birthdayPin = `${m}-${d}-${y}`;
+        }
+      }
+    }
+
+    if (!birthday && colBdayMonth !== -1 && colBdayDay !== -1 && colBdayYear !== -1 &&
         row[colBdayMonth] !== undefined && row[colBdayDay] !== undefined && row[colBdayYear] !== undefined &&
         String(row[colBdayMonth]).trim() !== "" && String(row[colBdayDay]).trim() !== "" && String(row[colBdayYear]).trim() !== "") {
       
@@ -336,52 +393,26 @@ export async function parseBeneficiaryExcelBuffer(
         birthday = `${yStr}-${mStr}-${dStr}`;
         birthdayPin = `${mStr}-${dStr}-${yStr}`;
       }
-    } else if (colBdaySingle !== -1 && row[colBdaySingle] !== undefined && String(row[colBdaySingle]).trim() !== "") {
-      const val = row[colBdaySingle];
-      if (val instanceof Date && !isNaN(val.getTime())) {
-        birthday = val.toISOString().split("T")[0];
-        const [y, m, d] = birthday.split("-");
-        birthdayPin = `${m}-${d}-${y}`;
-      } else if (typeof val === "number") {
-        const parsedDate = new Date(Math.round((val - 25569) * 86400 * 1000));
-        if (!isNaN(parsedDate.getTime())) {
-          birthday = parsedDate.toISOString().split("T")[0];
-          const [y, m, d] = birthday.split("-");
-          birthdayPin = `${m}-${d}-${y}`;
-        }
-      } else {
-        const strVal = String(val).trim();
-        if (/^\d{4}-\d{1,2}-\d{1,2}$/.test(strVal)) {
-          const parts = strVal.split("-");
-          const y = parts[0];
-          const m = parts[1].padStart(2, "0");
-          const d = parts[2].padStart(2, "0");
-          birthday = `${y}-${m}-${d}`;
-          birthdayPin = `${m}-${d}-${y}`;
-        } else if (/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(strVal)) {
-          const parts = strVal.split("/");
-          const m = parts[0].padStart(2, "0");
-          const d = parts[1].padStart(2, "0");
-          const y = parts[2];
-          birthday = `${y}-${m}-${d}`;
-          birthdayPin = `${m}-${d}-${y}`;
-        } else if (/^\d{1,2}-\d{1,2}-\d{4}$/.test(strVal)) {
-          const parts = strVal.split("-");
-          const m = parts[0].padStart(2, "0");
-          const d = parts[1].padStart(2, "0");
-          const y = parts[2];
-          birthday = `${y}-${m}-${d}`;
-          birthdayPin = `${m}-${d}-${y}`;
-        } else {
-          const dateObj = new Date(strVal);
-          if (!isNaN(dateObj.getTime())) {
-            birthday = dateObj.toISOString().split("T")[0];
-            const [y, m, d] = birthday.split("-");
-            birthdayPin = `${m}-${d}-${y}`;
-          }
-        }
-      }
     }
+
+    // Skip non-beneficiary rows (such as footer grouping matrix e.g. "APLAYA GROUP 1, PUROK LAPU LAPU")
+    const isFooterOrNonBene =
+      !fullName ||
+      fullName.includes("GROUP") ||
+      fullName.includes("PUROK") ||
+      fullName.includes("SITIO") ||
+      designated.includes("GROUP") ||
+      designated.includes("APLAYA") ||
+      designated.includes("BNB") ||
+      designated.includes("UMIRAY") ||
+      !birthday;
+
+    if (isFooterOrNonBene) {
+      continue;
+    }
+
+    if (fullName) candidateNames.add(fullName);
+    if (lastName) candidateLastNames.add(lastName);
 
     // 4. Address & Demographics
     const rawBrgy = colBrgy !== -1 && row[colBrgy] ? String(row[colBrgy]).trim() : "Dingalan";
@@ -416,6 +447,9 @@ export async function parseBeneficiaryExcelBuffer(
     const isIp = rawIps.startsWith("Y") || rawIps === "YES";
 
     const isSenior = (age && age >= 60) || (typeOfBeneficiary && typeOfBeneficiary.toLowerCase().includes("senior"));
+
+    // Grouping Classification according to official Dingalan Purok and Sitio Groups
+    const groupInfo = classifyBeneficiaryGroup(barangay, sitio);
 
     // Dependent fields
     const depFirst = colDepFirst !== -1 && row[colDepFirst] ? String(row[colDepFirst]).trim().toUpperCase() : undefined;
@@ -464,6 +498,9 @@ export async function parseBeneficiaryExcelBuffer(
       dependentExtensionName: depExt,
       dependentRelationship,
       dependentAge,
+      groupName: groupInfo.groupName,
+      groupLabel: groupInfo.groupLabel,
+      designatedMainArea: groupInfo.designatedMainArea,
     });
   }
 
@@ -533,9 +570,9 @@ export async function parseBeneficiaryExcelBuffer(
       status = "INVALID_BIRTHDAY";
       validationError = "Birthdate (Month, Day, Year) is required for verification PIN";
       invalidCount++;
-    } else if (seenDesigInFile.has(item.designatedNumber) || existingDesigSet.has(item.designatedNumber)) {
+    } else if (seenDesigInFile.has(item.designatedNumber)) {
       status = "DUPLICATE_DESIGNATED_NUMBER";
-      validationError = `Designated Number '${item.designatedNumber}' already exists in batch`;
+      validationError = `Designated Number '${item.designatedNumber}' is repeated within file`;
       invalidCount++;
     } else if (seenNameInFile.has(`${item.fullName}_${item.birthday}`)) {
       status = "DUPLICATE";
