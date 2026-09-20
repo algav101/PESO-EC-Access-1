@@ -114,7 +114,7 @@ export async function POST(request: Request) {
       if (histPb) {
         lastAvailment = {
           adlNo: histPb.program.batchNumber || histPb.program.programCode,
-          payoutDate: histPb.program.payoutDate || histPb.payouts[0]?.paidAt?.toLocaleDateString() || "Recorded in System",
+          payoutDate: histPb.program.payoutDate || histPb.payouts[0]?.payoutDate || "Recorded in System",
           workDate: `${histPb.program.startDate || "Day 1"} - ${histPb.program.endDate || "Day 10"}`,
           orientationDate: histPb.program.orientationDate || "-",
           barangay: histPb.program.projectLocation || "Dingalan",
@@ -159,32 +159,32 @@ export async function POST(request: Request) {
       statusMessage = "Maedup! Ang inyong aplikasyon ay kasalukuyang nakapila para susunod na batch ng TUPAD Beneficiary";
     }
 
-// Helper functions for Data Privacy Act (RA 10173) compliant masking
-function maskFullName(fullName: string = ""): string {
-  if (!fullName) return "***";
-  return fullName
-    .split(/\s+/)
-    .map((word) => (word.length > 1 ? word[0] + "*".repeat(Math.min(word.length - 1, 4)) : word))
-    .join(" ");
-}
+    // Helper functions for Data Privacy Act (RA 10173) compliant masking
+    const maskFullName = (fullName: string = ""): string => {
+      if (!fullName) return "***";
+      return fullName
+        .split(/\s+/)
+        .map((word) => (word.length > 1 ? word[0] + "*".repeat(Math.min(word.length - 1, 4)) : word))
+        .join(" ");
+    };
 
-function maskPhoneNumber(phone?: string | null): string {
-  if (!phone || String(phone).trim().length < 7) return "Nakatala (Masked)";
-  const clean = String(phone).trim();
-  if (clean.length <= 4) return "****";
-  return clean.slice(0, 4) + "****" + clean.slice(-3);
-}
+    const maskPhoneNumber = (phone?: string | null): string => {
+      if (!phone || String(phone).trim().length < 7) return "Nakatala (Masked)";
+      const clean = String(phone).trim();
+      if (clean.length <= 4) return "****";
+      return clean.slice(0, 4) + "****" + clean.slice(-3);
+    };
 
-function maskIdNumber(idNum?: string | null): string {
-  if (!idNum || String(idNum).trim().length < 4) return "Nakatala (Masked)";
-  const clean = String(idNum).trim();
-  return clean.slice(0, Math.min(3, clean.length)) + "-****-" + clean.slice(-2);
-}
+    const maskIdNumber = (idNum?: string | null): string => {
+      if (!idNum || String(idNum).trim().length < 4) return "Nakatala (Masked)";
+      const clean = String(idNum).trim();
+      return clean.slice(0, Math.min(3, clean.length)) + "-****-" + clean.slice(-2);
+    };
 
-function maskDependentName(name?: string | null): string {
-  if (!name || String(name).trim().length < 2) return "May Nakatalang Dependent";
-  return maskFullName(String(name).trim());
-}
+    const maskDependentName = (name?: string | null): string => {
+      if (!name || String(name).trim().length < 2) return "May Nakatalang Dependent";
+      return maskFullName(String(name).trim());
+    };
 
     return NextResponse.json({
       found: true,

@@ -500,15 +500,15 @@ export default function BeneficiariesMasterlistPage() {
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <div className="flex items-center space-x-2 text-gov-blue text-xs font-bold uppercase tracking-wider mb-0.5">
-            <Sparkles className="w-3.5 h-3.5 text-amber-500" />
-            <span>TUPAD Implementation Command System</span>
+          <div className="flex items-center space-x-2 text-slate-800 text-xs font-black uppercase tracking-wider mb-0.5">
+            <Sparkles className="w-3.5 h-3.5 text-amber-600" />
+            <span>PESO EC Access - EC TUPAD Implementation System</span>
           </div>
-          <h1 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight flex items-center space-x-2">
-            <Users className="w-6 h-6 text-gov-blue" />
+          <h1 className="text-xl sm:text-2xl font-black text-slate-950 tracking-tight flex items-center space-x-2">
+            <Users className="w-6 h-6 text-slate-900" />
             <span>Final List of Beneficiaries for Implementation</span>
           </h1>
-          <p className="text-xs text-slate-500">
+          <p className="text-xs text-slate-700 font-medium">
             Authoritative Masterlist for TUPAD Deployment, Purok/Sitio Allocation, Biometric QR Verification &amp; Work Program Scheduling
           </p>
         </div>
@@ -517,10 +517,10 @@ export default function BeneficiariesMasterlistPage() {
           <a
             href="/api/v1/beneficiaries/template"
             download="tupad_final_beneficiaries_template.csv"
-            className="px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl border flex items-center space-x-1.5 transition shadow-xs"
+            className="px-3 py-2 bg-white hover:bg-slate-100 text-slate-800 font-bold text-xs rounded-xl border border-slate-300 flex items-center space-x-1.5 transition shadow-xs"
             title="Download standard CSV template for Final Masterlist"
           >
-            <Download className="w-3.5 h-3.5" />
+            <Download className="w-3.5 h-3.5 text-slate-700" />
             <span>Template CSV</span>
           </a>
 
@@ -530,18 +530,18 @@ export default function BeneficiariesMasterlistPage() {
                 type="button"
                 disabled={isDeduplicating}
                 onClick={handleDeduplicateRoster}
-                className="px-3.5 py-2 bg-indigo-700 hover:bg-indigo-800 text-white font-bold text-xs rounded-xl shadow flex items-center space-x-1.5 transition disabled:opacity-50"
+                className="px-3.5 py-2 bg-slate-800 hover:bg-slate-900 text-white font-bold text-xs rounded-xl shadow-sm flex items-center space-x-1.5 transition disabled:opacity-50 border border-slate-700"
                 title="Remove duplicate names/numbers and test sample data from masterlist"
               >
-                <Sparkles className={`w-3.5 h-3.5 text-indigo-200 ${isDeduplicating ? "animate-spin" : ""}`} />
+                <Sparkles className={`w-3.5 h-3.5 text-slate-300 ${isDeduplicating ? "animate-spin" : ""}`} />
                 <span>{isDeduplicating ? "Cleaning..." : "Clean Duplicates"}</span>
               </button>
 
               <button
                 onClick={() => setIsUploadModalOpen(true)}
-                className="px-3.5 py-2 bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-xs rounded-xl shadow flex items-center space-x-1.5 transition"
+                className="px-3.5 py-2 bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-xs rounded-xl shadow-sm flex items-center space-x-1.5 transition"
               >
-                <UploadCloud className="w-4 h-4 text-emerald-200" />
+                <UploadCloud className="w-4 h-4 text-emerald-100" />
                 <span>Upload CSV / Excel Masterlist</span>
               </button>
             </>
@@ -550,9 +550,9 @@ export default function BeneficiariesMasterlistPage() {
           {selectedProgram && (
             <a
               href={`/programs/${selectedProgram}/work-program`}
-              className="px-3.5 py-2 bg-gov-blue hover:bg-gov-light text-white font-bold text-xs rounded-xl shadow flex items-center space-x-1.5 transition"
+              className="px-3.5 py-2 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-xl shadow-sm flex items-center space-x-1.5 transition border border-slate-800"
             >
-              <FileSpreadsheet className="w-4 h-4 text-gov-goldLight" />
+              <FileSpreadsheet className="w-4 h-4 text-slate-300" />
               <span>Work Program Deployment</span>
             </a>
           )}
@@ -926,13 +926,13 @@ export default function BeneficiariesMasterlistPage() {
         ) : (
           <TableScrollWrapper>
             <table className="w-full text-left text-xs min-w-[1050px]">
-              <thead className="bg-slate-100 text-slate-700 font-bold uppercase text-[10px] tracking-wider border-b">
+              <thead className="bg-slate-900 text-white font-extrabold uppercase text-[10px] tracking-wider border-b border-slate-800">
                 <tr>
                   {/* Master Checkbox Header */}
-                  <th className="px-3 py-3 w-10 text-center select-none">
+                  <th className="px-3 py-3.5 w-10 text-center select-none">
                     <input
                       type="checkbox"
-                      className="w-4 h-4 rounded border-slate-300 text-gov-blue focus:ring-gov-blue cursor-pointer"
+                      className="w-4 h-4 rounded border-slate-400 text-slate-900 focus:ring-slate-900 cursor-pointer"
                       checked={isAllFilteredSelected}
                       ref={(el) => {
                         if (el) el.indeterminate = isSomeFilteredSelected;
@@ -950,10 +950,10 @@ export default function BeneficiariesMasterlistPage() {
                   {renderSortHeader("Orientation", "orientation")}
                   {renderSortHeader("Attendance", "attendance")}
                   {renderSortHeader("Status", "status")}
-                  <th className="px-4 py-3 text-right">Action</th>
+                  <th className="px-4 py-3.5 text-right">Action</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100">
+              <tbody className="divide-y divide-slate-200 bg-white">
                 {sortedBeneficiaries.map((pb) => {
                   if (!pb) return null;
                   const isSelected = selectedPbIds.includes(pb.id);
@@ -981,50 +981,50 @@ export default function BeneficiariesMasterlistPage() {
                       onClick={() => handleToggleSelectRow(pb.id)}
                       className={`transition cursor-pointer ${
                         isSelected
-                          ? "bg-blue-50/80 border-l-4 border-l-gov-blue"
-                          : "hover:bg-slate-50"
+                          ? "bg-slate-100 border-l-4 border-l-slate-900"
+                          : "hover:bg-slate-50/90"
                       }`}
                     >
                       {/* Row Checkbox */}
                       <td className="px-3 py-3 text-center" onClick={(e) => e.stopPropagation()}>
                         <input
                           type="checkbox"
-                          className="w-4 h-4 rounded border-slate-300 text-gov-blue focus:ring-gov-blue cursor-pointer"
+                          className="w-4 h-4 rounded border-slate-400 text-slate-900 focus:ring-slate-900 cursor-pointer"
                           checked={isSelected}
                           onChange={() => handleToggleSelectRow(pb.id)}
                         />
                       </td>
-                      <td className="px-4 py-3 font-mono font-bold text-gov-blue">
+                      <td className="px-4 py-3 font-mono font-black text-slate-950">
                         {pb.designatedNumber || "-"}
                       </td>
                       <td className="px-4 py-3">
-                        <span className="font-bold text-slate-900 block">{pb.beneficiary?.fullName || "Unnamed"}</span>
-                        <span className="text-[10px] text-slate-400 font-mono">{pb.beneficiary?.beneficiaryNumber || pb.designatedNumber || "-"}</span>
+                        <span className="font-black text-slate-950 block">{pb.beneficiary?.fullName || "Unnamed"}</span>
+                        <span className="text-[11px] text-slate-600 font-mono font-bold">{pb.beneficiary?.beneficiaryNumber || pb.designatedNumber || "-"}</span>
                       </td>
-                      <td className="px-4 py-3 font-mono text-slate-600">
+                      <td className="px-4 py-3 font-mono font-bold text-slate-800">
                         {pb.beneficiary?.birthday || "-"}
                       </td>
                       <td className="px-4 py-3">
-                        <span className="font-semibold text-slate-800 block">{pb.beneficiary?.barangay || "-"}</span>
-                        <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200 inline-block mt-0.5">
+                        <span className="font-bold text-slate-950 block">{pb.beneficiary?.barangay || "-"}</span>
+                        <span className="text-[11px] font-black text-slate-900 bg-slate-100 px-2 py-0.5 rounded border border-slate-300 inline-block mt-0.5">
                           {pb.beneficiary?.sitio || "Centro"}
                         </span>
                       </td>
-                      <td className="px-4 py-3 font-bold text-slate-800">
+                      <td className="px-4 py-3 font-black text-slate-950">
                         {pb.tableNumber || "-"}
                       </td>
                       <td className="px-4 py-3">
                         {isFlagged ? (
                           <div className="space-y-1">
                             <span
-                              className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-50 text-rose-700 border border-rose-200 inline-flex items-center space-x-1"
+                              className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-50 text-rose-800 border border-rose-300 inline-flex items-center space-x-1"
                               title={flagRemarks || "Flagged for onsite replacement"}
                             >
                               <span>🚩 Flagged Repl.</span>
                             </span>
                             {flagRemarks && (
                               <p
-                                className="text-[10px] text-rose-700 font-semibold max-w-[170px] truncate leading-tight"
+                                className="text-[10px] text-rose-800 font-semibold max-w-[170px] truncate leading-tight"
                                 title={flagRemarks}
                               >
                                 {flagRemarks}
@@ -1033,29 +1033,29 @@ export default function BeneficiariesMasterlistPage() {
                           </div>
                         ) : dist ? (
                           <span
-                            className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 inline-flex items-center space-x-1"
+                            className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-300 inline-flex items-center space-x-1"
                             title={`Affirmed: ${dist.verificationMethod || "Verified"}${formattedDistDate ? ` on ${formattedDistDate}` : ""}`}
                           >
                             <span>✓ Affirmed</span>
                           </span>
                         ) : (
-                          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
+                          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-800 border border-amber-300">
                             ⏳ Uninformed
                           </span>
                         )}
                       </td>
                       <td className="px-4 py-3">
                         {isOriented ? (
-                          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-300">
                             Present
                           </span>
                         ) : (
-                          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-500">
+                          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-700 border border-slate-300">
                             Pending
                           </span>
                         )}
                       </td>
-                      <td className="px-4 py-3 font-bold text-slate-700">
+                      <td className="px-4 py-3 font-bold text-slate-800">
                         {attendCount} / 10 Days
                       </td>
                       <td className="px-4 py-3">

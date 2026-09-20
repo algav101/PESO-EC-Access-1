@@ -6,7 +6,7 @@
 
 :root {
   --background: #f8fafc;
-  --foreground: #0f172a;
+  --foreground: #090d16;
 }
 
 body {
@@ -16,49 +16,54 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
-/* Philippine Government Official Style Utilities */
+/* High-Contrast Gray / Black / White Official Style Utilities */
 .gov-header-gradient {
-  background: linear-gradient(135deg, #072444 0%, #0c3b6d 60%, #174b82 100%);
+  background: linear-gradient(135deg, #090d16 0%, #0f172a 50%, #1e293b 100%);
+  border-bottom: 1px solid #334155;
 }
 
 .gov-badge-gold {
-  background: #fdf6e7;
-  color: #925f08;
-  border: 1px solid #f4c462;
+  background: #fef3c7;
+  color: #78350f;
+  border: 1px solid #fcd34d;
+  font-weight: 700;
 }
 
 .gov-badge-blue {
-  background: #eef5fc;
-  color: #0c3b6d;
-  border: 1px solid #bad8f5;
+  background: #e2e8f0;
+  color: #0f172a;
+  border: 1px solid #94a3b8;
+  font-weight: 700;
 }
 
 .gov-badge-green {
   background: #ecfdf5;
   color: #065f46;
-  border: 1px solid #a7f3d0;
+  border: 1px solid #6ee7b7;
+  font-weight: 700;
 }
 
 .gov-badge-red {
   background: #fef2f2;
   color: #991b1b;
-  border: 1px solid #fecaca;
+  border: 1px solid #fca5a5;
+  font-weight: 700;
 }
 
-/* Glass & Card Aesthetics */
+/* High-Contrast Crisp Cards */
 .gov-card {
   background: #ffffff;
-  border: 1px solid #e2e8f0;
+  border: 1px solid #cbd5e1;
   border-radius: 0.75rem;
-  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.05), 0 1px 2px -1px rgba(0, 0, 0, 0.05);
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.06), 0 1px 2px -1px rgba(0, 0, 0, 0.04);
 }
 
 .gov-card-hover {
   transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 }
 .gov-card-hover:hover {
-  box-shadow: 0 10px 15px -3px rgba(12, 59, 109, 0.08), 0 4px 6px -4px rgba(12, 59, 109, 0.05);
-  border-color: #cbd5e1;
+  box-shadow: 0 10px 15px -3px rgba(15, 23, 42, 0.1), 0 4px 6px -4px rgba(15, 23, 42, 0.06);
+  border-color: #94a3b8;
   transform: translateY(-1px);
 }
 

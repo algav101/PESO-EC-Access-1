@@ -23,10 +23,12 @@ import { generateQrDataUrl } from "@/lib/qr";
 import { DeleteBeneficiaryModal } from "@/components/beneficiaries/DeleteBeneficiaryModal";
 import { EditBeneficiaryButton } from "@/components/beneficiaries/EditBeneficiaryButton";
 import { getCurrentUser, isAdminUser } from "@/lib/auth";
+import { hasPermission } from "@/lib/permissions";
 
 export const dynamic = "force-dynamic";
 
 export default async function BeneficiaryProfilePage({ params }: { params: { id: string } }) {
+  const currentUser = await getCurrentUser();
   const isAdmin = isAdminUser(currentUser);
   const canEdit = isAdmin || hasPermission(currentUser?.role || "", "beneficiary.update");
 

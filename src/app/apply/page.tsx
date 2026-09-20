@@ -122,7 +122,8 @@ export default function OnlineTupadApplicationPage() {
       setDependentAge("34");
       setDependentRelationship("SPOUSE");
       setRemarks("Complete requirements submitted");
-      setAgreedToTerms(true);
+      setAgreedToTruthfulness(true);
+      setAgreedToDataPrivacy(true);
     } else if (presetType === "INCOMPLETE_MISSING_ID") {
       setLastName("SANTOS");
       setFirstName("MARIA");
@@ -146,7 +147,8 @@ export default function OnlineTupadApplicationPage() {
       setDependentAge("");
       setDependentRelationship("");
       setRemarks("Applicant will follow up valid ID photocopy");
-      setAgreedToTerms(true);
+      setAgreedToTruthfulness(true);
+      setAgreedToDataPrivacy(true);
     } else if (presetType === "RESTRICTED_RECENT") {
       setLastName("DELA CRUZ");
       setFirstName("JUAN");
@@ -168,7 +170,8 @@ export default function OnlineTupadApplicationPage() {
       setDependentAge("16");
       setDependentRelationship("DAUGHTER");
       setRemarks("Testing 365-Day Restriction Trigger");
-      setAgreedToTerms(true);
+      setAgreedToTruthfulness(true);
+      setAgreedToDataPrivacy(true);
     } else if (presetType === "IP_DUMAGAT") {
       setLastName("KATALBAS");
       setFirstName("DANILO");
@@ -192,7 +195,8 @@ export default function OnlineTupadApplicationPage() {
       setDependentAge("46");
       setDependentRelationship("SPOUSE");
       setRemarks("Dumagat-Remontado IP community applicant");
-      setAgreedToTerms(true);
+      setAgreedToTruthfulness(true);
+      setAgreedToDataPrivacy(true);
     } else if (presetType === "RANDOM") {
       const firstNames = ["ARNEL", "JOCELYN", "RODEL", "MARILOU", "CHRISTOPHER", "GINA", "EDWARD", "TERESA"];
       const lastNames = ["BAUTISTA", "MENDOZA", "PASCUAL", "VILLANUEVA", "RAMIREZ", "CORTEZ", "DOMINGO"];

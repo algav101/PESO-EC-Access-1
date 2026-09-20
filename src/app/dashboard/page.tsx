@@ -264,16 +264,18 @@ export default async function DashboardPage() {
   return (
     <div className="space-y-8">
       {/* Welcome Banner */}
-      <div className="gov-card p-6 bg-gradient-to-r from-slate-900 via-gov-dark to-gov-blue text-white flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-lg border-l-4 border-l-gov-gold">
-        <div className="space-y-1">
-          <div className="flex items-center space-x-2 text-gov-goldLight text-xs font-bold uppercase tracking-wider">
-            <span>PESO Dingalan Operations Command Center</span>
+      <div className="gov-card p-6 bg-slate-900 border border-slate-800 text-white flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-lg rounded-2xl">
+        <div className="space-y-1.5">
+          <div className="flex items-center space-x-2">
+            <span className="text-xs font-extrabold text-slate-200 uppercase tracking-wider bg-slate-800 px-2.5 py-0.5 rounded-md border border-slate-700 inline-block">
+              PESO EC Access-EC Tupad Management
+            </span>
           </div>
-          <h1 className="text-xl sm:text-2xl font-black tracking-tight">
-            DOLE-TUPAD Beneficiary & Attendance Monitoring
+          <h1 className="text-xl sm:text-2xl font-black tracking-tight text-white">
+            DOLE-TUPAD Beneficiary &amp; Attendance Monitoring
           </h1>
-          <p className="text-xs text-blue-100 max-w-xl">
-            Real-time biometric & cryptographic QR verification across all 11 Dingalan barangays.
+          <p className="text-xs text-slate-300 max-w-xl font-medium leading-relaxed">
+            Real-time biometric &amp; cryptographic QR verification across all 11 Dingalan barangays.
           </p>
         </div>
 
@@ -281,17 +283,17 @@ export default async function DashboardPage() {
           {isPesoAdmin && (
             <a
               href="/programs/new"
-              className="px-4 py-2 bg-gov-gold hover:bg-gov-goldLight text-gov-dark font-bold text-xs rounded-lg transition shadow flex items-center space-x-1.5"
+              className="px-4 py-2 bg-white hover:bg-slate-100 text-slate-900 font-bold text-xs rounded-lg transition shadow flex items-center space-x-1.5 border border-slate-200"
             >
-              <PlusCircle className="w-4 h-4" />
+              <PlusCircle className="w-4 h-4 text-slate-900" />
               <span>New Program</span>
             </a>
           )}
           <a
             href="/field/attendance"
-            className="px-4 py-2 bg-white/10 hover:bg-white/20 text-white font-bold text-xs rounded-lg border border-white/20 transition flex items-center space-x-1.5"
+            className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs rounded-lg border border-slate-700 transition flex items-center space-x-1.5 shadow-sm"
           >
-            <Clock className="w-4 h-4 text-gov-goldLight" />
+            <Clock className="w-4 h-4 text-slate-300" />
             <span>Daily Scanner</span>
           </a>
         </div>
@@ -305,20 +307,20 @@ export default async function DashboardPage() {
             <a
               key={idx}
               href={card.href}
-              className="gov-card p-4 sm:p-5 gov-card-hover flex items-center space-x-4 border border-slate-200"
+              className="gov-card p-4 sm:p-5 gov-card-hover flex items-center space-x-4 border border-slate-300 bg-white shadow-xs"
             >
-              <div className={`p-3 rounded-xl ${card.bg} ${card.color}`}>
+              <div className={`p-3 rounded-xl ${card.bg} ${card.color} shrink-0`}>
                 <Icon className="w-5 h-5 sm:w-6 sm:h-6" />
               </div>
               <div className="min-w-0 flex-1">
-                <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider truncate">
+                <p className="text-[11px] font-extrabold text-slate-700 uppercase tracking-wider truncate">
                   {card.label}
                 </p>
-                <p className="text-xl sm:text-2xl font-black text-slate-900 leading-tight">
+                <p className="text-xl sm:text-2xl font-black text-slate-950 leading-tight">
                   {card.value}
                 </p>
                 {card.sublabel && (
-                  <p className="text-[10px] text-slate-400 truncate mt-0.5 font-medium">
+                  <p className="text-[11px] text-slate-600 truncate mt-0.5 font-semibold">
                     {card.sublabel}
                   </p>
                 )}
@@ -329,20 +331,20 @@ export default async function DashboardPage() {
       </div>
 
       {/* Feature Section: Final List of Beneficiaries for Implementation */}
-      <div className="gov-card p-6 bg-gradient-to-r from-blue-950 via-slate-900 to-indigo-950 text-white shadow-xl rounded-2xl border-l-4 border-l-gov-gold space-y-4">
+      <div className="gov-card p-6 bg-slate-900 text-white shadow-xl rounded-2xl border border-slate-800 space-y-4">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div className="space-y-1">
+          <div className="space-y-1.5">
             <div className="flex items-center space-x-2">
-              <span className="px-2.5 py-0.5 bg-gov-gold/20 text-gov-goldLight font-black text-[10px] uppercase rounded-full border border-gov-gold/40 tracking-wider">
+              <span className="px-2.5 py-0.5 bg-slate-800 text-slate-200 font-black text-[10px] uppercase rounded-full border border-slate-700 tracking-wider">
                 Work Program Deployment Basis
               </span>
-              <span className="text-[11px] text-blue-200 font-bold">Official Masterlist Roster</span>
+              <span className="text-[11px] text-slate-300 font-bold">Official Masterlist Roster</span>
             </div>
             <h2 className="text-lg sm:text-xl font-black tracking-tight text-white flex items-center space-x-2">
-              <Users className="w-5 h-5 text-gov-gold" />
+              <Users className="w-5 h-5 text-slate-200" />
               <span>Final List of Beneficiaries for Implementation</span>
             </h2>
-            <p className="text-xs text-blue-100 max-w-2xl leading-relaxed">
+            <p className="text-xs text-slate-300 max-w-2xl leading-relaxed font-medium">
               Manage the official 2026 TUPAD Implementation Masterlist. Upload CSV batches, view automatic grouping across all 11 Dingalan Barangays and Puroks/Sitios, edit beneficiary records, and sync directly to the 10-Day Work Program.
             </p>
           </div>
@@ -351,16 +353,16 @@ export default async function DashboardPage() {
             <a
               href="/api/v1/beneficiaries/template"
               download="tupad_final_beneficiaries_template.csv"
-              className="px-3.5 py-2 bg-white/10 hover:bg-white/20 text-white font-bold text-xs rounded-xl border border-white/20 transition flex items-center space-x-1.5 shadow-sm"
+              className="px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs rounded-xl border border-slate-700 transition flex items-center space-x-1.5 shadow-sm"
               title="Download standard CSV template"
             >
-              <FileSpreadsheet className="w-3.5 h-3.5 text-gov-goldLight" />
+              <FileSpreadsheet className="w-3.5 h-3.5 text-slate-300" />
               <span>Template CSV</span>
             </a>
 
             <a
               href="/beneficiaries"
-              className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-xl shadow-lg transition flex items-center space-x-1.5"
+              className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow-md transition flex items-center space-x-1.5"
             >
               <FileSpreadsheet className="w-4 h-4 text-emerald-100" />
               <span>Open Masterlist &amp; Upload</span>
@@ -369,41 +371,41 @@ export default async function DashboardPage() {
             {activeProgramId && (
               <a
                 href={`/programs/${activeProgramId}/work-program`}
-                className="px-4 py-2 bg-gov-blue hover:bg-gov-light text-white font-bold text-xs rounded-xl shadow-lg transition flex items-center space-x-1.5"
+                className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs rounded-xl border border-slate-700 shadow-md transition flex items-center space-x-1.5"
               >
                 <span>Work Program Deployment</span>
-                <ArrowRight className="w-3.5 h-3.5 text-gov-goldLight" />
+                <ArrowRight className="w-3.5 h-3.5 text-slate-300" />
               </a>
             )}
           </div>
         </div>
 
         {/* 3 Value Pillars */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2 border-t border-white/10 text-xs">
-          <div className="p-3 bg-white/5 rounded-xl border border-white/10 space-y-1">
-            <span className="font-bold text-gov-goldLight flex items-center space-x-1 text-[11px]">
-              <ShieldCheck className="w-3.5 h-3.5" />
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-3 border-t border-slate-800 text-xs">
+          <div className="p-3.5 bg-slate-800/80 rounded-xl border border-slate-700/80 space-y-1">
+            <span className="font-bold text-white flex items-center space-x-1 text-[11px]">
+              <ShieldCheck className="w-3.5 h-3.5 text-slate-300" />
               <span>Purok / Sitio Grouping</span>
             </span>
-            <p className="text-[11px] text-blue-100 leading-snug">
+            <p className="text-[11px] text-slate-300 font-medium leading-snug">
               Groups beneficiaries by official barangay clusters (e.g. Umiray Group 1: Singawan, Pinamaypayan &amp; Dugyan).
             </p>
           </div>
-          <div className="p-3 bg-white/5 rounded-xl border border-white/10 space-y-1">
-            <span className="font-bold text-gov-goldLight flex items-center space-x-1 text-[11px]">
-              <Users className="w-3.5 h-3.5" />
+          <div className="p-3.5 bg-slate-800/80 rounded-xl border border-slate-700/80 space-y-1">
+            <span className="font-bold text-white flex items-center space-x-1 text-[11px]">
+              <Users className="w-3.5 h-3.5 text-slate-300" />
               <span>Demographic Ratios</span>
             </span>
-            <p className="text-[11px] text-blue-100 leading-snug">
+            <p className="text-[11px] text-slate-300 font-medium leading-snug">
               Auto-calculates Gender (M/F), Senior Citizen (Age &ge; 60), PWD, and IP counts per designated work area.
             </p>
           </div>
-          <div className="p-3 bg-white/5 rounded-xl border border-white/10 space-y-1">
-            <span className="font-bold text-gov-goldLight flex items-center space-x-1 text-[11px]">
-              <QrCode className="w-3.5 h-3.5" />
+          <div className="p-3.5 bg-slate-800/80 rounded-xl border border-slate-700/80 space-y-1">
+            <span className="font-bold text-white flex items-center space-x-1 text-[11px]">
+              <QrCode className="w-3.5 h-3.5 text-slate-300" />
               <span>Biometric QR &amp; Editing</span>
             </span>
-            <p className="text-[11px] text-blue-100 leading-snug">
+            <p className="text-[11px] text-slate-300 font-medium leading-snug">
               Live editing of beneficiary profiles, duplicate prevention, 365-day lockout enforcement, and deletion options.
             </p>
           </div>
@@ -415,8 +417,8 @@ export default async function DashboardPage() {
         {/* Left 2 Cols: Active Programs Hub */}
         <div className="lg:col-span-2 space-y-4">
           <div className="flex items-center justify-between">
-            <h2 className="text-sm font-bold text-slate-900 uppercase tracking-wider flex items-center space-x-2">
-              <FolderKanban className="w-4 h-4 text-gov-blue" />
+            <h2 className="text-sm font-black text-slate-900 uppercase tracking-wider flex items-center space-x-2">
+              <FolderKanban className="w-4 h-4 text-slate-800" />
               <span>Active TUPAD Programs</span>
             </h2>
             <a href="/programs" className="text-xs font-bold text-gov-blue hover:underline">
@@ -426,53 +428,53 @@ export default async function DashboardPage() {
 
           <div className="space-y-3">
             {recentPrograms.map((prog) => (
-              <div key={prog.id} className="gov-card p-5 space-y-3 gov-card-hover border-l-4 border-l-gov-blue">
+              <div key={prog.id} className="gov-card p-5 space-y-3 gov-card-hover border border-slate-300 bg-white">
                 <div className="flex items-start justify-between">
                   <div>
-                    <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-blue-50 text-gov-blue border border-blue-200">
+                    <span className="text-[10px] font-mono font-bold px-2.5 py-0.5 rounded-md bg-slate-100 text-slate-800 border border-slate-300">
                       {prog.programCode}
                     </span>
-                    <h3 className="text-sm font-bold text-slate-900 mt-1">{prog.programName}</h3>
+                    <h3 className="text-sm font-black text-slate-950 mt-1.5">{prog.programName}</h3>
                   </div>
-                  <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                  <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-50 text-emerald-800 border border-emerald-300">
                     {prog.status}
                   </span>
                 </div>
 
-                <div className="grid grid-cols-3 gap-2 text-center text-xs py-2 bg-slate-50 rounded-lg border border-slate-100">
+                <div className="grid grid-cols-3 gap-2 text-center text-xs py-2.5 bg-slate-50 rounded-xl border border-slate-200">
                   <div>
-                    <span className="text-[10px] text-slate-500 font-bold uppercase">Beneficiaries</span>
-                    <p className="font-extrabold text-slate-800">{prog._count.programBeneficiaries}</p>
+                    <span className="text-[10px] text-slate-600 font-bold uppercase tracking-wider">Beneficiaries</span>
+                    <p className="font-black text-slate-950 text-sm mt-0.5">{prog._count.programBeneficiaries}</p>
                   </div>
                   <div>
-                    <span className="text-[10px] text-slate-500 font-bold uppercase">Attendance Scans</span>
-                    <p className="font-extrabold text-slate-800">{prog._count.attendanceRecords}</p>
+                    <span className="text-[10px] text-slate-600 font-bold uppercase tracking-wider">Attendance Scans</span>
+                    <p className="font-black text-slate-950 text-sm mt-0.5">{prog._count.attendanceRecords}</p>
                   </div>
                   <div>
-                    <span className="text-[10px] text-slate-500 font-bold uppercase">Paid Payouts</span>
-                    <p className="font-extrabold text-slate-800">{prog._count.payouts}</p>
+                    <span className="text-[10px] text-slate-600 font-bold uppercase tracking-wider">Paid Payouts</span>
+                    <p className="font-black text-slate-950 text-sm mt-0.5">{prog._count.payouts}</p>
                   </div>
                 </div>
 
                 <div className="flex items-center justify-between pt-1 text-xs">
-                  <span className="text-slate-500 text-[11px]">
-                    Schedule: {prog.requiredWorkDays} Work Days
+                  <span className="text-slate-600 font-semibold text-[11px]">
+                    Schedule: <strong className="text-slate-900">{prog.requiredWorkDays} Work Days</strong>
                   </span>
                   <div className="flex space-x-2">
                     {isPesoAdmin && (
                       <a
                         href={`/programs/${prog.id}/import`}
-                        className="px-2.5 py-1 text-[11px] font-bold bg-slate-100 hover:bg-slate-200 text-slate-700 rounded transition"
+                        className="px-3 py-1.5 text-xs font-bold bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-lg transition border border-slate-300 shadow-xs"
                       >
                         Import Excel
                       </a>
                     )}
                     <a
                       href={`/programs/${prog.id}`}
-                      className="px-2.5 py-1 text-[11px] font-bold bg-gov-blue hover:bg-gov-light text-white rounded transition flex items-center space-x-1"
+                      className="px-3 py-1.5 text-xs font-bold bg-slate-900 hover:bg-slate-800 text-white rounded-lg transition flex items-center space-x-1 shadow-xs"
                     >
                       <span>Manage</span>
-                      <ArrowRight className="w-3 h-3" />
+                      <ArrowRight className="w-3.5 h-3.5" />
                     </a>
                   </div>
                 </div>
@@ -484,82 +486,82 @@ export default async function DashboardPage() {
         {/* Right 1 Col: Quick Actions & Role-Gated Feed */}
         <div className="space-y-6">
           {/* Quick Operations Grid */}
-          <div className="gov-card p-5 space-y-3">
-            <h2 className="text-xs font-bold text-slate-900 uppercase tracking-wider">
+          <div className="gov-card p-5 space-y-3 border border-slate-300 bg-white">
+            <h2 className="text-xs font-black text-slate-900 uppercase tracking-wider">
               Field Operations Hub
             </h2>
             <div className="grid grid-cols-2 gap-2">
               <a
                 href="/field/stub-distribution"
-                className="p-3 rounded-lg border border-slate-200 hover:border-gov-blue hover:bg-blue-50/50 text-center transition flex flex-col items-center space-y-1"
+                className="p-3 rounded-xl border border-slate-300 hover:border-slate-900 hover:bg-slate-50 text-center transition flex flex-col items-center space-y-1.5 shadow-xs"
               >
-                <QrCode className="w-5 h-5 text-gov-blue" />
-                <span className="text-[11px] font-bold text-slate-800">Distribute Stubs</span>
+                <QrCode className="w-5 h-5 text-slate-800" />
+                <span className="text-xs font-bold text-slate-900">Distribute Stubs</span>
               </a>
               <a
                 href="/field/orientation"
-                className="p-3 rounded-lg border border-slate-200 hover:border-gov-blue hover:bg-blue-50/50 text-center transition flex flex-col items-center space-y-1"
+                className="p-3 rounded-xl border border-slate-300 hover:border-slate-900 hover:bg-slate-50 text-center transition flex flex-col items-center space-y-1.5 shadow-xs"
               >
-                <CalendarCheck className="w-5 h-5 text-teal-600" />
-                <span className="text-[11px] font-bold text-slate-800">Orientation</span>
+                <CalendarCheck className="w-5 h-5 text-teal-700" />
+                <span className="text-xs font-bold text-slate-900">Orientation</span>
               </a>
               <a
                 href="/field/attendance"
-                className="p-3 rounded-lg border border-slate-200 hover:border-gov-blue hover:bg-blue-50/50 text-center transition flex flex-col items-center space-y-1"
+                className="p-3 rounded-xl border border-slate-300 hover:border-slate-900 hover:bg-slate-50 text-center transition flex flex-col items-center space-y-1.5 shadow-xs"
               >
-                <Clock className="w-5 h-5 text-amber-600" />
-                <span className="text-[11px] font-bold text-slate-800">Daily QR Scan</span>
+                <Clock className="w-5 h-5 text-amber-700" />
+                <span className="text-xs font-bold text-slate-900">Daily QR Scan</span>
               </a>
               <a
                 href="/field/photos"
-                className="p-3 rounded-lg border border-slate-200 hover:border-gov-blue hover:bg-blue-50/50 text-center transition flex flex-col items-center space-y-1"
+                className="p-3 rounded-xl border border-slate-300 hover:border-slate-900 hover:bg-slate-50 text-center transition flex flex-col items-center space-y-1.5 shadow-xs"
               >
-                <Camera className="w-5 h-5 text-indigo-600" />
-                <span className="text-[11px] font-bold text-slate-800">Accomplishment</span>
+                <Camera className="w-5 h-5 text-indigo-700" />
+                <span className="text-xs font-bold text-slate-900">Accomplishment</span>
               </a>
               <a
                 href="/field/payout"
-                className="p-3 rounded-lg border border-slate-200 hover:border-gov-blue hover:bg-blue-50/50 text-center transition flex flex-col items-center space-y-1"
+                className="p-3 rounded-xl border border-slate-300 hover:border-slate-900 hover:bg-slate-50 text-center transition flex flex-col items-center space-y-1.5 shadow-xs"
               >
-                <Banknote className="w-5 h-5 text-green-600" />
-                <span className="text-[11px] font-bold text-slate-800">Payout</span>
+                <Banknote className="w-5 h-5 text-green-700" />
+                <span className="text-xs font-bold text-slate-900">Payout</span>
               </a>
               <a
                 href="/reports"
-                className="p-3 rounded-lg border border-slate-200 hover:border-gov-blue hover:bg-blue-50/50 text-center transition flex flex-col items-center space-y-1"
+                className="p-3 rounded-xl border border-slate-300 hover:border-slate-900 hover:bg-slate-50 text-center transition flex flex-col items-center space-y-1.5 shadow-xs"
               >
-                <FileSpreadsheet className="w-5 h-5 text-purple-600" />
-                <span className="text-[11px] font-bold text-slate-800">Reports Engine</span>
+                <FileSpreadsheet className="w-5 h-5 text-purple-700" />
+                <span className="text-xs font-bold text-slate-900">Reports Engine</span>
               </a>
             </div>
           </div>
 
           {/* Audit Activity Feed: EXCLUSIVE TO PESO_ADMIN */}
           {isPesoAdmin ? (
-            <div className="gov-card p-5 space-y-3 border-t-4 border-t-gov-blue">
+            <div className="gov-card p-5 space-y-3 border border-slate-300 bg-white">
               <div className="flex items-center justify-between">
-                <h2 className="text-xs font-bold text-slate-900 uppercase tracking-wider flex items-center space-x-1.5">
-                  <History className="w-3.5 h-3.5 text-gov-blue" />
+                <h2 className="text-xs font-black text-slate-900 uppercase tracking-wider flex items-center space-x-1.5">
+                  <History className="w-3.5 h-3.5 text-slate-700" />
                   <span>Audit Activity</span>
                 </h2>
-                <a href="/admin/audit" className="text-[11px] font-bold text-gov-blue hover:underline">
+                <a href="/admin/audit" className="text-xs font-bold text-slate-700 hover:text-slate-950 hover:underline">
                   View All
                 </a>
               </div>
 
               <div className="space-y-2.5 text-xs">
                 {recentAudits.length === 0 ? (
-                  <p className="text-[11px] text-slate-400 italic py-2 text-center">No recent audit logs recorded.</p>
+                  <p className="text-xs text-slate-500 italic py-2 text-center font-medium">No recent audit logs recorded.</p>
                 ) : (
                   recentAudits.map((a) => (
-                    <div key={a.id} className="pb-2 border-b border-slate-100 last:border-0 last:pb-0">
+                    <div key={a.id} className="pb-2 border-b border-slate-200 last:border-0 last:pb-0">
                       <div className="flex items-center justify-between">
-                        <span className="font-bold text-slate-800 text-[11px]">{a.action.replace(/_/g, " ")}</span>
-                        <span className="text-[10px] text-slate-400">
+                        <span className="font-bold text-slate-900 text-xs">{a.action.replace(/_/g, " ")}</span>
+                        <span className="text-[11px] font-semibold text-slate-500">
                           {format(new Date(a.createdAt), "HH:mm")}
                         </span>
                       </div>
-                      <p className="text-[10px] text-slate-500">
+                      <p className="text-[11px] text-slate-600 font-medium mt-0.5">
                         By {a.user?.fullName || "System"} • {a.entityType || "GENERAL"}
                       </p>
                     </div>
@@ -569,17 +571,17 @@ export default async function DashboardPage() {
             </div>
           ) : (
             /* Non-Admin Coordinator Guidance & Support Box */
-            <div className="gov-card p-5 space-y-3 bg-gradient-to-br from-slate-50 to-blue-50/30 border border-blue-100">
-              <div className="flex items-center space-x-2 text-gov-blue font-bold text-xs uppercase tracking-wider">
-                <ShieldCheck className="w-4 h-4 text-gov-gold" />
+            <div className="gov-card p-5 space-y-3 bg-slate-50 border border-slate-300">
+              <div className="flex items-center space-x-2 text-slate-900 font-black text-xs uppercase tracking-wider">
+                <ShieldCheck className="w-4 h-4 text-slate-700" />
                 <span>Field Coordinator Assistance</span>
               </div>
-              <p className="text-xs text-slate-600 leading-relaxed">
+              <p className="text-xs text-slate-700 leading-relaxed font-medium">
                 For QR scanning discrepancies, offline synchronization support, or emergency onsite worker replacements, contact the PESO Dingalan Admin Helpdesk.
               </p>
-              <div className="pt-2 border-t border-slate-200/60 flex items-center justify-between text-xs">
-                <span className="text-[11px] font-semibold text-slate-500">LGU Dingalan Hotline</span>
-                <span className="font-mono font-bold text-gov-blue">0917-PESO-DNG</span>
+              <div className="pt-2.5 border-t border-slate-200 flex items-center justify-between text-xs">
+                <span className="text-xs font-bold text-slate-600">LGU Dingalan Hotline</span>
+                <span className="font-mono font-black text-slate-950">0917-PESO-DNG</span>
               </div>
             </div>
           )}

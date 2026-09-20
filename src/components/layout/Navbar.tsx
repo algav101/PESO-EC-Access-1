@@ -46,7 +46,7 @@ export function Navbar({ onToggleSidebar }: NavbarProps) {
                 <div className="flex items-center space-x-1.5">
                   <span className="font-bold tracking-tight text-base sm:text-lg">LGU DINGALAN</span>
                 </div>
-                <span className="text-xs text-blue-200 hidden sm:inline font-medium">
+                <span className="text-xs text-slate-300 hidden sm:inline font-semibold">
                   PESO EC Access
                 </span>
               </div>
@@ -69,7 +69,7 @@ export function Navbar({ onToggleSidebar }: NavbarProps) {
                 {isOnline ? <Wifi className="w-3.5 h-3.5" /> : <WifiOff className="w-3.5 h-3.5" />}
                 <span className="hidden md:inline">{isOnline ? "Online" : "Offline"}</span>
                 {pendingCount > 0 && (
-                  <span className="bg-gov-gold text-gov-dark px-1.5 py-0.2 rounded-full text-[10px] font-bold">
+                  <span className="bg-amber-400 text-slate-950 px-1.5 py-0.2 rounded-full text-[10px] font-black">
                     {pendingCount}
                   </span>
                 )}
@@ -82,7 +82,7 @@ export function Navbar({ onToggleSidebar }: NavbarProps) {
                   className="p-1.5 rounded-full bg-white/10 hover:bg-white/20 text-white disabled:opacity-50"
                   title="Sync offline transactions now"
                 >
-                  <RefreshCw className={`w-3.5 h-3.5 ${isSyncing ? "animate-spin text-gov-gold" : ""}`} />
+                  <RefreshCw className={`w-3.5 h-3.5 ${isSyncing ? "animate-spin text-amber-300" : ""}`} />
                 </button>
               )}
             </div>
@@ -91,13 +91,13 @@ export function Navbar({ onToggleSidebar }: NavbarProps) {
             {user ? (
               <div className="flex items-center space-x-3 pl-2 border-l border-white/20">
                 <div className="hidden sm:flex flex-col text-right">
-                  <span className="text-xs font-semibold text-white leading-tight">{user.fullName}</span>
+                  <span className="text-xs font-bold text-white leading-tight">{user.fullName}</span>
                   {user.role === "DOMAIN_MASTER" ? (
                     <span className="text-[10px] font-black text-amber-300 bg-amber-500/20 px-1.5 py-0.2 rounded border border-amber-400/40 inline-flex items-center space-x-1 justify-end">
                       <span>👑 Domain Master</span>
                     </span>
                   ) : (
-                    <span className="text-[11px] text-gov-goldLight font-mono">
+                    <span className="text-[11px] text-slate-300 font-mono font-bold">
                       {(user.role || "").replace(/_/g, " ")}
                     </span>
                   )}

@@ -27,6 +27,7 @@ import {
   ArrowRight,
 } from "lucide-react";
 import { QrScannerModal } from "@/components/scanner/QrScannerModal";
+import { FieldQrPassGeneratorModal } from "@/components/field/FieldQrPassGeneratorCard";
 import { useAuth } from "@/context/AuthContext";
 import { useOffline } from "@/context/OfflineContext";
 import { offlineDb, queueOfflineTransaction, findBeneficiaryOffline, extractCleanQrToken } from "@/lib/dexie";

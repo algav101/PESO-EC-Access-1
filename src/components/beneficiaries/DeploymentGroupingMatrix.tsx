@@ -219,9 +219,9 @@ export function DeploymentGroupingMatrix({
                           </span>
                           <span className="text-xs font-bold text-slate-800">{g.designatedMainArea}</span>
                         </div>
-                        <p className="text-[11px] text-slate-500 mt-1">
+                        <p className="text-xs text-slate-600 mt-1 font-medium">
                           Covered Puroks &amp; Sitios:{" "}
-                          <span className="font-semibold text-slate-700">
+                          <span className="font-bold text-slate-900">
                             {g.coveredPuroks.slice(0, 6).join(", ")}
                             {g.coveredPuroks.length > 6 ? ` +${g.coveredPuroks.length - 6} more` : ""}
                           </span>
@@ -230,23 +230,23 @@ export function DeploymentGroupingMatrix({
 
                       {/* Demographics Pill Box */}
                       <div className="flex flex-wrap items-center gap-2">
-                        <span className="px-2.5 py-1 bg-blue-50 text-blue-900 border border-blue-200 rounded-lg text-xs font-black">
+                        <span className="px-2.5 py-1 bg-slate-900 text-white border border-slate-800 rounded-lg text-xs font-black">
                           Total: {demo.totalCount}
                         </span>
-                        <span className="px-2 py-1 bg-sky-50 text-sky-800 border border-sky-200 rounded-lg text-[11px] font-bold">
+                        <span className="px-2 py-1 bg-slate-100 text-slate-900 border border-slate-300 rounded-lg text-[11px] font-bold">
                           Male: {demo.maleCount}
                         </span>
-                        <span className="px-2 py-1 bg-pink-50 text-pink-800 border border-pink-200 rounded-lg text-[11px] font-bold">
+                        <span className="px-2 py-1 bg-slate-100 text-slate-900 border border-slate-300 rounded-lg text-[11px] font-bold">
                           Female: {demo.femaleCount}
                         </span>
-                        <span className="px-2 py-1 bg-purple-50 text-purple-800 border border-purple-200 rounded-lg text-[11px] font-bold">
+                        <span className="px-2 py-1 bg-purple-50 text-purple-900 border border-purple-300 rounded-lg text-[11px] font-bold">
                           SC: {demo.isSeniorCount}
                         </span>
-                        <span className="px-2 py-1 bg-indigo-50 text-indigo-800 border border-indigo-200 rounded-lg text-[11px] font-bold">
+                        <span className="px-2 py-1 bg-blue-50 text-blue-900 border border-blue-300 rounded-lg text-[11px] font-bold">
                           PWD: {demo.isPwdCount}
                         </span>
                         {demo.isIpCount > 0 && (
-                          <span className="px-2 py-1 bg-emerald-50 text-emerald-800 border border-emerald-200 rounded-lg text-[11px] font-bold">
+                          <span className="px-2 py-1 bg-emerald-50 text-emerald-900 border border-emerald-300 rounded-lg text-[11px] font-bold">
                             IP: {demo.isIpCount}
                           </span>
                         )}
@@ -254,7 +254,7 @@ export function DeploymentGroupingMatrix({
                         <button
                           type="button"
                           onClick={() => toggleGroup(`${brgy.barangay}_${g.groupName}`)}
-                          className="p-1.5 text-slate-500 hover:text-gov-blue hover:bg-slate-200 rounded-lg border transition ml-1 flex items-center space-x-1 text-xs font-bold"
+                          className="p-1.5 text-slate-700 hover:text-slate-950 hover:bg-slate-200 rounded-lg border border-slate-300 transition ml-1 flex items-center space-x-1 text-xs font-bold shadow-2xs"
                         >
                           <span>{isExpanded ? "Hide Roster" : "View Roster"}</span>
                           {isExpanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
@@ -265,58 +265,58 @@ export function DeploymentGroupingMatrix({
                     {/* Expandable Group Roster Table */}
                     {isExpanded && (
                       <div className="pt-2">
-                        <div className="border border-slate-200 rounded-xl overflow-x-auto bg-white">
+                        <div className="border border-slate-300 rounded-xl overflow-x-auto bg-white shadow-xs">
                           <table className="w-full text-left text-xs">
-                            <thead className="bg-slate-100 text-slate-700 font-bold uppercase text-[10px] border-b">
+                            <thead className="bg-slate-900 text-white font-extrabold uppercase text-[10px] border-b border-slate-800">
                               <tr>
-                                <th className="px-3 py-2">#</th>
-                                <th className="px-3 py-2">Full Name</th>
-                                <th className="px-3 py-2">Purok / Sitio</th>
-                                <th className="px-3 py-2">Sex &amp; Age</th>
-                                <th className="px-3 py-2">Categories</th>
-                                <th className="px-3 py-2">Contact No.</th>
-                                <th className="px-3 py-2 text-right">Actions</th>
+                                <th className="px-3 py-2.5">#</th>
+                                <th className="px-3 py-2.5">Full Name</th>
+                                <th className="px-3 py-2.5">Purok / Sitio</th>
+                                <th className="px-3 py-2.5">Sex &amp; Age</th>
+                                <th className="px-3 py-2.5">Categories</th>
+                                <th className="px-3 py-2.5">Contact No.</th>
+                                <th className="px-3 py-2.5 text-right">Actions</th>
                               </tr>
                             </thead>
-                            <tbody className="divide-y divide-slate-100">
+                            <tbody className="divide-y divide-slate-200">
                               {g.beneficiaries.map((pb) => {
                                 const b = pb.beneficiary || pb;
                                 return (
-                                  <tr key={pb.id} className="hover:bg-slate-50">
-                                    <td className="px-3 py-2 font-mono font-bold text-slate-600">
+                                  <tr key={pb.id} className="hover:bg-slate-50/90">
+                                    <td className="px-3 py-2.5 font-mono font-black text-slate-950">
                                       {pb.designatedNumber || "-"}
                                     </td>
-                                    <td className="px-3 py-2 font-bold text-slate-900">{b.fullName}</td>
-                                    <td className="px-3 py-2 font-medium text-slate-700">{b.sitio || "-"}</td>
-                                    <td className="px-3 py-2 font-mono text-slate-600">
+                                    <td className="px-3 py-2.5 font-black text-slate-950">{b.fullName}</td>
+                                    <td className="px-3 py-2.5 font-bold text-slate-800">{b.sitio || "-"}</td>
+                                    <td className="px-3 py-2.5 font-mono font-semibold text-slate-800">
                                       {b.sex || "-"} / {b.age || "-"} yrs
                                     </td>
-                                    <td className="px-3 py-2">
+                                    <td className="px-3 py-2.5">
                                       <div className="flex flex-wrap gap-1">
                                         {(b.isSenior || (b.age && b.age >= 60)) && (
-                                          <span className="px-1.5 py-0.2 bg-purple-50 text-purple-800 border border-purple-200 rounded text-[9px] font-bold">
+                                          <span className="px-1.5 py-0.2 bg-purple-50 text-purple-900 border border-purple-300 rounded text-[9px] font-bold">
                                             SC
                                           </span>
                                         )}
                                         {b.isPwd && (
-                                          <span className="px-1.5 py-0.2 bg-blue-50 text-blue-800 border border-blue-200 rounded text-[9px] font-bold">
+                                          <span className="px-1.5 py-0.2 bg-blue-50 text-blue-900 border border-blue-300 rounded text-[9px] font-bold">
                                             PWD
                                           </span>
                                         )}
                                         {b.isIp && (
-                                          <span className="px-1.5 py-0.2 bg-emerald-50 text-emerald-800 border border-emerald-200 rounded text-[9px] font-bold">
+                                          <span className="px-1.5 py-0.2 bg-emerald-50 text-emerald-900 border border-emerald-300 rounded text-[9px] font-bold">
                                             IP
                                           </span>
                                         )}
                                         {b.is4Ps && (
-                                          <span className="px-1.5 py-0.2 bg-amber-50 text-amber-800 border border-amber-200 rounded text-[9px] font-bold">
+                                          <span className="px-1.5 py-0.2 bg-amber-50 text-amber-900 border border-amber-300 rounded text-[9px] font-bold">
                                             4Ps
                                           </span>
                                         )}
                                       </div>
                                     </td>
-                                    <td className="px-3 py-2 font-mono text-slate-500">{b.contactNumber || "-"}</td>
-                                    <td className="px-3 py-2 text-right">
+                                    <td className="px-3 py-2.5 font-mono font-bold text-slate-800">{b.contactNumber || "-"}</td>
+                                    <td className="px-3 py-2.5 text-right">
                                       <div className="flex items-center justify-end space-x-1">
                                         <button
                                           type="button"
