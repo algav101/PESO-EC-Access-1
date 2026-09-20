@@ -128,8 +128,8 @@ export function DeploymentGroupingMatrix({
     pbIds: [] as string[],
   });
 
-  // Merge Group State
-  const [mergeTargetGroup, setMergeTargetGroup] = useState<string>("");
+  // Merge Group State (Supports Multiple Partner Groups)
+  const [mergeTargetGroups, setMergeTargetGroups] = useState<string[]>([]);
   const [mergeTargetDays, setMergeTargetDays] = useState<number[]>([6, 7, 8, 9, 10]);
   const [mergedGroupLabel, setMergedGroupLabel] = useState<string>("");
   const [mergedDesignatedArea, setMergedDesignatedArea] = useState<string>("");
@@ -564,17 +564,42 @@ export function DeploymentGroupingMatrix({
     return computeGroupDemographics(list);
   }, [modalBarangayBeneficiaries, subGroupB.pbIds]);
 
-  // Merged Group Demographics
+  // Merged Group Demographics across multiple selected partner groups
   const mergedGroupDemographics = useMemo(() => {
     const stdBrgy = getStandardBarangayName(modalBarangay);
-    const partnerGroupObj = groupedData[stdBrgy]?.groups.find((g) => g.groupName === mergeTargetGroup);
-    const partnerBenes = partnerGroupObj?.beneficiaries || [];
-    const currentSelectedBenes = modalBarangayBeneficiaries.filter((pb) =>
-      modalSelectedPbIds.includes(pb.id) || modalSelectedPbIds.includes(pb.beneficiary?.id)
-    );
-    const combinedBenes = Array.from(new Set([...currentSelectedBenes, ...partnerBenes]));
+    const brgyGroups = groupedData[stdBrgy]?.groups || [];
+    const allInvolvedGroupNames = Array.from(new Set([modalGroupName, ...mergeTargetGroups])).filter(Boolean);
+
+    const combinedBenes: any[] = [];
+    const seenIds = new Set<string>();
+
+    brgyGroups
+      .filter((g) => allInvolvedGroupNames.includes(g.groupName))
+      .forEach((g) => {
+        g.beneficiaries.forEach((pb: any) => {
+          const id = pb.id || pb.beneficiary?.id;
+          if (id && !seenIds.has(id)) {
+            seenIds.add(id);
+            combinedBenes.push(pb);
+          }
+        });
+      });
+
+    // Also include modalSelectedPbIds if modalGroupName is being edited
+    if (modalSelectedPbIds.length > 0) {
+      modalBarangayBeneficiaries
+        .filter((pb) => modalSelectedPbIds.includes(pb.id) || modalSelectedPbIds.includes(pb.beneficiary?.id))
+        .forEach((pb) => {
+          const id = pb.id || pb.beneficiary?.id;
+          if (id && !seenIds.has(id)) {
+            seenIds.add(id);
+            combinedBenes.push(pb);
+          }
+        });
+    }
+
     return computeGroupDemographics(combinedBenes);
-  }, [modalBarangay, mergeTargetGroup, groupedData, modalBarangayBeneficiaries, modalSelectedPbIds]);
+  }, [modalBarangay, modalGroupName, mergeTargetGroups, groupedData, modalBarangayBeneficiaries, modalSelectedPbIds]);
 
   // Helper to get available Work Program items for a barangay
   const getAvailableWpItems = (brgy: string) => {
@@ -725,11 +750,12 @@ export function DeploymentGroupingMatrix({
       pbIds: [],
     });
 
-    const partner = existingGroups[0];
-    setMergeTargetGroup(partner ? partner.groupName : "");
+    const partnerNames = existingGroups.length > 0 ? [existingGroups[0].groupName] : [];
+    setMergeTargetGroups(partnerNames);
     setMergeTargetDays([6, 7, 8, 9, 10]);
-    setMergedGroupLabel(partner ? `${defaultLabel} & ${partner.groupLabel} Joint Taskforce` : `${defaultLabel} Joint Taskforce`);
-    setMergedDesignatedArea(partner ? `${stdBrgy} Unified Sector` : `${stdBrgy} Designated Sector`);
+    const partnerLabels = existingGroups.filter((g) => partnerNames.includes(g.groupName)).map((g) => g.groupLabel);
+    setMergedGroupLabel(partnerLabels.length > 0 ? `${defaultLabel} & ${partnerLabels.join(" & ")} Joint Taskforce` : `${defaultLabel} Joint Taskforce`);
+    setMergedDesignatedArea(partnerNames.length > 0 ? `${stdBrgy} Unified Sector` : `${stdBrgy} Designated Sector`);
     setMergedSpecificActivity(`Joint comprehensive community clean-up and tree planting in Barangay ${stdBrgy}`);
 
     setIsGroupModalOpen(true);
@@ -808,20 +834,27 @@ export function DeploymentGroupingMatrix({
       pbIds: existingSubB?.beneficiaryIds?.length ? existingSubB.beneficiaryIds : currentMemberIds.slice(mid),
     });
 
-    // Initialize Merged Group
+    // Initialize Merged Group (Supports Multiple Partner Groups)
     const otherGroupsInBrgy = (groupedData[stdBrgy]?.groups || []).filter((g) => g.groupName !== group.groupName);
-    const partner = otherGroupsInBrgy[0];
     const existingMerge = group.mergedSchedules?.[0];
+    const initialPartnerNames =
+      existingMerge?.partnerGroupNames?.filter((n: string) => n !== group.groupName) ||
+      (otherGroupsInBrgy.length > 0 ? [otherGroupsInBrgy[0].groupName] : []);
 
-    setMergeTargetGroup(existingMerge?.partnerGroupNames?.find((n: string) => n !== group.groupName) || (partner ? partner.groupName : ""));
+    setMergeTargetGroups(initialPartnerNames);
     setMergeTargetDays(existingMerge?.targetDays || [6, 7, 8, 9, 10]);
+
+    const partnerObjs = otherGroupsInBrgy.filter((g) => initialPartnerNames.includes(g.groupName));
+    const allLabels = [group.groupLabel, ...partnerObjs.map((g) => g.groupLabel)];
+    const allAreas = [group.designatedMainArea, ...partnerObjs.map((g) => g.designatedMainArea)].filter(Boolean);
+
     setMergedGroupLabel(
       existingMerge?.mergedGroupLabel ||
-        (partner ? `${group.groupLabel} & ${partner.groupLabel} Joint Taskforce` : `${group.groupLabel} Joint Taskforce`)
+        (partnerObjs.length > 0 ? `${allLabels.join(" & ")} Joint Taskforce` : `${group.groupLabel} Joint Taskforce`)
     );
     setMergedDesignatedArea(
       existingMerge?.designatedArea ||
-        (partner ? `${group.designatedMainArea} & ${partner.designatedMainArea}` : group.designatedMainArea)
+        (partnerObjs.length > 0 ? allAreas.join(" & ") : group.designatedMainArea)
     );
     setMergedSpecificActivity(
       existingMerge?.specificActivity ||
@@ -829,6 +862,71 @@ export function DeploymentGroupingMatrix({
     );
 
     setIsGroupModalOpen(true);
+  };
+
+  // Open Multi-Group Merge directly from Barangay level header
+  const handleOpenMergeMultipleModal = (brgy: string) => {
+    const stdBrgy = getStandardBarangayName(brgy);
+    const existingGroups = groupedData[stdBrgy]?.groups || [];
+    if (existingGroups.length < 2) {
+      alert(`Kailangan ng kahit 2 grupo sa Barangay ${stdBrgy} upang makapag-merge.`);
+      return;
+    }
+
+    const primaryGroup = existingGroups[0];
+    const partnerGroupNames = existingGroups.slice(1).map((g) => g.groupName);
+
+    setEditingGroup(primaryGroup);
+    setModalMode("MERGE_GROUP");
+    setModalBarangay(stdBrgy);
+    setModalGroupName(primaryGroup.groupName);
+    setModalGroupLabel(primaryGroup.groupLabel);
+    setModalActivityPuroks([]);
+    setModalCustomPurokInput("");
+    setModalDesignatedArea(primaryGroup.designatedMainArea);
+    setModalSpecificActivity(
+      primaryGroup.specificActivity || `Joint community clean-up and environmental sanitation in Barangay ${stdBrgy}`
+    );
+    setModalSelectedPbIds(primaryGroup.beneficiaries.map((pb: any) => pb.id));
+    setModalAutoSyncToWorkProgram(true);
+    setGroupModalFeedback(null);
+
+    setMergeTargetGroups(partnerGroupNames);
+    setMergeTargetDays([6, 7, 8, 9, 10]);
+    setMergedGroupLabel(`${existingGroups.map((g) => g.groupLabel).join(" & ")} Joint Taskforce`);
+    setMergedDesignatedArea(
+      existingGroups
+        .map((g) => g.designatedMainArea)
+        .filter(Boolean)
+        .join(" & ")
+    );
+    setMergedSpecificActivity(
+      `Joint comprehensive community clean-up, massive tree-planting, and environmental rehabilitation in Barangay ${stdBrgy}`
+    );
+
+    setIsGroupModalOpen(true);
+  };
+
+  // Toggle partner group in Multi-Group Merge
+  const toggleMergePartnerGroup = (groupName: string) => {
+    setMergeTargetGroups((prev) => {
+      const next = prev.includes(groupName) ? prev.filter((n) => n !== groupName) : [...prev, groupName];
+      const stdBrgy = getStandardBarangayName(modalBarangay);
+      const brgyGroups = groupedData[stdBrgy]?.groups || [];
+      const allSelectedNames = Array.from(new Set([modalGroupName, ...next])).filter(Boolean);
+      const matchedGroups = brgyGroups.filter((g) => allSelectedNames.includes(g.groupName));
+
+      if (matchedGroups.length > 0) {
+        setMergedGroupLabel(`${matchedGroups.map((g) => g.groupLabel).join(" & ")} Joint Taskforce`);
+        setMergedDesignatedArea(
+          matchedGroups
+            .map((g) => g.designatedMainArea)
+            .filter(Boolean)
+            .join(" & ")
+        );
+      }
+      return next;
+    });
   };
 
   // Toggle beneficiary selection in modal
@@ -983,18 +1081,33 @@ export function DeploymentGroupingMatrix({
         groupDef.subGroups = editingGroup.subGroups;
       }
 
-      // Handle Merged Schedule Configuration
-      if (modalMode === "MERGE_GROUP" && mergeTargetGroup) {
+      // Handle Merged Schedule Configuration (Multi-Group Merge)
+      if (modalMode === "MERGE_GROUP") {
+        const allInvolvedNames = Array.from(new Set([groupDef.groupName, ...mergeTargetGroups])).filter(Boolean);
+        if (allInvolvedNames.length < 2) {
+          alert("Pumili ng kahit dalawa (2) o higit pang grupo na pagsasamahin sa Joint Taskforce.");
+          setIsSubmittingGroup(false);
+          return;
+        }
+
         const mergeConfig: MergedGroupScheduleConfig = {
           mergedGroupName: (mergedGroupLabel.trim() || `${groupDef.groupLabel} Joint Taskforce`).toUpperCase(),
           mergedGroupLabel: mergedGroupLabel.trim() || `${groupDef.groupLabel} Joint Taskforce`,
-          partnerGroupNames: [groupDef.groupName, mergeTargetGroup],
+          partnerGroupNames: allInvolvedNames,
           designatedArea: mergedDesignatedArea.trim() || groupDef.designatedMainArea,
           specificActivity: mergedSpecificActivity.trim() || modalSpecificActivity.trim(),
           targetDays: mergeTargetDays,
           demographics: mergedGroupDemographics,
         };
         groupDef.mergedSchedules = [mergeConfig];
+
+        // Also update mergedSchedules on all other participating partner groups in this barangay
+        const currentForBrgy = customGroups[stdBrgy] || [];
+        currentForBrgy.forEach((cg) => {
+          if (allInvolvedNames.includes(cg.groupName) && cg.groupName !== groupDef.groupName) {
+            cg.mergedSchedules = [mergeConfig];
+          }
+        });
       } else if (editingGroup?.mergedSchedules) {
         groupDef.mergedSchedules = editingGroup.mergedSchedules;
       }
@@ -1077,6 +1190,7 @@ export function DeploymentGroupingMatrix({
           }
         } else if (modalMode === "MERGE_GROUP" && groupDef.mergedSchedules?.[0]) {
           const m = groupDef.mergedSchedules[0];
+          // 1. Sync Joint Merged Taskforce
           await fetch(`/api/v1/programs/${programId}/work-program/sync-group`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -1091,22 +1205,30 @@ export function DeploymentGroupingMatrix({
             }),
           });
 
-          // Sync individual main group for days outside merge
+          // 2. Sync individual participating groups for days outside merge (e.g. Days 1-5)
           const nonMergedDays = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10].filter((d) => !mergeTargetDays.includes(d));
           if (nonMergedDays.length > 0) {
-            await fetch(`/api/v1/programs/${programId}/work-program/sync-group`, {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                barangay: stdBrgy,
-                groupName: groupDef.groupName,
-                groupLabel: groupDef.groupLabel,
-                designatedArea: groupDef.designatedMainArea,
-                specificActivities: groupDef.specificActivity,
-                targetDays: nonMergedDays,
-                demographics: modalSelectionDemographics,
-              }),
-            });
+            const allInvolvedNames = m.partnerGroupNames || [groupDef.groupName];
+            const brgyGroups = groupedData[stdBrgy]?.groups || [];
+
+            for (const gName of allInvolvedNames) {
+              const matchedG = brgyGroups.find((g) => g.groupName === gName);
+              if (matchedG) {
+                await fetch(`/api/v1/programs/${programId}/work-program/sync-group`, {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({
+                    barangay: stdBrgy,
+                    groupName: matchedG.groupName,
+                    groupLabel: matchedG.groupLabel,
+                    designatedArea: matchedG.designatedMainArea,
+                    specificActivities: matchedG.specificActivity || modalSpecificActivity.trim(),
+                    targetDays: nonMergedDays,
+                    demographics: matchedG.demographics,
+                  }),
+                });
+              }
+            }
           }
         } else {
           // STANDARD mode
@@ -1411,14 +1533,27 @@ export function DeploymentGroupingMatrix({
               </div>
 
               {canManage && (
-                <button
-                  type="button"
-                  onClick={() => handleOpenCreateModal(brgy.barangay)}
-                  className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-xl text-xs font-bold transition flex items-center space-x-1 border border-slate-300 self-start sm:self-auto cursor-pointer"
-                >
-                  <Plus className="w-3.5 h-3.5 text-emerald-600" />
-                  <span>Magdagdag ng Grupo sa {brgy.barangay}</span>
-                </button>
+                <div className="flex flex-wrap items-center gap-2 self-start sm:self-auto">
+                  {brgy.groups.length >= 2 && (
+                    <button
+                      type="button"
+                      onClick={() => handleOpenMergeMultipleModal(brgy.barangay)}
+                      className="px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-900 rounded-xl text-xs font-bold transition flex items-center space-x-1.5 border border-emerald-300 cursor-pointer shadow-2xs"
+                      title={`Pagsamahin ang dalawa o higit pang grupo sa Barangay ${brgy.barangay} sa iisang Joint Taskforce`}
+                    >
+                      <GitMerge className="w-3.5 h-3.5 text-emerald-700" />
+                      <span>I-merge ang mga Grupo</span>
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => handleOpenCreateModal(brgy.barangay)}
+                    className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-xl text-xs font-bold transition flex items-center space-x-1 border border-slate-300 cursor-pointer"
+                  >
+                    <Plus className="w-3.5 h-3.5 text-emerald-600" />
+                    <span>Magdagdag ng Grupo sa {brgy.barangay}</span>
+                  </button>
+                </div>
               )}
             </div>
 
@@ -2656,47 +2791,145 @@ export function DeploymentGroupingMatrix({
                 </div>
               )}
 
-              {/* MODE 3: MERGE TO OTHER GROUP (PAGSAMAHIN SA IBANG GRUPO) */}
-              {modalMode === "MERGE_GROUP" && (
-                <div className="space-y-5 animate-fadeIn">
-                  <div className="p-4 bg-emerald-50/80 rounded-2xl border border-emerald-300 space-y-4">
-                    <h4 className="text-xs font-black uppercase text-emerald-950 tracking-wider flex items-center space-x-1.5">
-                      <GitMerge className="w-4 h-4 text-emerald-700" />
-                      <span>1. Pagsamahin (Merge) sa Ibang Umiiral na Grupo sa Barangay {modalBarangay}</span>
-                    </h4>
+              {/* MODE 3: MERGE TO OTHER GROUPS (PAGSAMAHIN ANG MARAMIHANG GRUPO) */}
+              {modalMode === "MERGE_GROUP" && (() => {
+                const stdBrgy = getStandardBarangayName(modalBarangay);
+                const allBrgyGroups = groupedData[stdBrgy]?.groups || [];
+                const allInvolvedGroupNames = Array.from(new Set([modalGroupName, ...mergeTargetGroups])).filter(Boolean);
 
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                      <div>
-                        <label className="block font-bold text-slate-700 uppercase mb-1">
-                          Pumili ng Grupong Pagsasamahan (Partner Group) <span className="text-rose-500">*</span>
-                        </label>
-                        <select
-                          required
-                          value={mergeTargetGroup}
-                          onChange={(e) => {
-                            const pName = e.target.value;
-                            setMergeTargetGroup(pName);
-                            const pObj = groupedData[getStandardBarangayName(modalBarangay)]?.groups.find((g) => g.groupName === pName);
-                            if (pObj) {
-                              setMergedGroupLabel(`${modalGroupLabel || modalGroupName} & ${pObj.groupLabel} Joint Taskforce`);
-                              setMergedDesignatedArea(`${modalDesignatedArea} & ${pObj.designatedMainArea}`);
-                            }
-                          }}
-                          className="w-full px-3.5 py-2.5 font-bold border border-emerald-300 rounded-xl bg-white focus:outline-none focus:border-emerald-600"
-                        >
-                          <option value="">-- Pumili ng Partner Group --</option>
-                          {(groupedData[getStandardBarangayName(modalBarangay)]?.groups || [])
-                            .filter((g) => g.groupName !== modalGroupName)
-                            .map((g) => (
-                              <option key={g.groupName} value={g.groupName}>
-                                {g.groupLabel} ({g.demographics.totalCount} Pax) - {g.designatedMainArea}
-                              </option>
-                            ))}
-                        </select>
+                return (
+                  <div className="space-y-5 animate-fadeIn">
+                    <div className="p-4 sm:p-5 bg-emerald-50/90 rounded-2xl border border-emerald-300 space-y-4">
+                      {/* Header & Quick Selector Controls */}
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-emerald-200 pb-3">
+                        <div>
+                          <h4 className="text-xs font-black uppercase text-emerald-950 tracking-wider flex items-center space-x-1.5">
+                            <GitMerge className="w-4 h-4 text-emerald-700" />
+                            <span>1. Pumili ng Dalawa o Higit Pang Grupo na Pagsasamahin (Merge Groups)</span>
+                          </h4>
+                          <p className="text-[11px] text-emerald-800 mt-0.5">
+                            Barangay <strong>{stdBrgy}</strong> • Piliin ang mga grupong magsasama sa iisang Joint Taskforce para sa mga itinakdang araw.
+                          </p>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <span className="px-2.5 py-1 bg-emerald-700 text-white rounded-lg font-mono text-[11px] font-black shadow-2xs">
+                            {allInvolvedGroupNames.length} sa {allBrgyGroups.length} Napiling Grupo
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const allNames = allBrgyGroups.map((g) => g.groupName);
+                              setMergeTargetGroups(allNames.filter((n) => n !== modalGroupName));
+                              setMergedGroupLabel(`${allBrgyGroups.map((g) => g.groupLabel).join(" & ")} Joint Taskforce`);
+                              setMergedDesignatedArea(
+                                allBrgyGroups
+                                  .map((g) => g.designatedMainArea)
+                                  .filter(Boolean)
+                                  .join(" & ")
+                              );
+                            }}
+                            className="text-[11px] font-bold text-emerald-900 bg-white hover:bg-emerald-100 border border-emerald-300 px-2.5 py-1 rounded-lg transition cursor-pointer"
+                          >
+                            Lahat ({allBrgyGroups.length})
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setMergeTargetGroups([]);
+                              const currentG = allBrgyGroups.find((g) => g.groupName === modalGroupName);
+                              if (currentG) {
+                                setMergedGroupLabel(`${currentG.groupLabel} Joint Taskforce`);
+                                setMergedDesignatedArea(currentG.designatedMainArea);
+                              }
+                            }}
+                            className="text-[11px] font-bold text-slate-600 bg-white hover:bg-slate-100 border border-slate-300 px-2.5 py-1 rounded-lg transition cursor-pointer"
+                          >
+                            I-clear
+                          </button>
+                        </div>
                       </div>
 
+                      {/* Multi-Group Checkbox Grid */}
+                      <div className="space-y-2">
+                        <label className="block text-[11px] font-black text-emerald-950 uppercase">
+                          Mga Umiiral na Grupo sa Barangay {stdBrgy} (Lagyan ng Check ang mga Pagsasamahin):
+                        </label>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
+                          {allBrgyGroups.map((g) => {
+                            const isPrimary = g.groupName === modalGroupName;
+                            const isSelected = isPrimary || mergeTargetGroups.includes(g.groupName);
+                            const demo = g.demographics;
+
+                            return (
+                              <div
+                                key={g.groupName}
+                                onClick={() => {
+                                  if (isPrimary) return;
+                                  toggleMergePartnerGroup(g.groupName);
+                                }}
+                                className={`p-3 rounded-2xl border transition text-xs flex flex-col justify-between space-y-2 cursor-pointer ${
+                                  isSelected
+                                    ? "bg-white border-emerald-600 ring-2 ring-emerald-500/30 shadow-xs"
+                                    : "bg-emerald-50/50 border-emerald-200 hover:bg-white hover:border-emerald-300"
+                                }`}
+                              >
+                                <div className="flex items-start justify-between gap-2">
+                                  <div className="flex items-start space-x-2">
+                                    <div className="mt-0.5">
+                                      {isSelected ? (
+                                        <CheckSquare className="w-4 h-4 text-emerald-700 shrink-0" />
+                                      ) : (
+                                        <Square className="w-4 h-4 text-slate-400 shrink-0" />
+                                      )}
+                                    </div>
+                                    <div>
+                                      <div className="flex items-center space-x-1.5 flex-wrap">
+                                        <span className="font-black text-slate-900">{g.groupLabel}</span>
+                                        {isPrimary && (
+                                          <span className="px-1.5 py-0.2 bg-blue-100 text-blue-900 text-[9px] font-bold rounded">
+                                            Current
+                                          </span>
+                                        )}
+                                      </div>
+                                      <p className="text-[10px] text-slate-500 flex items-center space-x-1 mt-0.5 line-clamp-1">
+                                        <MapPin className="w-3 h-3 text-emerald-600 shrink-0" />
+                                        <span>{g.designatedMainArea}</span>
+                                      </p>
+                                    </div>
+                                  </div>
+                                </div>
+
+                                <div className="flex items-center justify-between text-[10px] pt-1.5 border-t border-slate-100 font-mono">
+                                  <span className="font-bold text-slate-700 bg-slate-100 px-2 py-0.5 rounded-md">
+                                    {demo.totalCount} Pax
+                                  </span>
+                                  <div className="flex items-center space-x-1 text-slate-600">
+                                    <span className="text-blue-700 font-bold">♂ {demo.maleCount}</span>
+                                    <span>•</span>
+                                    <span className="text-pink-700 font-bold">♀ {demo.femaleCount}</span>
+                                    {(demo.isSeniorCount > 0 || demo.isPwdCount > 0) && (
+                                      <>
+                                        <span>•</span>
+                                        <span className="text-amber-700 font-bold">SC/PWD: {demo.isSeniorCount + demo.isPwdCount}</span>
+                                      </>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                        {allInvolvedGroupNames.length < 2 && (
+                          <p className="text-[11px] text-amber-700 font-bold flex items-center space-x-1 bg-amber-50 p-2 rounded-xl border border-amber-200">
+                            <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                            <span>Pumili ng kahit 2 grupo para mabuo ang Pinagsamang Joint Taskforce.</span>
+                          </p>
+                        )}
+                      </div>
+
+                      {/* Joint Taskforce Name Input */}
                       <div>
-                        <label className="block font-bold text-slate-700 uppercase mb-1">
+                        <label className="block font-bold text-slate-700 uppercase mb-1 text-xs">
                           Pangalan ng Pinagsamang Joint Taskforce <span className="text-rose-500">*</span>
                         </label>
                         <input
@@ -2704,164 +2937,164 @@ export function DeploymentGroupingMatrix({
                           required
                           value={mergedGroupLabel}
                           onChange={(e) => setMergedGroupLabel(e.target.value)}
-                          placeholder="Hal. Uno &amp; DOS Combined Mega Taskforce"
-                          className="w-full px-3.5 py-2.5 font-bold border border-emerald-300 rounded-xl bg-white focus:outline-none focus:border-emerald-600"
+                          placeholder="Hal. Aplaya Group 1 & Uno Joint Taskforce"
+                          className="w-full px-3.5 py-2.5 font-bold border border-emerald-300 rounded-xl bg-white focus:outline-none focus:border-emerald-600 text-xs"
                         />
                       </div>
-                    </div>
 
-                    {/* Target Days for the Merged Joint Taskforce */}
-                    <div className="space-y-1.5 pt-1">
-                      <div className="flex items-center justify-between text-[11px]">
-                        <span className="font-bold text-emerald-950 uppercase">
-                          I-apply ang Pinagsamang Grupo sa mga Sumusunod na Araw:
-                        </span>
-                        <div className="space-x-2">
-                          <button
-                            type="button"
-                            onClick={() => setMergeTargetDays([6, 7, 8, 9, 10])}
-                            className="font-bold text-emerald-900 hover:underline cursor-pointer"
-                          >
-                            Days 6–10 (Joint Phase)
-                          </button>
-                          <span className="text-emerald-300">|</span>
-                          <button
-                            type="button"
-                            onClick={() => setMergeTargetDays([1, 2, 3, 4, 5])}
-                            className="font-bold text-emerald-900 hover:underline cursor-pointer"
-                          >
-                            Days 1–5
-                          </button>
-                          <span className="text-emerald-300">|</span>
-                          <button
-                            type="button"
-                            onClick={() => setMergeTargetDays([1, 2, 3, 4, 5, 6, 7, 8, 9, 10])}
-                            className="font-bold text-emerald-900 hover:underline cursor-pointer"
-                          >
-                            Lahat (10 Araw)
-                          </button>
-                        </div>
-                      </div>
-
-                      <div className="grid grid-cols-5 sm:grid-cols-10 gap-1.5">
-                        {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((d) => {
-                          const isSelected = mergeTargetDays.includes(d);
-                          return (
+                      {/* Target Days for the Merged Joint Taskforce */}
+                      <div className="space-y-1.5 pt-1">
+                        <div className="flex items-center justify-between text-[11px]">
+                          <span className="font-bold text-emerald-950 uppercase">
+                            I-apply ang Pinagsamang Grupo sa mga Sumusunod na Araw:
+                          </span>
+                          <div className="space-x-2">
                             <button
-                              key={d}
                               type="button"
-                              onClick={() => {
-                                setMergeTargetDays((prev) =>
-                                  prev.includes(d) ? prev.filter((day) => day !== d) : [...prev, d].sort((a, b) => a - b)
-                                );
-                              }}
-                              className={`py-1.5 rounded-xl text-center text-xs font-mono font-black transition border cursor-pointer ${
-                                isSelected
-                                  ? "bg-emerald-600 text-white border-emerald-700 shadow-2xs scale-105"
-                                  : "bg-white text-emerald-900 hover:bg-emerald-100 border-emerald-200"
-                              }`}
+                              onClick={() => setMergeTargetDays([6, 7, 8, 9, 10])}
+                              className="font-bold text-emerald-900 hover:underline cursor-pointer"
                             >
-                              Day {d}
+                              Days 6–10 (Joint Phase)
                             </button>
-                          );
-                        })}
-                      </div>
-                    </div>
+                            <span className="text-emerald-300">|</span>
+                            <button
+                              type="button"
+                              onClick={() => setMergeTargetDays([1, 2, 3, 4, 5])}
+                              className="font-bold text-emerald-900 hover:underline cursor-pointer"
+                            >
+                              Days 1–5
+                            </button>
+                            <span className="text-emerald-300">|</span>
+                            <button
+                              type="button"
+                              onClick={() => setMergeTargetDays([1, 2, 3, 4, 5, 6, 7, 8, 9, 10])}
+                              className="font-bold text-emerald-900 hover:underline cursor-pointer"
+                            >
+                              Lahat (10 Araw)
+                            </button>
+                          </div>
+                        </div>
 
-                    {/* Dropdown for Choosing Work Area or Activity from Existing Work Program */}
-                    <div className="bg-emerald-100/70 p-3 rounded-xl border border-emerald-300 space-y-1.5">
-                      <label className="block text-[10px] font-black text-emerald-950 uppercase flex items-center space-x-1">
-                        <FolderDown className="w-3.5 h-3.5 text-emerald-700" />
-                        <span>Pumili ng Pinagsamang Lugar / Gawain mula sa Work Program:</span>
-                      </label>
-                      <select
-                        onChange={(e) => {
-                          const val = e.target.value;
-                          if (val !== "") {
-                            const item = availableWpItems[parseInt(val, 10)];
-                            if (item) {
-                              if (item.workArea) setMergedDesignatedArea(item.workArea);
-                              if (item.specificActivities) setMergedSpecificActivity(item.specificActivities);
+                        <div className="grid grid-cols-5 sm:grid-cols-10 gap-1.5">
+                          {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((d) => {
+                            const isSelected = mergeTargetDays.includes(d);
+                            return (
+                              <button
+                                key={d}
+                                type="button"
+                                onClick={() => {
+                                  setMergeTargetDays((prev) =>
+                                    prev.includes(d) ? prev.filter((day) => day !== d) : [...prev, d].sort((a, b) => a - b)
+                                  );
+                                }}
+                                className={`py-1.5 rounded-xl text-center text-xs font-mono font-black transition border cursor-pointer ${
+                                  isSelected
+                                    ? "bg-emerald-600 text-white border-emerald-700 shadow-2xs scale-105"
+                                    : "bg-white text-emerald-900 hover:bg-emerald-100 border-emerald-200"
+                                }`}
+                              >
+                                Day {d}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+
+                      {/* Dropdown for Choosing Work Area or Activity from Existing Work Program */}
+                      <div className="bg-emerald-100/70 p-3 rounded-xl border border-emerald-300 space-y-1.5">
+                        <label className="block text-[10px] font-black text-emerald-950 uppercase flex items-center space-x-1">
+                          <FolderDown className="w-3.5 h-3.5 text-emerald-700" />
+                          <span>Pumili ng Pinagsamang Lugar / Gawain mula sa Work Program:</span>
+                        </label>
+                        <select
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            if (val !== "") {
+                              const item = availableWpItems[parseInt(val, 10)];
+                              if (item) {
+                                if (item.workArea) setMergedDesignatedArea(item.workArea);
+                                if (item.specificActivities) setMergedSpecificActivity(item.specificActivities);
+                              }
                             }
-                          }
-                        }}
-                        className="w-full px-3 py-2 text-xs border border-emerald-300 rounded-lg bg-white font-medium text-slate-800 focus:outline-none focus:border-emerald-600 cursor-pointer"
-                      >
-                        <option value="">-- Piliin ang Lugar / Gawain mula sa Work Program --</option>
-                        {availableWpItems.map((item, idx) => (
-                          <option key={idx} value={idx}>
-                            📍 {item.workArea || "Work Area"} — {item.specificActivities.length > 60 ? item.specificActivities.substring(0, 60) + "..." : item.specificActivities}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-
-                    <div>
-                      <label className="block font-bold text-slate-700 uppercase mb-1">
-                        Pinagsamang Lugar ng Paggawa (Joint Work Area) <span className="text-rose-500">*</span>
-                      </label>
-                      <input
-                        type="text"
-                        required
-                        value={mergedDesignatedArea}
-                        onChange={(e) => setMergedDesignatedArea(e.target.value)}
-                        placeholder="Hal. Barangay Aplaya Shoreline Buffer &amp; Tree Planting Corridor"
-                        className="w-full px-3.5 py-2.5 font-bold border border-emerald-300 rounded-xl bg-white"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block font-bold text-slate-700 uppercase mb-1">
-                        Pinagsamang Partikular na Gawain (Joint Specific Activity) <span className="text-rose-500">*</span>
-                      </label>
-                      <textarea
-                        rows={2}
-                        required
-                        value={mergedSpecificActivity}
-                        onChange={(e) => setMergedSpecificActivity(e.target.value)}
-                        placeholder="Hal. Massive coastal clean-up, mangrove tree planting, and flood mitigation canal clearance..."
-                        className="w-full px-3.5 py-2.5 font-medium border border-emerald-300 rounded-xl bg-white text-xs leading-relaxed"
-                      />
-                    </div>
-
-                    {/* Combined Demographic Summary Box */}
-                    <div className="p-3.5 bg-gradient-to-r from-emerald-950 via-slate-900 to-emerald-950 text-white rounded-2xl shadow-sm space-y-2">
-                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-emerald-800 pb-2">
-                        <span className="text-xs font-black text-emerald-300 uppercase tracking-wider flex items-center space-x-1.5">
-                          <Combine className="w-4 h-4 text-emerald-400" />
-                          <span>Pinagsamang Lakas-Paggawa (Combined Demographic Quota):</span>
-                        </span>
-                        <span className="px-3 py-0.5 rounded-full font-mono font-black text-xs bg-emerald-400 text-slate-950">
-                          Total: {mergedGroupDemographics.totalCount} Benepisyaryo
-                        </span>
+                          }}
+                          className="w-full px-3 py-2 text-xs border border-emerald-300 rounded-lg bg-white font-medium text-slate-800 focus:outline-none focus:border-emerald-600 cursor-pointer"
+                        >
+                          <option value="">-- Piliin ang Lugar / Gawain mula sa Work Program --</option>
+                          {availableWpItems.map((item, idx) => (
+                            <option key={idx} value={idx}>
+                              📍 {item.workArea || "Work Area"} — {item.specificActivities.length > 60 ? item.specificActivities.substring(0, 60) + "..." : item.specificActivities}
+                            </option>
+                          ))}
+                        </select>
                       </div>
 
-                      <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 text-center text-xs font-mono">
-                        <div className="bg-white/10 p-2 rounded-xl">
-                          <span className="text-slate-400 text-[10px] block uppercase">♂ Lalaki</span>
-                          <strong className="text-blue-300 text-sm">{mergedGroupDemographics.maleCount}</strong>
+                      <div>
+                        <label className="block font-bold text-slate-700 uppercase mb-1 text-xs">
+                          Pinagsamang Lugar ng Paggawa (Joint Work Area) <span className="text-rose-500">*</span>
+                        </label>
+                        <input
+                          type="text"
+                          required
+                          value={mergedDesignatedArea}
+                          onChange={(e) => setMergedDesignatedArea(e.target.value)}
+                          placeholder="Hal. Barangay Aplaya Shoreline Buffer & Tree Planting Corridor"
+                          className="w-full px-3.5 py-2.5 font-bold border border-emerald-300 rounded-xl bg-white text-xs"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block font-bold text-slate-700 uppercase mb-1 text-xs">
+                          Pinagsamang Partikular na Gawain (Joint Specific Activity) <span className="text-rose-500">*</span>
+                        </label>
+                        <textarea
+                          rows={2}
+                          required
+                          value={mergedSpecificActivity}
+                          onChange={(e) => setMergedSpecificActivity(e.target.value)}
+                          placeholder="Hal. Massive coastal clean-up, mangrove tree planting, and flood mitigation canal clearance..."
+                          className="w-full px-3.5 py-2.5 font-medium border border-emerald-300 rounded-xl bg-white text-xs leading-relaxed"
+                        />
+                      </div>
+
+                      {/* Combined Demographic Summary Box */}
+                      <div className="p-3.5 bg-gradient-to-r from-emerald-950 via-slate-900 to-emerald-950 text-white rounded-2xl shadow-sm space-y-2">
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-emerald-800 pb-2">
+                          <span className="text-xs font-black text-emerald-300 uppercase tracking-wider flex items-center space-x-1.5">
+                            <Combine className="w-4 h-4 text-emerald-400" />
+                            <span>Pinagsamang Lakas-Paggawa ({allInvolvedGroupNames.length} Groups Combined Demographic Quota):</span>
+                          </span>
+                          <span className="px-3 py-0.5 rounded-full font-mono font-black text-xs bg-emerald-400 text-slate-950">
+                            Total: {mergedGroupDemographics.totalCount} Benepisyaryo
+                          </span>
                         </div>
-                        <div className="bg-white/10 p-2 rounded-xl">
-                          <span className="text-slate-400 text-[10px] block uppercase">♀ Babae</span>
-                          <strong className="text-pink-300 text-sm">{mergedGroupDemographics.femaleCount}</strong>
-                        </div>
-                        <div className="bg-white/10 p-2 rounded-xl">
-                          <span className="text-slate-400 text-[10px] block uppercase">Senior</span>
-                          <strong className="text-amber-300 text-sm">{mergedGroupDemographics.isSeniorCount}</strong>
-                        </div>
-                        <div className="bg-white/10 p-2 rounded-xl">
-                          <span className="text-slate-400 text-[10px] block uppercase">PWD</span>
-                          <strong className="text-purple-300 text-sm">{mergedGroupDemographics.isPwdCount}</strong>
-                        </div>
-                        <div className="bg-white/10 p-2 rounded-xl col-span-2 sm:col-span-1">
-                          <span className="text-slate-400 text-[10px] block uppercase">IP Katutubo</span>
-                          <strong className="text-emerald-300 text-sm">{mergedGroupDemographics.isIpCount}</strong>
+
+                        <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 text-center text-xs font-mono">
+                          <div className="bg-white/10 p-2 rounded-xl">
+                            <span className="text-slate-400 text-[10px] block uppercase">♂ Lalaki</span>
+                            <strong className="text-blue-300 text-sm">{mergedGroupDemographics.maleCount}</strong>
+                          </div>
+                          <div className="bg-white/10 p-2 rounded-xl">
+                            <span className="text-slate-400 text-[10px] block uppercase">♀ Babae</span>
+                            <strong className="text-pink-300 text-sm">{mergedGroupDemographics.femaleCount}</strong>
+                          </div>
+                          <div className="bg-white/10 p-2 rounded-xl">
+                            <span className="text-slate-400 text-[10px] block uppercase">Senior</span>
+                            <strong className="text-amber-300 text-sm">{mergedGroupDemographics.isSeniorCount}</strong>
+                          </div>
+                          <div className="bg-white/10 p-2 rounded-xl">
+                            <span className="text-slate-400 text-[10px] block uppercase">PWD</span>
+                            <strong className="text-purple-300 text-sm">{mergedGroupDemographics.isPwdCount}</strong>
+                          </div>
+                          <div className="bg-white/10 p-2 rounded-xl col-span-2 sm:col-span-1">
+                            <span className="text-slate-400 text-[10px] block uppercase">IP Katutubo</span>
+                            <strong className="text-emerald-300 text-sm">{mergedGroupDemographics.isIpCount}</strong>
+                          </div>
                         </div>
                       </div>
                     </div>
                   </div>
-                </div>
-              )}
+                );
+              })()}
 
               {/* Submit Buttons */}
               <div className="flex items-center justify-end space-x-2 pt-3 border-t">
