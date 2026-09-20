@@ -272,10 +272,10 @@ export default async function DashboardPage() {
             </span>
           </div>
           <h1 className="text-xl sm:text-2xl font-black tracking-tight text-slate-950">
-            DOLE-TUPAD Beneficiary &amp; Attendance Monitoring
+            Digital Tool para sa Pinabilis at Pinadaling Access sa Serbisyo Publiko ng PESO Dingalan
           </h1>
           <p className="text-sm text-slate-700 max-w-2xl font-semibold leading-relaxed">
-            Digital Tool para sa mas pinabilis at pinadaling Accessible na Serbisyo ng PESO Dingalan
+            Gawa at Lokal na Disenyo ng PESO Dingalan
           </p>
         </div>
 
