@@ -37,6 +37,7 @@ import { EditBeneficiaryModal } from "@/components/beneficiaries/EditBeneficiary
 import { AdminStubOverrideModal } from "@/components/beneficiaries/AdminStubOverrideModal";
 import { MasterlistUploadModal } from "@/components/beneficiaries/MasterlistUploadModal";
 import { DeploymentGroupingMatrix } from "@/components/beneficiaries/DeploymentGroupingMatrix";
+import { BeneficiarySummaryDropdown } from "@/components/beneficiaries/BeneficiarySummaryDropdown";
 import { TableScrollWrapper } from "@/components/common/TableScrollWrapper";
 import { useAuth } from "@/context/AuthContext";
 import { offlineDb } from "@/lib/dexie";
@@ -514,6 +515,9 @@ export default function BeneficiariesMasterlistPage() {
         </div>
 
         <div className="flex flex-wrap items-center gap-2 self-start md:self-auto">
+          {/* Beneficiaries Demographic & Geographic Summary Dropdown Button */}
+          <BeneficiarySummaryDropdown beneficiaries={beneficiaries} />
+
           <a
             href="/api/v1/beneficiaries/template"
             download="tupad_final_beneficiaries_template.csv"

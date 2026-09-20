@@ -34,6 +34,7 @@ import { TableAssignmentModal } from "@/components/tables/TableAssignmentModal";
 import { EditProgramModal } from "@/components/programs/EditProgramModal";
 import { DeleteProgramModal } from "@/components/programs/DeleteProgramModal";
 import { EditBeneficiaryModal } from "@/components/beneficiaries/EditBeneficiaryModal";
+import { BeneficiarySummaryDropdown } from "@/components/beneficiaries/BeneficiarySummaryDropdown";
 
 export default function ProgramDetailsHub() {
   const params = useParams();
@@ -437,22 +438,26 @@ export default function ProgramDetailsHub() {
             <h2 className="text-xs font-bold text-slate-800 uppercase tracking-wider">
               Enrolled Beneficiaries ({beneficiaries.length})
             </h2>
-            {isAdmin && (
-              <div className="flex space-x-2">
-                <button
-                  onClick={handleGenerateQrs}
-                  className="px-3 py-1.5 bg-slate-800 hover:bg-slate-900 text-white font-bold text-xs rounded-lg transition"
-                >
-                  Generate Missing QRs
-                </button>
-                <a
-                  href={`/programs/${program.id}/import`}
-                  className="px-3 py-1.5 bg-gov-blue hover:bg-gov-light text-white font-bold text-xs rounded-lg transition"
-                >
-                  Upload Excel Masterlist
-                </a>
-              </div>
-            )}
+            <div className="flex flex-wrap items-center gap-2">
+              <BeneficiarySummaryDropdown beneficiaries={beneficiaries} programTitle={program?.programName} />
+
+              {isAdmin && (
+                <>
+                  <button
+                    onClick={handleGenerateQrs}
+                    className="px-3 py-1.5 bg-slate-800 hover:bg-slate-900 text-white font-bold text-xs rounded-lg transition"
+                  >
+                    Generate Missing QRs
+                  </button>
+                  <a
+                    href={`/programs/${program.id}/import`}
+                    className="px-3 py-1.5 bg-gov-blue hover:bg-gov-light text-white font-bold text-xs rounded-lg transition"
+                  >
+                    Upload Excel Masterlist
+                  </a>
+                </>
+              )}
+            </div>
           </div>
 
           <div className="gov-card overflow-hidden">
