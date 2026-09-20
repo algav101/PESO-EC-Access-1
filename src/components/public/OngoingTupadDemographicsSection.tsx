@@ -12,7 +12,6 @@ import {
   HeartHandshake,
   ShieldCheck,
   Search,
-  Printer,
   Table as TableIcon,
   Layers,
   Sparkles,
@@ -408,12 +407,6 @@ export function OngoingTupadDemographicsSection({
     setExpandedBarangays({});
   };
 
-  const handlePrint = () => {
-    if (typeof window !== "undefined") {
-      window.print();
-    }
-  };
-
   return (
     <section id="demographics" className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-6 scroll-mt-24">
       {/* Top Banner & Header */}
@@ -436,18 +429,6 @@ export function OngoingTupadDemographicsSection({
                 Municipal summary per Barangay and Purok with Gender, Senior Citizen, PWD, and Indigenous Peoples (IP) metrics
               </p>
             </div>
-          </div>
-
-          <div className="flex items-center space-x-2 self-start sm:self-auto">
-            <button
-              type="button"
-              onClick={handlePrint}
-              className="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl transition flex items-center space-x-1.5 shadow-xs border border-slate-200 cursor-pointer"
-              title="Print summary sheet"
-            >
-              <Printer className="w-3.5 h-3.5 text-slate-600" />
-              <span>Print / Save</span>
-            </button>
           </div>
         </div>
 
