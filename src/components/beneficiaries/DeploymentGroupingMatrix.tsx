@@ -371,9 +371,62 @@ export function DeploymentGroupingMatrix({
     });
   }, [beneficiaries, modalBarangay]);
 
+  // Helper to determine which group a beneficiary is assigned to in a barangay
+  const getAssignedGroupNameForBeneficiary = (pb: any, stdBrgy: string) => {
+    const b = pb.beneficiary || pb;
+    const explicit =
+      beneficiaryGroupAssignments[pb.id] ||
+      beneficiaryGroupAssignments[b.id] ||
+      (b.designatedNumber ? beneficiaryGroupAssignments[String(b.designatedNumber)] : null);
+    if (explicit) return explicit;
+
+    const brgyEntry = groupedData[stdBrgy];
+    if (brgyEntry) {
+      for (const g of brgyEntry.groups) {
+        if (
+          g.beneficiaries.some(
+            (item: any) =>
+              item.id === pb.id ||
+              item.beneficiary?.id === b.id ||
+              (item.beneficiary?.designatedNumber && item.beneficiary?.designatedNumber === b.designatedNumber)
+          )
+        ) {
+          return g.groupName;
+        }
+      }
+    }
+    return null;
+  };
+
+  // Available candidate beneficiaries for the modal:
+  // If creating a new group: Exclude any beneficiary already in any group in this barangay.
+  // If editing an existing group: Include current members of this group + unassigned beneficiaries, but exclude those in other groups.
+  const modalCandidateBeneficiaries = useMemo(() => {
+    const stdBrgy = getStandardBarangayName(modalBarangay);
+    return modalBarangayBeneficiaries.filter((pb) => {
+      const assignedGroup = getAssignedGroupNameForBeneficiary(pb, stdBrgy);
+      if (!assignedGroup) return true; // Unassigned -> available
+      if (editingGroup) {
+        // When editing, show members of the current group or if currently selected
+        if (assignedGroup === editingGroup.groupName || modalSelectedPbIds.includes(pb.id)) {
+          return true;
+        }
+      }
+      // If creating a new group or assigned to a different group -> DO NOT SHOW
+      return false;
+    });
+  }, [modalBarangayBeneficiaries, modalBarangay, editingGroup, modalSelectedPbIds, beneficiaryGroupAssignments, groupedData]);
+
+  // Demographic stats of available candidate beneficiaries
+  const availableCandidatesDemographics = useMemo(() => {
+    return computeGroupDemographics(modalCandidateBeneficiaries);
+  }, [modalCandidateBeneficiaries]);
+
+  const assignedInOtherGroupsCount = modalBarangayBeneficiaries.length - modalCandidateBeneficiaries.length;
+
   // Filtered beneficiaries inside the modal selection table
   const filteredModalBeneficiaries = useMemo(() => {
-    return modalBarangayBeneficiaries.filter((pb) => {
+    return modalCandidateBeneficiaries.filter((pb) => {
       const b = pb.beneficiary || pb;
       const name = (b.fullName || `${b.lastName}, ${b.firstName}`).toLowerCase();
       const num = String(b.designatedNumber || pb.designatedNumber || "");
@@ -407,7 +460,7 @@ export function DeploymentGroupingMatrix({
 
       return true;
     });
-  }, [modalBarangayBeneficiaries, modalBeneSearch, modalBeneGenderFilter, modalBeneCategoryFilter, modalBenePurokFilter]);
+  }, [modalCandidateBeneficiaries, modalBeneSearch, modalBeneGenderFilter, modalBeneCategoryFilter, modalBenePurokFilter]);
 
   // Computed demographics of the currently checked beneficiaries in modal
   const modalSelectionDemographics = useMemo(() => {
@@ -478,14 +531,14 @@ export function DeploymentGroupingMatrix({
     );
   };
 
-  // Strategic Quick Allocation Helpers
+  // Strategic Quick Allocation Helpers (operating ONLY on available candidate beneficiaries)
   const handleSelectAllInModal = () => {
-    const ids = modalBarangayBeneficiaries.map((pb) => pb.id);
+    const ids = modalCandidateBeneficiaries.map((pb) => pb.id);
     setModalSelectedPbIds(Array.from(new Set([...modalSelectedPbIds, ...ids])));
   };
 
   const handleSelectMalesOnly = () => {
-    const maleIds = modalBarangayBeneficiaries
+    const maleIds = modalCandidateBeneficiaries
       .filter((pb) => {
         const b = pb.beneficiary || pb;
         const sex = (b.sex || b.gender || "").toUpperCase();
@@ -496,7 +549,7 @@ export function DeploymentGroupingMatrix({
   };
 
   const handleSelectFemalesOnly = () => {
-    const femaleIds = modalBarangayBeneficiaries
+    const femaleIds = modalCandidateBeneficiaries
       .filter((pb) => {
         const b = pb.beneficiary || pb;
         const sex = (b.sex || b.gender || "").toUpperCase();
@@ -507,7 +560,7 @@ export function DeploymentGroupingMatrix({
   };
 
   const handleSelectSeniorsAndPwds = () => {
-    const vulnerableIds = modalBarangayBeneficiaries
+    const vulnerableIds = modalCandidateBeneficiaries
       .filter((pb) => {
         const b = pb.beneficiary || pb;
         return b.isSenior || b.isPwd;
@@ -521,7 +574,7 @@ export function DeploymentGroupingMatrix({
       alert("Pumili muna ng Purok o Sitio ng aktibidad sa itaas.");
       return;
     }
-    const purokIds = modalBarangayBeneficiaries
+    const purokIds = modalCandidateBeneficiaries
       .filter((pb) => {
         const b = pb.beneficiary || pb;
         const sitio = (b.sitio || "").toUpperCase();
@@ -1320,19 +1373,31 @@ export function DeploymentGroupingMatrix({
               {/* SECTION B: Precise Beneficiary Allocation & Worker Strategy */}
               <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200 space-y-4">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                  <h4 className="text-xs font-black uppercase text-slate-800 tracking-wider flex items-center space-x-1.5">
-                    <Users className="w-4 h-4 text-blue-900" />
-                    <span>2. Pagtatalaga ng mga Benepisyaryo (Strength, Capacity &amp; Location Strategy)</span>
-                  </h4>
-                  <span className="text-[11px] font-bold text-slate-500">
-                    Kabuuan sa {modalBarangay}: <strong className="text-blue-950">{modalBarangayBeneficiaries.length} Enrolled</strong>
-                  </span>
+                  <div>
+                    <h4 className="text-xs font-black uppercase text-slate-800 tracking-wider flex items-center space-x-1.5">
+                      <Users className="w-4 h-4 text-blue-900" />
+                      <span>2. Pagtatalaga ng mga Benepisyaryo (Strength, Capacity &amp; Location Strategy)</span>
+                    </h4>
+                    <p className="text-[11px] text-slate-500 mt-0.5">
+                      Ang mga nakatalaga na sa ibang grupo ay awtomatikong itinago upang maiwasan ang duplicate allocation.
+                    </p>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-900 border border-emerald-300">
+                      Available: <strong>{modalCandidateBeneficiaries.length}</strong> sa {modalBarangayBeneficiaries.length} Tao
+                    </span>
+                    {assignedInOtherGroupsCount > 0 && (
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-200 text-slate-700">
+                        {assignedInOtherGroupsCount} nakatalaga na sa ibang grupo
+                      </span>
+                    )}
+                  </div>
                 </div>
 
                 {/* Strategic Allocation Preset Buttons */}
                 <div className="p-3 bg-white rounded-xl border border-slate-200 space-y-2">
                   <span className="text-[10px] font-black uppercase text-slate-500">
-                    ⚡ Mabilisang Estratehiya sa Paglalaan ng Manggagawa:
+                    ⚡ Mabilisang Estratehiya sa Paglalaan ng Manggagawa (Mula sa {modalCandidateBeneficiaries.length} Available):
                   </span>
                   <div className="flex flex-wrap gap-1.5">
                     <button
@@ -1341,7 +1406,7 @@ export function DeploymentGroupingMatrix({
                       className="px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-900 font-bold rounded-lg border border-blue-200 transition"
                       title="Mabibigat na trabaho gaya ng paghuhukay at de-clogging ng mga kanal"
                     >
-                      💪 Heavy Labor (Lahat ng Lalaki)
+                      💪 Heavy Labor (Available na Lalaki: {availableCandidatesDemographics.maleCount})
                     </button>
                     <button
                       type="button"
@@ -1349,14 +1414,14 @@ export function DeploymentGroupingMatrix({
                       className="px-3 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-900 font-bold rounded-lg border border-amber-200 transition"
                       title="Magagaang gawain gaya ng community gardening, tree planting, o street sweeping"
                     >
-                      🌱 Light Tasks (Senior Citizens &amp; PWDs)
+                      🌱 Light Tasks (Available na Seniors &amp; PWDs: {availableCandidatesDemographics.isSeniorCount + availableCandidatesDemographics.isPwdCount})
                     </button>
                     <button
                       type="button"
                       onClick={handleSelectFemalesOnly}
                       className="px-3 py-1.5 bg-pink-50 hover:bg-pink-100 text-pink-900 font-bold rounded-lg border border-pink-200 transition"
                     >
-                      👩 Maintenance &amp; Sweeping (Kababaihan)
+                      👩 Maintenance &amp; Sweeping (Available na Kababaihan: {availableCandidatesDemographics.femaleCount})
                     </button>
                     <button
                       type="button"
@@ -1370,7 +1435,7 @@ export function DeploymentGroupingMatrix({
                       onClick={handleSelectAllInModal}
                       className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-white font-bold rounded-lg transition"
                     >
-                      Piliin Lahat ({modalBarangayBeneficiaries.length})
+                      Piliin Lahat ng Available ({modalCandidateBeneficiaries.length})
                     </button>
                     {modalSelectedPbIds.length > 0 && (
                       <button
@@ -1378,7 +1443,7 @@ export function DeploymentGroupingMatrix({
                         onClick={handleClearBeneficiarySelection}
                         className="px-3 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold rounded-lg border border-rose-200 transition"
                       >
-                        I-clear ang Napili
+                        I-clear ang Napili ({modalSelectedPbIds.length})
                       </button>
                     )}
                   </div>
