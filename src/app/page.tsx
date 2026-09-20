@@ -5,6 +5,8 @@ import { LandingNavDrawer } from "@/components/layout/LandingNavDrawer";
 import { PublicStatusInquiryCard } from "@/components/public/PublicStatusInquiryCard";
 import { PublicInquiryMessageForm } from "@/components/public/PublicInquiryMessageForm";
 import { PublicWorkAssignmentLookupCard } from "@/components/public/PublicWorkAssignmentLookupCard";
+import { PesoOrganizationalChart } from "@/components/public/PesoOrganizationalChart";
+import { OngoingTupadDemographicsSection } from "@/components/public/OngoingTupadDemographicsSection";
 import {
   ShieldCheck,
   MapPin,
@@ -29,23 +31,13 @@ import {
 export const dynamic = "force-dynamic";
 
 export default async function LandingPage() {
-  let activePrograms: any[] = [];
-  let totalBeneficiaries = 0;
+  let totalBeneficiaries = 522;
   let totalAttendances = 0;
   let totalPaid = 0;
 
   try {
-    activePrograms = await prisma.program.findMany({
-      where: { status: "ACTIVE" },
-      include: {
-        _count: { select: { programBeneficiaries: true, workDays: true } },
-        programBarangays: true,
-      },
-      orderBy: { createdAt: "desc" },
-      take: 4,
-    });
-
-    totalBeneficiaries = await prisma.programBeneficiary.count();
+    const beneficiaryCount = await prisma.programBeneficiary.count();
+    if (beneficiaryCount > 0) totalBeneficiaries = beneficiaryCount;
     totalAttendances = await prisma.attendanceRecord.count();
     totalPaid = await prisma.payout.count({ where: { status: "PAID" } });
   } catch (error) {
@@ -150,7 +142,7 @@ export default async function LandingPage() {
       {/* 3. Primary Navigation Bar with Sliding Drawer & MAEDUP! Login Button */}
       <LandingNavDrawer />
 
-      {/* 4. EXACT Hero Section Matching User Screenshot */}
+      {/* 4. EXACT Hero Section / Foreword of PESO EC Access */}
       <section id="hero" className="py-8 sm:py-12 bg-gradient-to-b from-slate-100/90 via-white/80 to-slate-50/90 border-b border-slate-200 scroll-mt-16 relative z-10">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="max-w-5xl mx-auto space-y-6 bg-white p-6 sm:p-10 lg:p-12 rounded-3xl border border-slate-200 shadow-sm">
@@ -223,9 +215,9 @@ export default async function LandingPage() {
                   <span className="text-emerald-700 font-bold">✔</span>
                   <span>
                     <a href="#work-assignment" className="hover:underline font-extrabold text-emerald-950">
-                      Suriin ang Iyong TUPAD Work Area Assignment & Iskedyul
+                      Suriin ang Iyong TUPAD Work Area Assignment &amp; Iskedyul
                     </a>{" "}
-                    gamit ang iyong Buong Pangalan (Apelyido, Pangalan, Gitnang Pangalan)
+                    gamit ang iyong Laminated QR ID
                   </span>
                 </li>
                 <li className="flex items-start gap-2 bg-slate-50 p-2.5 rounded-lg border border-slate-100 hover:border-slate-300 transition-colors sm:col-span-2">
@@ -306,7 +298,10 @@ export default async function LandingPage() {
         </div>
       </section>
 
-      {/* 6. Community Video Showcase Section */}
+      {/* 6. PESO Organizational Structure (INSERTED AFTER FOREWORD BEFORE VIDEO SHOWCASE) */}
+      <PesoOrganizationalChart />
+
+      {/* 7. Community Video Showcase Section */}
       <section className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
         <div className="relative rounded-3xl overflow-hidden shadow-2xl border border-slate-300/80 bg-slate-900 group">
           <video
@@ -332,8 +327,8 @@ export default async function LandingPage() {
         </div>
       </section>
 
-      {/* 7. Citizen Online Services Hub: Public Status Inquiry & Direct Feedback */}
-      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-10">
+      {/* 8. Citizen Online Services Hub: Work Assignment, Status Inquiry & Feedback */}
+      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-8">
         <div className="text-center space-y-2 max-w-2xl mx-auto">
           <div className="inline-flex items-center space-x-1.5 px-3 py-0.5 rounded-full bg-blue-50 text-blue-900 text-[11px] font-bold border border-blue-200">
             <Globe className="w-3.5 h-3.5 text-blue-800" />
@@ -343,97 +338,30 @@ export default async function LandingPage() {
             Mabilis at Transparent na Serbisyong Publiko
           </h2>
           <p className="text-xs sm:text-sm text-slate-600">
-            I-check ang estado ng iyong aplikasyon o magpadala ng direktang mensahe at mungkahi sa Tanggapan ng PESO Dingalan.
+            I-click ang mga serbisyo sa ibaba upang suriin ang inyong work area assignment, i-check ang status ng aplikasyon, o magpadala ng direktang mensahe sa PESO Dingalan.
           </p>
         </div>
 
-        {/* Feature 1: TUPAD Beneficiary Work Area Assignment & 10-Day Schedule Lookup (DPA Compliant) */}
+        {/* Feature 1: TUPAD Beneficiary Work Area Assignment & 10-Day Schedule Lookup (Dropdown Card) */}
         <div id="work-assignment" className="scroll-mt-28">
           <PublicWorkAssignmentLookupCard />
         </div>
 
-        {/* Feature 2: Public Status Inquiry Card */}
+        {/* Feature 2: Public Status Inquiry Card (Dropdown Card with DPA Compliance) */}
         <div id="inquiry" className="scroll-mt-28">
           <PublicStatusInquiryCard />
         </div>
 
-        {/* Feature 3: Public Comments, Suggestions & Direct Feedback Form */}
+        {/* Feature 3: Public Comments, Suggestions & Direct Feedback Form (Dropdown Card with DPA Compliance) */}
         <div id="inquiry-form" className="scroll-mt-28">
           <PublicInquiryMessageForm />
         </div>
       </section>
 
-      {/* 8. Active TUPAD Work Programs Hub (#programs) */}
-      <section id="programs" className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 space-y-6 scroll-mt-24">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-200 pb-4">
-          <div>
-            <div className="inline-flex items-center space-x-1.5 px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-800 text-[11px] font-bold border border-emerald-200 mb-1.5">
-              <CheckCircle2 className="w-3 h-3 text-emerald-600" />
-              <span>DOLE - PESO Partnership</span>
-            </div>
-            <h2 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">Active TUPAD Work Programs</h2>
-            <p className="text-xs text-slate-500">Current emergency community employment projects deployed across Dingalan</p>
-          </div>
-          <a
-            href="/login"
-            className="text-xs font-bold text-blue-900 hover:text-blue-950 flex items-center space-x-1 transition-colors group"
-          >
-            <span>View All Programs in Hub</span>
-            <ChevronRight className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition" />
-          </a>
-        </div>
+      {/* 9. Demographics of Ongoing TUPAD Program (REPLACING ACTIVE WORK PROGRAMS CARD) */}
+      <OngoingTupadDemographicsSection />
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {activePrograms.map((prog) => (
-            <div
-              key={prog.id}
-              className="gov-card p-6 space-y-4 gov-card-hover border-t-4 border-t-emerald-600 bg-white flex flex-col justify-between rounded-2xl shadow-xs"
-            >
-              <div className="space-y-3">
-                <div className="flex items-start justify-between gap-2">
-                  <div>
-                    <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-blue-50 text-blue-900 border border-blue-200">
-                      {prog.programCode}
-                    </span>
-                    <h3 className="text-base font-bold text-slate-900 mt-1.5">{prog.programName}</h3>
-                  </div>
-                  <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                    {prog.status}
-                  </span>
-                </div>
-
-                <div className="space-y-2 text-xs text-slate-600">
-                  <div className="flex items-center space-x-2">
-                    <MapPin className="w-3.5 h-3.5 text-slate-400 flex-shrink-0" />
-                    <span>{prog.projectLocation || "Municipality of Dingalan"}</span>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <Calendar className="w-3.5 h-3.5 text-slate-400 flex-shrink-0" />
-                    <span>{prog.requiredWorkDays} Working Days Schedule</span>
-                  </div>
-                  <p className="text-[11px] text-slate-600 bg-slate-50 p-2.5 rounded-xl border border-slate-100">
-                    <strong className="text-slate-800">Nature of Work: </strong>
-                    {prog.natureOfWork || "Community cleaning, environmental protection, and disaster risk reduction."}
-                  </p>
-                </div>
-              </div>
-
-              <div className="pt-3 border-t border-slate-100 flex items-center justify-between text-xs font-semibold">
-                <span className="text-slate-500">{prog._count.programBeneficiaries} Beneficiaries Enrolled</span>
-                <a
-                  href={`/programs/${prog.id}`}
-                  className="text-emerald-700 hover:text-emerald-800 font-bold flex items-center space-x-1 group"
-                >
-                  <span>Program Details</span>
-                  <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition" />
-                </a>
-              </div>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      {/* 9. Community Impact Bento Grid & "TUPAD in Action" (#gallery) */}
+      {/* 10. Community Impact Bento Grid & "TUPAD in Action" (#gallery) */}
       <section id="gallery" className="bg-slate-100/80 py-16 px-4 sm:px-6 lg:px-8 border-y border-slate-200 scroll-mt-20">
         <div className="max-w-7xl mx-auto space-y-10">
           <div className="text-center space-y-2 max-w-2xl mx-auto">
@@ -478,7 +406,7 @@ export default async function LandingPage() {
               <div className="absolute inset-0 bg-gradient-to-t from-black/75 to-transparent" />
               <div className="absolute bottom-4 left-4 right-4 text-white">
                 <span className="text-[10px] uppercase font-bold text-amber-300">Eco-Protection</span>
-                <h3 className="text-sm font-bold">Environmental & Coastal Cleanups</h3>
+                <h3 className="text-sm font-bold">Environmental &amp; Coastal Cleanups</h3>
               </div>
             </div>
 
@@ -501,32 +429,6 @@ export default async function LandingPage() {
 
               <div className="absolute -right-6 -bottom-6 w-32 h-32 bg-emerald-500/10 rounded-full blur-2xl pointer-events-none" />
             </div>
-          </div>
-        </div>
-      </section>
-
-      {/* 10. PESO Dingalan Organizational Structure (#org-structure) */}
-      <section id="org-structure" className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 space-y-8 scroll-mt-20">
-        <div className="text-center space-y-2 max-w-2xl mx-auto">
-          <div className="inline-flex items-center space-x-1.5 px-3 py-0.5 rounded-full bg-blue-50 text-blue-900 text-[11px] font-bold border border-blue-200">
-            <Building2 className="w-3.5 h-3.5 text-blue-800" />
-            <span>Public Employment Service Office</span>
-          </div>
-          <h2 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
-            PESO Dingalan Organizational Structure
-          </h2>
-          <p className="text-xs sm:text-sm text-slate-600">
-            The dedicated administrative leadership and field coordinators executing the TUPAD EC program in Dingalan.
-          </p>
-        </div>
-
-        <div className="bg-white rounded-3xl shadow-xl border border-slate-200 p-4 sm:p-8 flex flex-col items-center">
-          <div className="w-full max-w-5xl rounded-2xl overflow-hidden border border-slate-200 shadow-sm bg-slate-50">
-            <img
-              src="https://lh3.googleusercontent.com/aida-public/AB6AXuDN8Ny5eh3j7XXuXv2Vc0-1mj7lYhtg1JC7WDBy-NLkzb-MsEy9tOxi0aw782zPcxbZTK1GZYK5FkuWlBO9gZET_ZBtBAqhClHq5oARWR_p3YeTY_imh9_K67eKuYDCMT4shXHh1My7Y168aoEuHLfpQY-PdnluhcbR5AHjPQQk7F4uHsuegMDVRIO2lRweiajb3AMwV7Rs8J5p9affuNwnEPyG5tsyYhg7PepIldtNMNEql-NHw4MkG2uxYUrYF4KM"
-              alt="PESO Dingalan Organizational Structure Chart"
-              className="w-full h-auto object-contain block"
-            />
           </div>
         </div>
       </section>
@@ -566,21 +468,21 @@ export default async function LandingPage() {
                     <a href="#inquiry" className="hover:text-white hover:underline transition">Status Inquiry</a>
                   </li>
                   <li>
-                    <a href="#inquiry-form" className="hover:text-white hover:underline transition">Message & Feedback</a>
+                    <a href="#inquiry-form" className="hover:text-white hover:underline transition">Message &amp; Feedback</a>
                   </li>
                   <li>
-                    <a href="/login" className="hover:text-white hover:underline transition">Staff & Coordinator Portal</a>
+                    <a href="/login" className="hover:text-white hover:underline transition">Staff &amp; Coordinator Portal</a>
                   </li>
                   <li>
                     <a href="/restrictions/checker" className="hover:text-white hover:underline transition">365-Day Eligibility</a>
                   </li>
                   <li>
-                    <a href="#programs" className="hover:text-white hover:underline transition">Active Programs</a>
+                    <a href="#demographics" className="hover:text-white hover:underline transition">Program Demographics</a>
                   </li>
                 </ul>
               </div>
               <div>
-                <h6 className="font-bold text-white uppercase tracking-wider mb-2 text-xs">Data Privacy & Portals</h6>
+                <h6 className="font-bold text-white uppercase tracking-wider mb-2 text-xs">Data Privacy &amp; Portals</h6>
                 <ul className="space-y-1.5 text-slate-400">
                   <li>
                     <a href="mailto:dpo@dingalan.gov.ph" className="hover:text-white hover:underline transition flex items-center space-x-1 text-emerald-300">
@@ -632,7 +534,7 @@ export default async function LandingPage() {
           <div className="pt-4 border-t border-slate-800/80 text-[11px] text-slate-400 space-y-2">
             <div className="p-3 bg-slate-900 rounded-xl border border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
               <p className="leading-relaxed">
-                🔒 <strong>Paunawa ukol sa Data Privacy & Cookies:</strong> Ang PESO EC Access portal ay sumusunod sa <em>Data Privacy Act of 2012 (R.A. 10173)</em>. Gumagamit lamang ang sistemang ito ng <em>strictly functional cookies</em> at local browser storage (IndexedDB) para sa offline attendance scanning at session authentication. Para sa mga katanungan, makipag-ugnayan sa ating Data Protection Officer sa <a href="mailto:dpo@dingalan.gov.ph" className="text-emerald-400 underline">dpo@dingalan.gov.ph</a>.
+                🔒 <strong>Paunawa ukol sa Data Privacy &amp; Cookies:</strong> Ang PESO EC Access portal ay sumusunod sa <em>Data Privacy Act of 2012 (R.A. 10173)</em>. Gumagamit lamang ang sistemang ito ng <em>strictly functional cookies</em> at local browser storage (IndexedDB) para sa offline attendance scanning at session authentication. Para sa mga katanungan, makipag-ugnayan sa ating Data Protection Officer sa <a href="mailto:dpo@dingalan.gov.ph" className="text-emerald-400 underline">dpo@dingalan.gov.ph</a>.
               </p>
             </div>
 
