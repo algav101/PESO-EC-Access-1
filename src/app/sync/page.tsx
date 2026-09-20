@@ -17,6 +17,7 @@ import {
   Trash2,
   UserCheck,
   RotateCcw,
+  Key,
 } from "lucide-react";
 import { useOffline } from "@/context/OfflineContext";
 import { useAuth } from "@/context/AuthContext";
@@ -36,6 +37,7 @@ export default function SyncCenterPage() {
     isSyncing,
     lastSyncTime,
     syncNow,
+    masterSyncNow,
     refreshOfflineCache,
   } = useOffline();
 
@@ -142,6 +144,30 @@ export default function SyncCenterPage() {
         </div>
 
         <div className="flex flex-wrap items-center gap-2 self-start sm:self-auto">
+          <button
+            onClick={async () => {
+              if (
+                confirm(
+                  `Initiate Master Key Sync?\n\nThis will purge all local IndexedDB tables on this unit and re-align with the authoritative PESO Admin central database (scoped to ${activeScope}).`
+                )
+              ) {
+                setActionInProgress(true);
+                try {
+                  await masterSyncNow();
+                  await fetchOfflineStats();
+                } finally {
+                  setActionInProgress(false);
+                }
+              }
+            }}
+            disabled={!isOnline || isSyncing || actionInProgress}
+            className="px-3.5 py-2 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-slate-950 font-black text-xs rounded-xl shadow-md flex items-center space-x-1.5 transition disabled:opacity-50"
+            title="Authoritative Master Key Sync: Purge local cache and sync with PESO Admin database"
+          >
+            <Key className={`w-3.5 h-3.5 text-slate-950 ${isSyncing ? "animate-spin" : ""}`} />
+            <span>Master Key Sync</span>
+          </button>
+
           <button
             onClick={handleRefreshCache}
             disabled={!isOnline || isSyncing || actionInProgress}

@@ -777,3 +777,172 @@ export async function initializeUserOfflineCache(user?: {
   }
 }
 
+/**
+ * MASTER KEY SYNC:
+ * Forces a clean, authoritative purge and re-sync of all local client caches with the central PESO Admin database.
+ * Scoped according to user's assigned barangay or municipality-wide access.
+ */
+export async function forceMasterSyncWithServer(user?: {
+  id?: string;
+  role?: string;
+  assignedBarangay?: string | null;
+}) {
+  if (typeof window === "undefined") return { success: false, error: "Window is undefined" };
+
+  try {
+    // 1. Push any pending outgoing mutations first
+    await pushSyncQueue();
+
+    // 2. Fetch authoritative programs and workdays
+    const progRes = await fetch("/api/v1/programs");
+    if (!progRes.ok) throw new Error("Could not connect to PESO Admin server to retrieve programs.");
+    const { programs } = await progRes.json();
+    if (!programs || programs.length === 0) throw new Error("No active programs found on PESO Admin server.");
+
+    // 3. Clear local Dexie caches for programs, workdays, beneficiaries, and attendance records
+    await offlineDb.cachedPrograms.clear();
+    await offlineDb.cachedWorkDays.clear();
+    await offlineDb.cachedWorkProgramItems.clear();
+    await offlineDb.cachedBeneficiaries.clear();
+    await offlineDb.offlineAttendanceRecords.clear();
+
+    let totalBeneficiariesCount = 0;
+    let totalAttendanceRecordsCount = 0;
+
+    for (const prog of programs) {
+      // Put Program
+      await offlineDb.cachedPrograms.put({
+        id: prog.id,
+        programCode: prog.programCode,
+        programName: prog.programName,
+        municipality: prog.municipality || "Dingalan",
+        province: prog.province || "Aurora",
+        status: prog.status,
+        requiredWorkDays: prog.requiredWorkDays || 10,
+        morningStart: prog.morningStart,
+        morningEnd: prog.morningEnd,
+        afternoonStart: prog.afternoonStart,
+        afternoonEnd: prog.afternoonEnd,
+        orientationDate: prog.orientationDate,
+        payoutDate: prog.payoutDate,
+      });
+
+      // Put Work Days
+      for (const wd of prog.workDays || []) {
+        await offlineDb.cachedWorkDays.put({
+          id: wd.id,
+          programId: prog.id,
+          dayNumber: wd.dayNumber,
+          workDate: wd.workDate,
+          status: wd.status,
+        });
+      }
+
+      // Put Work Program Items
+      try {
+        const wpRes = await fetch(`/api/v1/programs/${prog.id}/work-program`);
+        if (wpRes.ok) {
+          const wpData = await wpRes.json();
+          for (const wp of wpData.workPrograms || []) {
+            for (const it of wp.items || []) {
+              await offlineDb.cachedWorkProgramItems.put({
+                id: it.id,
+                programId: prog.id,
+                barangay: wp.barangay,
+                dayNumber: it.dayNumber,
+                area: it.area,
+                specificActivities: it.specificActivities,
+                totalCount: it.totalCount || (it.maleCount || 0) + (it.femaleCount || 0),
+                maleCount: it.maleCount,
+                femaleCount: it.femaleCount,
+              });
+            }
+          }
+        }
+      } catch (err) {}
+
+      // Put Authoritative Beneficiaries & Attendance Records
+      let beneUrl = `/api/v1/programs/${prog.id}/beneficiaries`;
+      if ((user?.role === "TUPAD_COORDINATOR" || user?.role === "TUPAD_ASSISTING_DOCUMENTOR") && user.assignedBarangay) {
+        beneUrl += `?barangay=${encodeURIComponent(user.assignedBarangay)}`;
+      }
+
+      const beneRes = await fetch(beneUrl);
+      if (beneRes.ok) {
+        const { beneficiaries } = await beneRes.json();
+        totalBeneficiariesCount += (beneficiaries || []).length;
+
+        for (const pb of beneficiaries || []) {
+          const activeQr = pb.qrCodes?.find((q: any) => q.status === "ACTIVE") || pb.qrCodes?.[0];
+          let birthdayPin = pb.beneficiary?.birthday || "";
+          if (birthdayPin) {
+            const parts = birthdayPin.split("-");
+            if (parts.length === 3 && parts[0].length === 4) {
+              birthdayPin = `${parts[1]}-${parts[2]}-${parts[0]}`;
+            }
+          }
+
+          const hasOrientation = pb.orientationAttendance && pb.orientationAttendance.length > 0;
+
+          await offlineDb.cachedBeneficiaries.put({
+            id: pb.id,
+            programId: prog.id,
+            beneficiaryId: pb.beneficiaryId,
+            designatedNumber: pb.designatedNumber,
+            fullName: pb.beneficiary?.fullName || "",
+            birthday: pb.beneficiary?.birthday || "",
+            birthdayPin,
+            barangay: pb.beneficiary?.barangay || "",
+            sitio: pb.beneficiary?.sitio || "",
+            tableNumber: pb.tableNumber || "",
+            qrToken: activeQr?.publicToken || "",
+            status: pb.participationStatus || "ACTIVE",
+            orientationStatus: hasOrientation ? "PRESENT" : "ABSENT",
+          });
+
+          // Store authoritative server attendance records
+          for (const rec of pb.attendanceRecords || []) {
+            totalAttendanceRecordsCount++;
+            await offlineDb.offlineAttendanceRecords.add({
+              programId: prog.id,
+              workDayId: rec.workDayId,
+              programBeneficiaryId: pb.id,
+              designatedNumber: pb.designatedNumber,
+              attendanceDate: rec.attendanceDate || "",
+              morningTimeIn: rec.morningTimeIn,
+              morningTimeOut: rec.morningTimeOut,
+              afternoonTimeIn: rec.afternoonTimeIn,
+              afternoonTimeOut: rec.afternoonTimeOut,
+              status: rec.status || "PRESENT",
+              scannedAt: rec.morningTimeIn || new Date().toISOString(),
+              isSynced: true,
+            });
+          }
+        }
+      }
+    }
+
+    const scopeStr =
+      (user?.role === "TUPAD_COORDINATOR" || user?.role === "TUPAD_ASSISTING_DOCUMENTOR") && user.assignedBarangay
+        ? `Barangay ${user.assignedBarangay}`
+        : "Municipality-wide (All 11 Barangays)";
+
+    localStorage.setItem("tupad_last_offline_sync", new Date().toISOString());
+    localStorage.setItem("tupad_offline_scope", scopeStr);
+
+    // Broadcast update events to all open tabs and components
+    window.dispatchEvent(new CustomEvent("tupad-offline-synced"));
+    window.dispatchEvent(new CustomEvent("tupad-attendance-updated"));
+
+    return {
+      success: true,
+      beneficiariesCount: totalBeneficiariesCount,
+      attendanceCount: totalAttendanceRecordsCount,
+      scope: scopeStr,
+    };
+  } catch (error: any) {
+    console.error("forceMasterSyncWithServer error:", error);
+    return { success: false, error: error.message };
+  }
+}
+

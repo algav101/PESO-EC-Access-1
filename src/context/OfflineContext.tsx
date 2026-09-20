@@ -6,6 +6,7 @@ import {
   pushSyncQueue,
   getPendingQueueCount,
   initializeUserOfflineCache,
+  forceMasterSyncWithServer,
 } from "@/lib/dexie";
 import { useAuth } from "./AuthContext";
 
@@ -16,6 +17,7 @@ interface OfflineContextType {
   lastSyncTime: string | null;
   syncNotice: string | null;
   syncNow: () => Promise<any>;
+  masterSyncNow: () => Promise<any>;
   cacheProgramData: (programId: string) => Promise<void>;
   refreshOfflineCache: () => Promise<void>;
   dismissNotice: () => void;
@@ -28,6 +30,7 @@ const OfflineContext = createContext<OfflineContextType>({
   lastSyncTime: null,
   syncNotice: null,
   syncNow: async () => {},
+  masterSyncNow: async () => {},
   cacheProgramData: async () => {},
   refreshOfflineCache: async () => {},
   dismissNotice: () => {},
@@ -81,6 +84,27 @@ export function OfflineProvider({ children }: { children: React.ReactNode }) {
 
   const syncNow = async () => {
     return await executeAutoSync();
+  };
+
+  const masterSyncNow = async () => {
+    setIsSyncing(true);
+    try {
+      const res = await forceMasterSyncWithServer(user || undefined);
+      await refreshPending();
+      const now = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+      setLastSyncTime(now);
+
+      if (res.success) {
+        setSyncNotice(`✓ Master Key Sync Complete: ${res.beneficiariesCount} beneficiaries & ${res.attendanceCount} attendance logs aligned with PESO Admin database (${res.scope}).`);
+        setTimeout(() => setSyncNotice(null), 8000);
+      } else {
+        setSyncNotice(`Master Sync Notice: ${res.error || "Could not complete sync."}`);
+        setTimeout(() => setSyncNotice(null), 6000);
+      }
+      return res;
+    } finally {
+      setIsSyncing(false);
+    }
   };
 
   const refreshOfflineCache = async () => {
@@ -183,6 +207,7 @@ export function OfflineProvider({ children }: { children: React.ReactNode }) {
         lastSyncTime,
         syncNotice,
         syncNow,
+        masterSyncNow,
         cacheProgramData,
         refreshOfflineCache,
         dismissNotice,

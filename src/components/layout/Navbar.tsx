@@ -14,6 +14,7 @@ import {
   User as UserIcon,
   Menu,
   FileSpreadsheet,
+  Key,
 } from "lucide-react";
 
 interface NavbarProps {
@@ -22,7 +23,7 @@ interface NavbarProps {
 
 export function Navbar({ onToggleSidebar }: NavbarProps) {
   const { user, logout } = useAuth();
-  const { isOnline, pendingCount, isSyncing, syncNow } = useOffline();
+  const { isOnline, pendingCount, isSyncing, syncNow, masterSyncNow } = useOffline();
 
   return (
     <header className="gov-header-gradient text-white sticky top-0 z-40 shadow-md">
@@ -56,7 +57,7 @@ export function Navbar({ onToggleSidebar }: NavbarProps) {
           {/* Right actions */}
           <div className="flex items-center space-x-2 sm:space-x-4">
             {/* Sync & Offline Status Indicator */}
-            <div className="flex items-center space-x-2">
+            <div className="flex items-center space-x-1.5 sm:space-x-2">
               <a
                 href="/sync"
                 className={`flex items-center space-x-1.5 px-2.5 py-1 rounded-full text-xs font-semibold border transition ${
@@ -74,6 +75,27 @@ export function Navbar({ onToggleSidebar }: NavbarProps) {
                   </span>
                 )}
               </a>
+
+              {user && (
+                <button
+                  onClick={async () => {
+                    if (
+                      confirm(
+                        "Execute Master Key Sync?\n\nThis will purge local device cache and re-align all attendance and beneficiary records with the PESO Admin central database."
+                      )
+                    ) {
+                      await masterSyncNow();
+                      window.location.reload();
+                    }
+                  }}
+                  disabled={!isOnline || isSyncing}
+                  className="px-2 py-1 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-400/40 text-[11px] font-bold transition flex items-center space-x-1 disabled:opacity-40"
+                  title="Master Key Sync: Align local device with PESO Admin database"
+                >
+                  <Key className={`w-3.5 h-3.5 ${isSyncing ? "animate-spin" : ""}`} />
+                  <span className="hidden lg:inline">Master Sync</span>
+                </button>
+              )}
 
               {pendingCount > 0 && isOnline && (
                 <button

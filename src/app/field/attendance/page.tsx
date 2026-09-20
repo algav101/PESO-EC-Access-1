@@ -14,6 +14,8 @@ import {
   ArrowRight,
   FileSpreadsheet,
   MapPin,
+  RotateCcw,
+  Key,
 } from "lucide-react";
 import { QrScannerModal } from "@/components/scanner/QrScannerModal";
 import { FieldQrPassGeneratorModal } from "@/components/field/FieldQrPassGeneratorCard";
@@ -22,7 +24,7 @@ import { offlineDb, queueOfflineTransaction, recordOfflineAttendance } from "@/l
 import { format } from "date-fns";
 
 export default function DailyAttendancePage() {
-  const { isOnline } = useOffline();
+  const { isOnline, masterSyncNow, isSyncing } = useOffline();
 
   const [programs, setPrograms] = useState<any[]>([]);
   const [selectedProgramId, setSelectedProgramId] = useState<string>("");
@@ -228,8 +230,31 @@ export default function DailyAttendancePage() {
           Record Morning &amp; Afternoon time in/out across 10 TUPAD work days
         </p>
 
-        {/* Quick QR Generator Trigger Button */}
-        <div className="flex items-center justify-center gap-2 pt-1">
+        {/* Quick QR Generator & Master Key Sync Buttons */}
+        <div className="flex flex-wrap items-center justify-center gap-2 pt-1">
+          <button
+            type="button"
+            onClick={async () => {
+              if (
+                confirm(
+                  "Execute Master Key Sync?\n\nThis will purge local offline device cache and re-download fresh data from the PESO Admin central database (scoped to your assigned barangay)."
+                )
+              ) {
+                await masterSyncNow();
+                await fetchPrograms();
+                if (selectedProgramId) {
+                  await fetchWorkPrograms(selectedProgramId);
+                }
+              }
+            }}
+            disabled={isSyncing}
+            className="px-3.5 py-1.5 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-slate-950 font-black rounded-xl text-xs transition flex items-center space-x-1.5 shadow-xs disabled:opacity-50"
+            title="Purge local cache and sync authoritative data with PESO Admin database"
+          >
+            <Key className={`w-3.5 h-3.5 text-slate-950 ${isSyncing ? "animate-spin" : ""}`} />
+            <span>Master Key Sync</span>
+          </button>
+
           <button
             type="button"
             onClick={() => setQrGeneratorOpen(true)}
@@ -237,7 +262,7 @@ export default function DailyAttendancePage() {
             title="Generate and screenshot official QR code of any beneficiary"
           >
             <QrCode className="w-3.5 h-3.5 text-amber-700" />
-            <span>Generate / Screenshot Beneficiary QR</span>
+            <span>Generate QR Pass</span>
           </button>
         </div>
       </div>

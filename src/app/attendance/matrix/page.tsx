@@ -12,6 +12,8 @@ import {
   Printer,
   ShieldAlert,
   RefreshCw,
+  RotateCcw,
+  Key,
   Wifi,
   WifiOff,
 } from "lucide-react";
@@ -27,7 +29,7 @@ function AttendanceMatrixContent() {
   const searchParams = useSearchParams();
   const urlProgramId = searchParams.get("programId");
   const { user } = useAuth();
-  const { isOnline } = useOffline();
+  const { isOnline, masterSyncNow, isSyncing } = useOffline();
   const isAdmin = isAdminUser(user);
 
   const [programs, setPrograms] = useState<any[]>([]);
@@ -303,7 +305,29 @@ function AttendanceMatrixContent() {
           </p>
         </div>
 
-        <div className="flex items-center space-x-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={async () => {
+              if (
+                confirm(
+                  "Execute Master Key Sync?\n\nThis will purge local device cache and re-align all attendance and beneficiary records with the PESO Admin central database (scoped to your access permissions)."
+                )
+              ) {
+                await masterSyncNow();
+                if (selectedProgramId) {
+                  await fetchProgramAndMatrix(selectedProgramId, true);
+                }
+              }
+            }}
+            disabled={isSyncing}
+            className="px-3.5 py-2 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-slate-950 font-black text-xs rounded-xl shadow-md flex items-center space-x-1.5 transition disabled:opacity-50"
+            title="Purge local device cache & synchronize authoritative records with PESO Admin database"
+          >
+            <Key className={`w-3.5 h-3.5 text-slate-950 ${isSyncing ? "animate-spin" : ""}`} />
+            <span>Master Key Sync</span>
+          </button>
+
           <button
             type="button"
             onClick={() => {

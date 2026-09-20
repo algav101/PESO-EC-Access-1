@@ -19,6 +19,7 @@ import {
   Layers,
 } from "lucide-react";
 import { formatTime } from "@/lib/utils";
+import { offlineDb } from "@/lib/dexie";
 
 interface AdminStubOverrideModalProps {
   isOpen: boolean;
@@ -195,7 +196,19 @@ export function AdminStubOverrideModal({
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed to reset day attendance");
 
-      setSuccessMsg(data.message);
+      // Clean local client Dexie database if available
+      if (typeof window !== "undefined") {
+        try {
+          await offlineDb.offlineAttendanceRecords
+            .where("programBeneficiaryId")
+            .equals(pb.id)
+            .and((r) => r.dayNumber === selectedDayNumber)
+            .delete();
+          window.dispatchEvent(new CustomEvent("tupad-attendance-updated"));
+        } catch (e) {
+          console.warn("Could not clear local offline scan record:", e);
+        }
+      }
 
       // Update local state
       const updatedAttendance = (pb.attendanceRecords || []).filter((r: any) => {
@@ -240,6 +253,19 @@ export function AdminStubOverrideModal({
 
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed to reset attendance");
+
+      // Clean local client Dexie database if available
+      if (typeof window !== "undefined") {
+        try {
+          await offlineDb.offlineAttendanceRecords
+            .where("programBeneficiaryId")
+            .equals(pb.id)
+            .delete();
+          window.dispatchEvent(new CustomEvent("tupad-attendance-updated"));
+        } catch (e) {
+          console.warn("Could not clear local offline scan records:", e);
+        }
+      }
 
       setSuccessMsg(data.message);
       const updatedPb = { ...pb, attendanceRecords: [] };
