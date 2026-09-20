@@ -1,6 +1,6 @@
 /**
  * Dingalan Official Purok and Sitio Groupings for TUPAD Work Program Deployment
- * Reference: Official Dingalan Municipal Deployment Grouping Matrix
+ * Reference: Clean, Canonical Uploaded Purok/Sitio Data from Final Beneficiaries Masterlist
  */
 
 export interface PurokSitioGroupDefinition {
@@ -24,7 +24,7 @@ export const DINGALAN_BARANGAY_GROUPINGS: Record<string, BarangayGroupingConfig>
         groupName: "APLAYA GROUP 1",
         groupLabel: "Aplaya Group 1",
         designatedMainArea: "Purok Lapu-Lapu, Maya-Maya & Tanigue",
-        purokSitios: ["PUROK LAPU LAPU", "PUROK MAYA-MAYA", "PUROK TANIGUE", "LAPU LAPU", "LAPU-LAPU", "MAYA MAYA", "MAYA-MAYA", "TANIGUE", "TANGIGUE", "TANGGUE", "PUROK 1"],
+        purokSitios: ["Lapu-Lapu", "Maya-Maya", "Tanigue"],
       },
     ],
   },
@@ -35,7 +35,7 @@ export const DINGALAN_BARANGAY_GROUPINGS: Record<string, BarangayGroupingConfig>
         groupName: "BNB GROUP 1",
         groupLabel: "BNB Group 1",
         designatedMainArea: "Purok 1, 2, 3 & 4 (All Puroks)",
-        purokSitios: ["PUROK 1", "PUROK 2", "PUROK 3", "PUROK 4", "1", "2", "3", "4"],
+        purokSitios: ["Purok 1", "Purok 2", "Purok 3", "Purok 4"],
       },
     ],
   },
@@ -45,11 +45,8 @@ export const DINGALAN_BARANGAY_GROUPINGS: Record<string, BarangayGroupingConfig>
       {
         groupName: "DAVILDAVILAN GROUP 1",
         groupLabel: "Davildavilan Group 1",
-        designatedMainArea: "Purok 1 to 6 & Angara / Ilang-Ilang St.",
-        purokSitios: [
-          "PUROK 1", "PUROK 2", "PUROK 3", "PUROK 4", "PUROK 5", "PUROK 6",
-          "1", "2", "3", "4", "5", "6", "ANGARA ST.", "ANGARA STREET", "ILANG-ILANG STREET", "ILANG ILANG"
-        ],
+        designatedMainArea: "Purok 1, 2, 3, 5 & 6",
+        purokSitios: ["Purok 1", "Purok 2", "Purok 3", "Purok 5", "Purok 6"],
       },
     ],
   },
@@ -60,21 +57,26 @@ export const DINGALAN_BARANGAY_GROUPINGS: Record<string, BarangayGroupingConfig>
         groupName: "CARAGSACAN GROUP 1",
         groupLabel: "Caragsacan Group 1",
         designatedMainArea: "Purok 1 (Phase 1 & Phase 2)",
-        purokSitios: ["PUROK 1 PHASE 1", "PUROK 1 PHASE 2", "PUROK 1", "PHASE 1", "PHASE 2", "UNO"],
+        purokSitios: ["Purok 1", "Purok 1 Phase 1", "Purok 1 Phase 2"],
       },
       {
         groupName: "CARAGSACAN GROUP 2",
         groupLabel: "Caragsacan Group 2",
         designatedMainArea: "Purok 2, 3 & 4",
-        purokSitios: ["PUROK 2", "PUROK 3", "PUROK 4", "2", "3", "4"],
+        purokSitios: ["Purok 2", "Purok 3", "Purok 4"],
       },
       {
         groupName: "CARAGSACAN GROUP 3",
         groupLabel: "Caragsacan Group 3",
-        designatedMainArea: "Purok 5 (Kailyo, EVNAI, Horseshoe, GK & ADRA)",
+        designatedMainArea: "Purok 5 (Kailyo, EVNAI, Horseshoe, GK & ADRA) & Purok 6",
         purokSitios: [
-          "PUROK 5 KAILYO", "PUROK 5 EVNAI", "PUROK 5 HORSEO", "PUROK 5 HORSHOE", "PUROK 5 HORSESHOE",
-          "PUROK 5 GK", "PUROK 5 GAWAD KALINGA", "PUROK 5 KALINGA", "PUROK 5 ADRA", "PUROK 5", "KAILYO", "EVNAI", "ADRA", "GAWAD KALINGA"
+          "Purok 5",
+          "Purok 5 ADRA",
+          "Purok 5 EVNAI",
+          "Purok 5 Gawad Kalinga",
+          "Purok 5 Horseshoe",
+          "Purok 5 Kailyo",
+          "Purok 6",
         ],
       },
     ],
@@ -85,19 +87,14 @@ export const DINGALAN_BARANGAY_GROUPINGS: Record<string, BarangayGroupingConfig>
       {
         groupName: "IBONA GROUP 1",
         groupLabel: "Ibona Group 1",
-        designatedMainArea: "Purok 1, 2A, 2B, 3A, 3B, 3C & Purok 7 Setic",
-        purokSitios: [
-          "PUROK 1", "PUROK 2", "PUROK 2A", "PUROK 2B", "PUROK 3", "PUROK 3A", "PUROK 3B", "PUROK 3C",
-          "PUROK 7 SETIC", "PUROK 7", "SETIC", "CAMILING"
-        ],
+        designatedMainArea: "Purok 1, 2, 3, 7 & Camiling",
+        purokSitios: ["Camiling", "Purok 1", "Purok 2", "Purok 3", "Purok 7"],
       },
       {
         groupName: "IBONA GROUP 2",
         groupLabel: "Ibona Group 2",
-        designatedMainArea: "Purok 4, 5, 6 (Aves & Abungan) & Labuyo",
-        purokSitios: [
-          "PUROK 4", "PUROK 5", "PUROK 6 AVES", "PUROK 6 ABUNGAN", "PUROK 6", "AVES", "ABUNGAN", "LABUYO"
-        ],
+        designatedMainArea: "Purok 4, 5, 6 & Abungan",
+        purokSitios: ["Abungan", "Purok 4", "Purok 5", "Purok 6"],
       },
     ],
   },
@@ -107,16 +104,14 @@ export const DINGALAN_BARANGAY_GROUPINGS: Record<string, BarangayGroupingConfig>
       {
         groupName: "MATAWE GROUP 1",
         groupLabel: "Matawe Group 1",
-        designatedMainArea: "Purok 1, 2, 3, 4 & 5",
-        purokSitios: ["PUROK 1", "PUROK 2", "PUROK 3", "PUROK 4", "PUROK 5", "1", "2", "3", "4", "5"],
+        designatedMainArea: "Purok 2, 3, 4 & 5",
+        purokSitios: ["Purok 2", "Purok 3", "Purok 4", "Purok 5"],
       },
       {
         groupName: "MATAWE GROUP 2",
         groupLabel: "Matawe Group 2",
-        designatedMainArea: "Purok 6A, 6B, Bughaw & Purok 7",
-        purokSitios: [
-          "PUROK 6", "PUROK 6A", "PUROK 6B", "BUGHAW", "PUROK 7", "6A", "6B", "7"
-        ],
+        designatedMainArea: "Purok 6, 6B & 7",
+        purokSitios: ["Purok 6", "Purok 6B", "Purok 7"],
       },
     ],
   },
@@ -126,8 +121,8 @@ export const DINGALAN_BARANGAY_GROUPINGS: Record<string, BarangayGroupingConfig>
       {
         groupName: "TANAWAN GROUP 1",
         groupLabel: "Tanawan Group 1",
-        designatedMainArea: "Purok 1, 2, 3 & Barangay Site",
-        purokSitios: ["PUROK 1", "PUROK 2", "PUROK 3", "BRGY SITE", "BARANGAY SITE", "1", "2", "3"],
+        designatedMainArea: "Purok 1, 2 & 3",
+        purokSitios: ["Purok 1", "Purok 2", "Purok 3"],
       },
     ],
   },
@@ -137,8 +132,8 @@ export const DINGALAN_BARANGAY_GROUPINGS: Record<string, BarangayGroupingConfig>
       {
         groupName: "POBLACION GROUP 1",
         groupLabel: "Poblacion Group 1",
-        designatedMainArea: "Purok 1, 2, 3, 4 & 5 (Market Site)",
-        purokSitios: ["PUROK 1", "PUROK 2", "PUROK 3", "PUROK 4", "PUROK 5", "MARKET SITE", "1", "2", "3", "4", "5"],
+        designatedMainArea: "Market Site, Purok 1, 2, 3, 4 & 5",
+        purokSitios: ["Market Site", "Purok 1", "Purok 2", "Purok 3", "Purok 4", "Purok 5"],
       },
     ],
   },
@@ -148,30 +143,20 @@ export const DINGALAN_BARANGAY_GROUPINGS: Record<string, BarangayGroupingConfig>
       {
         groupName: "PALTIC GROUP 1",
         groupLabel: "Paltic Group 1",
-        designatedMainArea: "Purok Mahogany, Narra & Kamagong",
-        purokSitios: [
-          "PUROK MAHOGANY", "MAHOGANY", "PUROK MAHAGONY", "MAHAGONY",
-          "PUROK NARRA", "NARRA",
-          "PUROK KAMAGONG", "KAMAGONG"
-        ],
+        designatedMainArea: "Purok Kamagong, Mahogany & Narra",
+        purokSitios: ["Kamagong", "Mahogany", "Narra"],
       },
       {
         groupName: "PALTIC GROUP 2",
         groupLabel: "Paltic Group 2",
         designatedMainArea: "Purok Almaciga, Yakal 1 & Yakal 2",
-        purokSitios: [
-          "PUROK ALMACIGA", "ALMACIGA", "PUROK ALMASIGA", "ALMASIGA",
-          "PUROK YAKAL 1", "YAKAL 1", "PUROK YAKAL 2", "YAKAL 2", "YAKAL2", "YAKAL"
-        ],
+        purokSitios: ["Almaciga", "Yakal 1", "Yakal 2"],
       },
       {
         groupName: "PALTIC GROUP 3",
         groupLabel: "Paltic Group 3",
         designatedMainArea: "Purok Ipil-Ipil & Mulawin",
-        purokSitios: [
-          "PUROK IPIL-IPIL", "IPIL-IPIL", "PUROK IPIL IPIL", "IPIL IPIL", "IPIP IPIL",
-          "PUROK MULAWIN", "MULAWIN"
-        ],
+        purokSitios: ["Ipil-Ipil", "Mulawin"],
       },
     ],
   },
@@ -182,45 +167,25 @@ export const DINGALAN_BARANGAY_GROUPINGS: Record<string, BarangayGroupingConfig>
         groupName: "UMIRAY GROUP 1",
         groupLabel: "Umiray Group 1",
         designatedMainArea: "Sitio Singawan (Covering Singawan, Pinamaypayan & Dugyan)",
-        purokSitios: [
-          "SITIO SINGAWAN", "SINGAWAN", "SO SINGAWAN",
-          "SITIO PINAMAYPAYAN", "PINAMAYPAYAN", "SO PINAMAYPAYAN",
-          "SITIO DUGYAN", "DUGYAN", "SO DUGYAN"
-        ],
+        purokSitios: ["Dugyan", "Pinamaypayan", "Singawan"],
       },
       {
         groupName: "UMIRAY GROUP 2",
         groupLabel: "Umiray Group 2",
-        designatedMainArea: "Sitio Sabang & Malakawayan (Covering Sumalag, Sabang, Malakawayan, Limbok & School Site)",
-        purokSitios: [
-          "SITIO SUMALAG", "SUMALAG", "SO SUMALAG",
-          "SITIO SABANG", "SABANG", "SO SABANG",
-          "SITIO MALAKAWAYAN", "MALAKAWAYAN", "MALACAUAYAN", "MALACAUYAN", "SO MALACAUAYAN",
-          "SITIO LIMBOK", "LIMBOK", "SO LIMBOK",
-          "SITIO SCHOOL SITE", "SCHOOL SITE"
-        ],
+        designatedMainArea: "Sitio Sabang & Malakawayan (Covering Sabang, Malacauayan & Limbok)",
+        purokSitios: ["Limbok", "Malacauayan", "Sabang"],
       },
       {
         groupName: "UMIRAY GROUP 3",
         groupLabel: "Umiray Group 3",
         designatedMainArea: "Sitio Malamig & Iyapit (Covering Malamig, Iyapit, Bakahan & Tabi)",
-        purokSitios: [
-          "SITIO MALAMIG", "MALAMIG", "SO MALAMIG",
-          "SITIO IYAPIT", "IYAPIT", "SO IYAPIT",
-          "SITIO BAKAHAN", "BAKAHAN", "SO BAKAHAN",
-          "SITIO TABI", "TABI", "SO TABI"
-        ],
+        purokSitios: ["Bakahan", "Iyapit", "Malamig", "Tabi"],
       },
       {
         groupName: "UMIRAY GROUP 4",
         groupLabel: "Umiray Group 4",
-        designatedMainArea: "Sitio Bacong & Market Site (Covering Ferry, Bacong Hi-Way, Bacong Looban, Market Site & Kamandag)",
-        purokSitios: [
-          "SITIO FERRY", "FERRY", "SO FERRY",
-          "SITIO BACONG HI-WAY", "SITIO BACONG LOOBAN", "SITIO BACONG", "BACONG", "SO BACONG", "SO.BACONG", "SO BACOONG", "BACONG UMIRAY",
-          "SITIO MARKET SITE", "MARKET SITE", "SO MARKET SITE", "PALENGKE UMIRAY",
-          "SITIO KAMANDAG", "KAMANDAG", "SO KAMANDAG", "PUROK 6", "PUROK 2"
-        ],
+        designatedMainArea: "Sitio Bacong & Market Site (Covering Ferry, Bacong, Market Site & Kamandag)",
+        purokSitios: ["Bacong", "Ferry", "Kamandag", "Market Site"],
       },
     ],
   },
@@ -231,11 +196,7 @@ export const DINGALAN_BARANGAY_GROUPINGS: Record<string, BarangayGroupingConfig>
         groupName: "DIKAPANIKIAN GROUP 1",
         groupLabel: "Dikapanikian Group 1",
         designatedMainArea: "Sentro, Saint Paul 1 & 2, Pundongan, Sagingan & Core Housing",
-        purokSitios: [
-          "PUROK 1 PHASE 1", "PUROK 1PHASE 1", "PUROK 1", "PUROK 2",
-          "SENTRO", "CENTRO", "SAINT PAUL 1", "SAINT PAUL 2",
-          "PUROK PUNDONGAN", "PUROK SAGINGAN", "SAGINGAN", "CORE HOUSING"
-        ],
+        purokSitios: ["Core Housing", "Pundongan", "Sagingan", "Saint Paul 1", "Saint Paul 2", "Sentro"],
       },
     ],
   },
@@ -271,8 +232,21 @@ export function getStandardBarangayName(rawBarangay: string): string {
 }
 
 /**
+ * Normalizes Purok/Sitio strings for reliable matching against uploaded names
+ */
+export function normalizeSitioString(str: string): string {
+  return (str || "")
+    .trim()
+    .toLowerCase()
+    .replace(/^purok\s*/i, "")
+    .replace(/^sitio\s*/i, "")
+    .replace(/^so\s*/i, "")
+    .replace(/[^a-z0-9]/g, "");
+}
+
+/**
  * Match a beneficiary's Sitio / Purok / Address to their official Barangay Group
- * Uses fuzzy matching and aliases for nearest spellings
+ * Uses normalized clean matching against uploaded names
  */
 export function classifyBeneficiaryGroup(
   rawBarangay: string,
@@ -302,16 +276,12 @@ export function classifyBeneficiaryGroup(
     };
   }
 
-  const cleanAddr = rawSitioOrAddress
-    .trim()
-    .toUpperCase()
-    .replace(/[^A-Z0-9 ]/g, " ")
-    .replace(/\s+/g, " ");
+  const cleanAddr = normalizeSitioString(rawSitioOrAddress);
 
-  // 1. Direct and Substring matching across defined groups
+  // 1. Direct and normalized matching across defined groups
   for (const group of config.groups) {
     for (const ps of group.purokSitios) {
-      const cleanPs = ps.toUpperCase();
+      const cleanPs = normalizeSitioString(ps);
       if (
         cleanAddr === cleanPs ||
         cleanAddr.includes(cleanPs) ||
@@ -327,26 +297,7 @@ export function classifyBeneficiaryGroup(
     }
   }
 
-  // 2. Token-based word match (handles "SO DUGYAN" vs "DUGYAN", "PUROK ALMACIGA" vs "ALMACIGA")
-  const addrWords = cleanAddr.split(" ").filter((w) => w.length > 2 && w !== "PUROK" && w !== "SITIO");
-  if (addrWords.length > 0) {
-    for (const group of config.groups) {
-      for (const ps of group.purokSitios) {
-        const psWords = ps.toUpperCase().split(" ").filter((w) => w.length > 2 && w !== "PUROK" && w !== "SITIO");
-        const hasOverlap = addrWords.some((aw) => psWords.includes(aw));
-        if (hasOverlap) {
-          return {
-            groupName: group.groupName,
-            groupLabel: group.groupLabel,
-            designatedMainArea: group.designatedMainArea,
-            matchedPurokSitio: ps,
-          };
-        }
-      }
-    }
-  }
-
-  // 3. Fallback to Group 1
+  // 2. Fallback to Group 1
   return {
     groupName: defaultGroup.groupName,
     groupLabel: defaultGroup.groupLabel,

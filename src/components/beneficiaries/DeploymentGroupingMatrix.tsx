@@ -117,7 +117,25 @@ export function DeploymentGroupingMatrix({
     try {
       const savedGroups = localStorage.getItem("tupad_custom_deployment_groupings");
       if (savedGroups) {
-        setCustomGroups(JSON.parse(savedGroups));
+        const parsed = JSON.parse(savedGroups);
+        // Sanitize legacy custom groups to remove old search token dumps or "Group 1"
+        const sanitized: Record<string, PurokSitioGroupDefinition[]> = {};
+        Object.entries(parsed).forEach(([brgy, groups]) => {
+          if (Array.isArray(groups)) {
+            sanitized[brgy] = groups.map((g: any) => ({
+              ...g,
+              purokSitios: (g.purokSitios || []).filter(
+                (p: string) =>
+                  p &&
+                  !p.toLowerCase().startsWith("group") &&
+                  !p.toLowerCase().startsWith("grupo") &&
+                  !p.includes(",") &&
+                  p.length < 35
+              ),
+            }));
+          }
+        });
+        setCustomGroups(sanitized);
       }
       const savedAssignments = localStorage.getItem("tupad_beneficiary_group_assignments");
       if (savedAssignments) {
@@ -340,25 +358,29 @@ export function DeploymentGroupingMatrix({
     return barangayMap;
   }, [beneficiaries, customGroups, beneficiaryGroupAssignments]);
 
-  // Available puroks in a given barangay based on masterlist data
+  // Available puroks in a given barangay strictly based on uploaded masterlist beneficiaries data
   const getPuroksInBarangay = (brgyName: string) => {
     const stdBrgy = getStandardBarangayName(brgyName);
     const purokSet = new Set<string>();
     beneficiaries.forEach((pb) => {
       const b = pb.beneficiary || pb;
-      if (getStandardBarangayName(b.barangay || "") === stdBrgy && b.sitio) {
+      if (getStandardBarangayName(b.barangay || "") === stdBrgy && b.sitio && b.sitio.trim()) {
         purokSet.add(b.sitio.trim());
       }
     });
 
-    // Also include default puroks from configuration
-    const bKey = getBarangayKey(brgyName);
-    const defaultCfg = DINGALAN_BARANGAY_GROUPINGS[bKey]?.groups || [];
-    defaultCfg.forEach((g) => {
-      g.purokSitios.forEach((p) => purokSet.add(p));
-    });
+    // Fallback to canonical configuration list only if no beneficiaries are uploaded yet for this barangay
+    if (purokSet.size === 0) {
+      const bKey = getBarangayKey(brgyName);
+      const defaultCfg = DINGALAN_BARANGAY_GROUPINGS[bKey]?.groups || [];
+      defaultCfg.forEach((g) => {
+        g.purokSitios.forEach((p) => {
+          if (p && p.trim()) purokSet.add(p.trim());
+        });
+      });
+    }
 
-    return Array.from(purokSet).sort();
+    return Array.from(purokSet).sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
   };
 
   // Beneficiaries in modal's selected barangay
@@ -504,7 +526,31 @@ export function DeploymentGroupingMatrix({
     setModalBarangay(stdBrgy);
     setModalGroupName(group.groupName);
     setModalGroupLabel(group.groupLabel);
-    setModalActivityPuroks(group.coveredPuroks || []);
+
+    // Initial activity puroks strictly from assigned beneficiaries' actual uploaded sitios or clean covered puroks
+    const memberPuroks = Array.from(
+      new Set(
+        group.beneficiaries
+          .map((pb: any) => {
+            const b = pb.beneficiary || pb;
+            return (b.sitio || "").trim();
+          })
+          .filter(Boolean)
+      )
+    );
+    const initialActivityPuroks =
+      memberPuroks.length > 0
+        ? memberPuroks
+        : (group.coveredPuroks || []).filter(
+            (p: string) =>
+              p &&
+              !p.toLowerCase().startsWith("group") &&
+              !p.toLowerCase().startsWith("grupo") &&
+              !p.includes(",") &&
+              p.length < 35
+          );
+
+    setModalActivityPuroks(initialActivityPuroks as string[]);
     setModalCustomPurokInput("");
     setModalDesignatedArea(group.designatedMainArea || "");
     setModalSpecificActivity(
@@ -608,14 +654,32 @@ export function DeploymentGroupingMatrix({
     setGroupModalFeedback(null);
 
     try {
-      // 1. Compile Purok list
+      // 1. Compile Purok list strictly from selected puroks or selected beneficiaries' uploaded sitios
       let combinedPuroks = [...modalActivityPuroks];
       if (modalCustomPurokInput.trim()) {
         const extra = modalCustomPurokInput.split(/[,;\n]/).map((p) => p.trim()).filter(Boolean);
         combinedPuroks = Array.from(new Set([...combinedPuroks, ...extra]));
       }
       if (combinedPuroks.length === 0) {
-        combinedPuroks = [modalGroupLabel.trim() || modalGroupName.trim()];
+        // Derive from the selected beneficiaries' actual uploaded sitios
+        const selectedObjects = modalBarangayBeneficiaries.filter((pb) =>
+          modalSelectedPbIds.includes(pb.id) || modalSelectedPbIds.includes(pb.beneficiary?.id)
+        );
+        const derivedFromBene = Array.from(
+          new Set(
+            selectedObjects
+              .map((pb) => {
+                const b = pb.beneficiary || pb;
+                return (b.sitio || "").trim();
+              })
+              .filter(Boolean)
+          )
+        );
+        if (derivedFromBene.length > 0) {
+          combinedPuroks = derivedFromBene;
+        } else {
+          combinedPuroks = getPuroksInBarangay(stdBrgy);
+        }
       }
 
       // 2. Save Custom Group Definition
@@ -1012,14 +1076,50 @@ export function DeploymentGroupingMatrix({
                           </div>
                         )}
 
-                        <p className="text-xs text-slate-600 font-medium">
-                          <span className="font-bold text-slate-800">Sakop na Puroks &amp; Sitios:</span>{" "}
-                          {g.coveredPuroks.length > 0 ? (
-                            <span>{g.coveredPuroks.join(", ")}</span>
-                          ) : (
-                            <span className="italic text-slate-400">Direktang Itinalagang mga Benepisyaryo</span>
-                          )}
-                        </p>
+                        {/* Compute clean actual uploaded Puroks & Sitios */}
+                        {(() => {
+                          const groupActualPuroks = Array.from(
+                            new Set(
+                              g.beneficiaries
+                                .map((pb: any) => {
+                                  const b = pb.beneficiary || pb;
+                                  return (b.sitio || "").trim();
+                                })
+                                .filter(Boolean)
+                            )
+                          ).sort((a: string, b: string) => a.localeCompare(b, undefined, { numeric: true }));
+
+                          let displayPuroks: string[] = [];
+                          if (groupActualPuroks.length > 0) {
+                            displayPuroks = groupActualPuroks;
+                          } else if (!g.isCustom) {
+                            const bKey = getBarangayKey(brgy.barangay);
+                            const defG = DINGALAN_BARANGAY_GROUPINGS[bKey]?.groups.find(
+                              (dg) => dg.groupName === g.groupName
+                            );
+                            displayPuroks = defG ? defG.purokSitios : g.coveredPuroks;
+                          } else {
+                            displayPuroks = (g.coveredPuroks || []).filter(
+                              (p: string) =>
+                                p &&
+                                !p.toLowerCase().startsWith("group") &&
+                                !p.toLowerCase().startsWith("grupo") &&
+                                !p.includes(",") &&
+                                p.length < 35
+                            );
+                          }
+
+                          return (
+                            <p className="text-xs text-slate-600 font-medium">
+                              <span className="font-bold text-slate-800">Sakop na Puroks &amp; Sitios:</span>{" "}
+                              {displayPuroks.length > 0 ? (
+                                <span>{displayPuroks.join(", ")}</span>
+                              ) : (
+                                <span className="italic text-slate-400">Direktang Itinalagang mga Benepisyaryo</span>
+                              )}
+                            </p>
+                          );
+                        })()}
                       </div>
 
                       {/* Middle: Demographic Badge Counters */}
