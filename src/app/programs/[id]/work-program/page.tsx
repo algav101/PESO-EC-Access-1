@@ -62,8 +62,9 @@ export default function WorkProgramManagementPage() {
   const [beneficiaries, setBeneficiaries] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Custom Groups from Local Storage
+  // Custom Groups & Beneficiary Assignments from Local Storage
   const [customGroups, setCustomGroups] = useState<Record<string, PurokSitioGroupDefinition[]>>({});
+  const [beneficiaryGroupAssignments, setBeneficiaryGroupAssignments] = useState<Record<string, string>>({});
 
   // Upload & Preview state
   const [file, setFile] = useState<File | null>(null);
@@ -152,6 +153,10 @@ export default function WorkProgramManagementPage() {
       if (saved) {
         setCustomGroups(JSON.parse(saved));
       }
+      const savedAssignments = localStorage.getItem("tupad_beneficiary_group_assignments");
+      if (savedAssignments) {
+        setBeneficiaryGroupAssignments(JSON.parse(savedAssignments));
+      }
     } catch (e) {
       console.warn("Failed to load custom groupings from storage:", e);
     }
@@ -178,8 +183,8 @@ export default function WorkProgramManagementPage() {
         }
       }
 
-      // Also fetch beneficiaries for accurate demographic quotas
-      const resBen = await fetch(`/api/v1/beneficiaries?programId=${params.id}`);
+      // Also fetch authoritative masterlist beneficiaries for accurate demographic quotas
+      const resBen = await fetch(`/api/v1/programs/${params.id}/beneficiaries`);
       if (resBen.ok) {
         const data = await resBen.json();
         setBeneficiaries(data.beneficiaries || []);
@@ -191,7 +196,7 @@ export default function WorkProgramManagementPage() {
     }
   };
 
-  // Groupings available for the currently selected Barangay
+  // Groupings available for the currently selected Barangay with exact Masterlist Beneficiary Tallies
   const currentBarangayGroups = useMemo(() => {
     if (!selectedBarangay) return [];
     const stdName = getStandardBarangayName(selectedBarangay);
@@ -199,44 +204,85 @@ export default function WorkProgramManagementPage() {
     const defaultCfg = DINGALAN_BARANGAY_GROUPINGS[bKey]?.groups || [];
     const customForBrgy = customGroups[stdName] || [];
 
-    const allGroups = [
-      ...defaultCfg.map((g) => ({
-        groupName: g.groupName,
-        groupLabel: g.groupLabel,
-        designatedMainArea: g.designatedMainArea,
-        coveredPuroks: g.purokSitios,
-        isCustom: false,
-      })),
-      ...customForBrgy.map((cg) => ({
-        groupName: cg.groupName,
-        groupLabel: cg.groupLabel,
-        designatedMainArea: cg.designatedMainArea,
-        coveredPuroks: cg.purokSitios,
-        isCustom: true,
-      })),
+    // Filter beneficiaries belonging to this barangay
+    const brgyBeneficiaries = beneficiaries.filter((pb) => {
+      if (pb.participationStatus === "REPLACED") return false;
+      const b = pb.beneficiary || pb;
+      const bBrgy = getStandardBarangayName(b.barangay || "");
+      return bBrgy === stdName;
+    });
+
+    // 1. Build initial list of groups
+    const initialGroups = [
+      ...defaultCfg.map((g) => {
+        const customOverride = customForBrgy.find((cg) => cg.groupName === g.groupName);
+        return {
+          groupName: g.groupName,
+          groupLabel: customOverride?.groupLabel || g.groupLabel,
+          designatedMainArea: customOverride?.designatedMainArea || g.designatedMainArea,
+          specificActivity: (customOverride as any)?.specificActivity || (g as any).specificActivity || "",
+          coveredPuroks: customOverride?.purokSitios || g.purokSitios,
+          isCustom: false,
+          beneficiaries: [] as any[],
+        };
+      }),
+      ...customForBrgy
+        .filter((cg) => !defaultCfg.some((g) => g.groupName === cg.groupName))
+        .map((cg) => ({
+          groupName: cg.groupName,
+          groupLabel: cg.groupLabel,
+          designatedMainArea: cg.designatedMainArea,
+          specificActivity: (cg as any).specificActivity || "",
+          coveredPuroks: cg.purokSitios,
+          isCustom: true,
+          beneficiaries: [] as any[],
+        })),
     ];
 
-    // Compute demographic tallies for each group in this barangay based on masterlist
-    return allGroups.map((g) => {
-      const groupBenes = beneficiaries.filter((pb) => {
-        if (pb.participationStatus === "REPLACED") return false;
-        const b = pb.beneficiary || pb;
-        const bBrgy = getStandardBarangayName(b.barangay || "");
-        if (bBrgy !== stdName) return false;
-        const sitio = (b.sitio || "").trim().toUpperCase();
-        return g.coveredPuroks.some(
-          (p) => sitio.includes(p.toUpperCase()) || p.toUpperCase().includes(sitio)
-        );
-      });
+    // 2. Populate beneficiaries into their assigned groups
+    brgyBeneficiaries.forEach((pb) => {
+      const b = pb.beneficiary || pb;
 
-      const demo = computeGroupDemographics(groupBenes);
+      // Check explicit assignment first
+      const explicitGroupName =
+        beneficiaryGroupAssignments[pb.id] ||
+        beneficiaryGroupAssignments[b.id] ||
+        beneficiaryGroupAssignments[b.designatedNumber];
+
+      let matchedGroup = initialGroups.find((g) => g.groupName === explicitGroupName);
+
+      // If no explicit assignment, match by covered puroks
+      if (!matchedGroup) {
+        const sitio = (b.sitio || "").trim().toUpperCase();
+        matchedGroup = initialGroups.find((g) =>
+          g.coveredPuroks.some((p) => sitio.includes(p.toUpperCase()) || p.toUpperCase().includes(sitio))
+        );
+      }
+
+      // Fallback to default classifier
+      if (!matchedGroup) {
+        const classification = classifyBeneficiaryGroup(stdName, b.sitio || "");
+        matchedGroup = initialGroups.find((g) => g.groupName === classification.groupName);
+        if (!matchedGroup && initialGroups.length > 0) {
+          matchedGroup = initialGroups[0];
+        }
+      }
+
+      if (matchedGroup) {
+        matchedGroup.beneficiaries.push(pb);
+      }
+    });
+
+    // 3. Compute demographics for each group
+    return initialGroups.map((g) => {
+      const demo = computeGroupDemographics(g.beneficiaries);
       return {
         ...g,
         demographics: demo,
-        beneficiaryCount: groupBenes.length,
+        beneficiaryCount: g.beneficiaries.length,
       };
     });
-  }, [selectedBarangay, customGroups, beneficiaries]);
+  }, [selectedBarangay, customGroups, beneficiaryGroupAssignments, beneficiaries]);
 
   const currentWp = workPrograms.find((w) => w.barangay === selectedBarangay) || workPrograms[0];
   const items: any[] = currentWp?.items || [];
