@@ -122,6 +122,87 @@ function normalizeBarangayName(input: string): string {
     .join(" ");
 }
 
+export function normalizeSitioName(rawSitio: string, rawBarangay?: string): string {
+  if (!rawSitio) return "";
+  const trimmed = rawSitio.trim();
+  const upper = trimmed.toUpperCase().replace(/\s+/g, " ");
+
+  const aliasMap: Record<string, string> = {
+    "LAPU LAPU": "Lapu-Lapu",
+    "LAPU-LAPU": "Lapu-Lapu",
+    "PUROK LAPU-LAPU": "Lapu-Lapu",
+    "PUROK LAPU LAPU": "Lapu-Lapu",
+    "TANGIGUE": "Tanigue",
+    "TANGGUE": "Tanigue",
+    "TANIGUE": "Tanigue",
+    "PUROK TANIGUE": "Tanigue",
+    "MAYA-MAYA": "Maya-Maya",
+    "MAYA MAYA": "Maya-Maya",
+    "PUROK MAYA-MAYA": "Maya-Maya",
+    "PUROK MAYA MAYA": "Maya-Maya",
+    "PUROK 1": "Purok 1",
+    "PUROK 2": "Purok 2",
+    "PUROK 3": "Purok 3",
+    "PUROK 4": "Purok 4",
+    "PUROK 5": "Purok 5",
+    "PUROK 6": "Purok 6",
+    "PUROK 7": "Purok 7",
+    "PUROK 1 PHASE 1": "Purok 1 Phase 1",
+    "PUROK 1 PHASE 2": "Purok 1 Phase 2",
+    "PUROK 5 EVNAI": "Purok 5 EVNAI",
+    "PUROK 5 HORSHOE": "Purok 5 Horseshoe",
+    "PUROK 5 HORSESHOE": "Purok 5 Horseshoe",
+    "PUROK 5 KAILYO": "Purok 5 Kailyo",
+    "PUROK 5 ADRA": "Purok 5 ADRA",
+    "PUROK 5 GAWAD KALINGA": "Purok 5 Gawad Kalinga",
+    "PUROK 6B": "Purok 6B",
+    "PUROK 6A": "Purok 6A",
+    "SENTRO": "Sentro",
+    "CENTRO": "Sentro",
+    "SAINT PAUL 1": "Saint Paul 1",
+    "SAINT PAUL 2": "Saint Paul 2",
+    "PUNDONGAN": "Pundongan",
+    "SAGINGAN": "Sagingan",
+    "CORE HOUSING": "Core Housing",
+    "ABUNGAN": "Abungan",
+    "CAMILING": "Camiling",
+    "ALMACIGA": "Almaciga",
+    "KAMAGONG": "Kamagong",
+    "MAHOGANY": "Mahogany",
+    "MULAWIN": "Mulawin",
+    "NARRA": "Narra",
+    "YAKAL 1": "Yakal 1",
+    "YAKAL 2": "Yakal 2",
+    "IPIL-IPIL": "Ipil-Ipil",
+    "IPIL IPIL": "Ipil-Ipil",
+    "BACONG": "Bacong",
+    "BAKAHAN": "Bakahan",
+    "DUGYAN": "Dugyan",
+    "FERRY": "Ferry",
+    "IYAPIT": "Iyapit",
+    "KAMANDAG": "Kamandag",
+    "LIMBOK": "Limbok",
+    "MALACAUAYAN": "Malacauayan",
+    "MALAKAWAYAN": "Malacauayan",
+    "MALAMIG": "Malamig",
+    "MARKET SITE": "Market Site",
+    "PINAMAYPAYAN": "Pinamaypayan",
+    "SABANG": "Sabang",
+    "SINGAWAN": "Singawan",
+    "TABI": "Tabi",
+  };
+
+  if (aliasMap[upper]) {
+    return aliasMap[upper];
+  }
+
+  return trimmed
+    .toLowerCase()
+    .split(" ")
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+    .join(" ");
+}
+
 export async function parseBeneficiaryExcelBuffer(
   buffer: Buffer,
   fileName: string,
@@ -169,11 +250,12 @@ export async function parseBeneficiaryExcelBuffer(
       rowStr.includes("barangay")
     ) {
       headerRowIndex = i;
-      // Check if next row contains sub-headers like "first name", "montrh", "day", "brgy"
+      // Check if next row contains sub-headers like "first name", "street", "brgy", "sitio"
       if (i + 1 < rawRows.length) {
         const nextRowStr = rawRows[i + 1].map((c: any) => String(c).toLowerCase()).join(" ");
         if (
           nextRowStr.includes("first name") ||
+          nextRowStr.includes("street") ||
           nextRowStr.includes("montrh") ||
           nextRowStr.includes("month") ||
           nextRowStr.includes("brgy") ||
@@ -218,7 +300,7 @@ export async function parseBeneficiaryExcelBuffer(
   for (let c = 0; c < maxCols; c++) {
     const sub = (subHeaders[c] || "").toLowerCase();
     const top = (topHeaders[c] || "").toLowerCase();
-    if (top.includes("name of beneficiary") || top.includes("beneficiary") || c >= 3 && c <= 6) {
+    if (top.includes("name of beneficiary") || top.includes("beneficiary") || (c >= 3 && c <= 6)) {
       if (sub.includes("first") && colBeneFirst === -1) colBeneFirst = c;
       if (sub.includes("middle") && colBeneMiddle === -1) colBeneMiddle = c;
       if (sub.includes("last") && colBeneLast === -1) colBeneLast = c;
@@ -250,14 +332,13 @@ export async function parseBeneficiaryExcelBuffer(
     }
   }
 
-  // If topHeader had "Birthdate" with multiple subsequent columns for Month, Day, Year
   if (colBdaySingle !== -1) {
     if (colBdayMonth === -1 && colBdaySingle + 1 < maxCols) colBdayMonth = colBdaySingle + 1;
     if (colBdayDay === -1 && colBdaySingle + 2 < maxCols) colBdayDay = colBdaySingle + 2;
     if (colBdayYear === -1 && colBdaySingle + 3 < maxCols) colBdayYear = colBdaySingle + 3;
   }
 
-  // Address sub-headers (Sitio/Purok, Brgy, City/Municipality, Province)
+  // Address sub-headers (Street/Sitio/Purok, Brgy, City/Municipality, Province)
   let colSitio = -1;
   let colBrgy = -1;
   let colCity = -1;
@@ -265,10 +346,45 @@ export async function parseBeneficiaryExcelBuffer(
 
   for (let c = 0; c < maxCols; c++) {
     const sub = (subHeaders[c] || "").toLowerCase();
-    if (sub.includes("sitio") || sub.includes("purok")) colSitio = c;
-    if (sub.includes("brgy") || sub.includes("barangay")) colBrgy = c;
-    if (sub.includes("city") || sub.includes("municipality")) colCity = c;
-    if (sub.includes("province")) colProvince = c;
+    const top = (topHeaders[c] || "").toLowerCase();
+    const combined = `${top} ${sub}`.trim();
+
+    if (
+      colSitio === -1 &&
+      (sub.includes("street") ||
+        sub.includes("sitio") ||
+        sub.includes("purok") ||
+        sub.includes("address") ||
+        combined.includes("street") ||
+        combined.includes("sitio") ||
+        combined.includes("purok"))
+    ) {
+      colSitio = c;
+    }
+    if (
+      colBrgy === -1 &&
+      (sub.includes("brgy") ||
+        sub.includes("barangay") ||
+        combined.includes("brgy") ||
+        combined.includes("barangay"))
+    ) {
+      colBrgy = c;
+    }
+    if (
+      colCity === -1 &&
+      (sub.includes("city") ||
+        sub.includes("municipality") ||
+        combined.includes("city") ||
+        combined.includes("municipality"))
+    ) {
+      colCity = c;
+    }
+    if (
+      colProvince === -1 &&
+      (sub.includes("province") || combined.includes("province"))
+    ) {
+      colProvince = c;
+    }
   }
 
   // Demographics
@@ -291,7 +407,7 @@ export async function parseBeneficiaryExcelBuffer(
   for (let c = 20; c < maxCols; c++) {
     const sub = (subHeaders[c] || "").toLowerCase();
     const top = (topHeaders[c] || "").toLowerCase();
-    if (top.includes("dependent") || c >= 24 && c <= 27) {
+    if (top.includes("dependent") || (c >= 24 && c <= 27)) {
       if (sub.includes("first") && colDepFirst === -1) colDepFirst = c;
       if (sub.includes("middle") && colDepMiddle === -1) colDepMiddle = c;
       if (sub.includes("last") && colDepLast === -1) colDepLast = c;
@@ -352,46 +468,21 @@ export async function parseBeneficiaryExcelBuffer(
       fullName = `${lastName}, ${firstName}${midPart}${extPart}`;
     }
 
-    // 3. Birthday Parsing (Single Column e.g. "2000/11/08" OR Split Columns: Month, Day, Year)
+    // 3. Birthday Parsing: First check split columns (Month, Day, Year) if present
     let birthday = ""; // YYYY-MM-DD
     let birthdayPin = ""; // MM-DD-YYYY
 
-    if (colBdaySingle !== -1 && row[colBdaySingle] !== undefined && String(row[colBdaySingle]).trim() !== "") {
-      const val = row[colBdaySingle];
-      const strVal = String(val).trim();
-
-      if (/^\d{4}[\/\-]\d{1,2}[\/\-]\d{1,2}$/.test(strVal)) {
-        const parts = strVal.split(/[\/\-]/);
-        const y = parts[0];
-        const m = parts[1].padStart(2, "0");
-        const d = parts[2].padStart(2, "0");
-        birthday = `${y}-${m}-${d}`;
-        birthdayPin = `${m}-${d}-${y}`;
-      } else if (/^\d{1,2}[\/\-]\d{1,2}[\/\-]\d{4}$/.test(strVal)) {
-        const parts = strVal.split(/[\/\-]/);
-        const m = parts[0].padStart(2, "0");
-        const d = parts[1].padStart(2, "0");
-        const y = parts[2];
-        birthday = `${y}-${m}-${d}`;
-        birthdayPin = `${m}-${d}-${y}`;
-      } else if (val instanceof Date && !isNaN(val.getTime())) {
-        birthday = val.toISOString().split("T")[0];
-        const [y, m, d] = birthday.split("-");
-        birthdayPin = `${m}-${d}-${y}`;
-      } else if (typeof val === "number") {
-        const parsedDate = new Date(Math.round((val - 25569) * 86400 * 1000));
-        if (!isNaN(parsedDate.getTime())) {
-          birthday = parsedDate.toISOString().split("T")[0];
-          const [y, m, d] = birthday.split("-");
-          birthdayPin = `${m}-${d}-${y}`;
-        }
-      }
-    }
-
-    if (!birthday && colBdayMonth !== -1 && colBdayDay !== -1 && colBdayYear !== -1 &&
-        row[colBdayMonth] !== undefined && row[colBdayDay] !== undefined && row[colBdayYear] !== undefined &&
-        String(row[colBdayMonth]).trim() !== "" && String(row[colBdayDay]).trim() !== "" && String(row[colBdayYear]).trim() !== "") {
-      
+    if (
+      colBdayMonth !== -1 &&
+      colBdayDay !== -1 &&
+      colBdayYear !== -1 &&
+      row[colBdayMonth] !== undefined &&
+      row[colBdayDay] !== undefined &&
+      row[colBdayYear] !== undefined &&
+      String(row[colBdayMonth]).trim() !== "" &&
+      String(row[colBdayDay]).trim() !== "" &&
+      String(row[colBdayYear]).trim() !== ""
+    ) {
       let mStr = String(row[colBdayMonth]).trim().toLowerCase();
       if (MONTH_NAME_MAP[mStr]) {
         mStr = MONTH_NAME_MAP[mStr];
@@ -407,9 +498,53 @@ export async function parseBeneficiaryExcelBuffer(
       if (!isNaN(yNum) && yNum < 100) yNum += yNum > 30 ? 1900 : 2000;
       const yStr = !isNaN(yNum) ? yNum.toString() : "";
 
-      if (mStr && dStr && yStr) {
+      if (mStr && dStr && yStr && mStr.length === 2 && dStr.length === 2 && yStr.length === 4) {
         birthday = `${yStr}-${mStr}-${dStr}`;
         birthdayPin = `${mStr}-${dStr}-${yStr}`;
+      }
+    }
+
+    // Fallback: Single date column e.g. "2000/11/08" or "14/06/1978" or Date object or serial
+    if (!birthday && colBdaySingle !== -1 && row[colBdaySingle] !== undefined && String(row[colBdaySingle]).trim() !== "") {
+      const val = row[colBdaySingle];
+      const strVal = String(val).trim();
+
+      if (/^\d{4}[\/\-]\d{1,2}[\/\-]\d{1,2}$/.test(strVal)) {
+        const parts = strVal.split(/[\/\-]/);
+        const y = parts[0];
+        const m = parts[1].padStart(2, "0");
+        const d = parts[2].padStart(2, "0");
+        birthday = `${y}-${m}-${d}`;
+        birthdayPin = `${m}-${d}-${y}`;
+      } else if (/^\d{1,2}[\/\-]\d{1,2}[\/\-]\d{4}$/.test(strVal)) {
+        const parts = strVal.split(/[\/\-]/);
+        const num1 = parseInt(parts[0], 10);
+        const num2 = parseInt(parts[1], 10);
+        const y = parts[2];
+        let m = "";
+        let d = "";
+        if (num1 > 12) {
+          // DD/MM/YYYY
+          d = String(num1).padStart(2, "0");
+          m = String(num2).padStart(2, "0");
+        } else {
+          // MM/DD/YYYY
+          m = String(num1).padStart(2, "0");
+          d = String(num2).padStart(2, "0");
+        }
+        birthday = `${y}-${m}-${d}`;
+        birthdayPin = `${m}-${d}-${y}`;
+      } else if (val instanceof Date && !isNaN(val.getTime())) {
+        birthday = val.toISOString().split("T")[0];
+        const [y, m, d] = birthday.split("-");
+        birthdayPin = `${m}-${d}-${y}`;
+      } else if (typeof val === "number") {
+        const parsedDate = new Date(Math.round((val - 25569) * 86400 * 1000));
+        if (!isNaN(parsedDate.getTime())) {
+          birthday = parsedDate.toISOString().split("T")[0];
+          const [y, m, d] = birthday.split("-");
+          birthdayPin = `${m}-${d}-${y}`;
+        }
       }
     }
 
@@ -435,7 +570,8 @@ export async function parseBeneficiaryExcelBuffer(
     // 4. Address & Demographics
     const rawBrgy = colBrgy !== -1 && row[colBrgy] ? String(row[colBrgy]).trim() : "Dingalan";
     const barangay = normalizeBarangayName(rawBrgy);
-    const sitio = colSitio !== -1 && row[colSitio] ? String(row[colSitio]).trim() : "";
+    const rawSitio = colSitio !== -1 && row[colSitio] ? String(row[colSitio]).trim() : "";
+    const sitio = normalizeSitioName(rawSitio, barangay);
     const contact = colContact !== -1 && row[colContact] ? String(row[colContact]).trim() : "";
 
     const rawSex = colSex !== -1 && row[colSex] ? String(row[colSex]).trim().toUpperCase() : "";
