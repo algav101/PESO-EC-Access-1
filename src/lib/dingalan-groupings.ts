@@ -3,12 +3,36 @@
  * Reference: Clean, Canonical Uploaded Purok/Sitio Data from Final Beneficiaries Masterlist
  */
 
+export interface SubGroupScheduleConfig {
+  id?: string;
+  subGroupName: string;
+  subGroupLabel: string;
+  designatedArea: string;
+  specificActivity: string;
+  targetDays: number[];
+  beneficiaryIds: string[];
+  demographics?: any;
+}
+
+export interface MergedGroupScheduleConfig {
+  id?: string;
+  mergedGroupName: string;
+  mergedGroupLabel: string;
+  partnerGroupNames: string[];
+  designatedArea: string;
+  specificActivity: string;
+  targetDays: number[];
+  demographics?: any;
+}
+
 export interface PurokSitioGroupDefinition {
   groupName: string;
   groupLabel: string;
   designatedMainArea: string;
   specificActivity?: string;
   purokSitios: string[];
+  subGroups?: SubGroupScheduleConfig[];
+  mergedSchedules?: MergedGroupScheduleConfig[];
 }
 
 export interface BarangayGroupingConfig {

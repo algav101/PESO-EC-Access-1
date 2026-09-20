@@ -29,6 +29,11 @@ import {
   Check,
   X,
   Sliders,
+  Split,
+  GitMerge,
+  Combine,
+  Link2,
+  Unlink,
 } from "lucide-react";
 import { StatusBadge } from "@/components/common/StatusBadge";
 import { ParsedBarangayWorkProgram, WorkProgramPreviewResult } from "@/lib/work-program-parser";
@@ -79,6 +84,9 @@ export default function WorkProgramManagementPage() {
   const [isBatchSubmitting, setIsBatchSubmitting] = useState(false);
   const [batchSelectedGroup, setBatchSelectedGroup] = useState<string>("");
 
+  // Batch Modal Mode: STANDARD | SUB_TEAMS | MERGE_GROUPS
+  const [batchModalMode, setBatchModalMode] = useState<"STANDARD" | "SUB_TEAMS" | "MERGE_GROUPS">("STANDARD");
+
   const [batchForm, setBatchForm] = useState({
     specificActivities: "",
     area: "",
@@ -88,6 +96,35 @@ export default function WorkProgramManagementPage() {
     scPwdFemaleCount: "",
     totalCount: "",
   });
+
+  // Batch Sub-Teams State
+  const [batchSubParentGroup, setBatchSubParentGroup] = useState<string>("");
+  const [batchSubTeamA, setBatchSubTeamA] = useState({
+    name: "",
+    area: "",
+    activity: "",
+    maleCount: 0,
+    femaleCount: 0,
+    scPwdMaleCount: 0,
+    scPwdFemaleCount: 0,
+    totalCount: 0,
+  });
+  const [batchSubTeamB, setBatchSubTeamB] = useState({
+    name: "",
+    area: "",
+    activity: "",
+    maleCount: 0,
+    femaleCount: 0,
+    scPwdMaleCount: 0,
+    scPwdFemaleCount: 0,
+    totalCount: 0,
+  });
+
+  // Batch Merged Groups State
+  const [batchSelectedMergeGroups, setBatchSelectedMergeGroups] = useState<string[]>([]);
+  const [batchMergedLabel, setBatchMergedLabel] = useState("");
+  const [batchMergedArea, setBatchMergedArea] = useState("");
+  const [batchMergedActivity, setBatchMergedActivity] = useState("");
 
   // Single Activity Edit/Add modal state
   const [isActivityModalOpen, setIsActivityModalOpen] = useState(false);
@@ -237,6 +274,169 @@ export default function WorkProgramManagementPage() {
     setSelectedActivityIds([]);
   };
 
+  // Sub-Teams and Merged Groups Helpers
+  const handleSelectSubParentGroup = (grpName: string) => {
+    setBatchSubParentGroup(grpName);
+    const grp = currentBarangayGroups.find((g) => g.groupName === grpName);
+    if (grp) {
+      const male = grp.demographics.maleCount;
+      const female = grp.demographics.femaleCount;
+      const scPwdM = grp.demographics.scPwdMaleCount;
+      const scPwdF = grp.demographics.scPwdFemaleCount;
+
+      const maleA = Math.ceil(male / 2);
+      const maleB = Math.floor(male / 2);
+      const femA = Math.ceil(female / 2);
+      const femB = Math.floor(female / 2);
+
+      setBatchSubTeamA({
+        name: `${grp.groupLabel} - Sub-Team A`,
+        area: `${grp.designatedMainArea} (Team A Zone)`,
+        activity: "De-clogging, desiltation of main canals and drainage waterways",
+        maleCount: maleA,
+        femaleCount: femA,
+        scPwdMaleCount: Math.ceil(scPwdM / 2),
+        scPwdFemaleCount: Math.ceil(scPwdF / 2),
+        totalCount: maleA + femA,
+      });
+
+      setBatchSubTeamB({
+        name: `${grp.groupLabel} - Sub-Team B`,
+        area: `${grp.designatedMainArea} (Team B Zone)`,
+        activity: "Roadside brushing, debris sweeping, tree planting, and greening",
+        maleCount: maleB,
+        femaleCount: femB,
+        scPwdMaleCount: Math.floor(scPwdM / 2),
+        scPwdFemaleCount: Math.floor(scPwdF / 2),
+        totalCount: maleB + femB,
+      });
+    }
+  };
+
+  const handleSplitSubTeams5050 = () => {
+    const grp = currentBarangayGroups.find((g) => g.groupName === batchSubParentGroup);
+    if (!grp) return;
+    const male = grp.demographics.maleCount;
+    const female = grp.demographics.femaleCount;
+    const scM = grp.demographics.scPwdMaleCount;
+    const scF = grp.demographics.scPwdFemaleCount;
+
+    const maleA = Math.ceil(male / 2);
+    const maleB = Math.floor(male / 2);
+    const femA = Math.ceil(female / 2);
+    const femB = Math.floor(female / 2);
+
+    setBatchSubTeamA((prev) => ({
+      ...prev,
+      maleCount: maleA,
+      femaleCount: femA,
+      scPwdMaleCount: Math.ceil(scM / 2),
+      scPwdFemaleCount: Math.ceil(scF / 2),
+      totalCount: maleA + femA,
+    }));
+
+    setBatchSubTeamB((prev) => ({
+      ...prev,
+      maleCount: maleB,
+      femaleCount: femB,
+      scPwdMaleCount: Math.floor(scM / 2),
+      scPwdFemaleCount: Math.floor(scF / 2),
+      totalCount: maleB + femB,
+    }));
+  };
+
+  const handleSplitSubTeamsByGender = () => {
+    const grp = currentBarangayGroups.find((g) => g.groupName === batchSubParentGroup);
+    if (!grp) return;
+    const male = grp.demographics.maleCount;
+    const female = grp.demographics.femaleCount;
+
+    setBatchSubTeamA((prev) => ({
+      ...prev,
+      name: `${grp.groupLabel} - Heavy Labor Team (Male)`,
+      activity: "Heavy declogging, drainage desiltation, deep excavation & clearing",
+      maleCount: male,
+      femaleCount: 0,
+      scPwdMaleCount: 0,
+      scPwdFemaleCount: 0,
+      totalCount: male,
+    }));
+
+    setBatchSubTeamB((prev) => ({
+      ...prev,
+      name: `${grp.groupLabel} - Maintenance Team (Female)`,
+      activity: "Sweeping, debris bagging, vegetation maintenance & tree planting",
+      maleCount: 0,
+      femaleCount: female,
+      scPwdMaleCount: 0,
+      scPwdFemaleCount: grp.demographics.scPwdFemaleCount,
+      totalCount: female,
+    }));
+  };
+
+  const handleSplitSubTeamsByVulnerable = () => {
+    const grp = currentBarangayGroups.find((g) => g.groupName === batchSubParentGroup);
+    if (!grp) return;
+    const male = grp.demographics.maleCount;
+    const female = grp.demographics.femaleCount;
+    const scM = grp.demographics.scPwdMaleCount;
+    const scF = grp.demographics.scPwdFemaleCount;
+    const totalVuln = scM + scF;
+    const ableMale = Math.max(0, male - scM);
+    const ableFemale = Math.max(0, female - scF);
+
+    setBatchSubTeamA((prev) => ({
+      ...prev,
+      name: `${grp.groupLabel} - General Operations Team`,
+      activity: "Canal desiltation, heavy clearing, and street sweeping",
+      maleCount: ableMale,
+      femaleCount: ableFemale,
+      scPwdMaleCount: 0,
+      scPwdFemaleCount: 0,
+      totalCount: ableMale + ableFemale,
+    }));
+
+    setBatchSubTeamB((prev) => ({
+      ...prev,
+      name: `${grp.groupLabel} - Light Tasks Team (SC/PWD)`,
+      activity: "Light sweeping, seedling preparation, watering and tree guard fixing",
+      maleCount: scM,
+      femaleCount: scF,
+      scPwdMaleCount: scM,
+      scPwdFemaleCount: scF,
+      totalCount: totalVuln,
+    }));
+  };
+
+  const handleToggleMergeGroup = (grpName: string) => {
+    const next = batchSelectedMergeGroups.includes(grpName)
+      ? batchSelectedMergeGroups.filter((n) => n !== grpName)
+      : [...batchSelectedMergeGroups, grpName];
+
+    setBatchSelectedMergeGroups(next);
+
+    const matched = currentBarangayGroups.filter((g) => next.includes(g.groupName));
+    if (matched.length > 0) {
+      const label = matched.map((g) => g.groupLabel).join(" & ") + " Joint Taskforce";
+      const area = matched.map((g) => g.designatedMainArea).join(" & ");
+      setBatchMergedLabel(label);
+      setBatchMergedArea(area);
+      setBatchMergedActivity(`Joint comprehensive community clean-up, canal de-clogging, and environmental rehabilitation in Barangay ${selectedBarangay}`);
+    }
+  };
+
+  // Merged Groups Demographics summary
+  const mergedDemographicsSummary = useMemo(() => {
+    const matched = currentBarangayGroups.filter((g) => batchSelectedMergeGroups.includes(g.groupName));
+    return {
+      maleCount: matched.reduce((acc, g) => acc + g.demographics.maleCount, 0),
+      femaleCount: matched.reduce((acc, g) => acc + g.demographics.femaleCount, 0),
+      scPwdMaleCount: matched.reduce((acc, g) => acc + g.demographics.scPwdMaleCount, 0),
+      scPwdFemaleCount: matched.reduce((acc, g) => acc + g.demographics.scPwdFemaleCount, 0),
+      totalCount: matched.reduce((acc, g) => acc + g.demographics.totalCount, 0),
+    };
+  }, [currentBarangayGroups, batchSelectedMergeGroups]);
+
   // Quick Batch Grouping Assignment
   const handleBatchAssignGroup = async (group: (typeof currentBarangayGroups)[0]) => {
     if (selectedActivityIds.length === 0) {
@@ -287,40 +487,139 @@ export default function WorkProgramManagementPage() {
     }
   };
 
-  // Batch Edit Submission
+  // Batch Edit Submission (Supports STANDARD, SUB_TEAMS, and MERGE_GROUPS)
   const handleSaveBatchEdit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (selectedActivityIds.length === 0) return;
 
     setIsBatchSubmitting(true);
     try {
-      const updates: any = {};
-      if (batchForm.maleCount !== "") updates.maleCount = parseInt(batchForm.maleCount, 10);
-      if (batchForm.femaleCount !== "") updates.femaleCount = parseInt(batchForm.femaleCount, 10);
-      if (batchForm.scPwdMaleCount !== "") updates.scPwdMaleCount = parseInt(batchForm.scPwdMaleCount, 10);
-      if (batchForm.scPwdFemaleCount !== "") updates.scPwdFemaleCount = parseInt(batchForm.scPwdFemaleCount, 10);
-      if (batchForm.totalCount !== "") updates.totalCount = parseInt(batchForm.totalCount, 10);
+      if (batchModalMode === "MERGE_GROUPS") {
+        if (batchSelectedMergeGroups.length === 0) {
+          alert("Pumili ng kahit 2 grupo na pagsasamahin sa Joint Taskforce.");
+          setIsBatchSubmitting(false);
+          return;
+        }
 
-      const res = await fetch(`/api/v1/programs/${params.id}/work-program/batch`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          action: "UPDATE",
-          itemIds: selectedActivityIds,
-          specificActivities: batchForm.specificActivities.trim() || undefined,
-          area: batchForm.area.trim() || undefined,
-          updates: Object.keys(updates).length > 0 ? updates : undefined,
-        }),
-      });
+        const res = await fetch(`/api/v1/programs/${params.id}/work-program/batch`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            action: "UPDATE",
+            itemIds: selectedActivityIds,
+            specificActivities: batchMergedActivity.trim() || undefined,
+            area: batchMergedArea.trim() || undefined,
+            groupName: batchMergedLabel.trim() || undefined,
+            updates: {
+              maleCount: mergedDemographicsSummary.maleCount,
+              femaleCount: mergedDemographicsSummary.femaleCount,
+              scPwdMaleCount: mergedDemographicsSummary.scPwdMaleCount,
+              scPwdFemaleCount: mergedDemographicsSummary.scPwdFemaleCount,
+              totalCount: mergedDemographicsSummary.totalCount,
+            },
+          }),
+        });
 
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Failed to update selected activities");
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || "Failed to merge activities");
 
-      setIsBatchEditModalOpen(false);
-      setBatchActionFeedback(`✓ Na-update ang ${selectedActivityIds.length} napiling aktibidad!`);
-      setTimeout(() => setBatchActionFeedback(null), 5000);
-      setSelectedActivityIds([]);
-      fetchProgramAndWorkPrograms();
+        setIsBatchEditModalOpen(false);
+        setBatchActionFeedback(`✓ Matagumpay na nai-merge ang ${batchSelectedMergeGroups.length} grupo sa ${selectedActivityIds.length} aktibidad!`);
+        setTimeout(() => setBatchActionFeedback(null), 5000);
+        setSelectedActivityIds([]);
+        fetchProgramAndWorkPrograms();
+      } else if (batchModalMode === "SUB_TEAMS") {
+        if (!batchSubParentGroup) {
+          alert("Pumili ng pangunahing grupo na hahatiin.");
+          setIsBatchSubmitting(false);
+          return;
+        }
+
+        const selectedDays = Array.from(
+          new Set(
+            items
+              .filter((it: any) => selectedActivityIds.includes(it.id))
+              .map((it: any) => it.dayNumber)
+          )
+        );
+
+        // Sync Sub-Team A
+        await fetch(`/api/v1/programs/${params.id}/work-program/sync-group`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            barangay: selectedBarangay,
+            groupName: (batchSubTeamA.name || "Sub-Team A").toUpperCase(),
+            groupLabel: batchSubTeamA.name || "Sub-Team A",
+            designatedArea: batchSubTeamA.area,
+            specificActivities: batchSubTeamA.activity,
+            targetDays: selectedDays,
+            demographics: {
+              maleCount: batchSubTeamA.maleCount,
+              femaleCount: batchSubTeamA.femaleCount,
+              scPwdMaleCount: batchSubTeamA.scPwdMaleCount,
+              scPwdFemaleCount: batchSubTeamA.scPwdFemaleCount,
+              totalCount: batchSubTeamA.totalCount,
+            },
+          }),
+        });
+
+        // Sync Sub-Team B
+        await fetch(`/api/v1/programs/${params.id}/work-program/sync-group`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            barangay: selectedBarangay,
+            groupName: (batchSubTeamB.name || "Sub-Team B").toUpperCase(),
+            groupLabel: batchSubTeamB.name || "Sub-Team B",
+            designatedArea: batchSubTeamB.area,
+            specificActivities: batchSubTeamB.activity,
+            targetDays: selectedDays,
+            demographics: {
+              maleCount: batchSubTeamB.maleCount,
+              femaleCount: batchSubTeamB.femaleCount,
+              scPwdMaleCount: batchSubTeamB.scPwdMaleCount,
+              scPwdFemaleCount: batchSubTeamB.scPwdFemaleCount,
+              totalCount: batchSubTeamB.totalCount,
+            },
+          }),
+        });
+
+        setIsBatchEditModalOpen(false);
+        setBatchActionFeedback(`✓ Matagumpay na nai-deploy ang Sub-Team A at Sub-Team B para sa Araw: ${selectedDays.join(", ")}!`);
+        setTimeout(() => setBatchActionFeedback(null), 5000);
+        setSelectedActivityIds([]);
+        fetchProgramAndWorkPrograms();
+      } else {
+        // STANDARD mode
+        const updates: any = {};
+        if (batchForm.maleCount !== "") updates.maleCount = parseInt(batchForm.maleCount, 10);
+        if (batchForm.femaleCount !== "") updates.femaleCount = parseInt(batchForm.femaleCount, 10);
+        if (batchForm.scPwdMaleCount !== "") updates.scPwdMaleCount = parseInt(batchForm.scPwdMaleCount, 10);
+        if (batchForm.scPwdFemaleCount !== "") updates.scPwdFemaleCount = parseInt(batchForm.scPwdFemaleCount, 10);
+        if (batchForm.totalCount !== "") updates.totalCount = parseInt(batchForm.totalCount, 10);
+
+        const res = await fetch(`/api/v1/programs/${params.id}/work-program/batch`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            action: "UPDATE",
+            itemIds: selectedActivityIds,
+            specificActivities: batchForm.specificActivities.trim() || undefined,
+            area: batchForm.area.trim() || undefined,
+            updates: Object.keys(updates).length > 0 ? updates : undefined,
+          }),
+        });
+
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || "Failed to update selected activities");
+
+        setIsBatchEditModalOpen(false);
+        setBatchActionFeedback(`✓ Na-update ang ${selectedActivityIds.length} napiling aktibidad!`);
+        setTimeout(() => setBatchActionFeedback(null), 5000);
+        setSelectedActivityIds([]);
+        fetchProgramAndWorkPrograms();
+      }
     } catch (err: any) {
       alert(err.message || "Failed to batch update");
     } finally {
@@ -533,7 +832,7 @@ export default function WorkProgramManagementPage() {
             TUPAD Work Program &amp; Day-to-Day Activity Management
           </h1>
           <p className="text-xs text-slate-500">
-            Select/unselect daily activities to edit schedules, assign official purok/sitio deployment groupings, and automate gender quotas per Barangay
+            Select/unselect daily activities to edit schedules, sub-divide into Sub-Teams, merge groups into Joint Taskforces, and automate gender quotas per Barangay
           </p>
         </div>
 
@@ -1003,7 +1302,7 @@ export default function WorkProgramManagementPage() {
                           {selectedActivityIds.length} Day-to-Day Activity(ies) Selected
                         </h4>
                         <p className="text-[11px] text-slate-300">
-                          Magsagawa ng batch grouping assignment, baguhin ang work area, o i-edit ang aktibidad para sa mga napiling araw.
+                          Magsagawa ng batch grouping assignment, hatiin sa Sub-Teams, o i-merge ang mga grupo para sa mga napiling araw.
                         </p>
                       </div>
                     </div>
@@ -1012,6 +1311,7 @@ export default function WorkProgramManagementPage() {
                       <button
                         type="button"
                         onClick={() => {
+                          setBatchModalMode("STANDARD");
                           setBatchForm({
                             specificActivities: "",
                             area: "",
@@ -1024,6 +1324,7 @@ export default function WorkProgramManagementPage() {
                           setIsBatchEditModalOpen(true);
                         }}
                         className="px-3.5 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-xl shadow transition flex items-center space-x-1.5"
+                        title="I-edit ang detalye ng mga napiling aktibidad"
                       >
                         <Edit2 className="w-3.5 h-3.5" />
                         <span>Batch Edit Details</span>
@@ -1031,12 +1332,50 @@ export default function WorkProgramManagementPage() {
 
                       <button
                         type="button"
+                        onClick={() => {
+                          setBatchModalMode("SUB_TEAMS");
+                          if (currentBarangayGroups.length > 0) {
+                            handleSelectSubParentGroup(currentBarangayGroups[0].groupName);
+                          }
+                          setIsBatchEditModalOpen(true);
+                        }}
+                        className="px-3.5 py-2 bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs rounded-xl shadow transition flex items-center space-x-1.5"
+                        title="Hatiin ang grupo sa dalawang Sub-Teams para sa mga napiling araw"
+                      >
+                        <Split className="w-3.5 h-3.5 text-indigo-200" />
+                        <span>Hatiin sa Sub-Teams</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setBatchModalMode("MERGE_GROUPS");
+                          if (currentBarangayGroups.length >= 2) {
+                            setBatchSelectedMergeGroups([currentBarangayGroups[0].groupName, currentBarangayGroups[1].groupName]);
+                            const matched = [currentBarangayGroups[0], currentBarangayGroups[1]];
+                            setBatchMergedLabel(`${matched[0].groupLabel} & ${matched[1].groupLabel} Joint Taskforce`);
+                            setBatchMergedArea(`${matched[0].designatedMainArea} & ${matched[1].designatedMainArea}`);
+                            setBatchMergedActivity(`Joint comprehensive community clean-up, canal de-clogging, and massive tree planting in Barangay ${selectedBarangay}`);
+                          } else if (currentBarangayGroups.length === 1) {
+                            setBatchSelectedMergeGroups([currentBarangayGroups[0].groupName]);
+                          }
+                          setIsBatchEditModalOpen(true);
+                        }}
+                        className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-xl shadow transition flex items-center space-x-1.5"
+                        title="Pagsamahin o i-merge ang maraming grupo sa isang Joint Taskforce"
+                      >
+                        <GitMerge className="w-3.5 h-3.5 text-emerald-200" />
+                        <span>I-merge ang mga Grupo</span>
+                      </button>
+
+                      <button
+                        type="button"
                         onClick={handleBatchDelete}
                         disabled={isBatchSubmitting}
-                        className="px-3.5 py-2 bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs rounded-xl shadow transition flex items-center space-x-1.5 disabled:opacity-50"
+                        className="px-3 py-2 bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs rounded-xl shadow transition flex items-center space-x-1.5 disabled:opacity-50"
                       >
                         <Trash2 className="w-3.5 h-3.5" />
-                        <span>Batch Delete</span>
+                        <span>Delete</span>
                       </button>
 
                       <button
@@ -1120,6 +1459,9 @@ export default function WorkProgramManagementPage() {
                       ) : (
                         filteredItems.map((it: any) => {
                           const isSelected = selectedActivityIds.includes(it.id);
+                          const isSubTeam = (it.area || "").toLowerCase().includes("sub-team") || (it.specificActivities || "").toLowerCase().includes("sub-team") || (it.area || "").toLowerCase().includes("team a") || (it.area || "").toLowerCase().includes("team b");
+                          const isJointMerge = (it.area || "").toLowerCase().includes("joint") || (it.area || "").toLowerCase().includes("taskforce") || (it.area || "").toLowerCase().includes("&") || (it.specificActivities || "").toLowerCase().includes("joint");
+
                           return (
                             <tr
                               key={it.id}
@@ -1141,7 +1483,23 @@ export default function WorkProgramManagementPage() {
                                 Day {it.dayNumber}
                               </td>
                               <td className="px-4 py-3 font-semibold text-slate-900 max-w-sm">
-                                {it.specificActivities}
+                                <div className="space-y-1">
+                                  <div>{it.specificActivities}</div>
+                                  <div className="flex flex-wrap items-center gap-1.5">
+                                    {isSubTeam && (
+                                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200">
+                                        <Split className="w-2.5 h-2.5 text-indigo-500" />
+                                        <span>Sub-Team Deployment</span>
+                                      </span>
+                                    )}
+                                    {isJointMerge && (
+                                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                        <GitMerge className="w-2.5 h-2.5 text-emerald-500" />
+                                        <span>Joint Taskforce</span>
+                                      </span>
+                                    )}
+                                  </div>
+                                </div>
                               </td>
                               <td className="px-4 py-3 text-slate-700 font-medium">
                                 <span className="flex items-center space-x-1">
@@ -1180,14 +1538,14 @@ export default function WorkProgramManagementPage() {
                                       });
                                       setIsActivityModalOpen(true);
                                     }}
-                                    className="p-1 text-slate-500 hover:text-gov-blue rounded"
+                                    className="p-1 text-slate-500 hover:text-gov-blue rounded cursor-pointer"
                                     title="Edit activity"
                                   >
                                     <Edit2 className="w-3.5 h-3.5" />
                                   </button>
                                   <button
                                     onClick={() => handleDeleteActivity(it.id)}
-                                    className="p-1 text-slate-500 hover:text-rose-600 rounded"
+                                    className="p-1 text-slate-500 hover:text-rose-600 rounded cursor-pointer"
                                     title="Delete activity"
                                   >
                                     <Trash2 className="w-3.5 h-3.5" />
@@ -1207,21 +1565,22 @@ export default function WorkProgramManagementPage() {
         </div>
       )}
 
-      {/* BATCH EDIT MODAL */}
+      {/* BATCH EDIT MODAL (WITH SUB-TEAMS & MERGED GROUPS TABS) */}
       {isBatchEditModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 overflow-y-auto">
           <form
             onSubmit={handleSaveBatchEdit}
-            className="bg-white rounded-2xl max-w-lg w-full p-6 space-y-4 shadow-2xl animate-fadeIn"
+            className="bg-white rounded-3xl max-w-2xl w-full p-6 space-y-5 shadow-2xl animate-fadeIn max-h-[90vh] overflow-y-auto"
           >
+            {/* Header */}
             <div className="flex items-center justify-between border-b pb-3">
               <div>
-                <h3 className="text-sm font-black text-slate-900 uppercase tracking-wider flex items-center space-x-2">
+                <h3 className="text-base font-black text-slate-900 uppercase tracking-wider flex items-center space-x-2">
                   <Edit2 className="w-4 h-4 text-gov-blue" />
-                  <span>Batch Edit {selectedActivityIds.length} Activities</span>
+                  <span>Batch Edit {selectedActivityIds.length} Selected Activities</span>
                 </h3>
-                <p className="text-[11px] text-slate-500">
-                  Ang mga field na pupunan lamang ang ma-a-update sa lahat ng napiling aktibidad.
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Pumili ng pamamaraan ng pagpapakilos para sa mga napiling araw sa Barangay {selectedBarangay}.
                 </p>
               </div>
               <button
@@ -1233,167 +1592,566 @@ export default function WorkProgramManagementPage() {
               </button>
             </div>
 
-            {/* Quick Fill from Group */}
-            {currentBarangayGroups.length > 0 && (
-              <div className="p-3 bg-teal-50 border border-teal-200 rounded-xl space-y-1">
-                <label className="block text-[10px] font-black text-teal-900 uppercase">
-                  ⚡ Auto-Fill Details from Official Grouping:
-                </label>
-                <select
-                  value={batchSelectedGroup}
-                  onChange={(e) => {
-                    const grpName = e.target.value;
-                    setBatchSelectedGroup(grpName);
-                    const grp = currentBarangayGroups.find((g) => g.groupName === grpName);
-                    if (grp) {
-                      setBatchForm({
-                        ...batchForm,
-                        area: grp.designatedMainArea,
-                        maleCount: String(grp.demographics.maleCount),
-                        femaleCount: String(grp.demographics.femaleCount),
-                        scPwdMaleCount: String(grp.demographics.scPwdMaleCount),
-                        scPwdFemaleCount: String(grp.demographics.scPwdFemaleCount),
-                        totalCount: String(grp.demographics.totalCount),
-                      });
-                    }
-                  }}
-                  className="w-full px-3 py-2 text-xs border border-teal-300 rounded-lg bg-white font-bold text-teal-950"
-                >
-                  <option value="">-- Pumili ng Grupo upang Auto-Fill --</option>
-                  {currentBarangayGroups.map((g) => (
-                    <option key={g.groupName} value={g.groupName}>
-                      {g.groupLabel} ({g.designatedMainArea}) - {g.demographics.totalCount} Pax
-                    </option>
-                  ))}
-                </select>
+            {/* Mode Switcher Tabs */}
+            <div className="grid grid-cols-3 gap-1.5 p-1.5 bg-slate-100 rounded-2xl border border-slate-200">
+              <button
+                type="button"
+                onClick={() => setBatchModalMode("STANDARD")}
+                className={`py-2.5 px-3 rounded-xl text-xs font-black transition flex flex-col items-center gap-1 cursor-pointer ${
+                  batchModalMode === "STANDARD"
+                    ? "bg-gov-blue text-white shadow-sm"
+                    : "text-slate-600 hover:text-slate-900 hover:bg-white/60"
+                }`}
+              >
+                <div className="flex items-center space-x-1.5">
+                  <Sliders className="w-3.5 h-3.5" />
+                  <span>Solong Grupo / Direct</span>
+                </div>
+                <span className="text-[10px] font-normal opacity-85">Standard Activity Edit</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setBatchModalMode("SUB_TEAMS");
+                  if (currentBarangayGroups.length > 0 && !batchSubParentGroup) {
+                    handleSelectSubParentGroup(currentBarangayGroups[0].groupName);
+                  }
+                }}
+                className={`py-2.5 px-3 rounded-xl text-xs font-black transition flex flex-col items-center gap-1 cursor-pointer ${
+                  batchModalMode === "SUB_TEAMS"
+                    ? "bg-indigo-700 text-white shadow-sm"
+                    : "text-slate-600 hover:text-slate-900 hover:bg-white/60"
+                }`}
+              >
+                <div className="flex items-center space-x-1.5">
+                  <Split className="w-3.5 h-3.5 text-indigo-300" />
+                  <span>Hatiin sa Sub-Teams</span>
+                </div>
+                <span className="text-[10px] font-normal opacity-85">Team A &amp; Team B Division</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setBatchModalMode("MERGE_GROUPS");
+                  if (batchSelectedMergeGroups.length === 0 && currentBarangayGroups.length >= 2) {
+                    setBatchSelectedMergeGroups([currentBarangayGroups[0].groupName, currentBarangayGroups[1].groupName]);
+                    const matched = [currentBarangayGroups[0], currentBarangayGroups[1]];
+                    setBatchMergedLabel(`${matched[0].groupLabel} & ${matched[1].groupLabel} Joint Taskforce`);
+                    setBatchMergedArea(`${matched[0].designatedMainArea} & ${matched[1].designatedMainArea}`);
+                    setBatchMergedActivity(`Joint comprehensive community clean-up, canal de-clogging, and massive tree planting in Barangay ${selectedBarangay}`);
+                  }
+                }}
+                className={`py-2.5 px-3 rounded-xl text-xs font-black transition flex flex-col items-center gap-1 cursor-pointer ${
+                  batchModalMode === "MERGE_GROUPS"
+                    ? "bg-emerald-700 text-white shadow-sm"
+                    : "text-slate-600 hover:text-slate-900 hover:bg-white/60"
+                }`}
+              >
+                <div className="flex items-center space-x-1.5">
+                  <GitMerge className="w-3.5 h-3.5 text-emerald-300" />
+                  <span>I-merge ang mga Grupo</span>
+                </div>
+                <span className="text-[10px] font-normal opacity-85">Joint Taskforce Merge</span>
+              </button>
+            </div>
+
+            {/* MODE 1: STANDARD / DIRECT EDIT */}
+            {batchModalMode === "STANDARD" && (
+              <div className="space-y-4 animate-fadeIn">
+                {/* Quick Fill from Group */}
+                {currentBarangayGroups.length > 0 && (
+                  <div className="p-3.5 bg-teal-50 border border-teal-200 rounded-2xl space-y-1.5">
+                    <label className="block text-[10px] font-black text-teal-900 uppercase">
+                      ⚡ Auto-Fill Details from Official Grouping:
+                    </label>
+                    <select
+                      value={batchSelectedGroup}
+                      onChange={(e) => {
+                        const grpName = e.target.value;
+                        setBatchSelectedGroup(grpName);
+                        const grp = currentBarangayGroups.find((g) => g.groupName === grpName);
+                        if (grp) {
+                          setBatchForm({
+                            ...batchForm,
+                            area: grp.designatedMainArea,
+                            maleCount: String(grp.demographics.maleCount),
+                            femaleCount: String(grp.demographics.femaleCount),
+                            scPwdMaleCount: String(grp.demographics.scPwdMaleCount),
+                            scPwdFemaleCount: String(grp.demographics.scPwdFemaleCount),
+                            totalCount: String(grp.demographics.totalCount),
+                          });
+                        }
+                      }}
+                      className="w-full px-3 py-2 text-xs border border-teal-300 rounded-xl bg-white font-bold text-teal-950"
+                    >
+                      <option value="">-- Pumili ng Grupo upang Auto-Fill --</option>
+                      {currentBarangayGroups.map((g) => (
+                        <option key={g.groupName} value={g.groupName}>
+                          {g.groupLabel} ({g.designatedMainArea}) - {g.demographics.totalCount} Pax
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">
+                    Assigned Work Area (Purok/Sitio)
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="e.g. Purok Mulawin to Ipil-ipil (or leave blank to retain)"
+                    value={batchForm.area}
+                    onChange={(e) => setBatchForm({ ...batchForm, area: e.target.value })}
+                    className="w-full px-3 py-2.5 text-xs border rounded-xl"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">
+                    Specific Activity Description
+                  </label>
+                  <textarea
+                    rows={2}
+                    placeholder="e.g. De-clogging of canals, creeks, waterways, and drainage inlets... (leave blank to retain)"
+                    value={batchForm.specificActivities}
+                    onChange={(e) => setBatchForm({ ...batchForm, specificActivities: e.target.value })}
+                    className="w-full px-3 py-2 text-xs border rounded-xl"
+                  />
+                </div>
+
+                <div className="grid grid-cols-3 gap-3">
+                  <div>
+                    <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Male Quota</label>
+                    <input
+                      type="number"
+                      min={0}
+                      placeholder="Leave blank"
+                      value={batchForm.maleCount}
+                      onChange={(e) => setBatchForm({ ...batchForm, maleCount: e.target.value })}
+                      className="w-full px-3 py-2 text-xs border rounded-xl font-mono font-bold"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Female Quota</label>
+                    <input
+                      type="number"
+                      min={0}
+                      placeholder="Leave blank"
+                      value={batchForm.femaleCount}
+                      onChange={(e) => setBatchForm({ ...batchForm, femaleCount: e.target.value })}
+                      className="w-full px-3 py-2 text-xs border rounded-xl font-mono font-bold"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Total Pax</label>
+                    <input
+                      type="number"
+                      min={0}
+                      placeholder="Leave blank"
+                      value={batchForm.totalCount}
+                      onChange={(e) => setBatchForm({ ...batchForm, totalCount: e.target.value })}
+                      className="w-full px-3 py-2 text-xs border rounded-xl font-mono font-bold bg-slate-50"
+                    />
+                  </div>
+                </div>
               </div>
             )}
 
-            <div>
-              <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">
-                Assigned Work Area (Purok/Sitio)
-              </label>
-              <input
-                type="text"
-                placeholder="e.g. Purok Mulawin to Ipil-ipil (or leave blank to retain)"
-                value={batchForm.area}
-                onChange={(e) => setBatchForm({ ...batchForm, area: e.target.value })}
-                className="w-full px-3 py-2 text-xs border rounded-lg"
-              />
-            </div>
+            {/* MODE 2: SUB-TEAMS DIVISION */}
+            {batchModalMode === "SUB_TEAMS" && (
+              <div className="space-y-4 animate-fadeIn">
+                <div className="p-4 bg-indigo-50 border border-indigo-200 rounded-2xl space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-black text-indigo-950 uppercase flex items-center space-x-1.5">
+                      <Split className="w-4 h-4 text-indigo-700" />
+                      <span>Pumili ng Pangunahing Grupo na Hahatiin:</span>
+                    </span>
+                  </div>
 
-            <div>
-              <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">
-                Specific Activity Description
-              </label>
-              <textarea
-                rows={2}
-                placeholder="e.g. De-clogging of canals, creeks, waterways, and drainage inlets... (leave blank to retain)"
-                value={batchForm.specificActivities}
-                onChange={(e) => setBatchForm({ ...batchForm, specificActivities: e.target.value })}
-                className="w-full px-3 py-2 text-xs border rounded-lg"
-              />
-            </div>
+                  <select
+                    value={batchSubParentGroup}
+                    onChange={(e) => handleSelectSubParentGroup(e.target.value)}
+                    className="w-full px-3 py-2 text-xs border border-indigo-300 rounded-xl bg-white font-bold text-indigo-950"
+                  >
+                    <option value="">-- Pumili ng Grupo --</option>
+                    {currentBarangayGroups.map((g) => (
+                      <option key={g.groupName} value={g.groupName}>
+                        {g.groupLabel} ({g.designatedMainArea}) - {g.demographics.totalCount} Pax (♂ {g.demographics.maleCount}, ♀ {g.demographics.femaleCount})
+                      </option>
+                    ))}
+                  </select>
 
-            <div className="grid grid-cols-3 gap-3">
-              <div>
-                <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Male Quota</label>
-                <input
-                  type="number"
-                  min={0}
-                  placeholder="Leave blank"
-                  value={batchForm.maleCount}
-                  onChange={(e) => setBatchForm({ ...batchForm, maleCount: e.target.value })}
-                  className="w-full px-3 py-2 text-xs border rounded-lg font-mono font-bold"
-                />
-              </div>
-              <div>
-                <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Female Quota</label>
-                <input
-                  type="number"
-                  min={0}
-                  placeholder="Leave blank"
-                  value={batchForm.femaleCount}
-                  onChange={(e) => setBatchForm({ ...batchForm, femaleCount: e.target.value })}
-                  className="w-full px-3 py-2 text-xs border rounded-lg font-mono font-bold"
-                />
-              </div>
-              <div>
-                <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Total Pax</label>
-                <input
-                  type="number"
-                  min={0}
-                  placeholder="Leave blank"
-                  value={batchForm.totalCount}
-                  onChange={(e) => setBatchForm({ ...batchForm, totalCount: e.target.value })}
-                  className="w-full px-3 py-2 text-xs border rounded-lg font-mono font-bold bg-slate-50"
-                />
-              </div>
-            </div>
+                  {/* Split Presets */}
+                  <div className="flex flex-wrap items-center gap-1.5 pt-1">
+                    <span className="text-[10px] font-bold text-indigo-800 uppercase">⚡ Auto-Distribute:</span>
+                    <button
+                      type="button"
+                      onClick={handleSplitSubTeams5050}
+                      className="px-2.5 py-1 bg-white hover:bg-indigo-100 text-indigo-900 text-[11px] font-bold rounded-lg border border-indigo-200 cursor-pointer"
+                    >
+                      50 / 50 Equal Split
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleSplitSubTeamsByGender}
+                      className="px-2.5 py-1 bg-white hover:bg-indigo-100 text-indigo-900 text-[11px] font-bold rounded-lg border border-indigo-200 cursor-pointer"
+                    >
+                      Heavy (Male) vs Maintenance (Female)
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleSplitSubTeamsByVulnerable}
+                      className="px-2.5 py-1 bg-white hover:bg-indigo-100 text-indigo-900 text-[11px] font-bold rounded-lg border border-indigo-200 cursor-pointer"
+                    >
+                      Operations vs Light Tasks (SC/PWD)
+                    </button>
+                  </div>
+                </div>
 
+                {/* Sub-Team Cards */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+                  {/* Team A */}
+                  <div className="p-3.5 bg-slate-50 border-2 border-indigo-200 rounded-2xl space-y-2.5">
+                    <div className="flex items-center justify-between">
+                      <span className="px-2.5 py-0.5 bg-indigo-700 text-white font-black text-xs rounded-lg">
+                        Sub-Team A
+                      </span>
+                      <span className="text-xs font-mono font-black text-indigo-900">
+                        Total: {batchSubTeamA.totalCount} Pax
+                      </span>
+                    </div>
+
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-0.5">Label / Pangalan</label>
+                      <input
+                        type="text"
+                        value={batchSubTeamA.name}
+                        onChange={(e) => setBatchSubTeamA({ ...batchSubTeamA, name: e.target.value })}
+                        className="w-full px-2.5 py-1.5 text-xs border rounded-lg font-bold"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-0.5">Work Zone / Area</label>
+                      <input
+                        type="text"
+                        value={batchSubTeamA.area}
+                        onChange={(e) => setBatchSubTeamA({ ...batchSubTeamA, area: e.target.value })}
+                        className="w-full px-2.5 py-1.5 text-xs border rounded-lg"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-0.5">Gawain / Task</label>
+                      <textarea
+                        rows={2}
+                        value={batchSubTeamA.activity}
+                        onChange={(e) => setBatchSubTeamA({ ...batchSubTeamA, activity: e.target.value })}
+                        className="w-full px-2.5 py-1.5 text-xs border rounded-lg"
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2 text-[11px]">
+                      <div>
+                        <label className="block text-[9px] font-bold text-slate-500 uppercase">Male</label>
+                        <input
+                          type="number"
+                          value={batchSubTeamA.maleCount}
+                          onChange={(e) => {
+                            const val = parseInt(e.target.value, 10) || 0;
+                            setBatchSubTeamA({ ...batchSubTeamA, maleCount: val, totalCount: val + batchSubTeamA.femaleCount });
+                          }}
+                          className="w-full px-2 py-1 text-xs border rounded font-mono font-bold"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[9px] font-bold text-slate-500 uppercase">Female</label>
+                        <input
+                          type="number"
+                          value={batchSubTeamA.femaleCount}
+                          onChange={(e) => {
+                            const val = parseInt(e.target.value, 10) || 0;
+                            setBatchSubTeamA({ ...batchSubTeamA, femaleCount: val, totalCount: batchSubTeamA.maleCount + val });
+                          }}
+                          className="w-full px-2 py-1 text-xs border rounded font-mono font-bold"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Team B */}
+                  <div className="p-3.5 bg-slate-50 border-2 border-indigo-200 rounded-2xl space-y-2.5">
+                    <div className="flex items-center justify-between">
+                      <span className="px-2.5 py-0.5 bg-purple-700 text-white font-black text-xs rounded-lg">
+                        Sub-Team B
+                      </span>
+                      <span className="text-xs font-mono font-black text-purple-900">
+                        Total: {batchSubTeamB.totalCount} Pax
+                      </span>
+                    </div>
+
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-0.5">Label / Pangalan</label>
+                      <input
+                        type="text"
+                        value={batchSubTeamB.name}
+                        onChange={(e) => setBatchSubTeamB({ ...batchSubTeamB, name: e.target.value })}
+                        className="w-full px-2.5 py-1.5 text-xs border rounded-lg font-bold"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-0.5">Work Zone / Area</label>
+                      <input
+                        type="text"
+                        value={batchSubTeamB.area}
+                        onChange={(e) => setBatchSubTeamB({ ...batchSubTeamB, area: e.target.value })}
+                        className="w-full px-2.5 py-1.5 text-xs border rounded-lg"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-0.5">Gawain / Task</label>
+                      <textarea
+                        rows={2}
+                        value={batchSubTeamB.activity}
+                        onChange={(e) => setBatchSubTeamB({ ...batchSubTeamB, activity: e.target.value })}
+                        className="w-full px-2.5 py-1.5 text-xs border rounded-lg"
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2 text-[11px]">
+                      <div>
+                        <label className="block text-[9px] font-bold text-slate-500 uppercase">Male</label>
+                        <input
+                          type="number"
+                          value={batchSubTeamB.maleCount}
+                          onChange={(e) => {
+                            const val = parseInt(e.target.value, 10) || 0;
+                            setBatchSubTeamB({ ...batchSubTeamB, maleCount: val, totalCount: val + batchSubTeamB.femaleCount });
+                          }}
+                          className="w-full px-2 py-1 text-xs border rounded font-mono font-bold"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[9px] font-bold text-slate-500 uppercase">Female</label>
+                        <input
+                          type="number"
+                          value={batchSubTeamB.femaleCount}
+                          onChange={(e) => {
+                            const val = parseInt(e.target.value, 10) || 0;
+                            setBatchSubTeamB({ ...batchSubTeamB, femaleCount: val, totalCount: batchSubTeamB.maleCount + val });
+                          }}
+                          className="w-full px-2 py-1 text-xs border rounded font-mono font-bold"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* MODE 3: MERGED MULTI-GROUPS */}
+            {batchModalMode === "MERGE_GROUPS" && (
+              <div className="space-y-4 animate-fadeIn">
+                <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-2xl space-y-3">
+                  <span className="text-xs font-black text-emerald-950 uppercase flex items-center space-x-1.5">
+                    <GitMerge className="w-4 h-4 text-emerald-700" />
+                    <span>Pumili ng mga Grupo na Pagsasamahin / I-merge:</span>
+                  </span>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    {currentBarangayGroups.map((g) => {
+                      const isChecked = batchSelectedMergeGroups.includes(g.groupName);
+                      return (
+                        <label
+                          key={g.groupName}
+                          className={`p-2.5 rounded-xl border flex items-start space-x-2.5 cursor-pointer transition ${
+                            isChecked
+                              ? "bg-emerald-100/70 border-emerald-500 text-emerald-950 font-bold"
+                              : "bg-white border-slate-200 text-slate-700 hover:bg-slate-50"
+                          }`}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={isChecked}
+                            onChange={() => handleToggleMergeGroup(g.groupName)}
+                            className="rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 mt-0.5"
+                          />
+                          <div className="text-xs">
+                            <p className="font-bold">{g.groupLabel}</p>
+                            <p className="text-[10px] text-slate-500 font-normal">{g.designatedMainArea}</p>
+                            <p className="text-[10px] font-mono text-emerald-800 font-bold">
+                              {g.demographics.totalCount} Pax (♂ {g.demographics.maleCount}, ♀ {g.demographics.femaleCount})
+                            </p>
+                          </div>
+                        </label>
+                      );
+                    })}
+                  </div>
+
+                  {/* Combined Live Tally Strip */}
+                  <div className="p-3 bg-emerald-900 text-white rounded-xl flex flex-wrap items-center justify-between gap-2 text-xs">
+                    <span className="font-black text-emerald-200">
+                      Pinagsamang Quota ({batchSelectedMergeGroups.length} Grupo):
+                    </span>
+                    <div className="flex items-center space-x-2 font-mono font-bold">
+                      <span className="px-2 py-0.5 bg-emerald-950 rounded text-emerald-300">
+                        Total: {mergedDemographicsSummary.totalCount} Pax
+                      </span>
+                      <span>♂ {mergedDemographicsSummary.maleCount}</span>
+                      <span>♀ {mergedDemographicsSummary.femaleCount}</span>
+                      <span>SC/PWD: {mergedDemographicsSummary.scPwdMaleCount + mergedDemographicsSummary.scPwdFemaleCount}</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">
+                    Joint Taskforce Name / Label *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={batchMergedLabel}
+                    onChange={(e) => setBatchMergedLabel(e.target.value)}
+                    className="w-full px-3 py-2 text-xs border rounded-xl font-bold"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">
+                    Unified Designated Work Area *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={batchMergedArea}
+                    onChange={(e) => setBatchMergedArea(e.target.value)}
+                    className="w-full px-3 py-2 text-xs border rounded-xl"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">
+                    Joint Specific Activity Description *
+                  </label>
+                  <textarea
+                    rows={2}
+                    required
+                    value={batchMergedActivity}
+                    onChange={(e) => setBatchMergedActivity(e.target.value)}
+                    className="w-full px-3 py-2 text-xs border rounded-xl"
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* Modal Footer */}
             <div className="flex justify-end space-x-2 pt-3 border-t">
               <button
                 type="button"
                 onClick={() => setIsBatchEditModalOpen(false)}
-                className="px-4 py-2 text-xs font-bold border rounded-lg text-slate-600 hover:bg-slate-50"
+                className="px-4 py-2 text-xs font-bold border rounded-xl text-slate-600 hover:bg-slate-50 cursor-pointer"
               >
                 Cancel
               </button>
               <button
                 type="submit"
                 disabled={isBatchSubmitting}
-                className="px-5 py-2 bg-gov-blue hover:bg-gov-light text-white font-bold text-xs rounded-lg shadow flex items-center space-x-1.5 disabled:opacity-50"
+                className="px-5 py-2.5 bg-gov-blue hover:bg-gov-light text-white font-bold text-xs rounded-xl shadow flex items-center space-x-1.5 disabled:opacity-50 cursor-pointer"
               >
                 {isBatchSubmitting ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
-                <span>Apply Changes to {selectedActivityIds.length} Activities</span>
+                <span>
+                  {batchModalMode === "SUB_TEAMS"
+                    ? "Deploy Sub-Teams to Selected Days"
+                    : batchModalMode === "MERGE_GROUPS"
+                    ? `Apply Joint Merge to ${selectedActivityIds.length} Activities`
+                    : `Apply Changes to ${selectedActivityIds.length} Activities`}
+                </span>
               </button>
             </div>
           </form>
         </div>
       )}
 
-      {/* ADD / EDIT SINGLE ACTIVITY MODAL */}
+      {/* ADD / EDIT SINGLE ACTIVITY MODAL (WITH QUICK SUB-GROUP / MERGED PRESETS) */}
       {isActivityModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
           <form
             onSubmit={handleSaveActivity}
-            className="bg-white rounded-2xl max-w-lg w-full p-6 space-y-4 shadow-2xl"
+            className="bg-white rounded-3xl max-w-lg w-full p-6 space-y-4 shadow-2xl animate-fadeIn"
           >
-            <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider">
-              {editingItem ? "Edit Work Program Activity" : `Add Activity for ${selectedBarangay}`}
+            <h3 className="text-base font-black text-slate-900 uppercase tracking-wider">
+              {editingItem ? "Edit Work Program Activity" : `Add Activity for Barangay ${selectedBarangay}`}
             </h3>
 
-            {/* Quick Populate from Barangay Grouping */}
+            {/* Quick Populate from Barangay Grouping or Sub-Group / Merged Combinations */}
             {currentBarangayGroups.length > 0 && (
-              <div className="p-3 bg-teal-50 border border-teal-200 rounded-xl space-y-1">
+              <div className="p-3 bg-teal-50 border border-teal-200 rounded-2xl space-y-2">
                 <label className="block text-[10px] font-black text-teal-900 uppercase">
-                  ⚡ Quick Auto-Fill from Official Grouping:
+                  ⚡ Quick Auto-Fill from Official Groupings:
                 </label>
-                <select
-                  onChange={(e) => {
-                    const grpName = e.target.value;
-                    const grp = currentBarangayGroups.find((g) => g.groupName === grpName);
-                    if (grp) {
-                      setActivityForm({
-                        ...activityForm,
-                        area: grp.designatedMainArea,
-                        maleCount: grp.demographics.maleCount,
-                        femaleCount: grp.demographics.femaleCount,
-                        scPwdMaleCount: grp.demographics.scPwdMaleCount,
-                        scPwdFemaleCount: grp.demographics.scPwdFemaleCount,
-                        totalCount: grp.demographics.totalCount,
-                      });
-                    }
-                  }}
-                  className="w-full px-3 py-2 text-xs border border-teal-300 rounded-lg bg-white font-bold text-teal-950"
-                >
-                  <option value="">-- Pumili ng Grupo upang I-load ang Area &amp; Quotas --</option>
-                  {currentBarangayGroups.map((g) => (
-                    <option key={g.groupName} value={g.groupName}>
-                      {g.groupLabel} ({g.designatedMainArea}) - {g.demographics.totalCount} Pax
-                    </option>
-                  ))}
-                </select>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  <select
+                    onChange={(e) => {
+                      const grpName = e.target.value;
+                      const grp = currentBarangayGroups.find((g) => g.groupName === grpName);
+                      if (grp) {
+                        setActivityForm({
+                          ...activityForm,
+                          area: grp.designatedMainArea,
+                          specificActivities: `Roadside maintenance, canal declogging, and community sanitation in ${grp.designatedMainArea}`,
+                          maleCount: grp.demographics.maleCount,
+                          femaleCount: grp.demographics.femaleCount,
+                          scPwdMaleCount: grp.demographics.scPwdMaleCount,
+                          scPwdFemaleCount: grp.demographics.scPwdFemaleCount,
+                          totalCount: grp.demographics.totalCount,
+                        });
+                      }
+                    }}
+                    className="w-full px-2.5 py-1.5 text-xs border border-teal-300 rounded-xl bg-white font-bold text-teal-950"
+                  >
+                    <option value="">-- Buong Grupo (100%) --</option>
+                    {currentBarangayGroups.map((g) => (
+                      <option key={g.groupName} value={g.groupName}>
+                        {g.groupLabel} ({g.demographics.totalCount} Pax)
+                      </option>
+                    ))}
+                  </select>
+
+                  <select
+                    onChange={(e) => {
+                      const grpName = e.target.value;
+                      const grp = currentBarangayGroups.find((g) => g.groupName === grpName);
+                      if (grp) {
+                        const halfM = Math.ceil(grp.demographics.maleCount / 2);
+                        const halfF = Math.ceil(grp.demographics.femaleCount / 2);
+                        setActivityForm({
+                          ...activityForm,
+                          area: `${grp.designatedMainArea} (Sub-Team Zone)`,
+                          specificActivities: `Sectoral canal declogging and vegetation maintenance (Sub-Team)`,
+                          maleCount: halfM,
+                          femaleCount: halfF,
+                          scPwdMaleCount: Math.ceil(grp.demographics.scPwdMaleCount / 2),
+                          scPwdFemaleCount: Math.ceil(grp.demographics.scPwdFemaleCount / 2),
+                          totalCount: halfM + halfF,
+                        });
+                      }
+                    }}
+                    className="w-full px-2.5 py-1.5 text-xs border border-indigo-300 rounded-xl bg-white font-bold text-indigo-950"
+                  >
+                    <option value="">-- Sub-Team (50% Hati) --</option>
+                    {currentBarangayGroups.map((g) => (
+                      <option key={g.groupName} value={g.groupName}>
+                        {g.groupLabel} - Sub-Team (50%)
+                      </option>
+                    ))}
+                  </select>
+                </div>
               </div>
             )}
 
@@ -1403,7 +2161,7 @@ export default function WorkProgramManagementPage() {
                 <select
                   value={activityForm.dayNumber}
                   onChange={(e) => setActivityForm({ ...activityForm, dayNumber: parseInt(e.target.value, 10) })}
-                  className="w-full px-3 py-2 text-xs border rounded-lg bg-slate-50 font-bold"
+                  className="w-full px-3 py-2 text-xs border rounded-xl bg-slate-50 font-bold"
                 >
                   {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((d) => (
                     <option key={d} value={d}>Day {d}</option>
@@ -1419,7 +2177,7 @@ export default function WorkProgramManagementPage() {
                   placeholder="e.g. Purok Mulawin to Ipil-ipil"
                   value={activityForm.area}
                   onChange={(e) => setActivityForm({ ...activityForm, area: e.target.value })}
-                  className="w-full px-3 py-2 text-xs border rounded-lg"
+                  className="w-full px-3 py-2 text-xs border rounded-xl"
                 />
               </div>
             </div>
@@ -1432,7 +2190,7 @@ export default function WorkProgramManagementPage() {
                 placeholder="e.g. De-clogging of canals, creeks, waterways, and drainage inlets..."
                 value={activityForm.specificActivities}
                 onChange={(e) => setActivityForm({ ...activityForm, specificActivities: e.target.value })}
-                className="w-full px-3 py-2 text-xs border rounded-lg"
+                className="w-full px-3 py-2 text-xs border rounded-xl"
               />
             </div>
 
@@ -1444,7 +2202,7 @@ export default function WorkProgramManagementPage() {
                   min={0}
                   value={activityForm.maleCount}
                   onChange={(e) => setActivityForm({ ...activityForm, maleCount: parseInt(e.target.value, 10) || 0 })}
-                  className="w-full px-3 py-2 text-xs border rounded-lg font-mono font-bold"
+                  className="w-full px-3 py-2 text-xs border rounded-xl font-mono font-bold"
                 />
               </div>
               <div>
@@ -1454,7 +2212,7 @@ export default function WorkProgramManagementPage() {
                   min={0}
                   value={activityForm.femaleCount}
                   onChange={(e) => setActivityForm({ ...activityForm, femaleCount: parseInt(e.target.value, 10) || 0 })}
-                  className="w-full px-3 py-2 text-xs border rounded-lg font-mono font-bold"
+                  className="w-full px-3 py-2 text-xs border rounded-xl font-mono font-bold"
                 />
               </div>
               <div>
@@ -1464,7 +2222,7 @@ export default function WorkProgramManagementPage() {
                   min={0}
                   value={activityForm.totalCount || activityForm.maleCount + activityForm.femaleCount}
                   onChange={(e) => setActivityForm({ ...activityForm, totalCount: parseInt(e.target.value, 10) || 0 })}
-                  className="w-full px-3 py-2 text-xs border rounded-lg font-mono font-bold bg-slate-50"
+                  className="w-full px-3 py-2 text-xs border rounded-xl font-mono font-bold bg-slate-50"
                 />
               </div>
             </div>
@@ -1473,13 +2231,13 @@ export default function WorkProgramManagementPage() {
               <button
                 type="button"
                 onClick={() => setIsActivityModalOpen(false)}
-                className="px-4 py-2 text-xs font-bold border rounded-lg text-slate-600 hover:bg-slate-50"
+                className="px-4 py-2 text-xs font-bold border rounded-xl text-slate-600 hover:bg-slate-50 cursor-pointer"
               >
                 Cancel
               </button>
               <button
                 type="submit"
-                className="px-5 py-2 bg-gov-blue text-white font-bold text-xs rounded-lg shadow"
+                className="px-5 py-2.5 bg-gov-blue text-white font-bold text-xs rounded-xl shadow cursor-pointer"
               >
                 Save Activity
               </button>
