@@ -45,8 +45,8 @@ export async function POST(request: Request, { params }: { params: { id: string 
   try {
     const user = await getCurrentUser();
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    if (!isAdminUser(user) && !hasPermission(user.role, "program.update")) {
-      return NextResponse.json({ error: "Forbidden: Only Domain Master and PESO Admins can modify work plan activities" }, { status: 403 });
+    if (!isAdminUser(user) && user.role !== "TUPAD_COORDINATOR" && !hasPermission(user.role, "program.update")) {
+      return NextResponse.json({ error: "Forbidden: Only PESO Admins and Field Coordinators can modify work plan activities" }, { status: 403 });
     }
 
     const body = await request.json();
@@ -89,8 +89,8 @@ export async function PUT(request: Request, { params }: { params: { id: string }
   try {
     const user = await getCurrentUser();
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    if (!isAdminUser(user) && !hasPermission(user.role, "program.update")) {
-      return NextResponse.json({ error: "Forbidden: Only Domain Master and PESO Admins can edit work plan activities" }, { status: 403 });
+    if (!isAdminUser(user) && user.role !== "TUPAD_COORDINATOR" && !hasPermission(user.role, "program.update")) {
+      return NextResponse.json({ error: "Forbidden: Only PESO Admins and Field Coordinators can edit work plan activities" }, { status: 403 });
     }
 
     const body = await request.json();
@@ -124,8 +124,8 @@ export async function DELETE(request: Request) {
   try {
     const user = await getCurrentUser();
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    if (!isAdminUser(user) && !hasPermission(user.role, "program.update")) {
-      return NextResponse.json({ error: "Forbidden: Only Domain Master and PESO Admins can delete work plan activities" }, { status: 403 });
+    if (!isAdminUser(user) && user.role !== "TUPAD_COORDINATOR" && !hasPermission(user.role, "program.update")) {
+      return NextResponse.json({ error: "Forbidden: Only PESO Admins and Field Coordinators can delete work plan activities" }, { status: 403 });
     }
 
     const { searchParams } = new URL(request.url);

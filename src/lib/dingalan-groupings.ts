@@ -7,6 +7,7 @@ export interface PurokSitioGroupDefinition {
   groupName: string;
   groupLabel: string;
   designatedMainArea: string;
+  specificActivity?: string;
   purokSitios: string[];
 }
 
