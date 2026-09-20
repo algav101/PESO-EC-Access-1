@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState, Suspense } from "react";
+import React, { useEffect, useState, useCallback, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import {
   FileSpreadsheet,
@@ -11,17 +11,23 @@ import {
   Clock,
   Printer,
   ShieldAlert,
+  RefreshCw,
+  Wifi,
+  WifiOff,
 } from "lucide-react";
 import { formatTime } from "@/lib/utils";
 import { useAuth } from "@/context/AuthContext";
+import { useOffline } from "@/context/OfflineContext";
 import { isAdminUser } from "@/lib/permissions";
 import { AdminStubOverrideModal } from "@/components/beneficiaries/AdminStubOverrideModal";
 import { TableScrollWrapper } from "@/components/common/TableScrollWrapper";
+import { offlineDb } from "@/lib/dexie";
 
 function AttendanceMatrixContent() {
   const searchParams = useSearchParams();
   const urlProgramId = searchParams.get("programId");
   const { user } = useAuth();
+  const { isOnline } = useOffline();
   const isAdmin = isAdminUser(user);
 
   const [programs, setPrograms] = useState<any[]>([]);
@@ -30,55 +36,226 @@ function AttendanceMatrixContent() {
   const [beneficiaries, setBeneficiaries] = useState<any[]>([]);
   const [selectedBarangay, setSelectedBarangay] = useState("ALL");
   const [searchQuery, setSearchQuery] = useState("");
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [selectedPbForOverride, setSelectedPbForOverride] = useState<any | null>(null);
 
-  useEffect(() => {
-    fetchPrograms();
-  }, []);
+  // 1. Merge server attendance records with local offline scans
+  const mergeWithOfflineScans = useCallback(
+    async (serverBeneficiaries: any[], progId: string, workDays: any[]) => {
+      try {
+        const offlineRecords = await offlineDb.offlineAttendanceRecords
+          .where("programId")
+          .equals(progId)
+          .toArray();
 
-  useEffect(() => {
-    if (selectedProgramId) {
-      fetchProgramAndMatrix(selectedProgramId);
-    }
-  }, [selectedProgramId]);
+        if (!offlineRecords || offlineRecords.length === 0) {
+          return serverBeneficiaries;
+        }
 
-  const fetchPrograms = async () => {
+        return serverBeneficiaries.map((pb) => {
+          const pbScans = offlineRecords.filter(
+            (r) =>
+              r.programBeneficiaryId === pb.id ||
+              (pb.beneficiaryId && r.programBeneficiaryId === pb.beneficiaryId)
+          );
+
+          if (pbScans.length === 0) return pb;
+
+          const mergedRecords = [...(pb.attendanceRecords || [])];
+
+          for (const scan of pbScans) {
+            const existingIdx = mergedRecords.findIndex(
+              (r: any) =>
+                r.workDayId === scan.workDayId ||
+                r.attendanceDate === scan.attendanceDate
+            );
+
+            if (existingIdx >= 0) {
+              mergedRecords[existingIdx] = {
+                ...mergedRecords[existingIdx],
+                morningTimeIn:
+                  scan.morningTimeIn || mergedRecords[existingIdx].morningTimeIn,
+                morningTimeOut:
+                  scan.morningTimeOut || mergedRecords[existingIdx].morningTimeOut,
+                afternoonTimeIn:
+                  scan.afternoonTimeIn || mergedRecords[existingIdx].afternoonTimeIn,
+                afternoonTimeOut:
+                  scan.afternoonTimeOut || mergedRecords[existingIdx].afternoonTimeOut,
+                status: scan.status || mergedRecords[existingIdx].status,
+              };
+            } else {
+              mergedRecords.push({
+                id: `offline-${scan.id || Date.now()}`,
+                workDayId: scan.workDayId,
+                attendanceDate: scan.attendanceDate,
+                morningTimeIn: scan.morningTimeIn,
+                morningTimeOut: scan.morningTimeOut,
+                afternoonTimeIn: scan.afternoonTimeIn,
+                afternoonTimeOut: scan.afternoonTimeOut,
+                status: scan.status || "PRESENT",
+              });
+            }
+          }
+
+          return {
+            ...pb,
+            attendanceRecords: mergedRecords,
+          };
+        });
+      } catch (err) {
+        console.warn("Could not merge local offline scans:", err);
+        return serverBeneficiaries;
+      }
+    },
+    []
+  );
+
+  // 2. Instant Load from Local IndexedDB Cache
+  const loadFromLocalCache = useCallback(
+    async (progId?: string) => {
+      try {
+        const cachedProgs = await offlineDb.cachedPrograms.toArray();
+        if (cachedProgs && cachedProgs.length > 0) {
+          setPrograms(cachedProgs);
+          const activeProgId = progId || selectedProgramId || cachedProgs[0].id;
+          if (!selectedProgramId) {
+            setSelectedProgramId(activeProgId);
+          }
+
+          const cachedProg = cachedProgs.find((p) => p.id === activeProgId) || cachedProgs[0];
+          const cachedDays = await offlineDb.cachedWorkDays
+            .where("programId")
+            .equals(activeProgId)
+            .toArray();
+
+          const fullProg = {
+            ...cachedProg,
+            workDays: cachedDays.sort((a, b) => a.dayNumber - b.dayNumber),
+          };
+          setProgram(fullProg);
+
+          // Beneficiaries
+          let cachedBenes = await offlineDb.cachedBeneficiaries
+            .where("programId")
+            .equals(activeProgId)
+            .toArray();
+
+          if (cachedBenes.length > 0) {
+            const formattedBenes = cachedBenes.map((b) => ({
+              id: b.id,
+              designatedNumber: b.designatedNumber,
+              tableNumber: b.tableNumber,
+              participationStatus: b.status,
+              beneficiary: {
+                id: b.beneficiaryId,
+                fullName: b.fullName,
+                barangay: b.barangay,
+                sitio: b.sitio,
+              },
+              attendanceRecords: [],
+            }));
+
+            // Sort naturally
+            formattedBenes.sort((a, b) => {
+              const numA = parseInt(a.designatedNumber, 10);
+              const numB = parseInt(b.designatedNumber, 10);
+              if (!isNaN(numA) && !isNaN(numB)) return numA - numB;
+              return String(a.designatedNumber).localeCompare(String(b.designatedNumber), undefined, {
+                numeric: true,
+              });
+            });
+
+            const merged = await mergeWithOfflineScans(formattedBenes, activeProgId, fullProg.workDays);
+            setBeneficiaries(merged);
+            setLoading(false);
+          }
+        }
+      } catch (err) {
+        console.warn("Local cache matrix read:", err);
+      }
+    },
+    [mergeWithOfflineScans, selectedProgramId]
+  );
+
+  // 3. Fast Parallel Fetch from Optimized Server API
+  const fetchProgramAndMatrix = useCallback(
+    async (progId: string, isSilent = false) => {
+      if (!isSilent) setIsRefreshing(true);
+      try {
+        const res = await fetch(`/api/v1/programs/${progId}/matrix`);
+        if (res.ok) {
+          const data = await res.json();
+          const progData = data.program;
+          const beneData = data.beneficiaries || [];
+
+          setProgram(progData);
+
+          // Merge with any local offline scans immediately
+          const mergedBenes = await mergeWithOfflineScans(beneData, progId, progData.workDays || []);
+          setBeneficiaries(mergedBenes);
+          setLoading(false);
+        }
+      } catch (e) {
+        console.warn("Matrix fetch warning:", e);
+      } finally {
+        setIsRefreshing(false);
+        setLoading(false);
+      }
+    },
+    [mergeWithOfflineScans]
+  );
+
+  const fetchPrograms = useCallback(async () => {
     try {
       const res = await fetch("/api/v1/programs");
       if (res.ok) {
         const data = await res.json();
         const progs = data.programs || [];
-        setPrograms(progs);
-        if (!selectedProgramId && progs.length > 0) {
-          setSelectedProgramId(progs[0].id);
+        if (progs.length > 0) {
+          setPrograms(progs);
+          if (!selectedProgramId) {
+            setSelectedProgramId(progs[0].id);
+          }
         }
       }
     } catch (e) {
       console.error(e);
     }
-  };
+  }, [selectedProgramId]);
 
-  const fetchProgramAndMatrix = async (progId: string) => {
-    setLoading(true);
-    try {
-      const pRes = await fetch(`/api/v1/programs/${progId}`);
-      if (pRes.ok) {
-        const pData = await pRes.json();
-        setProgram(pData.program);
-      }
+  // Initial mount: immediate cache render then parallel fetch
+  useEffect(() => {
+    loadFromLocalCache();
+    fetchPrograms();
+  }, [loadFromLocalCache, fetchPrograms]);
 
-      const bRes = await fetch(`/api/v1/programs/${progId}/beneficiaries`);
-      if (bRes.ok) {
-        const bData = await bRes.json();
-        setBeneficiaries(bData.beneficiaries || []);
-      }
-    } catch (e) {
-      console.error(e);
-    } finally {
-      setLoading(false);
+  useEffect(() => {
+    if (selectedProgramId) {
+      loadFromLocalCache(selectedProgramId);
+      fetchProgramAndMatrix(selectedProgramId);
     }
-  };
+  }, [selectedProgramId, fetchProgramAndMatrix, loadFromLocalCache]);
+
+  // Listen to offline scan and sync events to re-merge attendance instantly
+  useEffect(() => {
+    const handleUpdate = () => {
+      if (selectedProgramId) {
+        loadFromLocalCache(selectedProgramId);
+        if (navigator.onLine) {
+          fetchProgramAndMatrix(selectedProgramId, true);
+        }
+      }
+    };
+
+    window.addEventListener("tupad-attendance-updated", handleUpdate);
+    window.addEventListener("tupad-offline-synced", handleUpdate);
+
+    return () => {
+      window.removeEventListener("tupad-attendance-updated", handleUpdate);
+      window.removeEventListener("tupad-offline-synced", handleUpdate);
+    };
+  }, [selectedProgramId, loadFromLocalCache, fetchProgramAndMatrix]);
 
   const filtered = beneficiaries.filter((pb) => {
     const q = searchQuery.toLowerCase();
@@ -106,15 +283,30 @@ function AttendanceMatrixContent() {
           </p>
         </div>
 
-        {selectedProgramId && (
-          <a
-            href={`/api/v1/reports/export?type=ATTENDANCE&programId=${selectedProgramId}`}
-            className="px-4 py-2 bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-xs rounded-xl shadow flex items-center space-x-1.5 transition"
+        <div className="flex items-center space-x-2">
+          <button
+            type="button"
+            onClick={() => {
+              if (selectedProgramId) fetchProgramAndMatrix(selectedProgramId);
+            }}
+            disabled={isRefreshing}
+            className="px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl shadow-xs flex items-center space-x-1.5 transition"
+            title="Refresh Attendance Matrix"
           >
-            <Download className="w-4 h-4" />
-            <span>Export Excel (.XLSX)</span>
-          </a>
-        )}
+            <RefreshCw className={`w-3.5 h-3.5 ${isRefreshing ? "animate-spin text-gov-blue" : ""}`} />
+            <span className="hidden sm:inline">Refresh</span>
+          </button>
+
+          {selectedProgramId && (
+            <a
+              href={`/api/v1/reports/export?type=ATTENDANCE&programId=${selectedProgramId}`}
+              className="px-4 py-2 bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-xs rounded-xl shadow flex items-center space-x-1.5 transition"
+            >
+              <Download className="w-4 h-4" />
+              <span>Export Excel (.XLSX)</span>
+            </a>
+          )}
+        </div>
       </div>
 
       {/* Filter Bar */}
@@ -143,11 +335,21 @@ function AttendanceMatrixContent() {
           >
             <option value="ALL">All Barangays</option>
             {[
-              "Aplaya", "Butas na Bato", "Caragsacan", "Davildavilan",
-              "Dikapanikian", "Ibona", "Matawe", "Paltic",
-              "Poblacion", "Tanawan", "Umiray"
+              "Aplaya",
+              "Butas na Bato",
+              "Caragsacan",
+              "Davildavilan",
+              "Dikapanikian",
+              "Ibona",
+              "Matawe",
+              "Paltic",
+              "Poblacion",
+              "Tanawan",
+              "Umiray",
             ].map((b) => (
-              <option key={b} value={b}>{b}</option>
+              <option key={b} value={b}>
+                {b}
+              </option>
             ))}
           </select>
         </div>
@@ -169,18 +371,20 @@ function AttendanceMatrixContent() {
 
       {/* Attendance Matrix Table */}
       <div className="gov-card overflow-hidden">
-        <div className="p-4 bg-slate-50 border-b flex items-center justify-between">
+        <div className="p-4 bg-slate-50 border-b flex flex-wrap items-center justify-between gap-2">
           <span className="text-xs font-bold text-slate-800 uppercase tracking-wider">
             Consolidated Attendance Matrix ({filtered.length} Beneficiaries • {numWorkDays} Work Days)
           </span>
-          {isAdmin && (
-            <span className="text-[11px] font-bold text-amber-800 bg-amber-50 px-2 py-0.5 rounded border border-amber-200">
-              💡 PESO Admin: Click "Edit / Reset" to modify slots or restart days
-            </span>
-          )}
+          <div className="flex items-center space-x-2">
+            {isAdmin && (
+              <span className="text-[11px] font-bold text-amber-800 bg-amber-50 px-2 py-0.5 rounded border border-amber-200">
+                💡 PESO Admin: Click "Reset" to modify slots or restart days
+              </span>
+            )}
+          </div>
         </div>
 
-        {loading ? (
+        {loading && beneficiaries.length === 0 ? (
           <div className="py-16 text-center text-xs text-slate-400">Loading Attendance Matrix...</div>
         ) : filtered.length === 0 ? (
           <div className="p-12 text-center text-xs text-slate-400">No records found.</div>

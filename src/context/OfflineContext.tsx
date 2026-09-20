@@ -128,10 +128,16 @@ export function OfflineProvider({ children }: { children: React.ReactNode }) {
       setTimeout(() => setSyncNotice(null), 6000);
     };
 
+    const handleAttendanceUpdate = () => {
+      refreshPending();
+    };
+
     window.addEventListener("online", handleOnlineEvent);
     window.addEventListener("offline", handleOfflineEvent);
+    window.addEventListener("tupad-attendance-updated", handleAttendanceUpdate);
+    window.addEventListener("tupad-offline-synced", handleAttendanceUpdate);
 
-    // Periodic heartbeat (every 20s) to test real connectivity and auto-sync
+    // Periodic heartbeat (every 10s) to test real connectivity and auto-sync
     const heartbeatInterval = setInterval(async () => {
       if (typeof navigator === "undefined") return;
 
@@ -155,13 +161,15 @@ export function OfflineProvider({ children }: { children: React.ReactNode }) {
       } catch (err) {
         setIsOnline(false);
       }
-    }, 20000);
+    }, 10000);
 
     refreshPending();
 
     return () => {
       window.removeEventListener("online", handleOnlineEvent);
       window.removeEventListener("offline", handleOfflineEvent);
+      window.removeEventListener("tupad-attendance-updated", handleAttendanceUpdate);
+      window.removeEventListener("tupad-offline-synced", handleAttendanceUpdate);
       clearInterval(heartbeatInterval);
     };
   }, [executeAutoSync, isOnline, isSyncing, refreshPending]);

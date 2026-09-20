@@ -26,9 +26,12 @@ import {
 import { StatusBadge } from "@/components/common/StatusBadge";
 import { FieldQrPassGeneratorModal } from "@/components/field/FieldQrPassGeneratorCard";
 import { formatDate } from "@/lib/utils";
+import { useOffline } from "@/context/OfflineContext";
+import { queueOfflineTransaction } from "@/lib/dexie";
 
 export default function PhotosPage() {
   const { user, can } = useAuth();
+  const { isOnline } = useOffline();
 
   const [programs, setPrograms] = useState<any[]>([]);
   const [selectedProgramId, setSelectedProgramId] = useState<string>("");
@@ -280,41 +283,78 @@ export default function PhotosPage() {
     }
 
     setSubmitting(true);
-    try {
-      const res = await fetch("/api/v1/photos", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          programId: selectedProgramId,
-          workDayNumber: uploadWorkDayNumber,
-          workProgramItemId: uploadWorkProgramItemId || undefined,
-          barangay:
-            (user?.role === "TUPAD_COORDINATOR" || user?.role === "TUPAD_ASSISTING_DOCUMENTOR") && user.assignedBarangay
-              ? user.assignedBarangay
-              : uploadBarangay,
-          sitio: uploadSitio,
-          workArea: uploadWorkArea || uploadSitio,
-          specificActivity: uploadSpecificActivity,
-          photoData: capturedImagePreview,
-          latitude: gpsCoords.lat,
-          longitude: gpsCoords.lng,
-          capturedAt: new Date().toISOString(),
-        }),
-      });
+    const targetBarangay =
+      (user?.role === "TUPAD_COORDINATOR" || user?.role === "TUPAD_ASSISTING_DOCUMENTOR") && user.assignedBarangay
+        ? user.assignedBarangay
+        : uploadBarangay;
 
-      if (res.ok) {
-        setIsUploadOpen(false);
-        setCapturedImagePreview(null);
-        setUploadWorkProgramItemId("");
-        setUploadWorkArea("");
-        setUploadSpecificActivity("");
-        fetchPhotos(selectedProgramId);
-      } else {
-        const data = await res.json();
-        alert(data.error || "Failed to upload accomplishment photo");
+    const photoPayload = {
+      programId: selectedProgramId,
+      workDayNumber: uploadWorkDayNumber,
+      workProgramItemId: uploadWorkProgramItemId || undefined,
+      barangay: targetBarangay,
+      sitio: uploadSitio,
+      workArea: uploadWorkArea || uploadSitio,
+      specificActivity: uploadSpecificActivity,
+      photoData: capturedImagePreview,
+      latitude: gpsCoords.lat,
+      longitude: gpsCoords.lng,
+      capturedAt: new Date().toISOString(),
+    };
+
+    try {
+      if (isOnline) {
+        try {
+          const res = await fetch("/api/v1/photos", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(photoPayload),
+          });
+
+          if (res.ok) {
+            setIsUploadOpen(false);
+            setCapturedImagePreview(null);
+            setUploadWorkProgramItemId("");
+            setUploadWorkArea("");
+            setUploadSpecificActivity("");
+            fetchPhotos(selectedProgramId);
+            return;
+          } else {
+            const data = await res.json();
+            throw new Error(data.error || "Failed to upload accomplishment photo");
+          }
+        } catch (onlineErr: any) {
+          console.warn("Online photo upload failed, saving to local offline queue:", onlineErr);
+        }
       }
-    } catch (e) {
-      alert("Failed to upload accomplishment photo");
+
+      // Offline fallback: Queue to IndexedDB
+      await queueOfflineTransaction("PHOTO", "CREATE", photoPayload);
+
+      // Add local preview photo to list
+      const tempPhoto = {
+        id: `offline-photo-${Date.now()}`,
+        barangay: targetBarangay,
+        sitio: uploadSitio,
+        workArea: uploadWorkArea || uploadSitio,
+        specificActivity: uploadSpecificActivity,
+        fileKey: capturedImagePreview,
+        latitude: gpsCoords.lat,
+        longitude: gpsCoords.lng,
+        capturedAt: new Date().toISOString(),
+        status: "PENDING_SYNC",
+        uploadedBy: { fullName: user?.fullName || "Field Coordinator" },
+      };
+      setPhotos((prev) => [tempPhoto, ...prev]);
+
+      setIsUploadOpen(false);
+      setCapturedImagePreview(null);
+      setUploadWorkProgramItemId("");
+      setUploadWorkArea("");
+      setUploadSpecificActivity("");
+      alert("✓ Accomplishment Photo Saved to Local Cache! Will automatically upload to central storage once online.");
+    } catch (e: any) {
+      alert(e.message || "Failed to save accomplishment photo");
     } finally {
       setSubmitting(false);
     }

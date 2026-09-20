@@ -26,12 +26,15 @@ import { StatusBadge } from "@/components/common/StatusBadge";
 import { TableScrollWrapper } from "@/components/common/TableScrollWrapper";
 import QRCode from "qrcode";
 import { useAuth } from "@/context/AuthContext";
+import { useOffline } from "@/context/OfflineContext";
 import { isFieldCoordinator } from "@/lib/permissions";
+import { offlineDb, queueOfflineTransaction } from "@/lib/dexie";
 
 function ReplacementsContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const { user } = useAuth();
+  const { isOnline } = useOffline();
   const urlProgramId = searchParams.get("programId");
   const urlOriginalPbId = searchParams.get("originalPbId");
 
@@ -187,37 +190,95 @@ function ReplacementsContent() {
     setLoading(true);
     setError(null);
 
+    const replacementPayload = {
+      programId: selectedProgramId,
+      originalProgramBeneficiaryId: originalPbId,
+      reason,
+      fullName: repName,
+      birthday: repBday,
+      sex: repSex,
+      barangay: repBrgy,
+      sitio: repSitio,
+      contactNumber: repContact,
+      idFrontFile: { name: "id_front.jpg", size: 2048, type: "image/jpeg" },
+      idBackFile: { name: "id_back.jpg", size: 2048, type: "image/jpeg" },
+    };
+
     try {
-      const res = await fetch("/api/v1/replacements", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
+      if (isOnline) {
+        try {
+          const res = await fetch("/api/v1/replacements", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(replacementPayload),
+          });
+
+          const data = await res.json();
+          if (!res.ok) throw new Error(data.error || "Replacement failed");
+
+          setCreatedResult(data);
+          if (data.qr?.publicToken) {
+            const qrUrl = await QRCode.toDataURL(data.qr.publicToken, {
+              width: 200,
+              margin: 1,
+              color: { dark: "#0c3b6d", light: "#ffffff" },
+            });
+            setNewQrImage(qrUrl);
+          }
+          setStep(4);
+          fetchBeneficiariesAndReplacements(selectedProgramId);
+          return;
+        } catch (onlineErr: any) {
+          console.warn("Online replacement submission failed, queuing to offline engine:", onlineErr);
+        }
+      }
+
+      // Offline Replacement Engine
+      const originalPb = beneficiaries.find((b) => b.id === originalPbId);
+      const offlineToken = `TUPAD-OFFLINE-REP-${Date.now().toString(36).toUpperCase()}`;
+
+      await queueOfflineTransaction("REPLACEMENT", "CREATE", replacementPayload);
+
+      // Update local IndexedDB cache
+      if (originalPb) {
+        await offlineDb.cachedBeneficiaries.update(originalPb.id, {
+          status: "REPLACED",
+        });
+
+        await offlineDb.cachedBeneficiaries.add({
+          id: `pb-offline-${Date.now()}`,
           programId: selectedProgramId,
-          originalProgramBeneficiaryId: originalPbId,
-          reason,
-          fullName: repName,
+          beneficiaryId: `bene-offline-${Date.now()}`,
+          designatedNumber: originalPb.designatedNumber,
+          fullName: repName.trim().toUpperCase(),
           birthday: repBday,
-          sex: repSex,
+          birthdayPin: repBday,
           barangay: repBrgy,
           sitio: repSitio,
-          contactNumber: repContact,
-          idFrontFile: { name: "id_front.jpg", size: 2048, type: "image/jpeg" },
-          idBackFile: { name: "id_back.jpg", size: 2048, type: "image/jpeg" },
-        }),
+          tableNumber: originalPb.tableNumber || "Table 1",
+          qrToken: offlineToken,
+          status: "ACTIVE",
+          orientationStatus: "PRESENT",
+        });
+      }
+
+      const qrUrl = await QRCode.toDataURL(offlineToken, {
+        width: 200,
+        margin: 1,
+        color: { dark: "#0c3b6d", light: "#ffffff" },
+      });
+      setNewQrImage(qrUrl);
+
+      setCreatedResult({
+        message: "✓ Replacement Successfully Queued to Local Cache! Will auto-sync when online.",
+        qr: { publicToken: offlineToken },
+        replacement: {
+          fullName: repName,
+          barangay: repBrgy,
+          designatedNumber: originalPb?.designatedNumber || "N/A",
+        },
       });
 
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Replacement failed");
-
-      setCreatedResult(data);
-      if (data.qr?.publicToken) {
-        const qrUrl = await QRCode.toDataURL(data.qr.publicToken, {
-          width: 200,
-          margin: 1,
-          color: { dark: "#0c3b6d", light: "#ffffff" },
-        });
-        setNewQrImage(qrUrl);
-      }
       setStep(4);
       fetchBeneficiariesAndReplacements(selectedProgramId);
     } catch (err: any) {

@@ -78,9 +78,32 @@ export async function POST(request: Request) {
               include: { program: true },
             });
           }
+          if (!pb && (payload.qrToken || payload.rawToken)) {
+            const token = String(payload.qrToken || payload.rawToken).trim();
+            const qr = await prisma.qrCode.findFirst({
+              where: {
+                OR: [{ publicToken: token }, { publicToken: token.toUpperCase() }],
+              },
+              include: { programBeneficiary: { include: { program: true } } },
+            });
+            if (qr?.programBeneficiary) {
+              pb = qr.programBeneficiary;
+            }
+          }
+          if (!pb && payload.designatedNumber) {
+            const slotNum = String(parseInt(String(payload.designatedNumber), 10));
+            pb = await prisma.programBeneficiary.findFirst({
+              where: {
+                designatedNumber: slotNum,
+                programId: programId || undefined,
+                participationStatus: "ACTIVE",
+              },
+              include: { program: true },
+            });
+          }
 
           if (!pb) {
-            throw new Error(`Beneficiary record (${programBeneficiaryId || "unknown"}) not found in database.`);
+            throw new Error(`Beneficiary record (${programBeneficiaryId || payload.designatedNumber || payload.qrToken || "unknown"}) not found in database.`);
           }
 
           const resolvedProgramId = pb.programId;
@@ -424,11 +447,13 @@ export async function POST(request: Request) {
           const {
             programId,
             workDayId,
+            workDayNumber,
             workProgramItemId,
             barangay,
             sitio,
             workArea,
             specificActivity,
+            photoData,
             fileKey,
             fileName,
             latitude,
@@ -440,6 +465,15 @@ export async function POST(request: Request) {
           if (workDayId && !String(workDayId).startsWith("WD-")) {
             const wdExists = await prisma.workDay.findUnique({ where: { id: workDayId } });
             if (wdExists) validWorkDayId = wdExists.id;
+          }
+          if (!validWorkDayId && (workDayNumber || workDayId)) {
+            const dayNum = Number(workDayNumber || String(workDayId).replace("WD-", ""));
+            if (!isNaN(dayNum)) {
+              const wd = await prisma.workDay.findFirst({
+                where: { programId, dayNumber: dayNum },
+              });
+              if (wd) validWorkDayId = wd.id;
+            }
           }
 
           let validWorkProgramItemId: string | null = null;
@@ -458,6 +492,8 @@ export async function POST(request: Request) {
             validUploadedById = firstUser?.id || null;
           }
 
+          const finalFileKey = photoData || fileKey || `photo_offline_${Date.now()}`;
+
           await prisma.accomplishmentPhoto.create({
             data: {
               programId,
@@ -467,7 +503,7 @@ export async function POST(request: Request) {
               sitio: sitio || null,
               workArea: workArea || sitio || null,
               specificActivity: specificActivity || null,
-              fileKey: fileKey || `photo_offline_${Date.now()}`,
+              fileKey: finalFileKey,
               fileName: fileName || "accomplishment_photo.jpg",
               latitude: latitude ? Number(latitude) : 15.3941,
               longitude: longitude ? Number(longitude) : 121.3965,
@@ -478,6 +514,109 @@ export async function POST(request: Request) {
               approvedAt: isAdminUser(user) ? new Date() : null,
             },
           });
+          accepted.push(clientTransactionId);
+        } else if (entityType === "REPLACEMENT") {
+          const {
+            programId,
+            originalProgramBeneficiaryId,
+            reason,
+            fullName,
+            lastName,
+            firstName,
+            middleName,
+            birthday,
+            sex,
+            sitio,
+            barangay,
+            contactNumber,
+          } = payload || {};
+
+          if (!programId || !originalProgramBeneficiaryId || !fullName || !birthday) {
+            throw new Error("Missing required parameters for replacement offline sync.");
+          }
+
+          const originalPb = await prisma.programBeneficiary.findUnique({
+            where: { id: originalProgramBeneficiaryId },
+            include: { beneficiary: true, qrCodes: true },
+          });
+
+          if (!originalPb) {
+            throw new Error(`Original beneficiary record (${originalProgramBeneficiaryId}) not found.`);
+          }
+
+          if (originalPb.participationStatus !== "REPLACED") {
+            await prisma.$transaction(async (dbTx) => {
+              // 1. Mark original replaced
+              await dbTx.programBeneficiary.update({
+                where: { id: originalPb.id },
+                data: { participationStatus: "REPLACED" },
+              });
+
+              // Invalidate old QR
+              await dbTx.qrCode.updateMany({
+                where: { programBeneficiaryId: originalPb.id },
+                data: { status: "INVALIDATED", invalidatedAt: new Date() },
+              });
+
+              // 2. Create replacement beneficiary
+              const beneNumber = `BN-${Date.now().toString().slice(-6)}`;
+              const newBene = await dbTx.beneficiary.create({
+                data: {
+                  beneficiaryNumber: beneNumber,
+                  fullName: fullName.trim().toUpperCase(),
+                  lastName: lastName || fullName.split(" ")[0],
+                  firstName: firstName || "",
+                  middleName: middleName || "",
+                  birthday,
+                  sex: sex || "MALE",
+                  civilStatus: "SINGLE",
+                  barangay: barangay || originalPb.beneficiary.barangay,
+                  sitio: sitio || originalPb.beneficiary.sitio,
+                  contactNumber: contactNumber || "",
+                  status: "ACTIVE",
+                },
+              });
+
+              // 3. Create replacement ProgramBeneficiary with original designated number
+              const newPb = await dbTx.programBeneficiary.create({
+                data: {
+                  programId: originalPb.programId,
+                  beneficiaryId: newBene.id,
+                  designatedNumber: originalPb.designatedNumber,
+                  tableNumber: originalPb.tableNumber,
+                  slotGroup: originalPb.slotGroup,
+                  participationStatus: "ACTIVE",
+                  originalBeneficiary: false,
+                },
+              });
+
+              // 4. Generate new QR code
+              const token = `TUPAD-${originalPb.programId.slice(0, 4).toUpperCase()}-${originalPb.designatedNumber}-${Date.now().toString(36).toUpperCase()}`;
+              await dbTx.qrCode.create({
+                data: {
+                  programId: originalPb.programId,
+                  programBeneficiaryId: newPb.id,
+                  publicToken: token,
+                  tokenHash: Buffer.from(token).toString("base64"),
+                  status: "ACTIVE",
+                },
+              });
+
+              // 5. Record Replacement
+              await dbTx.beneficiaryReplacement.create({
+                data: {
+                  programId: originalPb.programId,
+                  originalProgramBeneficiaryId: originalPb.id,
+                  replacementProgramBeneficiaryId: newPb.id,
+                  reason: reason || "Field replacement during offline operations",
+                  status: "APPROVED",
+                  initiatedById: user?.id,
+                  approvedById: user?.id,
+                  approvedAt: new Date(),
+                },
+              });
+            });
+          }
           accepted.push(clientTransactionId);
         } else {
           failed.push(clientTransactionId);

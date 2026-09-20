@@ -75,7 +75,7 @@ export interface OfflineTransaction {
   id?: number;
   clientTransactionId: string;
   deviceId: string;
-  entityType: "ATTENDANCE" | "ORIENTATION" | "STUB_DISTRIBUTION" | "PAYOUT" | "PHOTO";
+  entityType: "ATTENDANCE" | "ORIENTATION" | "STUB_DISTRIBUTION" | "PAYOUT" | "PHOTO" | "REPLACEMENT";
   operation: "CREATE" | "UPDATE";
   payload: any;
   status: "PENDING" | "SYNCING" | "SYNCED" | "FAILED" | "CONFLICT";
@@ -454,6 +454,19 @@ export async function recordOfflineAttendance(params: {
     activityName: resolvedActivity,
   });
 
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(
+      new CustomEvent("tupad-attendance-updated", {
+        detail: {
+          programBeneficiaryId: bene.id,
+          workDayId: resolvedWorkDayId,
+          attendanceDate,
+          slot: targetSlot,
+        },
+      })
+    );
+  }
+
   return {
     isDuplicate: false,
     slotRecorded: slotLabels[targetSlot],
@@ -537,16 +550,16 @@ export async function pushSyncQueue() {
     const result = await res.json();
     const errors = result.errors || {};
 
-    // Mark accepted / duplicates / conflicts / failed
+    // Remove accepted / duplicates from offline queue; update failed / conflicts
     for (const item of queueToSync) {
       if (
         result.accepted?.includes(item.clientTransactionId) ||
         result.duplicates?.includes(item.clientTransactionId)
       ) {
-        await offlineDb.offlineQueue.update(item.id!, {
-          status: "SYNCED",
-          lastError: undefined,
-        });
+        // Successful sync to system main storage: remove from local offline queue
+        if (item.id) {
+          await offlineDb.offlineQueue.delete(item.id);
+        }
       } else if (result.conflicts?.includes(item.clientTransactionId)) {
         await offlineDb.offlineQueue.update(item.id!, {
           status: "CONFLICT",
@@ -559,6 +572,10 @@ export async function pushSyncQueue() {
           lastError: errors[item.clientTransactionId] || "Failed during sync processing",
         });
       }
+    }
+
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new CustomEvent("tupad-offline-synced", { detail: result }));
     }
 
     return result;
