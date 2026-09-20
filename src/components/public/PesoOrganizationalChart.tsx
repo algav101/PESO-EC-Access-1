@@ -49,7 +49,7 @@ export function PesoOrganizationalChart() {
           <div className="flex flex-wrap items-center justify-center gap-2 max-w-4xl text-xs font-bold text-slate-700">
             <span className="px-3 py-1 bg-amber-50 text-amber-900 border border-amber-200 rounded-full flex items-center gap-1.5 shadow-2xs">
               <Award className="w-3.5 h-3.5 text-amber-600" />
-              Municipal Leadership: Mayor Shierwin H. Taay
+              Municipal Leadership: Mayor Aurora G. Taay
             </span>
             <span className="px-3 py-1 bg-blue-50 text-blue-900 border border-blue-200 rounded-full flex items-center gap-1.5 shadow-2xs">
               <Building2 className="w-3.5 h-3.5 text-blue-700" />

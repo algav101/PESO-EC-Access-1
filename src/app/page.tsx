@@ -31,17 +31,17 @@ import {
 export const dynamic = "force-dynamic";
 
 export default async function LandingPage() {
-  let totalBeneficiaries = 522;
-  let totalAttendances = 0;
-  let totalPaid = 0;
+  let programBeneficiaries: any[] = [];
 
   try {
-    const beneficiaryCount = await prisma.programBeneficiary.count();
-    if (beneficiaryCount > 0) totalBeneficiaries = beneficiaryCount;
-    totalAttendances = await prisma.attendanceRecord.count();
-    totalPaid = await prisma.payout.count({ where: { status: "PAID" } });
+    programBeneficiaries = await prisma.programBeneficiary.findMany({
+      include: {
+        beneficiary: true,
+      },
+      orderBy: { designatedNumber: "asc" },
+    });
   } catch (error) {
-    console.error("Landing page queries fallback:", error);
+    console.error("Landing page demographics beneficiaries query fallback:", error);
   }
 
   return (
@@ -251,57 +251,10 @@ export default async function LandingPage() {
         </div>
       </section>
 
-      {/* 5. Live Telemetry & Program Statistics Strip */}
-      <section aria-label="Key Municipal Impact Metrics" className="bg-slate-900 text-white py-8 border-y border-slate-800 shadow-inner">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-6 text-center divide-y md:divide-y-0 md:divide-x divide-slate-800">
-            <div className="pt-2 md:pt-0">
-              <div className="text-3xl sm:text-4xl font-black text-emerald-400 font-mono">
-                {totalBeneficiaries.toLocaleString()}
-              </div>
-              <div className="text-xs uppercase font-bold tracking-wider text-slate-300 mt-1">
-                Verified Beneficiaries
-              </div>
-              <div className="text-[10px] text-slate-400">Total Enrolled in System</div>
-            </div>
-
-            <div className="pt-2 md:pt-0">
-              <div className="text-3xl sm:text-4xl font-black text-blue-300 font-mono">
-                {totalAttendances.toLocaleString()}
-              </div>
-              <div className="text-xs uppercase font-bold tracking-wider text-slate-300 mt-1">
-                Attendance Scans Logged
-              </div>
-              <div className="text-[10px] text-slate-400">QR Verified Work Logs</div>
-            </div>
-
-            <div className="pt-2 md:pt-0">
-              <div className="text-3xl sm:text-4xl font-black text-amber-400 font-mono">
-                {totalPaid.toLocaleString()}
-              </div>
-              <div className="text-xs uppercase font-bold tracking-wider text-slate-300 mt-1">
-                Completed Payouts
-              </div>
-              <div className="text-[10px] text-slate-400">DOLE Standard Compensation</div>
-            </div>
-
-            <div className="pt-2 md:pt-0">
-              <div className="text-3xl sm:text-4xl font-black text-white font-mono">
-                11 / 11
-              </div>
-              <div className="text-xs uppercase font-bold tracking-wider text-slate-300 mt-1">
-                Barangays Covered
-              </div>
-              <div className="text-[10px] text-emerald-400">Full Dingalan Deployment</div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* 6. PESO Organizational Structure (INSERTED AFTER FOREWORD BEFORE VIDEO SHOWCASE) */}
+      {/* 5. PESO Organizational Structure (DIRECTLY AFTER FOREWORD BEFORE VIDEO SHOWCASE) */}
       <PesoOrganizationalChart />
 
-      {/* 7. Community Video Showcase Section */}
+      {/* 6. Community Video Showcase Section */}
       <section className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
         <div className="relative rounded-3xl overflow-hidden shadow-2xl border border-slate-300/80 bg-slate-900 group">
           <video
@@ -327,7 +280,7 @@ export default async function LandingPage() {
         </div>
       </section>
 
-      {/* 8. Citizen Online Services Hub: Work Assignment, Status Inquiry & Feedback */}
+      {/* 7. Citizen Online Services Hub: Work Assignment, Status Inquiry & Feedback */}
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-8">
         <div className="text-center space-y-2 max-w-2xl mx-auto">
           <div className="inline-flex items-center space-x-1.5 px-3 py-0.5 rounded-full bg-blue-50 text-blue-900 text-[11px] font-bold border border-blue-200">
@@ -358,10 +311,10 @@ export default async function LandingPage() {
         </div>
       </section>
 
-      {/* 9. Demographics of Ongoing TUPAD Program (REPLACING ACTIVE WORK PROGRAMS CARD) */}
-      <OngoingTupadDemographicsSection />
+      {/* 8. Demographics of Ongoing TUPAD Program (Replicating Masterlist Summary Tabulation & Features) */}
+      <OngoingTupadDemographicsSection beneficiaries={programBeneficiaries} />
 
-      {/* 10. Community Impact Bento Grid & "TUPAD in Action" (#gallery) */}
+      {/* 9. Community Impact Bento Grid & "TUPAD in Action" (#gallery) */}
       <section id="gallery" className="bg-slate-100/80 py-16 px-4 sm:px-6 lg:px-8 border-y border-slate-200 scroll-mt-20">
         <div className="max-w-7xl mx-auto space-y-10">
           <div className="text-center space-y-2 max-w-2xl mx-auto">
@@ -433,7 +386,7 @@ export default async function LandingPage() {
         </div>
       </section>
 
-      {/* 11. Official Philippine DICT Government Web Template (GWT) Footer */}
+      {/* 10. Official Philippine DICT Government Web Template (GWT) Footer */}
       <footer className="bg-slate-950 text-slate-300 text-xs border-t-4 border-emerald-500 mt-auto" data-purpose="dict-gwt-official-footer">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 sm:py-14 space-y-8">
           <div className="grid grid-cols-1 md:grid-cols-12 gap-8 items-start">
