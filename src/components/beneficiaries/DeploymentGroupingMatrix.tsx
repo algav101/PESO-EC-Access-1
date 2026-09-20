@@ -36,6 +36,7 @@ import {
   Combine,
   Link2,
   Unlink,
+  FolderDown,
 } from "lucide-react";
 import {
   DINGALAN_BARANGAY_GROUPINGS,
@@ -84,6 +85,9 @@ export function DeploymentGroupingMatrix({
 
   // Work Program Activities Cache per Barangay
   const [wpActivitiesByBarangay, setWpActivitiesByBarangay] = useState<Record<string, string[]>>({});
+  const [wpItemsByBarangay, setWpItemsByBarangay] = useState<
+    Record<string, Array<{ workArea: string; specificActivities: string }>>
+  >({});
 
   // Comprehensive Create / Edit Group Modal State
   const [isGroupModalOpen, setIsGroupModalOpen] = useState(false);
@@ -185,14 +189,31 @@ export function DeploymentGroupingMatrix({
         const res = await fetch(`/api/v1/programs/${programId}/work-program`);
         if (res.ok) {
           const data = await res.json();
-          const map: Record<string, string[]> = {};
+          const actMap: Record<string, string[]> = {};
+          const itemMap: Record<string, Array<{ workArea: string; specificActivities: string }>> = {};
+
           (data.workPrograms || []).forEach((wp: any) => {
-            const activities = (wp.items || [])
-              .map((it: any) => it.specificActivities?.trim())
-              .filter(Boolean);
-            map[wp.barangay] = Array.from(new Set(activities));
+            const brgy = wp.barangay;
+            const activities: string[] = [];
+            const items: Array<{ workArea: string; specificActivities: string }> = [];
+
+            (wp.items || []).forEach((it: any) => {
+              const act = (it.specificActivities || "").trim();
+              const area = (it.workArea || it.area || "").trim();
+              if (act && !activities.includes(act)) activities.push(act);
+              if (act || area) {
+                if (!items.some((existing) => existing.workArea === area && existing.specificActivities === act)) {
+                  items.push({ workArea: area, specificActivities: act });
+                }
+              }
+            });
+
+            actMap[brgy] = activities;
+            itemMap[brgy] = items;
           });
-          setWpActivitiesByBarangay(map);
+
+          setWpActivitiesByBarangay(actMap);
+          setWpItemsByBarangay(itemMap);
         }
       } catch (e) {
         console.warn("Could not fetch work program activities:", e);
@@ -554,6 +575,63 @@ export function DeploymentGroupingMatrix({
     const combinedBenes = Array.from(new Set([...currentSelectedBenes, ...partnerBenes]));
     return computeGroupDemographics(combinedBenes);
   }, [modalBarangay, mergeTargetGroup, groupedData, modalBarangayBeneficiaries, modalSelectedPbIds]);
+
+  // Helper to get available Work Program items for a barangay
+  const getAvailableWpItems = (brgy: string) => {
+    const std = getStandardBarangayName(brgy || "Aplaya");
+    const apiItems = wpItemsByBarangay[std] || wpItemsByBarangay[brgy] || [];
+
+    const defaultGroupItems: Array<{ workArea: string; specificActivities: string }> = [];
+    const cfg = DINGALAN_BARANGAY_GROUPINGS[getBarangayKey(std)];
+    if (cfg && cfg.groups) {
+      cfg.groups.forEach((g) => {
+        defaultGroupItems.push({
+          workArea: g.designatedMainArea,
+          specificActivities: (g as any).specificActivity || "Roadside maintenance, canal declogging, and community sanitation",
+        });
+      });
+    }
+
+    const fallbackTemplates = [
+      {
+        workArea: `${std} Line Canals & Drainage Network`,
+        specificActivities: "Declogging, desilting and clearing of drainage canals, road gutters, and public waterways",
+      },
+      {
+        workArea: `${std} Shoreline Buffer & Mangrove Corridor`,
+        specificActivities: "Tree Planting Activity (Cleaning of Area, Digging of Hole, Planting of Seedlings and provision of Tree Guard Fence)",
+      },
+      {
+        workArea: `${std} Main Arterial Roads & Barangay Streets`,
+        specificActivities: "Roadside brushing, vegetation trimming, sweeping, and removal of road obstructions",
+      },
+      {
+        workArea: `${std} Barangay Hall, Health Center & Public Plaza`,
+        specificActivities: "Community sanitation, disinfection, solid waste segregation, and public facility maintenance",
+      },
+    ];
+
+    const combined: Array<{ workArea: string; specificActivities: string }> = [];
+    const seen = new Set<string>();
+
+    [...apiItems, ...defaultGroupItems, ...fallbackTemplates].forEach((it) => {
+      const area = (it.workArea || "").trim();
+      const act = (it.specificActivities || "").trim();
+      const key = `${area}|${act}`;
+      if (!seen.has(key) && (area || act)) {
+        seen.add(key);
+        combined.push({ workArea: area, specificActivities: act });
+      }
+    });
+
+    return combined;
+  };
+
+  const availableWpItems = useMemo(() => getAvailableWpItems(modalBarangay), [modalBarangay, wpItemsByBarangay]);
+  const availableWpItemsForAssign = useMemo(
+    () => getAvailableWpItems(assigningGroup?.barangay || ""),
+    [assigningGroup, wpItemsByBarangay]
+  );
 
   // Auto-Split Helpers for Sub-Groups
   const handleSplitSubGroups5050 = () => {
@@ -1821,19 +1899,27 @@ export function DeploymentGroupingMatrix({
                       </div>
 
                       <div>
-                        <label className="block font-bold text-slate-700 uppercase mb-1">
-                          Pumili mula sa Umiiral na TUPAD Work Program Activities:
+                        <label className="block font-bold text-slate-700 uppercase mb-1 flex items-center space-x-1">
+                          <FolderDown className="w-3.5 h-3.5 text-emerald-600" />
+                          <span>Pumili mula sa Umiiral na TUPAD Work Program:</span>
                         </label>
                         <select
                           onChange={(e) => {
-                            if (e.target.value) setModalSpecificActivity(e.target.value);
+                            const val = e.target.value;
+                            if (val !== "") {
+                              const item = availableWpItems[parseInt(val, 10)];
+                              if (item) {
+                                if (item.workArea) setModalDesignatedArea(item.workArea);
+                                if (item.specificActivities) setModalSpecificActivity(item.specificActivities);
+                              }
+                            }
                           }}
-                          className="w-full px-3.5 py-2.5 font-bold border border-slate-300 rounded-xl bg-white focus:outline-none focus:border-emerald-600"
+                          className="w-full px-3.5 py-2.5 font-bold border border-slate-300 rounded-xl bg-white focus:outline-none focus:border-emerald-600 cursor-pointer"
                         >
-                          <option value="">-- Piliin ang Aktibidad mula sa Work Program --</option>
-                          {(wpActivitiesByBarangay[modalBarangay] || []).map((act, idx) => (
-                            <option key={idx} value={act}>
-                              {act.length > 70 ? act.substring(0, 70) + "..." : act}
+                          <option value="">-- Piliin ang Aktibidad / Lugar mula sa Work Program --</option>
+                          {availableWpItems.map((item, idx) => (
+                            <option key={idx} value={idx}>
+                              📍 {item.workArea || "Work Area"} — {item.specificActivities.length > 55 ? item.specificActivities.substring(0, 55) + "..." : item.specificActivities}
                             </option>
                           ))}
                         </select>
@@ -2332,6 +2418,37 @@ export function DeploymentGroupingMatrix({
                         />
                       </div>
 
+                      {/* Dropdown Button for Choosing Work Area or Activity from Existing Work Program */}
+                      <div className="bg-indigo-50/80 p-2.5 rounded-xl border border-indigo-200 space-y-1">
+                        <label className="block text-[10px] font-black text-indigo-950 uppercase flex items-center space-x-1">
+                          <FolderDown className="w-3.5 h-3.5 text-indigo-600" />
+                          <span>Pumili mula sa Umiiral na TUPAD Work Program:</span>
+                        </label>
+                        <select
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            if (val !== "") {
+                              const item = availableWpItems[parseInt(val, 10)];
+                              if (item) {
+                                setSubGroupA({
+                                  ...subGroupA,
+                                  area: item.workArea ? `${item.workArea} (Team A Zone)` : subGroupA.area,
+                                  activity: item.specificActivities || subGroupA.activity,
+                                });
+                              }
+                            }
+                          }}
+                          className="w-full px-2.5 py-1.5 text-xs border border-indigo-300 rounded-lg bg-white font-medium text-slate-800 focus:outline-none focus:border-indigo-600 cursor-pointer"
+                        >
+                          <option value="">-- Piliin ang Lugar / Gawain para sa Sub-Team A --</option>
+                          {availableWpItems.map((item, idx) => (
+                            <option key={idx} value={idx}>
+                              📍 {item.workArea || "Work Area"} — {item.specificActivities.length > 50 ? item.specificActivities.substring(0, 50) + "..." : item.specificActivities}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
                       <div>
                         <label className="block text-[10px] font-bold text-slate-600 uppercase mb-1">Itinalagang Lugar ng Sub-Team A</label>
                         <input
@@ -2339,6 +2456,7 @@ export function DeploymentGroupingMatrix({
                           required
                           value={subGroupA.area}
                           onChange={(e) => setSubGroupA({ ...subGroupA, area: e.target.value })}
+                          placeholder="Hal. Line Canals and General Public Area (Team A Zone)"
                           className="w-full px-3 py-2 border border-slate-300 rounded-xl bg-white"
                         />
                       </div>
@@ -2350,6 +2468,7 @@ export function DeploymentGroupingMatrix({
                           required
                           value={subGroupA.activity}
                           onChange={(e) => setSubGroupA({ ...subGroupA, activity: e.target.value })}
+                          placeholder="Isulat ang aktibidad ng Sub-Team A..."
                           className="w-full px-3 py-2 border border-slate-300 rounded-xl bg-white text-xs"
                         />
                       </div>
@@ -2394,6 +2513,37 @@ export function DeploymentGroupingMatrix({
                         />
                       </div>
 
+                      {/* Dropdown Button for Choosing Work Area or Activity from Existing Work Program */}
+                      <div className="bg-teal-50/80 p-2.5 rounded-xl border border-teal-200 space-y-1">
+                        <label className="block text-[10px] font-black text-teal-950 uppercase flex items-center space-x-1">
+                          <FolderDown className="w-3.5 h-3.5 text-teal-600" />
+                          <span>Pumili mula sa Umiiral na TUPAD Work Program:</span>
+                        </label>
+                        <select
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            if (val !== "") {
+                              const item = availableWpItems[parseInt(val, 10)];
+                              if (item) {
+                                setSubGroupB({
+                                  ...subGroupB,
+                                  area: item.workArea ? `${item.workArea} (Team B Zone)` : subGroupB.area,
+                                  activity: item.specificActivities || subGroupB.activity,
+                                });
+                              }
+                            }
+                          }}
+                          className="w-full px-2.5 py-1.5 text-xs border border-teal-300 rounded-lg bg-white font-medium text-slate-800 focus:outline-none focus:border-teal-600 cursor-pointer"
+                        >
+                          <option value="">-- Piliin ang Lugar / Gawain para sa Sub-Team B --</option>
+                          {availableWpItems.map((item, idx) => (
+                            <option key={idx} value={idx}>
+                              📍 {item.workArea || "Work Area"} — {item.specificActivities.length > 50 ? item.specificActivities.substring(0, 50) + "..." : item.specificActivities}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
                       <div>
                         <label className="block text-[10px] font-bold text-slate-600 uppercase mb-1">Itinalagang Lugar ng Sub-Team B</label>
                         <input
@@ -2401,6 +2551,7 @@ export function DeploymentGroupingMatrix({
                           required
                           value={subGroupB.area}
                           onChange={(e) => setSubGroupB({ ...subGroupB, area: e.target.value })}
+                          placeholder="Hal. Line Canals and General Public Area (Team B Zone)"
                           className="w-full px-3 py-2 border border-slate-300 rounded-xl bg-white"
                         />
                       </div>
@@ -2412,6 +2563,7 @@ export function DeploymentGroupingMatrix({
                           required
                           value={subGroupB.activity}
                           onChange={(e) => setSubGroupB({ ...subGroupB, activity: e.target.value })}
+                          placeholder="Isulat ang aktibidad ng Sub-Team B..."
                           className="w-full px-3 py-2 border border-slate-300 rounded-xl bg-white text-xs"
                         />
                       </div>
@@ -2616,6 +2768,34 @@ export function DeploymentGroupingMatrix({
                       </div>
                     </div>
 
+                    {/* Dropdown for Choosing Work Area or Activity from Existing Work Program */}
+                    <div className="bg-emerald-100/70 p-3 rounded-xl border border-emerald-300 space-y-1.5">
+                      <label className="block text-[10px] font-black text-emerald-950 uppercase flex items-center space-x-1">
+                        <FolderDown className="w-3.5 h-3.5 text-emerald-700" />
+                        <span>Pumili ng Pinagsamang Lugar / Gawain mula sa Work Program:</span>
+                      </label>
+                      <select
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          if (val !== "") {
+                            const item = availableWpItems[parseInt(val, 10)];
+                            if (item) {
+                              if (item.workArea) setMergedDesignatedArea(item.workArea);
+                              if (item.specificActivities) setMergedSpecificActivity(item.specificActivities);
+                            }
+                          }
+                        }}
+                        className="w-full px-3 py-2 text-xs border border-emerald-300 rounded-lg bg-white font-medium text-slate-800 focus:outline-none focus:border-emerald-600 cursor-pointer"
+                      >
+                        <option value="">-- Piliin ang Lugar / Gawain mula sa Work Program --</option>
+                        {availableWpItems.map((item, idx) => (
+                          <option key={idx} value={idx}>
+                            📍 {item.workArea || "Work Area"} — {item.specificActivities.length > 60 ? item.specificActivities.substring(0, 60) + "..." : item.specificActivities}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
                     <div>
                       <label className="block font-bold text-slate-700 uppercase mb-1">
                         Pinagsamang Lugar ng Paggawa (Joint Work Area) <span className="text-rose-500">*</span>
@@ -2748,6 +2928,34 @@ export function DeploymentGroupingMatrix({
             </div>
 
             <form onSubmit={handleSaveAreaAssignment} className="space-y-4 text-xs">
+              {/* Dropdown for existing TUPAD Work Program */}
+              <div className="bg-blue-50/80 p-3 rounded-xl border border-blue-200 space-y-1.5">
+                <label className="block text-[10px] font-black text-blue-950 uppercase flex items-center space-x-1">
+                  <FolderDown className="w-3.5 h-3.5 text-blue-700" />
+                  <span>Pumili mula sa Umiiral na TUPAD Work Program:</span>
+                </label>
+                <select
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    if (val !== "") {
+                      const item = availableWpItemsForAssign[parseInt(val, 10)];
+                      if (item) {
+                        if (item.workArea) setAssignAreaName(item.workArea);
+                        if (item.specificActivities) setAssignSpecificActivity(item.specificActivities);
+                      }
+                    }
+                  }}
+                  className="w-full px-3 py-2 text-xs border border-blue-300 rounded-lg bg-white font-medium text-slate-800 focus:outline-none focus:border-blue-900 cursor-pointer"
+                >
+                  <option value="">-- Piliin ang Umiiral na Lugar at Gawain --</option>
+                  {availableWpItemsForAssign.map((item, idx) => (
+                    <option key={idx} value={idx}>
+                      📍 {item.workArea || "Work Area"} — {item.specificActivities.length > 60 ? item.specificActivities.substring(0, 60) + "..." : item.specificActivities}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
               <div>
                 <label className="block font-bold text-slate-700 uppercase mb-1">
                   Itinalagang Lugar ng Paggawa (Designated Work Area) <span className="text-rose-500">*</span>

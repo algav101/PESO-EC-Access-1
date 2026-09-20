@@ -34,6 +34,7 @@ import {
   Combine,
   Link2,
   Unlink,
+  FolderDown,
 } from "lucide-react";
 import { StatusBadge } from "@/components/common/StatusBadge";
 import { ParsedBarangayWorkProgram, WorkProgramPreviewResult } from "@/lib/work-program-parser";
@@ -436,6 +437,34 @@ export default function WorkProgramManagementPage() {
       totalCount: matched.reduce((acc, g) => acc + g.demographics.totalCount, 0),
     };
   }, [currentBarangayGroups, batchSelectedMergeGroups]);
+
+  // Available Work Program items for selected barangay
+  const availableWpItems = useMemo(() => {
+    const combined: Array<{ workArea: string; specificActivities: string }> = [];
+    const seen = new Set<string>();
+
+    (items || []).forEach((it: any) => {
+      const area = (it.area || it.workArea || "").trim();
+      const act = (it.specificActivities || "").trim();
+      const key = `${area}|${act}`;
+      if (!seen.has(key) && (area || act)) {
+        seen.add(key);
+        combined.push({ workArea: area, specificActivities: act });
+      }
+    });
+
+    currentBarangayGroups.forEach((g) => {
+      const area = (g.designatedMainArea || "").trim();
+      const act = ((g as any).specificActivity || "Roadside maintenance, canal declogging, and community sanitation").trim();
+      const key = `${area}|${act}`;
+      if (!seen.has(key) && (area || act)) {
+        seen.add(key);
+        combined.push({ workArea: area, specificActivities: act });
+      }
+    });
+
+    return combined;
+  }, [items, currentBarangayGroups]);
 
   // Quick Batch Grouping Assignment
   const handleBatchAssignGroup = async (group: (typeof currentBarangayGroups)[0]) => {
@@ -1834,6 +1863,37 @@ export default function WorkProgramManagementPage() {
                       />
                     </div>
 
+                    {/* Dropdown for Sub-Team A */}
+                    <div className="bg-indigo-50/80 p-2 rounded-lg border border-indigo-200 space-y-1">
+                      <label className="block text-[9px] font-black text-indigo-950 uppercase flex items-center space-x-1">
+                        <FolderDown className="w-3 h-3 text-indigo-600" />
+                        <span>Pumili mula sa Work Program:</span>
+                      </label>
+                      <select
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          if (val !== "") {
+                            const item = availableWpItems[parseInt(val, 10)];
+                            if (item) {
+                              setBatchSubTeamA({
+                                ...batchSubTeamA,
+                                area: item.workArea ? `${item.workArea} (Team A Zone)` : batchSubTeamA.area,
+                                activity: item.specificActivities || batchSubTeamA.activity,
+                              });
+                            }
+                          }
+                        }}
+                        className="w-full px-2 py-1 text-xs border border-indigo-300 rounded bg-white text-slate-800 cursor-pointer"
+                      >
+                        <option value="">-- Piliin ang Lugar / Gawain para sa Team A --</option>
+                        {availableWpItems.map((item, idx) => (
+                          <option key={idx} value={idx}>
+                            📍 {item.workArea || "Work Area"} — {item.specificActivities?.substring(0, 45)}...
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
                     <div>
                       <label className="block text-[10px] font-bold text-slate-500 uppercase mb-0.5">Work Zone / Area</label>
                       <input
@@ -1901,6 +1961,37 @@ export default function WorkProgramManagementPage() {
                         onChange={(e) => setBatchSubTeamB({ ...batchSubTeamB, name: e.target.value })}
                         className="w-full px-2.5 py-1.5 text-xs border rounded-lg font-bold"
                       />
+                    </div>
+
+                    {/* Dropdown for Sub-Team B */}
+                    <div className="bg-purple-50/80 p-2 rounded-lg border border-purple-200 space-y-1">
+                      <label className="block text-[9px] font-black text-purple-950 uppercase flex items-center space-x-1">
+                        <FolderDown className="w-3 h-3 text-purple-600" />
+                        <span>Pumili mula sa Work Program:</span>
+                      </label>
+                      <select
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          if (val !== "") {
+                            const item = availableWpItems[parseInt(val, 10)];
+                            if (item) {
+                              setBatchSubTeamB({
+                                ...batchSubTeamB,
+                                area: item.workArea ? `${item.workArea} (Team B Zone)` : batchSubTeamB.area,
+                                activity: item.specificActivities || batchSubTeamB.activity,
+                              });
+                            }
+                          }
+                        }}
+                        className="w-full px-2 py-1 text-xs border border-purple-300 rounded bg-white text-slate-800 cursor-pointer"
+                      >
+                        <option value="">-- Piliin ang Lugar / Gawain para sa Team B --</option>
+                        {availableWpItems.map((item, idx) => (
+                          <option key={idx} value={idx}>
+                            📍 {item.workArea || "Work Area"} — {item.specificActivities?.substring(0, 45)}...
+                          </option>
+                        ))}
+                      </select>
                     </div>
 
                     <div>
@@ -2007,6 +2098,34 @@ export default function WorkProgramManagementPage() {
                       <span>SC/PWD: {mergedDemographicsSummary.scPwdMaleCount + mergedDemographicsSummary.scPwdFemaleCount}</span>
                     </div>
                   </div>
+                </div>
+
+                {/* Dropdown for Merged Joint Taskforce */}
+                <div className="bg-emerald-100/70 p-2.5 rounded-xl border border-emerald-300 space-y-1">
+                  <label className="block text-[10px] font-black text-emerald-950 uppercase flex items-center space-x-1">
+                    <FolderDown className="w-3.5 h-3.5 text-emerald-700" />
+                    <span>Pumili ng Pinagsamang Lugar / Gawain mula sa Work Program:</span>
+                  </label>
+                  <select
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      if (val !== "") {
+                        const item = availableWpItems[parseInt(val, 10)];
+                        if (item) {
+                          if (item.workArea) setBatchMergedArea(item.workArea);
+                          if (item.specificActivities) setBatchMergedActivity(item.specificActivities);
+                        }
+                      }
+                    }}
+                    className="w-full px-2.5 py-1.5 text-xs border border-emerald-300 rounded-lg bg-white text-slate-800 cursor-pointer"
+                  >
+                    <option value="">-- Piliin ang Lugar / Gawain mula sa Work Program --</option>
+                    {availableWpItems.map((item, idx) => (
+                      <option key={idx} value={idx}>
+                        📍 {item.workArea || "Work Area"} — {item.specificActivities?.substring(0, 50)}...
+                      </option>
+                    ))}
+                  </select>
                 </div>
 
                 <div>
