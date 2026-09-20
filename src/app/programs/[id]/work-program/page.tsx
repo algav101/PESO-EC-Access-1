@@ -463,8 +463,38 @@ export default function WorkProgramManagementPage() {
       }
     });
 
+    const std = getStandardBarangayName(selectedBarangay || "Aplaya");
+    const fallbackTemplates = [
+      {
+        workArea: `${std} Line Canals & Drainage Network`,
+        specificActivities: "Declogging, desilting and clearing of drainage canals, road gutters, and public waterways",
+      },
+      {
+        workArea: `${std} Shoreline Buffer & Mangrove Corridor`,
+        specificActivities: "Tree Planting Activity (Cleaning of Area, Digging of Hole, Planting of Seedlings and provision of Tree Guard Fence)",
+      },
+      {
+        workArea: `${std} Main Arterial Roads & Barangay Streets`,
+        specificActivities: "Roadside brushing, vegetation trimming, sweeping, and removal of road obstructions",
+      },
+      {
+        workArea: `${std} Barangay Hall, Health Center & Public Plaza`,
+        specificActivities: "Community sanitation, disinfection, solid waste segregation, and public facility maintenance",
+      },
+    ];
+
+    fallbackTemplates.forEach((it) => {
+      const area = it.workArea.trim();
+      const act = it.specificActivities.trim();
+      const key = `${area}|${act}`;
+      if (!seen.has(key)) {
+        seen.add(key);
+        combined.push({ workArea: area, specificActivities: act });
+      }
+    });
+
     return combined;
-  }, [items, currentBarangayGroups]);
+  }, [items, currentBarangayGroups, selectedBarangay]);
 
   // Quick Batch Grouping Assignment
   const handleBatchAssignGroup = async (group: (typeof currentBarangayGroups)[0]) => {
@@ -1725,6 +1755,37 @@ export default function WorkProgramManagementPage() {
                   </div>
                 )}
 
+                {/* Dropdown for Choosing Work Area or Activity from Existing Work Program */}
+                <div className="p-3 bg-blue-50/80 border border-blue-200 rounded-2xl space-y-1.5">
+                  <label className="block text-[10px] font-black text-blue-950 uppercase flex items-center space-x-1">
+                    <FolderDown className="w-3.5 h-3.5 text-blue-700" />
+                    <span>Pumili mula sa Umiiral na TUPAD Work Program (Lugar at Gawain):</span>
+                  </label>
+                  <select
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      if (val !== "") {
+                        const item = availableWpItems[parseInt(val, 10)];
+                        if (item) {
+                          setBatchForm((prev) => ({
+                            ...prev,
+                            area: item.workArea || prev.area,
+                            specificActivities: item.specificActivities || prev.specificActivities,
+                          }));
+                        }
+                      }
+                    }}
+                    className="w-full px-3 py-2 text-xs border border-blue-300 rounded-xl bg-white font-medium text-slate-800 focus:outline-none focus:border-blue-900 cursor-pointer"
+                  >
+                    <option value="">-- Pumili ng Aktibidad at Lugar mula sa Work Program --</option>
+                    {availableWpItems.map((item, idx) => (
+                      <option key={idx} value={idx}>
+                        📍 {item.workArea || "Work Area"} — {item.specificActivities?.substring(0, 55)}...
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
                 <div>
                   <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">
                     Assigned Work Area (Purok/Sitio)
@@ -2273,6 +2334,37 @@ export default function WorkProgramManagementPage() {
                 </div>
               </div>
             )}
+
+            {/* Dropdown for Choosing Work Area or Activity from Existing Work Program */}
+            <div className="p-3 bg-blue-50/80 border border-blue-200 rounded-2xl space-y-1.5">
+              <label className="block text-[10px] font-black text-blue-950 uppercase flex items-center space-x-1">
+                <FolderDown className="w-3.5 h-3.5 text-blue-700" />
+                <span>Pumili mula sa Umiiral na TUPAD Work Program (Lugar at Gawain):</span>
+              </label>
+              <select
+                onChange={(e) => {
+                  const val = e.target.value;
+                  if (val !== "") {
+                    const item = availableWpItems[parseInt(val, 10)];
+                    if (item) {
+                      setActivityForm((prev) => ({
+                        ...prev,
+                        area: item.workArea || prev.area,
+                        specificActivities: item.specificActivities || prev.specificActivities,
+                      }));
+                    }
+                  }
+                }}
+                className="w-full px-3 py-2 text-xs border border-blue-300 rounded-xl bg-white font-medium text-slate-800 focus:outline-none focus:border-blue-900 cursor-pointer"
+              >
+                <option value="">-- Pumili ng Aktibidad at Lugar mula sa Work Program --</option>
+                {availableWpItems.map((item, idx) => (
+                  <option key={idx} value={idx}>
+                    📍 {item.workArea || "Work Area"} — {item.specificActivities?.substring(0, 55)}...
+                  </option>
+                ))}
+              </select>
+            </div>
 
             <div className="grid grid-cols-2 gap-3">
               <div>
