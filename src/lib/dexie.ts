@@ -58,7 +58,9 @@ export interface OfflineAttendanceRecord {
   id?: number;
   programId: string;
   workDayId: string;
+  dayNumber?: number;
   programBeneficiaryId: string;
+  designatedNumber?: string;
   attendanceDate: string;
   morningTimeIn?: string;
   morningTimeOut?: string;
@@ -69,6 +71,7 @@ export interface OfflineAttendanceRecord {
   activityName?: string;
   status: string;
   scannedAt: string;
+  isSynced?: boolean;
 }
 
 export interface OfflineTransaction {
@@ -414,6 +417,8 @@ export async function recordOfflineAttendance(params: {
       workArea: resolvedArea || existingRecord.workArea,
       activityName: resolvedActivity || existingRecord.activityName,
       workProgramItemId: resolvedItemId || existingRecord.workProgramItemId,
+      dayNumber: dayNumber || existingRecord.dayNumber,
+      designatedNumber: bene.designatedNumber || existingRecord.designatedNumber,
     };
     if (targetSlot === "MORNING_IN") updates.morningTimeIn = nowIso;
     else if (targetSlot === "MORNING_OUT") updates.morningTimeOut = nowIso;
@@ -425,7 +430,9 @@ export async function recordOfflineAttendance(params: {
     await offlineDb.offlineAttendanceRecords.add({
       programId: resolvedProgramId,
       workDayId: resolvedWorkDayId,
+      dayNumber,
       programBeneficiaryId: bene.id,
+      designatedNumber: bene.designatedNumber,
       attendanceDate,
       morningTimeIn: targetSlot === "MORNING_IN" ? nowIso : undefined,
       morningTimeOut: targetSlot === "MORNING_OUT" ? nowIso : undefined,
@@ -443,7 +450,10 @@ export async function recordOfflineAttendance(params: {
   await queueOfflineTransaction("ATTENDANCE", "CREATE", {
     programId: resolvedProgramId,
     workDayId: resolvedWorkDayId,
+    dayNumber,
     programBeneficiaryId: bene.id,
+    designatedNumber: bene.designatedNumber,
+    qrToken: bene.qrToken || rawToken,
     attendanceDate,
     morningTimeIn: targetSlot === "MORNING_IN" ? nowIso : undefined,
     morningTimeOut: targetSlot === "MORNING_OUT" ? nowIso : undefined,
@@ -459,7 +469,9 @@ export async function recordOfflineAttendance(params: {
       new CustomEvent("tupad-attendance-updated", {
         detail: {
           programBeneficiaryId: bene.id,
+          designatedNumber: bene.designatedNumber,
           workDayId: resolvedWorkDayId,
+          dayNumber,
           attendanceDate,
           slot: targetSlot,
         },
@@ -717,6 +729,38 @@ export async function initializeUserOfflineCache(user?: {
             status: pb.participationStatus || "ACTIVE",
             orientationStatus: hasOrientation ? "PRESENT" : "ABSENT",
           });
+
+          // Cache any server attendance records locally
+          for (const rec of pb.attendanceRecords || []) {
+            const existing = await offlineDb.offlineAttendanceRecords
+              .where("[programId+workDayId+programBeneficiaryId]")
+              .equals([prog.id, rec.workDayId, pb.id])
+              .first();
+
+            if (existing && existing.id) {
+              await offlineDb.offlineAttendanceRecords.update(existing.id, {
+                morningTimeIn: rec.morningTimeIn || existing.morningTimeIn,
+                morningTimeOut: rec.morningTimeOut || existing.morningTimeOut,
+                afternoonTimeIn: rec.afternoonTimeIn || existing.afternoonTimeIn,
+                afternoonTimeOut: rec.afternoonTimeOut || existing.afternoonTimeOut,
+                status: rec.status || existing.status,
+              });
+            } else {
+              await offlineDb.offlineAttendanceRecords.add({
+                programId: prog.id,
+                workDayId: rec.workDayId,
+                programBeneficiaryId: pb.id,
+                designatedNumber: pb.designatedNumber,
+                attendanceDate: rec.attendanceDate || "",
+                morningTimeIn: rec.morningTimeIn,
+                morningTimeOut: rec.morningTimeOut,
+                afternoonTimeIn: rec.afternoonTimeIn,
+                afternoonTimeOut: rec.afternoonTimeOut,
+                status: rec.status || "PRESENT",
+                scannedAt: rec.morningTimeIn || new Date().toISOString(),
+              });
+            }
+          }
         }
       }
     }

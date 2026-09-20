@@ -57,7 +57,8 @@ function AttendanceMatrixContent() {
           const pbScans = offlineRecords.filter(
             (r) =>
               r.programBeneficiaryId === pb.id ||
-              (pb.beneficiaryId && r.programBeneficiaryId === pb.beneficiaryId)
+              (pb.beneficiaryId && r.programBeneficiaryId === pb.beneficiaryId) ||
+              (pb.designatedNumber && r.designatedNumber && String(pb.designatedNumber) === String(r.designatedNumber))
           );
 
           if (pbScans.length === 0) return pb;
@@ -65,8 +66,23 @@ function AttendanceMatrixContent() {
           const mergedRecords = [...(pb.attendanceRecords || [])];
 
           for (const scan of pbScans) {
+            const matchingWorkDay = workDays?.find(
+              (w: any) =>
+                w.id === scan.workDayId ||
+                w.dayNumber === scan.dayNumber ||
+                (scan.workDayId && String(scan.workDayId).endsWith(String(w.dayNumber))) ||
+                w.workDate === scan.attendanceDate
+            );
+
+            const resolvedWorkDayId = matchingWorkDay?.id || scan.workDayId;
+            const resolvedAttendanceDate = matchingWorkDay?.workDate || scan.attendanceDate;
+
             const existingIdx = mergedRecords.findIndex(
               (r: any) =>
+                (resolvedWorkDayId && r.workDayId === resolvedWorkDayId) ||
+                (matchingWorkDay && r.workDayId === matchingWorkDay.id) ||
+                (matchingWorkDay && r.attendanceDate === matchingWorkDay.workDate) ||
+                (scan.dayNumber && r.dayNumber === scan.dayNumber) ||
                 r.workDayId === scan.workDayId ||
                 r.attendanceDate === scan.attendanceDate
             );
@@ -74,6 +90,9 @@ function AttendanceMatrixContent() {
             if (existingIdx >= 0) {
               mergedRecords[existingIdx] = {
                 ...mergedRecords[existingIdx],
+                workDayId: resolvedWorkDayId || mergedRecords[existingIdx].workDayId,
+                attendanceDate: resolvedAttendanceDate || mergedRecords[existingIdx].attendanceDate,
+                dayNumber: matchingWorkDay?.dayNumber || scan.dayNumber || mergedRecords[existingIdx].dayNumber,
                 morningTimeIn:
                   scan.morningTimeIn || mergedRecords[existingIdx].morningTimeIn,
                 morningTimeOut:
@@ -87,8 +106,9 @@ function AttendanceMatrixContent() {
             } else {
               mergedRecords.push({
                 id: `offline-${scan.id || Date.now()}`,
-                workDayId: scan.workDayId,
-                attendanceDate: scan.attendanceDate,
+                workDayId: resolvedWorkDayId,
+                dayNumber: matchingWorkDay?.dayNumber || scan.dayNumber,
+                attendanceDate: resolvedAttendanceDate,
                 morningTimeIn: scan.morningTimeIn,
                 morningTimeOut: scan.morningTimeOut,
                 afternoonTimeIn: scan.afternoonTimeIn,
@@ -473,7 +493,14 @@ function AttendanceMatrixContent() {
                       const dayObj = workDaysList.find((w: any) => w.dayNumber === dIdx + 1);
                       const rec = dayObj
                         ? pb.attendanceRecords?.find(
-                            (a: any) => a.workDayId === dayObj.id || a.attendanceDate === dayObj.workDate
+                            (a: any) =>
+                              a.workDayId === dayObj.id ||
+                              a.dayNumber === dayObj.dayNumber ||
+                              a.dayNumber === dIdx + 1 ||
+                              a.workDayId === `WD-${dayObj.dayNumber}` ||
+                              a.workDayId === `WD-${dIdx + 1}` ||
+                              (dayObj.id && String(a.workDayId).includes(dayObj.id)) ||
+                              a.attendanceDate === dayObj.workDate
                           )
                         : null;
 

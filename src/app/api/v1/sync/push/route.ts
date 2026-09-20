@@ -115,6 +115,13 @@ export async function POST(request: Request) {
             wd = await prisma.workDay.findUnique({ where: { id: workDayId } });
           }
 
+          const parsedDayNum = payload.dayNumber || (String(workDayId).startsWith("WD-") ? parseInt(String(workDayId).replace("WD-", ""), 10) : null);
+          if (!wd && parsedDayNum) {
+            wd = await prisma.workDay.findFirst({
+              where: { programId: resolvedProgramId, dayNumber: parsedDayNum },
+            });
+          }
+
           const targetDate = attendanceDate || format(new Date(), "yyyy-MM-dd");
 
           if (!wd) {
