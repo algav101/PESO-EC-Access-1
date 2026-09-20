@@ -1,5 +1,10 @@
 import Dexie, { type Table } from "dexie";
 import { format } from "date-fns";
+import {
+  getPhilippineTime,
+  determineAttendanceSlot,
+  ATTENDANCE_SLOT_LABELS,
+} from "@/lib/utils";
 
 export interface CachedProgram {
   id: string;
@@ -249,45 +254,34 @@ export async function recordOfflineAttendance(params: {
     throw new Error(`QR Token or Beneficiary identifier "${rawToken}" not found in offline database cache.`);
   }
 
+  const pht = getPhilippineTime();
+  const now = pht.now;
+  const todayStr = pht.dateStr;
+
   // Resolve work day
   let workDay = workDayId ? await offlineDb.cachedWorkDays.get(workDayId) : null;
   if (!workDay && programId) {
     const progDays = await offlineDb.cachedWorkDays.where("programId").equals(programId).toArray();
-    const todayStr = format(new Date(), "yyyy-MM-dd");
     workDay = progDays.find((d) => d.workDate === todayStr) || progDays[0] || null;
   }
 
-  const now = new Date();
-  const todayStr = format(now, "yyyy-MM-dd");
   const attendanceDate = workDay?.workDate || todayStr;
   const dayNumber = workDay?.dayNumber || 1;
   const resolvedProgramId = bene.programId || programId;
   const resolvedWorkDayId = workDay?.id || workDayId || `WD-${dayNumber}`;
 
-  // Resolve Shift Slot
-  const currentHour = now.getHours();
-  const currentMinute = now.getMinutes();
-  const timeDecimal = currentHour + currentMinute / 60;
-
+  // Resolve Shift Slot in Philippine Standard Time
   let targetSlot: "MORNING_IN" | "MORNING_OUT" | "AFTERNOON_IN" | "AFTERNOON_OUT" = "MORNING_IN";
   if (shiftMode === "MORNING_IN") targetSlot = "MORNING_IN";
   else if (shiftMode === "MORNING_OUT") targetSlot = "MORNING_OUT";
   else if (shiftMode === "AFTERNOON_IN") targetSlot = "AFTERNOON_IN";
   else if (shiftMode === "AFTERNOON_OUT") targetSlot = "AFTERNOON_OUT";
   else {
-    // AUTO
-    if (timeDecimal < 11.5) targetSlot = "MORNING_IN";
-    else if (timeDecimal < 12.8) targetSlot = "MORNING_OUT";
-    else if (timeDecimal < 15.5) targetSlot = "AFTERNOON_IN";
-    else targetSlot = "AFTERNOON_OUT";
+    // AUTO detection by Philippine Standard Time
+    targetSlot = determineAttendanceSlot(pht.timeDecimal);
   }
 
-  const slotLabels: Record<string, string> = {
-    MORNING_IN: "Morning Time-In (AM IN)",
-    MORNING_OUT: "Morning Time-Out (AM OUT)",
-    AFTERNOON_IN: "Afternoon Time-In (PM IN)",
-    AFTERNOON_OUT: "Afternoon Time-Out (PM OUT)",
-  };
+  const slotLabels = ATTENDANCE_SLOT_LABELS;
 
   // Find local attendance record for duplicate detection
   const records = await offlineDb.offlineAttendanceRecords
@@ -378,6 +372,19 @@ export async function recordOfflineAttendance(params: {
       },
       isOffline: true,
     };
+  }
+
+  // Sequence check within day: Cannot scan Time-Out before Time-In!
+  if (targetSlot === "MORNING_OUT" && !existingRecord?.morningTimeIn) {
+    throw new Error(
+      `CANNOT RECORD TIME-OUT: Morning Time-In (AM IN) has not been recorded yet on this unit for #${bene.designatedNumber} (${bene.fullName}). Please scan AM IN first, or select "AM IN" from the Shift dropdown.`
+    );
+  }
+
+  if (targetSlot === "AFTERNOON_OUT" && !existingRecord?.afternoonTimeIn) {
+    throw new Error(
+      `CANNOT RECORD TIME-OUT: Afternoon Time-In (PM IN) has not been recorded yet on this unit for #${bene.designatedNumber} (${bene.fullName}). Please scan PM IN first, or select "PM IN" from the Shift dropdown.`
+    );
   }
 
   // Work Area Matching from Offline Work Program Items

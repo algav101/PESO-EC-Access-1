@@ -148,3 +148,82 @@ export function matchesBirthdayPin(storedBirthday?: string | null, enteredPin?: 
 
   return p1.y === p2.y && p1.m === p2.m && p1.d === p2.d;
 }
+
+/**
+ * Returns the current date and time in Philippine Standard Time (PST / Asia/Manila, UTC+8).
+ * Ensures correct calculations irrespective of server runtime timezone (e.g. UTC cloud environments).
+ */
+export function getPhilippineTime(inputDate: Date = new Date()): {
+  now: Date;
+  hour: number;
+  minute: number;
+  timeDecimal: number;
+  dateStr: string;
+  formattedTime: string;
+} {
+  const formatter = new Intl.DateTimeFormat("en-US", {
+    timeZone: "Asia/Manila",
+    hour12: false,
+    hour: "numeric",
+    minute: "numeric",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  });
+
+  const parts = formatter.formatToParts(inputDate);
+  const getVal = (type: string) => parts.find((p) => p.type === type)?.value || "0";
+
+  const hour = parseInt(getVal("hour"), 10) % 24;
+  const minute = parseInt(getVal("minute"), 10);
+  const year = getVal("year");
+  const month = getVal("month");
+  const day = getVal("day");
+
+  const timeDecimal = hour + minute / 60;
+  const dateStr = `${year}-${month}-${day}`;
+
+  const timeFormatter = new Intl.DateTimeFormat("en-US", {
+    timeZone: "Asia/Manila",
+    hour12: true,
+    hour: "numeric",
+    minute: "2-digit",
+  });
+
+  return {
+    now: inputDate,
+    hour,
+    minute,
+    timeDecimal,
+    dateStr,
+    formattedTime: timeFormatter.format(inputDate),
+  };
+}
+
+export function getPhilippineDateStr(inputDate: Date = new Date()): string {
+  return getPhilippineTime(inputDate).dateStr;
+}
+
+export type AttendanceSlotType = "MORNING_IN" | "MORNING_OUT" | "AFTERNOON_IN" | "AFTERNOON_OUT";
+
+/**
+ * Determines target attendance shift slot based on Philippine time decimal.
+ * - AM IN: 0:00 to 11:30 (timeDecimal < 11.5)
+ * - AM OUT: 11:30 to 12:45 (11.5 <= timeDecimal < 12.8)
+ * - PM IN: 12:45 to 15:30 (12.8 <= timeDecimal < 15.5)
+ * - PM OUT: 15:30 onwards (timeDecimal >= 15.5)
+ */
+export function determineAttendanceSlot(timeDecimal: number): AttendanceSlotType {
+  if (timeDecimal < 11.5) return "MORNING_IN";
+  if (timeDecimal < 12.8) return "MORNING_OUT";
+  if (timeDecimal < 15.5) return "AFTERNOON_IN";
+  return "AFTERNOON_OUT";
+}
+
+export const ATTENDANCE_SLOT_LABELS: Record<AttendanceSlotType, string> = {
+  MORNING_IN: "Morning Time-In (AM IN)",
+  MORNING_OUT: "Morning Time-Out (AM OUT)",
+  AFTERNOON_IN: "Afternoon Time-In (PM IN)",
+  AFTERNOON_OUT: "Afternoon Time-Out (PM OUT)",
+};
+

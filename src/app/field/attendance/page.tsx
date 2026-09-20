@@ -22,6 +22,11 @@ import { FieldQrPassGeneratorModal } from "@/components/field/FieldQrPassGenerat
 import { useOffline } from "@/context/OfflineContext";
 import { offlineDb, queueOfflineTransaction, recordOfflineAttendance } from "@/lib/dexie";
 import { format } from "date-fns";
+import {
+  getPhilippineTime,
+  determineAttendanceSlot,
+  ATTENDANCE_SLOT_LABELS,
+} from "@/lib/utils";
 
 export default function DailyAttendancePage() {
   const { isOnline, masterSyncNow, isSyncing } = useOffline();
@@ -42,6 +47,14 @@ export default function DailyAttendancePage() {
   const [error, setError] = useState<string | null>(null);
   const [scanResult, setScanResult] = useState<any | null>(null);
 
+  // Philippine Standard Time calculation
+  const pht = getPhilippineTime();
+  const autoDetectedSlot = determineAttendanceSlot(pht.timeDecimal);
+  const activeSlotLabel =
+    shiftMode === "AUTO"
+      ? `AUTO (${ATTENDANCE_SLOT_LABELS[autoDetectedSlot]})`
+      : ATTENDANCE_SLOT_LABELS[shiftMode as keyof typeof ATTENDANCE_SLOT_LABELS] || shiftMode;
+
   useEffect(() => {
     fetchPrograms();
   }, []);
@@ -52,7 +65,7 @@ export default function DailyAttendancePage() {
       if (prog) {
         setWorkDays(prog.workDays || []);
         if (prog.workDays?.length > 0) {
-          const todayStr = format(new Date(), "yyyy-MM-dd");
+          const todayStr = pht.dateStr;
           const todayWd = prog.workDays.find((w: any) => w.workDate === todayStr);
           setSelectedWorkDayId(todayWd ? todayWd.id : prog.workDays[0].id);
         }
@@ -307,11 +320,11 @@ export default function DailyAttendancePage() {
               onChange={(e) => setShiftMode(e.target.value)}
               className="w-full px-3 py-1.5 text-xs border border-slate-300 rounded-lg bg-slate-50 font-semibold focus:outline-none focus:border-gov-blue"
             >
-              <option value="AUTO">Auto Detect Time</option>
-              <option value="MORNING_IN">AM IN (Morning In)</option>
-              <option value="MORNING_OUT">AM OUT (Lunch Break)</option>
-              <option value="AFTERNOON_IN">PM IN (Afternoon In)</option>
-              <option value="AFTERNOON_OUT">PM OUT (Day End)</option>
+              <option value="AUTO">⚡ Auto Detect ({ATTENDANCE_SLOT_LABELS[autoDetectedSlot]})</option>
+              <option value="MORNING_IN">AM IN (Morning In • 6:00 AM - 11:30 AM)</option>
+              <option value="MORNING_OUT">AM OUT (Lunch Break • 11:30 AM - 12:45 PM)</option>
+              <option value="AFTERNOON_IN">PM IN (Afternoon In • 12:45 PM - 3:30 PM)</option>
+              <option value="AFTERNOON_OUT">PM OUT (Day End • 3:30 PM+)</option>
             </select>
           </div>
         </div>
@@ -347,8 +360,8 @@ export default function DailyAttendancePage() {
           </div>
 
           <div className="space-y-1">
-            <span className="text-[10px] font-bold uppercase font-mono px-2 py-0.5 rounded bg-blue-50 text-gov-blue border border-blue-200">
-              Active Session: Day {selectedWorkDay?.dayNumber || 1} • {shiftMode}
+            <span className="text-[10px] font-bold uppercase font-mono px-2.5 py-1 rounded bg-blue-50 text-gov-blue border border-blue-200 inline-block">
+              Active Session: Day {selectedWorkDay?.dayNumber || 1} • {activeSlotLabel}
             </span>
             <h3 className="text-base font-extrabold text-slate-900 mt-1">Ready for Attendance</h3>
             <p className="text-xs text-slate-500 max-w-xs mx-auto">
@@ -377,9 +390,37 @@ export default function DailyAttendancePage() {
       {error && (
         <div className="p-4 bg-red-50 border border-red-200 rounded-xl flex items-start space-x-3 text-xs text-red-700 shadow">
           <AlertCircle className="w-5 h-5 flex-shrink-0 mt-0.5 text-red-600" />
-          <div className="space-y-1">
-            <strong className="block font-bold">Attendance Alert</strong>
-            <span>{error}</span>
+          <div className="space-y-2 flex-1">
+            <div>
+              <strong className="block font-bold text-red-900">Attendance Alert</strong>
+              <span className="text-red-800 leading-relaxed">{error}</span>
+            </div>
+            {error.includes("PM IN") && shiftMode !== "AFTERNOON_IN" && (
+              <button
+                type="button"
+                onClick={() => {
+                  setShiftMode("AFTERNOON_IN");
+                  setError(null);
+                }}
+                className="px-2.5 py-1 bg-red-100 hover:bg-red-200 text-red-900 rounded-lg font-bold text-[11px] border border-red-300 inline-flex items-center space-x-1 transition"
+              >
+                <span>Switch Shift to PM IN (Afternoon In)</span>
+                <ArrowRight className="w-3 h-3" />
+              </button>
+            )}
+            {error.includes("AM IN") && shiftMode !== "MORNING_IN" && (
+              <button
+                type="button"
+                onClick={() => {
+                  setShiftMode("MORNING_IN");
+                  setError(null);
+                }}
+                className="px-2.5 py-1 bg-red-100 hover:bg-red-200 text-red-900 rounded-lg font-bold text-[11px] border border-red-300 inline-flex items-center space-x-1 transition"
+              >
+                <span>Switch Shift to AM IN (Morning In)</span>
+                <ArrowRight className="w-3 h-3" />
+              </button>
+            )}
           </div>
         </div>
       )}

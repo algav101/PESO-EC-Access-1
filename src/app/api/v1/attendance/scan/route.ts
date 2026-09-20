@@ -5,7 +5,12 @@ import prisma from "@/lib/prisma";
 import { getCurrentUser, hasPermission } from "@/lib/auth";
 import { logAudit } from "@/lib/audit";
 import { format } from "date-fns";
-import { normalizeBarangayName } from "@/lib/utils";
+import {
+  normalizeBarangayName,
+  getPhilippineTime,
+  determineAttendanceSlot,
+  ATTENDANCE_SLOT_LABELS,
+} from "@/lib/utils";
 
 export async function POST(request: Request) {
   try {
@@ -192,8 +197,10 @@ export async function POST(request: Request) {
 
     const program = pb.program;
 
-    // Resolve WorkDay
-    const dateStr = targetDate || format(new Date(), "yyyy-MM-dd");
+    // Resolve WorkDay using Philippine Standard Time date
+    const pht = getPhilippineTime();
+    const now = pht.now;
+    const dateStr = targetDate || pht.dateStr;
     let workDay = workDayId
       ? program.workDays.find((w: any) => w.id === workDayId)
       : program.workDays.find((w: any) => w.workDate === dateStr) || program.workDays[0];
@@ -250,31 +257,18 @@ export async function POST(request: Request) {
       },
     });
 
-    const now = new Date();
-    const currentHour = now.getHours();
-    const currentMinute = now.getMinutes();
-    const timeDecimal = currentHour + currentMinute / 60;
-
-    // Determine target slot
+    // Determine target slot in Philippine Standard Time (PST / Asia/Manila, UTC+8)
     let targetSlot: "MORNING_IN" | "MORNING_OUT" | "AFTERNOON_IN" | "AFTERNOON_OUT" = "MORNING_IN";
     if (shiftMode === "MORNING_IN") targetSlot = "MORNING_IN";
     else if (shiftMode === "MORNING_OUT") targetSlot = "MORNING_OUT";
     else if (shiftMode === "AFTERNOON_IN") targetSlot = "AFTERNOON_IN";
     else if (shiftMode === "AFTERNOON_OUT") targetSlot = "AFTERNOON_OUT";
     else {
-      // AUTO detection by time
-      if (timeDecimal < 11.5) targetSlot = "MORNING_IN";
-      else if (timeDecimal < 12.8) targetSlot = "MORNING_OUT";
-      else if (timeDecimal < 15.5) targetSlot = "AFTERNOON_IN";
-      else targetSlot = "AFTERNOON_OUT";
+      // AUTO detection strictly by Philippine Time (0:00-11:30 AM IN, 11:30-12:45 AM OUT, 12:45-15:30 PM IN, 15:30+ PM OUT)
+      targetSlot = determineAttendanceSlot(pht.timeDecimal);
     }
 
-    const slotLabels: Record<string, string> = {
-      MORNING_IN: "Morning Time-In (AM IN)",
-      MORNING_OUT: "Morning Time-Out (AM OUT)",
-      AFTERNOON_IN: "Afternoon Time-In (PM IN)",
-      AFTERNOON_OUT: "Afternoon Time-Out (PM OUT)",
-    };
+    const slotLabels = ATTENDANCE_SLOT_LABELS;
 
     // =========================================================================
     // ANTI-DOUBLE SCAN ENFORCEMENT: Check if the session slot was already logged
@@ -379,7 +373,7 @@ export async function POST(request: Request) {
     if (targetSlot === "MORNING_OUT" && !record?.morningTimeIn) {
       return NextResponse.json(
         {
-          error: `CANNOT RECORD TIME-OUT: Morning Time-In (AM IN) has not been recorded yet for #${pb.designatedNumber}. Please scan AM IN first.`,
+          error: `CANNOT RECORD TIME-OUT: Morning Time-In (AM IN) has not been recorded yet for #${pb.designatedNumber} (${pb.beneficiary.fullName}). Please scan AM IN first, or select "AM IN" from the Shift dropdown.`,
           stepBlocked: "TIME_IN_REQUIRED",
         },
         { status: 400 }
@@ -389,7 +383,7 @@ export async function POST(request: Request) {
     if (targetSlot === "AFTERNOON_OUT" && !record?.afternoonTimeIn) {
       return NextResponse.json(
         {
-          error: `CANNOT RECORD TIME-OUT: Afternoon Time-In (PM IN) has not been recorded yet for #${pb.designatedNumber}. Please scan PM IN first.`,
+          error: `CANNOT RECORD TIME-OUT: Afternoon Time-In (PM IN) has not been recorded yet for #${pb.designatedNumber} (${pb.beneficiary.fullName}). Please scan PM IN first, or select "PM IN" from the Shift dropdown.`,
           stepBlocked: "TIME_IN_REQUIRED",
         },
         { status: 400 }
