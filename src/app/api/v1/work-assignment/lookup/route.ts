@@ -401,11 +401,18 @@ async function handleLookup(params: any) {
   const beneficiary = pb.beneficiary;
 
   // =========================================================================
-  // MIDDLE NAME AUTHENTICATION (DATA PRIVACY PROTECTION)
+  // PHYSICAL QR ID AUTHENTICATION vs PUBLIC NAME LOOKUP PRIVACY
   // =========================================================================
+  const isDirectQrScan = Boolean(
+    (qr && cleanToken) ||
+    (cleanToken && cleanToken.length > 0) ||
+    designatedNumber ||
+    params.isQrScan === true ||
+    params.isScan === true
+  );
   const isAuthProvided = params.hasOwnProperty("middleName") || params.hasOwnProperty("authKey");
 
-  if (!isStaffSession) {
+  if (!isStaffSession && !isDirectQrScan) {
     if (!isAuthProvided) {
       // Return challenge response requiring Middle Name authentication
       return NextResponse.json({

@@ -1,80 +1,207 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect, useRef } from "react";
+import jsQR from "jsqr";
 import {
+  Camera,
+  QrCode,
+  Upload,
+  Search,
+  Sparkles,
   MapPin,
   Calendar,
   Clock,
-  User,
   ShieldCheck,
   CheckCircle2,
   AlertCircle,
-  Sparkles,
-  ArrowRight,
   RefreshCw,
   Building,
-  Navigation,
   Compass,
-  Search,
-  Lock,
-  FileText,
-  AlertTriangle,
-  Info,
+  Printer,
+  Layers,
+  SwitchCamera,
   Check,
-  Award,
+  AlertTriangle,
+  FileText,
+  User,
+  X,
+  Lock,
 } from "lucide-react";
 
-const DINGALAN_BARANGAYS = [
-  "ALL",
-  "Aplaya",
-  "Butas Na Bato",
-  "Cabischasan",
-  "Caragsacan",
-  "Davil-davilan",
-  "Dikapanikian",
-  "Ibona",
-  "Paltic",
-  "Poblacion",
-  "Tanawan",
-  "Umiray",
-];
-
 export function PublicWorkAssignmentLookupCard() {
-  const [lastName, setLastName] = useState("");
-  const [firstName, setFirstName] = useState("");
-  const [middleName, setMiddleName] = useState("");
-  const [barangay, setBarangay] = useState("ALL");
-  const [dpaConsent, setDpaConsent] = useState(false);
+  // Scanner & Input State
+  const [scanMode, setScanMode] = useState<"camera" | "upload" | "manual">("camera");
+  const [cameraActive, setCameraActive] = useState<boolean>(false);
+  const [facingMode, setFacingMode] = useState<"environment" | "user">("environment");
+  const [cameraError, setCameraError] = useState<string | null>(null);
+  const [manualToken, setManualToken] = useState("");
+  const [dpaConsent, setDpaConsent] = useState(true);
 
+  // Verification & Display State
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [data, setData] = useState<any | null>(null);
   const [selectedDay, setSelectedDay] = useState<number>(1);
+  const [showFullTable, setShowFullTable] = useState(false);
 
-  const handleLookup = async (e?: React.FormEvent) => {
-    if (e) e.preventDefault();
+  // Camera & Canvas Refs
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const streamRef = useRef<MediaStream | null>(null);
+  const animationFrameId = useRef<number | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
-    if (!dpaConsent) {
-      setError("Pakisuyong lagyan ng tsek ang Data Privacy Consent bago magpatuloy.");
-      return;
+  // Start/stop camera on mode change
+  useEffect(() => {
+    if (!data && scanMode === "camera" && cameraActive) {
+      startCamera();
+    } else {
+      stopCamera();
     }
 
-    if (!lastName.trim() || !firstName.trim() || !middleName.trim()) {
-      setError("Pakilagay ang iyong Apelyido, Pangalan, at Gitnang Pangalan (o 'N/A' kung wala).");
-      return;
+    return () => {
+      stopCamera();
+    };
+  }, [scanMode, cameraActive, facingMode, data]);
+
+  const startCamera = async () => {
+    setCameraError(null);
+    stopCamera();
+
+    try {
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        throw new Error("Camera API is not supported on this browser or device.");
+      }
+
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: {
+          facingMode: facingMode,
+          width: { ideal: 1280 },
+          height: { ideal: 720 },
+        },
+      });
+
+      streamRef.current = stream;
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+        videoRef.current.setAttribute("playsinline", "true");
+        await videoRef.current.play();
+        requestAnimationFrame(scanVideoFrame);
+      }
+    } catch (err: any) {
+      console.warn("Camera access failed:", err);
+      setCameraError(
+        "Hindi mabuksan ang camera o walang pahintulot. Maaaring gamitin ang 'Upload Larawan' o 'Manual Slot #' sa ibaba."
+      );
+      setCameraActive(false);
     }
+  };
+
+  const stopCamera = () => {
+    if (animationFrameId.current) {
+      cancelAnimationFrame(animationFrameId.current);
+      animationFrameId.current = null;
+    }
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach((t) => t.stop());
+      streamRef.current = null;
+    }
+  };
+
+  const scanVideoFrame = () => {
+    if (!videoRef.current || !canvasRef.current || !cameraActive) return;
+
+    if (videoRef.current.readyState === videoRef.current.HAVE_ENOUGH_DATA) {
+      const canvas = canvasRef.current;
+      const ctx = canvas.getContext("2d", { willReadFrequently: true });
+      if (ctx) {
+        canvas.height = videoRef.current.videoHeight;
+        canvas.width = videoRef.current.videoWidth;
+        ctx.drawImage(videoRef.current, 0, 0, canvas.width, canvas.height);
+
+        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        const code = jsQR(imageData.data, imageData.width, imageData.height, {
+          inversionAttempts: "dontInvert",
+        });
+
+        if (code && code.data && code.data.trim().length > 0) {
+          handleScannedToken(code.data.trim());
+          return;
+        }
+      }
+    }
+    animationFrameId.current = requestAnimationFrame(scanVideoFrame);
+  };
+
+  const handleScannedToken = (token: string) => {
+    stopCamera();
+    setCameraActive(false);
+
+    // Haptic vibration feedback if available
+    if (typeof navigator !== "undefined" && navigator.vibrate) {
+      navigator.vibrate(100);
+    }
+
+    performLookup(token);
+  };
+
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setLoading(true);
+    setError(null);
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement("canvas");
+        const ctx = canvas.getContext("2d", { willReadFrequently: true });
+        if (!ctx) {
+          setError("Hindi ma-proseso ang larawan.");
+          setLoading(false);
+          return;
+        }
+
+        canvas.width = img.width;
+        canvas.height = img.height;
+        ctx.drawImage(img, 0, 0, img.width, img.height);
+
+        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        const code = jsQR(imageData.data, imageData.width, imageData.height, {
+          inversionAttempts: "dontInvert",
+        });
+
+        if (code && code.data) {
+          performLookup(code.data.trim());
+        } else {
+          setError(
+            "Walang nabasang TUPAD QR Code sa larawang pinili. Pakitiyak na malinaw at nakatapat sa QR code ang kuha."
+          );
+          setLoading(false);
+        }
+      };
+      img.src = event.target?.result as string;
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const performLookup = async (tokenOrSlot: string) => {
+    const cleaned = tokenOrSlot.trim();
+    if (!cleaned) return;
 
     setLoading(true);
     setError(null);
 
     try {
       const queryParams = new URLSearchParams();
-      queryParams.set("lastName", lastName.trim());
-      queryParams.set("firstName", firstName.trim());
-      queryParams.set("middleName", middleName.trim());
-      if (barangay && barangay !== "ALL") {
-        queryParams.set("barangay", barangay);
+      if (/^\d+$/.test(cleaned) && cleaned.length <= 4) {
+        queryParams.set("designatedNumber", cleaned);
+      } else {
+        queryParams.set("qrToken", cleaned);
       }
+      queryParams.set("isQrScan", "true");
 
       const res = await fetch(`/api/v1/work-assignment/lookup?${queryParams.toString()}`);
       const json = await res.json();
@@ -83,38 +210,48 @@ export function PublicWorkAssignmentLookupCard() {
         setData(json);
         setSelectedDay(json.workDay?.dayNumber || 1);
         setError(null);
-      } else if (json.requiresAuth || json.authFailed) {
-        setError(json.error || "Maling Gitnang Pangalan. Pakitiyak ang tamang gitnang pangalan na nakarehistro sa iyong TUPAD application.");
-        setData(null);
       } else {
-        setError(json.error || "Walang nahanap na tala sa pangalang ibinigay. Pakitiyak ang baybay ng iyong pangalan.");
+        setError(
+          json.error ||
+            "Walang nahanap na aktibong tala ng benepisyaryo sa QR code o Slot number na ito. Pakitiyak ang QR ID."
+        );
         setData(null);
       }
     } catch (err: any) {
-      setError("May naganap na problema sa koneksyon: " + err.message);
+      setError("Nagkaroon ng problema sa koneksyon: " + err.message);
       setData(null);
     } finally {
       setLoading(false);
     }
   };
 
-  // Instant 0ms Day Switcher (reads pre-calculated 10-day schedule directly from memory)
+  const handleManualSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!manualToken.trim()) return;
+    performLookup(manualToken.trim());
+  };
+
   const handleDaySwitch = (dayNum: number) => {
     setSelectedDay(dayNum);
   };
 
-  const handleReset = () => {
+  const handleResetScan = () => {
+    stopCamera();
     setData(null);
     setError(null);
+    setManualToken("");
+    setScanMode("camera");
+    setCameraActive(true);
   };
 
-  // Active assignment for currently selected day (instant client-side evaluation)
+  const toggleFacingMode = () => {
+    setFacingMode((prev) => (prev === "environment" ? "user" : "environment"));
+  };
+
   const activeDayAssignment =
-    (data?.dailyAssignments && data.dailyAssignments[selectedDay])
+    data?.dailyAssignments && data.dailyAssignments[selectedDay]
       ? data.dailyAssignments[selectedDay]
       : data?.allDaysSchedule?.find((s: any) => s.dayNumber === selectedDay) || data?.assignment;
-
-  const [showFullTable, setShowFullTable] = useState(false);
 
   return (
     <div className="gov-card border-2 border-emerald-600/30 overflow-hidden bg-white shadow-xl rounded-3xl transition-all">
@@ -126,17 +263,21 @@ export function PublicWorkAssignmentLookupCard() {
               <Sparkles className="w-3.5 h-3.5 text-emerald-400" />
               DOLE - PESO TUPAD • Field Operations
             </span>
+            <span className="px-2.5 py-0.5 bg-amber-500/20 text-amber-300 border border-amber-400/30 rounded-full text-[11px] font-bold flex items-center gap-1">
+              <QrCode className="w-3 h-3 text-amber-300" />
+              Laminated QR ID Scanner
+            </span>
             <span className="px-2.5 py-0.5 bg-blue-500/20 text-blue-200 border border-blue-400/30 rounded-full text-[11px] font-bold">
               RA 10173 DPA Compliant
             </span>
           </div>
 
           <h3 className="text-xl sm:text-2xl lg:text-3xl font-black text-white tracking-tight">
-            Suriin ang Iyong TUPAD Work Area Assignment & Iskedyul
+            I-scan ang Iyong TUPAD Laminated QR ID para sa Work Area &amp; Iskedyul
           </h3>
 
           <p className="text-xs sm:text-sm text-slate-300 max-w-3xl leading-relaxed">
-            Para sa mga rehistradong benepisyaryo ng TUPAD sa Bayan ng Dingalan: Ilagay ang iyong kumpletong pangalan upang makita ang iyong itinalagang lugar ng paggawa, uri ng aktibidad (road clearing, coastal cleaning, atbp.), at 10-araw na iskedyul.
+            Itapat ang iyong opisyal na <strong className="text-gov-goldLight">TUPAD laminated QR ID</strong> sa camera o mag-upload ng larawan upang agad na makita ang iyong 10-araw na itinalagang lugar ng paggawa, partikular na gawain, at gabay sa pagpasok.
           </p>
         </div>
 
@@ -146,165 +287,261 @@ export function PublicWorkAssignmentLookupCard() {
       </div>
 
       <div className="p-6 sm:p-8 space-y-6">
-        {/* If no verified data is showing yet, show Search Form */}
+        {/* IF NO VERIFIED DATA IS SHOWING YET: RENDER SCANNER INTERFACE */}
         {!data ? (
-          <form onSubmit={(e) => handleLookup(e)} className="space-y-6">
-            {/* Input Grid: Last Name, First Name, Middle Name, Barangay */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-              {/* Last Name */}
-              <div className="space-y-1.5">
-                <label className="block text-xs font-bold text-slate-800 uppercase tracking-wider">
-                  Apelyido (Last Name) <span className="text-red-500">*</span>
-                </label>
-                <div className="relative">
-                  <User className="w-4 h-4 text-slate-400 absolute left-3 top-3.5 pointer-events-none" />
-                  <input
-                    type="text"
-                    required
-                    value={lastName}
-                    onChange={(e) => setLastName(e.target.value)}
-                    placeholder="Hal. DELA CRUZ"
-                    className="w-full pl-9 pr-3 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-sm font-semibold text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:bg-white transition uppercase placeholder:normal-case placeholder:font-normal"
-                  />
-                </div>
-              </div>
+          <div className="space-y-6">
+            {/* Scan Mode Switcher Tabs */}
+            <div className="flex bg-slate-100 p-1.5 rounded-2xl border border-slate-200 gap-1.5">
+              <button
+                type="button"
+                onClick={() => {
+                  setScanMode("camera");
+                  setCameraActive(true);
+                  setError(null);
+                }}
+                className={`flex-1 py-2.5 px-3 rounded-xl text-xs font-bold transition flex items-center justify-center space-x-1.5 ${
+                  scanMode === "camera"
+                    ? "bg-slate-900 text-white shadow-md font-black"
+                    : "text-slate-600 hover:text-slate-900 hover:bg-white/60"
+                }`}
+              >
+                <Camera className="w-4 h-4 text-emerald-400" />
+                <span>Camera Live Scanner</span>
+              </button>
 
-              {/* First Name */}
-              <div className="space-y-1.5">
-                <label className="block text-xs font-bold text-slate-800 uppercase tracking-wider">
-                  Pangalan (First Name) <span className="text-red-500">*</span>
-                </label>
-                <div className="relative">
-                  <User className="w-4 h-4 text-slate-400 absolute left-3 top-3.5 pointer-events-none" />
-                  <input
-                    type="text"
-                    required
-                    value={firstName}
-                    onChange={(e) => setFirstName(e.target.value)}
-                    placeholder="Hal. JUAN"
-                    className="w-full pl-9 pr-3 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-sm font-semibold text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:bg-white transition uppercase placeholder:normal-case placeholder:font-normal"
-                  />
-                </div>
-              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setScanMode("upload");
+                  stopCamera();
+                  setCameraActive(false);
+                  setError(null);
+                }}
+                className={`flex-1 py-2.5 px-3 rounded-xl text-xs font-bold transition flex items-center justify-center space-x-1.5 ${
+                  scanMode === "upload"
+                    ? "bg-slate-900 text-white shadow-md font-black"
+                    : "text-slate-600 hover:text-slate-900 hover:bg-white/60"
+                }`}
+              >
+                <Upload className="w-4 h-4 text-blue-400" />
+                <span>Upload Larawan ng QR</span>
+              </button>
 
-              {/* Middle Name (Auth Shield) */}
-              <div className="space-y-1.5">
-                <label className="block text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center justify-between">
-                  <span>Gitnang Pangalan <span className="text-red-500">*</span></span>
-                  <span className="text-[10px] text-emerald-700 font-bold lowercase">(o 'N/A')</span>
-                </label>
-                <div className="relative">
-                  <Lock className="w-4 h-4 text-emerald-600 absolute left-3 top-3.5 pointer-events-none" />
-                  <input
-                    type="text"
-                    required
-                    value={middleName}
-                    onChange={(e) => setMiddleName(e.target.value)}
-                    placeholder="Hal. SANTOS"
-                    className="w-full pl-9 pr-3 py-2.5 bg-slate-50 border border-emerald-300/80 rounded-xl text-sm font-semibold text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:bg-white transition uppercase placeholder:normal-case placeholder:font-normal"
-                  />
-                </div>
-              </div>
-
-              {/* Barangay Filter */}
-              <div className="space-y-1.5">
-                <label className="block text-xs font-bold text-slate-800 uppercase tracking-wider">
-                  Barangay (Opsyonal)
-                </label>
-                <div className="relative">
-                  <MapPin className="w-4 h-4 text-slate-400 absolute left-3 top-3.5 pointer-events-none" />
-                  <select
-                    value={barangay}
-                    onChange={(e) => setBarangay(e.target.value)}
-                    className="w-full pl-9 pr-3 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-sm font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:bg-white transition"
-                  >
-                    {DINGALAN_BARANGAYS.map((b) => (
-                      <option key={b} value={b}>
-                        {b === "ALL" ? "Lahat ng Barangay" : `Brgy. ${b}`}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setScanMode("manual");
+                  stopCamera();
+                  setCameraActive(false);
+                  setError(null);
+                }}
+                className={`flex-1 py-2.5 px-3 rounded-xl text-xs font-bold transition flex items-center justify-center space-x-1.5 ${
+                  scanMode === "manual"
+                    ? "bg-slate-900 text-white shadow-md font-black"
+                    : "text-slate-600 hover:text-slate-900 hover:bg-white/60"
+                }`}
+              >
+                <Search className="w-4 h-4 text-amber-400" />
+                <span>Manual Slot # Entry</span>
+              </button>
             </div>
 
-            {/* 2. Official Data Privacy Act Notice & User Consent Box */}
-            <div className="bg-gradient-to-br from-blue-50/80 via-slate-50 to-emerald-50/60 border-2 border-blue-200/80 rounded-2xl p-4 sm:p-5 space-y-3 shadow-xs">
-              <div className="flex items-start space-x-3">
-                <div className="p-2 bg-blue-600 text-white rounded-xl shrink-0 mt-0.5 shadow-xs">
-                  <ShieldCheck className="w-5 h-5" />
+            {/* MODE 1: LIVE CAMERA VIEWPORT */}
+            {scanMode === "camera" && (
+              <div className="bg-slate-900 text-white rounded-3xl p-6 sm:p-8 flex flex-col items-center justify-center border border-slate-800 shadow-2xl relative overflow-hidden min-h-[380px]">
+                {cameraActive ? (
+                  <div className="w-full max-w-sm aspect-square rounded-2xl overflow-hidden bg-black relative border-2 border-emerald-500 shadow-2xl flex items-center justify-center">
+                    <video ref={videoRef} className="w-full h-full object-cover" />
+                    <canvas ref={canvasRef} className="hidden" />
+
+                    {/* Laser scanning visual overlay */}
+                    <div className="absolute inset-5 border-2 border-dashed border-emerald-400/80 rounded-xl pointer-events-none flex flex-col justify-between p-2">
+                      <div className="flex justify-between">
+                        <div className="w-5 h-5 border-t-4 border-l-4 border-emerald-400 rounded-tl-sm"></div>
+                        <div className="w-5 h-5 border-t-4 border-r-4 border-emerald-400 rounded-tr-sm"></div>
+                      </div>
+                      <div className="w-full h-1 bg-emerald-400 shadow-[0_0_12px_rgba(52,211,153,0.9)] animate-pulse"></div>
+                      <div className="flex justify-between">
+                        <div className="w-5 h-5 border-b-4 border-l-4 border-emerald-400 rounded-bl-sm"></div>
+                        <div className="w-5 h-5 border-b-4 border-r-4 border-emerald-400 rounded-br-sm"></div>
+                      </div>
+                    </div>
+
+                    <div className="absolute bottom-3 inset-x-3 bg-slate-950/80 backdrop-blur-sm py-1.5 px-3 rounded-xl text-center">
+                      <p className="text-[11px] font-bold text-emerald-300">
+                        Iposisyon ang QR code ng laminated ID sa gitna ng kahon
+                      </p>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="text-center space-y-4 max-w-sm py-6">
+                    <div className="w-20 h-20 rounded-full bg-emerald-500/20 text-emerald-400 border-2 border-emerald-400/40 flex items-center justify-center mx-auto shadow-inner">
+                      <QrCode className="w-10 h-10" />
+                    </div>
+                    <div className="space-y-1">
+                      <h4 className="text-base font-black text-white">Handa nang I-scan ang Laminated QR ID</h4>
+                      <p className="text-xs text-slate-300">
+                        I-click ang pindutan sa ibaba upang buksan ang camera ng iyong smartphone o computer.
+                      </p>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setCameraActive(true);
+                        startCamera();
+                      }}
+                      className="px-6 py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs rounded-xl shadow-lg transition flex items-center space-x-2 mx-auto"
+                    >
+                      <Camera className="w-4 h-4" />
+                      <span>Buksan ang Camera Scanner</span>
+                    </button>
+                  </div>
+                )}
+
+                {/* Camera control buttons */}
+                {cameraActive && (
+                  <div className="flex flex-wrap items-center justify-center gap-2 mt-4 pt-2">
+                    <button
+                      type="button"
+                      onClick={toggleFacingMode}
+                      className="px-3.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 rounded-xl text-xs font-bold transition flex items-center space-x-1.5 shadow-sm"
+                      title="Lumipat sa Harap/Likod na Camera"
+                    >
+                      <SwitchCamera className="w-3.5 h-3.5 text-blue-400" />
+                      <span>Palitan ang Camera</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        stopCamera();
+                        setCameraActive(false);
+                      }}
+                      className="px-3.5 py-1.5 bg-rose-950/80 hover:bg-rose-900 text-rose-300 border border-rose-800/80 rounded-xl text-xs font-bold transition flex items-center space-x-1.5 shadow-sm"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                      <span>Ihinto ang Camera</span>
+                    </button>
+                  </div>
+                )}
+
+                {cameraError && (
+                  <div className="mt-4 p-3 bg-rose-950/80 border border-rose-800 text-rose-200 rounded-xl text-xs flex items-center space-x-2">
+                    <AlertCircle className="w-4 h-4 text-rose-400 shrink-0" />
+                    <span>{cameraError}</span>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* MODE 2: UPLOAD IMAGE / PHOTO */}
+            {scanMode === "upload" && (
+              <div className="bg-slate-50 border-2 border-dashed border-slate-300 rounded-3xl p-8 text-center space-y-4 hover:border-emerald-500 transition">
+                <input
+                  type="file"
+                  ref={fileInputRef}
+                  accept="image/*"
+                  onChange={handleFileUpload}
+                  className="hidden"
+                />
+
+                <div className="w-16 h-16 rounded-2xl bg-blue-100 text-blue-800 flex items-center justify-center mx-auto shadow-sm">
+                  <Upload className="w-8 h-8" />
                 </div>
-                <div className="space-y-1 text-xs">
-                  <h4 className="font-black text-slate-900 uppercase tracking-wide flex items-center gap-1.5">
-                    <span>PAUNAWA UKOL SA DATA PRIVACY (REPUBLIC ACT NO. 10173)</span>
+
+                <div className="space-y-1 max-w-md mx-auto">
+                  <h4 className="text-sm font-black text-slate-900">
+                    Pumili ng Larawan o Screenshot ng Laminated QR ID
                   </h4>
-                  <p className="text-slate-600 leading-relaxed">
-                    Ang Tanggapan ng <strong className="text-slate-900">PESO Dingalan</strong> ay mahigpit na sumusunod sa mga panuntunan ng <em>Data Privacy Act of 2012 (R.A. 10173)</em>. Ang impormasyong iyong ibibigay (Apelyido, Pangalan, Gitnang Pangalan) ay gagamitin <strong>eksklusibo</strong> para sa opisyal na pagberipika ng iyong talaan bilang benepisyaryo ng TUPAD, pagtukoy sa iyong itinalagang Work Area, at pagpapakita ng iyong 10-araw na iskedyul ng paggawa. Ang iyong personal na datos ay protektado at hindi kailanman ibabahagi sa mga hindi awtorisadong tao o ahensya.
+                  <p className="text-xs text-slate-500">
+                    Maaari kang mag-upload ng malinaw na larawan ng iyong TUPAD ID o screenshot ng QR pass mula sa iyong gallery.
                   </p>
                 </div>
-              </div>
 
-              {/* Interactive User Consent Checkbox */}
-              <div className="pt-2 border-t border-blue-200/60">
-                <label className="flex items-start space-x-3 cursor-pointer select-none group">
-                  <input
-                    type="checkbox"
-                    checked={dpaConsent}
-                    onChange={(e) => setDpaConsent(e.target.checked)}
-                    className="mt-0.5 w-4 h-4 text-emerald-600 border-slate-300 rounded focus:ring-emerald-500 cursor-pointer"
-                  />
-                  <span className="text-xs font-bold text-slate-800 group-hover:text-emerald-900 leading-tight">
-                    Nauunawaan ko at <strong className="text-emerald-800 font-black">kusang-loob akong nagbibigay ng pahintulot (User Consent)</strong> sa PESO LGU Dingalan na iproseso ang aking impormasyon para sa paghahanap ng aking TUPAD Work Assignment alinsunod sa Data Privacy Act of 2012.
-                  </span>
-                </label>
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={loading}
+                  className="px-6 py-3 bg-slate-900 hover:bg-slate-800 text-white font-black text-xs rounded-xl shadow transition flex items-center space-x-2 mx-auto disabled:opacity-50"
+                >
+                  <Upload className="w-4 h-4 text-emerald-400" />
+                  <span>{loading ? "Sinusuri ang Larawan..." : "Pumili ng Larawan mula sa Device"}</span>
+                </button>
               </div>
-            </div>
+            )}
+
+            {/* MODE 3: MANUAL SLOT # OR TOKEN ENTRY */}
+            {scanMode === "manual" && (
+              <form
+                onSubmit={handleManualSubmit}
+                className="bg-slate-50 border border-slate-200 rounded-3xl p-6 sm:p-8 space-y-4"
+              >
+                <div className="space-y-1">
+                  <h4 className="text-sm font-black text-slate-900">
+                    I-type ang Designated Slot # o QR Code Token
+                  </h4>
+                  <p className="text-xs text-slate-500">
+                    Ilagay ang iyong numero sa masterlist (halimbawa: <strong>1</strong> hanggang <strong>522</strong>) o ang buong QR token na nakalimbag sa stub.
+                  </p>
+                </div>
+
+                <div className="flex flex-col sm:flex-row gap-2.5">
+                  <input
+                    type="text"
+                    value={manualToken}
+                    onChange={(e) => setManualToken(e.target.value)}
+                    placeholder="Hal. 1, 25, o TUPAD-DGL-..."
+                    className="flex-1 px-4 py-3 bg-white border border-slate-300 rounded-xl text-sm font-mono font-bold text-slate-900 focus:outline-none focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600"
+                    autoFocus
+                  />
+
+                  <button
+                    type="submit"
+                    disabled={loading || !manualToken.trim()}
+                    className="px-6 py-3 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white font-black text-xs rounded-xl shadow transition flex items-center justify-center space-x-1.5"
+                  >
+                    {loading ? (
+                      <RefreshCw className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <Search className="w-4 h-4" />
+                    )}
+                    <span>Suriin ang Assignment</span>
+                  </button>
+                </div>
+              </form>
+            )}
 
             {/* Error Message Alert */}
             {error && (
-              <div className="p-4 bg-rose-50 border border-rose-200 rounded-2xl flex items-start space-x-3 text-rose-800 text-xs">
+              <div className="p-4 bg-rose-50 border border-rose-200 rounded-2xl flex items-start space-x-3 text-rose-800 text-xs animate-fadeIn">
                 <AlertCircle className="w-5 h-5 text-rose-600 shrink-0 mt-0.5" />
                 <div className="space-y-0.5">
-                  <p className="font-bold">Hindi Ma-verify ang Impormasyon:</p>
+                  <p className="font-bold">Hindi Ma-verify ang QR Code / Talaan:</p>
                   <p>{error}</p>
                 </div>
               </div>
             )}
 
-            {/* Action Buttons */}
-            <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-2">
-              <span className="text-xs text-slate-500 font-medium">
-                * Ang lahat ng impormasyon ay nabe-beripika nang real-time sa opisyal na PESO Dingalan Masterlist.
-              </span>
-
-              <button
-                type="submit"
-                disabled={loading || !dpaConsent}
-                className={`w-full sm:w-auto px-8 py-3.5 rounded-2xl font-black text-sm shadow-lg flex items-center justify-center space-x-2 transition transform active:scale-95 ${
-                  loading || !dpaConsent
-                    ? "bg-slate-300 text-slate-500 cursor-not-allowed shadow-none"
-                    : "bg-emerald-600 hover:bg-emerald-700 text-white hover:shadow-emerald-600/30"
-                }`}
-              >
-                {loading ? (
-                  <>
-                    <RefreshCw className="w-4 h-4 animate-spin" />
-                    <span>Hinahanap ang Talaan...</span>
-                  </>
-                ) : (
-                  <>
-                    <Search className="w-4 h-4" />
-                    <span>Suriin ang Aking Work Assignment</span>
-                    <ArrowRight className="w-4 h-4 ml-1" />
-                  </>
-                )}
-              </button>
+            {/* Data Privacy Act Notice */}
+            <div className="p-4 bg-blue-50/70 border border-blue-200 rounded-2xl flex items-start space-x-3 text-xs text-slate-700">
+              <ShieldCheck className="w-5 h-5 text-blue-600 shrink-0 mt-0.5" />
+              <div className="space-y-1">
+                <strong className="block text-slate-900 font-bold uppercase text-[11px]">
+                  Proteksyon sa Datos (Data Privacy Act of 2012 - R.A. 10173)
+                </strong>
+                <p className="text-slate-600 leading-relaxed text-[11px]">
+                  Ang pag-scan ng opisyal na Laminated QR ID ay ginagamit eksklusibo upang maipakita ang iyong itinalagang lugar ng paggawa at 10-araw na iskedyul para sa opisyal na implementasyon ng TUPAD sa Bayan ng Dingalan.
+                </p>
+              </div>
             </div>
-          </form>
+          </div>
         ) : (
-          /* 3. Verified Assignment Display Card */
+          /* ========================================================================= */
+          /* 2. VERIFIED 10-DAY WORK AREA ASSIGNMENT & SCHEDULE GUIDE DISPLAY CARD      */
+          /* ========================================================================= */
           <div className="space-y-6 animate-fadeIn">
-            {/* Top Verification Badge & Identity Summary */}
+            {/* Top Verification Header Badge */}
             <div className="bg-gradient-to-r from-emerald-50 via-teal-50 to-white border border-emerald-300/80 rounded-2xl p-5 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 shadow-sm">
               <div className="flex items-start space-x-3.5">
                 <div className="p-2.5 bg-emerald-600 text-white rounded-2xl shadow-md">
@@ -335,11 +572,11 @@ export function PublicWorkAssignmentLookupCard() {
 
               <button
                 type="button"
-                onClick={handleReset}
-                className="px-4 py-2 bg-white hover:bg-slate-100 text-slate-700 border border-slate-300 rounded-xl text-xs font-bold transition flex items-center space-x-1.5 shadow-xs cursor-pointer active:scale-95"
+                onClick={handleResetScan}
+                className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold transition flex items-center space-x-1.5 shadow-md cursor-pointer active:scale-95"
               >
-                <RefreshCw className="w-3.5 h-3.5" />
-                <span>Maghanap ng Ibang Pangalan</span>
+                <Camera className="w-3.5 h-3.5 text-emerald-400" />
+                <span>Mag-scan ng Ibang QR ID</span>
               </button>
             </div>
 
@@ -395,7 +632,7 @@ export function PublicWorkAssignmentLookupCard() {
                   <div className="bg-slate-950/60 p-3 rounded-xl border border-slate-800 flex items-center space-x-3">
                     <Clock className="w-4 h-4 text-blue-400 shrink-0" />
                     <div>
-                      <span className="text-[10px] uppercase font-bold text-slate-400 block">Oras ng Paggawa (Umaga & Hapon)</span>
+                      <span className="text-[10px] uppercase font-bold text-slate-400 block">Oras ng Paggawa (Umaga &amp; Hapon)</span>
                       <span className="text-xs font-bold text-slate-100">
                         {data.program.morningHours} • {data.program.afternoonHours}
                       </span>
@@ -419,7 +656,7 @@ export function PublicWorkAssignmentLookupCard() {
                 <div className="space-y-3">
                   <div className="flex items-center space-x-2 text-amber-900 font-extrabold text-sm uppercase tracking-wide">
                     <AlertTriangle className="w-5 h-5 text-amber-600" />
-                    <span>Mahalagang Paalala</span>
+                    <span>Mahalagang Paalala sa Paggawa</span>
                   </div>
 
                   <ul className="space-y-2 text-xs text-amber-950 leading-relaxed">
@@ -429,7 +666,7 @@ export function PublicWorkAssignmentLookupCard() {
                     </li>
                     <li className="flex items-start gap-2">
                       <Check className="w-4 h-4 text-emerald-700 shrink-0 mt-0.5 font-black" />
-                      <span><strong>Magdala ng Valid ID at QR Stub:</strong> Ipakita sa field coordinator tuwing AM at PM attendance scan.</span>
+                      <span><strong>Dalhin ang Laminated QR ID:</strong> Ipakita sa field coordinator tuwing AM at PM attendance scan.</span>
                     </li>
                     <li className="flex items-start gap-2">
                       <Check className="w-4 h-4 text-emerald-700 shrink-0 mt-0.5 font-black" />
@@ -452,7 +689,7 @@ export function PublicWorkAssignmentLookupCard() {
                     <Calendar className="w-4 h-4 text-emerald-700" />
                     <span>Iskedyul sa Kabuuang 10 Araw ng Programa</span>
                   </h4>
-                  <p className="text-xs text-slate-500">I-click ang bawat araw para makita agad ang assignment nang mabilis at walang delay.</p>
+                  <p className="text-xs text-slate-500">I-click ang bawat araw upang makita ang takdang lugar at gawain para sa araw na iyon.</p>
                 </div>
 
                 {data.allDaysSchedule?.length > 0 && (
@@ -466,7 +703,7 @@ export function PublicWorkAssignmentLookupCard() {
                 )}
               </div>
 
-              {/* Day Buttons Grid with instant tactile responsiveness */}
+              {/* Day Buttons Grid with instant 0ms switching */}
               <div className="grid grid-cols-2 sm:grid-cols-5 lg:grid-cols-10 gap-2">
                 {Array.from({ length: data.program.requiredWorkDays || 10 }, (_, i) => i + 1).map((dayNum) => {
                   const isDaySelected = selectedDay === dayNum;
@@ -488,7 +725,7 @@ export function PublicWorkAssignmentLookupCard() {
                 })}
               </div>
 
-              {/* Optional Full 10-Day Table Breakdown for instant full-schedule overview */}
+              {/* Full 10-Day Table Breakdown for complete schedule overview */}
               {showFullTable && data.allDaysSchedule && data.allDaysSchedule.length > 0 && (
                 <div className="mt-4 border border-slate-200 rounded-2xl overflow-hidden shadow-xs animate-fadeIn">
                   <div className="bg-slate-100 px-4 py-2.5 border-b border-slate-200 flex items-center justify-between">
