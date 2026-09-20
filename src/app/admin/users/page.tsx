@@ -165,6 +165,9 @@ export default function UserManagementPage() {
       if (res.ok) {
         const data = await res.json();
         setUsers(data.users || []);
+        try {
+          localStorage.removeItem("peso_login_preset_users");
+        } catch {}
       }
     } catch (e) {
       console.error(e);

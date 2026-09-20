@@ -29,12 +29,19 @@ interface PresetAccount {
   barangay?: string;
 }
 
-const PRESET_ROLES: { id: string; label: string; description: string; accounts: PresetAccount[] }[] = [
+interface PresetRoleGroup {
+  id: string;
+  label: string;
+  description: string;
+  accounts: PresetAccount[];
+}
+
+const DEFAULT_ROLE_GROUPS = [
   {
     id: "DOMAIN_MASTER",
     label: "👑 Domain Master (Super Admin)",
     description: "Full system owner access, beneficiary profile editing, and administrative control",
-    accounts: [
+    fallbackAccounts: [
       { label: "PESO Dingalan Admin Officer", name: "PESO Dingalan Admin", username: "admin", role: "Domain Master", barangay: "Municipality-wide (Full Access)" },
     ],
   },
@@ -42,7 +49,7 @@ const PRESET_ROLES: { id: string; label: string; description: string; accounts: 
     id: "PESO_ADMIN",
     label: "🛡️ PESO Administrator",
     description: "Full operational management, user administration, program creation, and report export",
-    accounts: [
+    fallbackAccounts: [
       { label: "PESO Operations Administrator", name: "PESO Administrator", username: "peso_admin", role: "PESO Admin", barangay: "Municipality-wide (Full Operations)" },
       { label: "PESO Division Head", name: "PESO Head Officer", username: "peso_head", role: "PESO Admin", barangay: "Municipality-wide (Operations)" },
       { label: "PESO Program Manager", name: "PESO Manager", username: "peso_manager", role: "PESO Admin", barangay: "Municipality-wide (Programs)" },
@@ -52,7 +59,7 @@ const PRESET_ROLES: { id: string; label: string; description: string; accounts: 
     id: "PESO_STAFF",
     label: "💼 PESO Operations Staff",
     description: "Front-desk operations, manual beneficiary entry, verification, and replacement requests",
-    accounts: [
+    fallbackAccounts: [
       { label: "MARCIAL BONIFACIO (Operations Desk)", name: "Marcial Bonifacio", username: "pesostaff", role: "PESO Operations Staff", barangay: "Municipality-wide (Desk)" },
       { label: "PESO STAFF - MCDO Desk", name: "Staff MCDO", username: "mcdo", role: "PESO Operations Staff", barangay: "Municipality-wide (Desk)" },
       { label: "PESO STAFF - IKOY Desk", name: "Staff Ikoy", username: "ikoy", role: "PESO Operations Staff", barangay: "Municipality-wide (Desk)" },
@@ -63,7 +70,7 @@ const PRESET_ROLES: { id: string; label: string; description: string; accounts: 
     id: "TUPAD_COORDINATOR",
     label: "TUPAD Field Coordinator",
     description: "Barangay-scoped field attendance, photo uploads, and beneficiary work program access",
-    accounts: [
+    fallbackAccounts: [
       { label: "NEDDIE (Brgy. Umiray)", name: "Neddie", username: "peso_umiray1", role: "Tupad Coordinator", barangay: "Umiray" },
       { label: "SHIELA (Brgy. Umiray)", name: "Shiela", username: "peso_umiray2", role: "Tupad Coordinator", barangay: "Umiray" },
       { label: "MARIAN (Brgy. Umiray)", name: "Marian", username: "peso_umiray3", role: "Tupad Coordinator", barangay: "Umiray" },
@@ -98,7 +105,7 @@ const PRESET_ROLES: { id: string; label: string; description: string; accounts: 
     id: "TUPAD_ASSISTING_DOCUMENTOR",
     label: "📸 Tupad Assisting Documentor",
     description: "Field role limited exclusively to Daily Accomplishment Photos and DTR (Attendance) scanning",
-    accounts: [
+    fallbackAccounts: [
       { label: "General Assisting Documentor", name: "Tupad Documentor", username: "documentor", role: "Tupad Assisting Documentor", barangay: "All Barangays" },
       { label: "MARIA (Brgy. Paltic Documentor)", name: "Maria Documentor", username: "peso_paltic_doc", role: "Tupad Assisting Documentor", barangay: "Paltic" },
       { label: "JUAN (Brgy. Umiray Documentor)", name: "Juan Documentor", username: "peso_umiray_doc", role: "Tupad Assisting Documentor", barangay: "Umiray" },
@@ -120,7 +127,7 @@ const PRESET_ROLES: { id: string; label: string; description: string; accounts: 
     id: "DOLE_COORDINATOR",
     label: "DOLE Regional Coordinator",
     description: "Auditing, compliance monitoring, and regional report inspection",
-    accounts: [
+    fallbackAccounts: [
       { label: "MARK (DOLE Aurora Field Office)", name: "Mark", username: "dolefoaurora_1", role: "DOLE Coordinator", barangay: "All Barangays" },
       { label: "ANGELO (DOLE Aurora Field Office)", name: "Angelo", username: "dolefoaurora_2", role: "DOLE Coordinator", barangay: "All Barangays" },
       { label: "General DOLE Officer", name: "DOLE Auditor", username: "dole", role: "DOLE Coordinator", barangay: "All Barangays" },
@@ -128,10 +135,82 @@ const PRESET_ROLES: { id: string; label: string; description: string; accounts: 
   },
 ];
 
+function buildPresetRoleGroups(dbUsers?: any[]): PresetRoleGroup[] {
+  if (!dbUsers || dbUsers.length === 0) {
+    return DEFAULT_ROLE_GROUPS.map((g) => ({
+      id: g.id,
+      label: g.label,
+      description: g.description,
+      accounts: g.fallbackAccounts,
+    }));
+  }
+
+  // 1. Process known standard roles
+  const knownGroups: PresetRoleGroup[] = DEFAULT_ROLE_GROUPS.map((g) => {
+    const matching = dbUsers.filter((u) => u.role === g.id);
+    if (matching.length === 0) {
+      return {
+        id: g.id,
+        label: g.label,
+        description: g.description,
+        accounts: g.fallbackAccounts,
+      };
+    }
+
+    const accounts: PresetAccount[] = matching.map((u) => {
+      const brgy = u.assignedBarangay ? `(Brgy. ${u.assignedBarangay})` : "(All Barangays)";
+      return {
+        label: `${u.fullName.toUpperCase()} ${brgy}`,
+        name: u.fullName,
+        username: u.username,
+        role: g.label,
+        barangay: u.assignedBarangay || "Municipality-wide",
+      };
+    });
+
+    return {
+      id: g.id,
+      label: g.label,
+      description: g.description,
+      accounts,
+    };
+  });
+
+  // 2. Check for any additional custom roles in the database
+  const standardIds = new Set(DEFAULT_ROLE_GROUPS.map((g) => g.id));
+  const customRoleUsers = dbUsers.filter((u) => !standardIds.has(u.role));
+
+  if (customRoleUsers.length > 0) {
+    const customRolesMap: Record<string, any[]> = {};
+    customRoleUsers.forEach((u) => {
+      if (!customRolesMap[u.role]) customRolesMap[u.role] = [];
+      customRolesMap[u.role].push(u);
+    });
+
+    Object.entries(customRolesMap).forEach(([customRole, uList]) => {
+      knownGroups.push({
+        id: customRole,
+        label: `👤 ${customRole.replace(/_/g, " ")}`,
+        description: "Custom system user role",
+        accounts: uList.map((u) => ({
+          label: `${u.fullName.toUpperCase()} ${u.assignedBarangay ? `(Brgy. ${u.assignedBarangay})` : ""}`.trim(),
+          name: u.fullName,
+          username: u.username,
+          role: customRole,
+          barangay: u.assignedBarangay || "Municipality-wide",
+        })),
+      });
+    });
+  }
+
+  return knownGroups;
+}
+
 export default function LoginPage() {
   const router = useRouter();
   const { login } = useAuth();
 
+  const [presetRoles, setPresetRoles] = useState<PresetRoleGroup[]>(() => buildPresetRoleGroups());
   const [selectedRole, setSelectedRole] = useState<string>("");
   const [selectedAccountUsername, setSelectedAccountUsername] = useState<string>("");
   const [username, setUsername] = useState("");
@@ -140,26 +219,64 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const getPresetPassword = (uname: string): string => {
+  // Fetch live active users dynamically from database
+  React.useEffect(() => {
+    // 1. Check local cache first for instant render
+    try {
+      const cached = localStorage.getItem("peso_login_preset_users");
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          setPresetRoles(buildPresetRoleGroups(parsed));
+        }
+      }
+    } catch {}
+
+    // 2. Fetch fresh users from database
+    const fetchLivePresets = async () => {
+      try {
+        const res = await fetch("/api/v1/auth/presets");
+        if (res.ok) {
+          const data = await res.json();
+          if (data.users && Array.isArray(data.users) && data.users.length > 0) {
+            setPresetRoles(buildPresetRoleGroups(data.users));
+            try {
+              localStorage.setItem("peso_login_preset_users", JSON.stringify(data.users));
+            } catch {}
+          }
+        }
+      } catch (err) {
+        console.warn("Could not load live user presets from server, using fallback:", err);
+      }
+    };
+
+    fetchLivePresets();
+  }, []);
+
+  const getPresetPassword = (uname: string, brgy?: string): string => {
     const u = (uname || "").toLowerCase();
+    const b = (brgy || "").toLowerCase();
     if (u === "admin" || u.startsWith("peso_admin") || u === "peso_head" || u === "peso_manager") return "admin123";
     if (u === "coordinator") return "coord123";
     if (u === "documentor") return "doc123";
     if (u === "dole") return "dole123";
     if (u === "staff") return "staff123";
     if (u === "pesostaff" || u === "mcdo" || u === "ikoy") return "Dingalan123!";
-    if (u.includes("umiray") || u.includes("pinamaypayan") || u.includes("singawan")) return "UMIRAY123";
-    if (u.includes("ibona")) return "IBONA123";
-    if (u.includes("matawe")) return "MATAWE123";
-    if (u.includes("bnb") || u.includes("butas")) return "BUTAS NA BATO123";
-    if (u.includes("aplaya")) return "APLAYA123";
-    if (u.includes("poblacion")) return "POBLACION123";
-    if (u.includes("davildavilan")) return "DAVILDAVILAN123";
-    if (u.includes("caragsacan")) return "CARAGSACAN123";
-    if (u.includes("tanawan")) return "TANAWAN123";
-    if (u.includes("dika")) return "DIKAPANIKIAN123";
-    if (u.includes("paltic")) return "PALTIC123";
+    if (u.includes("umiray") || u.includes("pinamaypayan") || u.includes("singawan") || b.includes("umiray")) return "UMIRAY123";
+    if (u.includes("ibona") || b.includes("ibona")) return "IBONA123";
+    if (u.includes("matawe") || b.includes("matawe")) return "MATAWE123";
+    if (u.includes("bnb") || u.includes("butas") || b.includes("butas")) return "BUTAS NA BATO123";
+    if (u.includes("aplaya") || b.includes("aplaya")) return "APLAYA123";
+    if (u.includes("poblacion") || b.includes("poblacion")) return "POBLACION123";
+    if (u.includes("davildavilan") || b.includes("davildavilan")) return "DAVILDAVILAN123";
+    if (u.includes("caragsacan") || b.includes("caragsacan")) return "CARAGSACAN123";
+    if (u.includes("tanawan") || b.includes("tanawan")) return "TANAWAN123";
+    if (u.includes("dika") || b.includes("dikapanikian")) return "DIKAPANIKIAN123";
+    if (u.includes("paltic") || b.includes("paltic")) return "PALTIC123";
     if (u.includes("dolefoaurora")) return "ALL BARANGAY123";
+    if (brgy && brgy !== "Municipality-wide" && !brgy.includes("All Barangays")) {
+      return `${brgy.trim().toUpperCase()}123`;
+    }
     return "Dingalan123!";
   };
 
@@ -172,12 +289,12 @@ export default function LoginPage() {
       setPassword("");
       return;
     }
-    const roleObj = PRESET_ROLES.find((r) => r.id === roleId);
+    const roleObj = presetRoles.find((r) => r.id === roleId);
     if (roleObj && roleObj.accounts.length === 1) {
       const uname = roleObj.accounts[0].username;
       setSelectedAccountUsername(uname);
       setUsername(uname);
-      const defPass = getPresetPassword(uname);
+      const defPass = getPresetPassword(uname, roleObj.accounts[0].barangay);
       if (defPass) setPassword(defPass);
     }
   };
@@ -186,7 +303,9 @@ export default function LoginPage() {
   const handleAccountSelect = (uname: string) => {
     setSelectedAccountUsername(uname);
     setUsername(uname);
-    const defPass = getPresetPassword(uname);
+    const roleObj = presetRoles.find((r) => r.id === selectedRole);
+    const acc = roleObj?.accounts.find((a) => a.username === uname);
+    const defPass = getPresetPassword(uname, acc?.barangay);
     if (defPass) setPassword(defPass);
   };
 
@@ -229,7 +348,7 @@ export default function LoginPage() {
     }
   };
 
-  const currentRoleObj = PRESET_ROLES.find((r) => r.id === selectedRole);
+  const currentRoleObj = presetRoles.find((r) => r.id === selectedRole);
   const currentAccount = currentRoleObj?.accounts.find((a) => a.username === username);
 
   return (
@@ -312,16 +431,16 @@ export default function LoginPage() {
                 className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg focus:outline-none focus:border-gov-blue focus:ring-1 focus:ring-gov-blue bg-slate-50 font-medium text-slate-800"
               >
                 <option value="">-- Choose Role / Manual Typing --</option>
-                {PRESET_ROLES.map((role) => (
+                {presetRoles.map((role) => (
                   <option key={role.id} value={role.id}>
-                    {role.label}
+                    {role.label} ({role.accounts.length} {role.accounts.length === 1 ? "user" : "users"})
                   </option>
                 ))}
               </select>
             </div>
 
             {/* 2. Account Picker for Selected Role */}
-            {selectedRole && currentRoleObj && currentRoleObj.accounts.length > 1 && (
+            {selectedRole && currentRoleObj && currentRoleObj.accounts.length > 0 && (
               <div className="space-y-1 animate-in fade-in duration-200">
                 <label className="block text-[11px] font-bold text-slate-700 uppercase tracking-wider flex items-center justify-between">
                   <span>2. Pick Specific Account ({currentRoleObj.accounts.length} available)</span>
@@ -331,7 +450,7 @@ export default function LoginPage() {
                   onChange={(e) => handleAccountSelect(e.target.value)}
                   className="w-full px-3 py-2 text-xs border border-blue-300 rounded-lg focus:outline-none focus:border-gov-blue focus:ring-1 focus:ring-gov-blue bg-blue-50/50 font-semibold text-gov-blue"
                 >
-                  <option value="">-- Select Specific Coordinator --</option>
+                  <option value="">-- Select Specific User ({currentRoleObj.label}) --</option>
                   {currentRoleObj.accounts.map((acc) => (
                     <option key={acc.username} value={acc.username}>
                       {acc.label} ({acc.username})
