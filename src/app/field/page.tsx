@@ -69,6 +69,14 @@ const FIELD_OPERATIONS = [
     badge: "Wage Disbursal",
     description: "Final scanning and identification check during official DOLE wage release and payroll disbursement.",
   },
+  {
+    title: "Purok Groupings & Area Assignment",
+    href: "/beneficiaries?view=groupings",
+    icon: Users,
+    color: "from-teal-600 to-teal-800",
+    badge: "Work Area Deployment",
+    description: "Tingnan ang total groups bawat barangay, lumikha ng mga bagong grupo, at italaga sa designated work areas ayon sa TUPAD 10-day work program.",
+  },
 ];
 
 export default function FieldScannerHubPage() {

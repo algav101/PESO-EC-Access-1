@@ -77,7 +77,11 @@ export const PERMISSIONS = {
     "sync.read"
   ],
   TUPAD_COORDINATOR: [
+    "dashboard.view",
     "field.scan",
+    "program.read",
+    "program.update",
+    "beneficiary.read",
     "qr.read", "qr.scan",
     "stub.distribution.scan",
     "orientation.scan",

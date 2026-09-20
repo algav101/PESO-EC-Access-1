@@ -42,11 +42,20 @@ import { TableScrollWrapper } from "@/components/common/TableScrollWrapper";
 import { useAuth } from "@/context/AuthContext";
 import { offlineDb } from "@/lib/dexie";
 import { isAdminUser, isFieldCoordinator } from "@/lib/permissions";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 
 export default function BeneficiariesMasterlistPage() {
+  return (
+    <React.Suspense fallback={<div className="p-12 text-center text-xs text-slate-400">Loading Beneficiaries Hub...</div>}>
+      <BeneficiariesMasterlistContent />
+    </React.Suspense>
+  );
+}
+
+function BeneficiariesMasterlistContent() {
   const { user, can } = useAuth();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const isAdmin = isAdminUser(user);
   const [beneficiaries, setBeneficiaries] = useState<any[]>([]);
   const [programs, setPrograms] = useState<any[]>([]);
@@ -66,20 +75,28 @@ export default function BeneficiariesMasterlistPage() {
   const [deleteGlobalInBatch, setDeleteGlobalInBatch] = useState(false);
   const [isDeduplicating, setIsDeduplicating] = useState(false);
 
-  // Redirect coordinators to field hub
+  // View Mode: Roster Table vs. Deployment Grouping Matrix
+  const [activeViewMode, setActiveViewMode] = useState<"ROSTER" | "GROUPING">("ROSTER");
+  const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
+
+  // Handle URL params and Coordinator view
   useEffect(() => {
-    if (isFieldCoordinator(user)) {
-      router.replace("/field");
+    const viewParam = searchParams.get("view");
+    const brgyParam = searchParams.get("barangay");
+    if (viewParam === "groupings" || viewParam === "grouping") {
+      setActiveViewMode("GROUPING");
     }
-  }, [user, router]);
+    if (brgyParam) {
+      setSelectedBarangay(brgyParam);
+    } else if (isFieldCoordinator(user) && user?.assignedBarangay) {
+      setSelectedBarangay(user.assignedBarangay);
+    }
+  }, [searchParams, user]);
 
   // Sorting State
   const [sortBy, setSortBy] = useState<string>("designatedNumber");
   const [sortOrder, setSortOrder] = useState<"ASC" | "DESC">("ASC");
 
-  // View Mode: Roster Table vs. Deployment Grouping Matrix
-  const [activeViewMode, setActiveViewMode] = useState<"ROSTER" | "GROUPING">("ROSTER");
-  const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
 
   // Editing, Override & Deletion state
   const [beneficiaryToEdit, setBeneficiaryToEdit] = useState<any | null>(null);

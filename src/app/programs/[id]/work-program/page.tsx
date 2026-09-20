@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useMemo } from "react";
 import { useParams, useRouter } from "next/navigation";
 import {
   FileSpreadsheet,
@@ -23,21 +23,41 @@ import {
   Sparkles,
   ChevronRight,
   HelpCircle,
+  CheckSquare,
+  Square,
+  Layers,
+  Check,
+  X,
+  Sliders,
 } from "lucide-react";
 import { StatusBadge } from "@/components/common/StatusBadge";
 import { ParsedBarangayWorkProgram, WorkProgramPreviewResult } from "@/lib/work-program-parser";
 import { useAuth } from "@/context/AuthContext";
-import { isAdminUser } from "@/lib/permissions";
+import { isAdminUser, isFieldCoordinator } from "@/lib/permissions";
+import {
+  DINGALAN_BARANGAY_GROUPINGS,
+  getBarangayKey,
+  getStandardBarangayName,
+  classifyBeneficiaryGroup,
+  computeGroupDemographics,
+  PurokSitioGroupDefinition,
+} from "@/lib/dingalan-groupings";
 
 export default function WorkProgramManagementPage() {
   const params = useParams();
   const router = useRouter();
   const { user } = useAuth();
   const isAdmin = isAdminUser(user);
+  const isCoordinator = isFieldCoordinator(user);
+  const canManage = isAdmin || isCoordinator;
 
   const [program, setProgram] = useState<any>(null);
   const [workPrograms, setWorkPrograms] = useState<any[]>([]);
+  const [beneficiaries, setBeneficiaries] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+
+  // Custom Groups from Local Storage
+  const [customGroups, setCustomGroups] = useState<Record<string, PurokSitioGroupDefinition[]>>({});
 
   // Upload & Preview state
   const [file, setFile] = useState<File | null>(null);
@@ -52,7 +72,24 @@ export default function WorkProgramManagementPage() {
   const [selectedBarangay, setSelectedBarangay] = useState<string>("");
   const [selectedDayFilter, setSelectedDayFilter] = useState<number | "ALL">("ALL");
 
-  // Activity Edit/Add modal state
+  // Day-to-Day Activity Selection & Batch Operations State
+  const [selectedActivityIds, setSelectedActivityIds] = useState<string[]>([]);
+  const [isBatchEditModalOpen, setIsBatchEditModalOpen] = useState(false);
+  const [batchActionFeedback, setBatchActionFeedback] = useState<string | null>(null);
+  const [isBatchSubmitting, setIsBatchSubmitting] = useState(false);
+  const [batchSelectedGroup, setBatchSelectedGroup] = useState<string>("");
+
+  const [batchForm, setBatchForm] = useState({
+    specificActivities: "",
+    area: "",
+    maleCount: "",
+    femaleCount: "",
+    scPwdMaleCount: "",
+    scPwdFemaleCount: "",
+    totalCount: "",
+  });
+
+  // Single Activity Edit/Add modal state
   const [isActivityModalOpen, setIsActivityModalOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<any | null>(null);
   const [activityForm, setActivityForm] = useState({
@@ -68,7 +105,19 @@ export default function WorkProgramManagementPage() {
 
   useEffect(() => {
     fetchProgramAndWorkPrograms();
+    loadCustomGroups();
   }, [params.id]);
+
+  const loadCustomGroups = () => {
+    try {
+      const saved = localStorage.getItem("tupad_custom_deployment_groupings");
+      if (saved) {
+        setCustomGroups(JSON.parse(saved));
+      }
+    } catch (e) {
+      console.warn("Failed to load custom groupings from storage:", e);
+    }
+  };
 
   const fetchProgramAndWorkPrograms = async () => {
     try {
@@ -90,6 +139,13 @@ export default function WorkProgramManagementPage() {
           setSelectedBarangay(wps[0].barangay);
         }
       }
+
+      // Also fetch beneficiaries for accurate demographic quotas
+      const resBen = await fetch(`/api/v1/beneficiaries?programId=${params.id}`);
+      if (resBen.ok) {
+        const data = await resBen.json();
+        setBeneficiaries(data.beneficiaries || []);
+      }
     } catch (e) {
       console.error(e);
     } finally {
@@ -97,75 +153,221 @@ export default function WorkProgramManagementPage() {
     }
   };
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      setFile(e.target.files[0]);
-      setPreview(null);
-      setError(null);
+  // Groupings available for the currently selected Barangay
+  const currentBarangayGroups = useMemo(() => {
+    if (!selectedBarangay) return [];
+    const stdName = getStandardBarangayName(selectedBarangay);
+    const bKey = getBarangayKey(selectedBarangay);
+    const defaultCfg = DINGALAN_BARANGAY_GROUPINGS[bKey]?.groups || [];
+    const customForBrgy = customGroups[stdName] || [];
+
+    const allGroups = [
+      ...defaultCfg.map((g) => ({
+        groupName: g.groupName,
+        groupLabel: g.groupLabel,
+        designatedMainArea: g.designatedMainArea,
+        coveredPuroks: g.purokSitios,
+        isCustom: false,
+      })),
+      ...customForBrgy.map((cg) => ({
+        groupName: cg.groupName,
+        groupLabel: cg.groupLabel,
+        designatedMainArea: cg.designatedMainArea,
+        coveredPuroks: cg.purokSitios,
+        isCustom: true,
+      })),
+    ];
+
+    // Compute demographic tallies for each group in this barangay based on masterlist
+    return allGroups.map((g) => {
+      const groupBenes = beneficiaries.filter((pb) => {
+        if (pb.participationStatus === "REPLACED") return false;
+        const b = pb.beneficiary || pb;
+        const bBrgy = getStandardBarangayName(b.barangay || "");
+        if (bBrgy !== stdName) return false;
+        const sitio = (b.sitio || "").trim().toUpperCase();
+        return g.coveredPuroks.some(
+          (p) => sitio.includes(p.toUpperCase()) || p.toUpperCase().includes(sitio)
+        );
+      });
+
+      const demo = computeGroupDemographics(groupBenes);
+      return {
+        ...g,
+        demographics: demo,
+        beneficiaryCount: groupBenes.length,
+      };
+    });
+  }, [selectedBarangay, customGroups, beneficiaries]);
+
+  const currentWp = workPrograms.find((w) => w.barangay === selectedBarangay) || workPrograms[0];
+  const items: any[] = currentWp?.items || [];
+  const filteredItems = selectedDayFilter === "ALL" ? items : items.filter((it: any) => it.dayNumber === selectedDayFilter);
+
+  // Multi-selection handlers
+  const toggleSelectActivity = (id: string) => {
+    setSelectedActivityIds((prev) =>
+      prev.includes(id) ? prev.filter((i) => i !== id) : [...prev, id]
+    );
+  };
+
+  const handleSelectAllFiltered = () => {
+    const filteredIds = filteredItems.map((it: any) => it.id);
+    const allSelected = filteredIds.every((id) => selectedActivityIds.includes(id));
+    if (allSelected) {
+      setSelectedActivityIds((prev) => prev.filter((id) => !filteredIds.includes(id)));
+    } else {
+      setSelectedActivityIds((prev) => Array.from(new Set([...prev, ...filteredIds])));
     }
   };
 
-  const handleUploadPreview = async () => {
-    if (!file) {
-      setError("Please select an Excel (.xlsx / .xls) or CSV spreadsheet.");
+  const handleSelectAll10Days = () => {
+    const allIds = items.map((it: any) => it.id);
+    setSelectedActivityIds(allIds);
+  };
+
+  const handleSelectDayRange = (startDay: number, endDay: number) => {
+    const rangeIds = items
+      .filter((it: any) => it.dayNumber >= startDay && it.dayNumber <= endDay)
+      .map((it: any) => it.id);
+    setSelectedActivityIds(Array.from(new Set([...selectedActivityIds, ...rangeIds])));
+  };
+
+  const handleUnselectAll = () => {
+    setSelectedActivityIds([]);
+  };
+
+  // Quick Batch Grouping Assignment
+  const handleBatchAssignGroup = async (group: (typeof currentBarangayGroups)[0]) => {
+    if (selectedActivityIds.length === 0) {
+      alert("Pumili muna ng mga araw o aktibidad na lalapatan ng grupong ito.");
       return;
     }
 
-    setParsing(true);
-    setError(null);
-
-    try {
-      const formData = new FormData();
-      formData.append("file", file);
-
-      const res = await fetch(`/api/v1/programs/${params.id}/work-program/preview`, {
-        method: "POST",
-        body: formData,
-      });
-
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Failed to parse work program spreadsheet");
-
-      setPreview(data.preview);
-    } catch (err: any) {
-      setError(err.message);
-    } finally {
-      setParsing(false);
+    if (
+      !confirm(
+        `Italaga ang "${group.groupLabel}" sa ${selectedActivityIds.length} napiling aktibidad?\n\nItatakda nito ang Designated Area sa: "${group.designatedMainArea}" at ilalapat ang kaukulang demograpiko (${group.demographics.maleCount} Male, ${group.demographics.femaleCount} Female, ${group.demographics.totalCount} Total).`
+      )
+    ) {
+      return;
     }
-  };
 
-  const handleCommitWorkProgram = async () => {
-    if (!preview || preview.programs.length === 0) return;
-
-    setCommitting(true);
-    setError(null);
-
+    setIsBatchSubmitting(true);
+    setBatchActionFeedback(null);
     try {
-      const res = await fetch(`/api/v1/programs/${params.id}/work-program/commit`, {
+      const res = await fetch(`/api/v1/programs/${params.id}/work-program/batch`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ programs: preview.programs }),
+        body: JSON.stringify({
+          action: "UPDATE",
+          itemIds: selectedActivityIds,
+          groupName: group.groupName,
+          area: group.designatedMainArea,
+          updates: {
+            maleCount: group.demographics.maleCount,
+            femaleCount: group.demographics.femaleCount,
+            scPwdMaleCount: group.demographics.scPwdMaleCount,
+            scPwdFemaleCount: group.demographics.scPwdFemaleCount,
+            totalCount: group.demographics.totalCount,
+          },
+        }),
       });
 
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Failed to commit work program");
+      if (!res.ok) throw new Error(data.error || "Failed to batch assign grouping");
 
-      alert(`Successfully saved TUPAD Work Program for ${data.committedBarangays} Barangays with ${data.committedActivities} activities!`);
-      setPreview(null);
-      setFile(null);
-      setIsUploadModalOpen(false);
+      setBatchActionFeedback(`✓ Matagumpay na itinalaga ang ${group.groupLabel} sa ${selectedActivityIds.length} aktibidad!`);
+      setTimeout(() => setBatchActionFeedback(null), 5000);
+      setSelectedActivityIds([]);
       fetchProgramAndWorkPrograms();
     } catch (err: any) {
-      setError(err.message);
+      alert(err.message || "Failed to batch assign group");
     } finally {
-      setCommitting(false);
+      setIsBatchSubmitting(false);
     }
   };
 
+  // Batch Edit Submission
+  const handleSaveBatchEdit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (selectedActivityIds.length === 0) return;
+
+    setIsBatchSubmitting(true);
+    try {
+      const updates: any = {};
+      if (batchForm.maleCount !== "") updates.maleCount = parseInt(batchForm.maleCount, 10);
+      if (batchForm.femaleCount !== "") updates.femaleCount = parseInt(batchForm.femaleCount, 10);
+      if (batchForm.scPwdMaleCount !== "") updates.scPwdMaleCount = parseInt(batchForm.scPwdMaleCount, 10);
+      if (batchForm.scPwdFemaleCount !== "") updates.scPwdFemaleCount = parseInt(batchForm.scPwdFemaleCount, 10);
+      if (batchForm.totalCount !== "") updates.totalCount = parseInt(batchForm.totalCount, 10);
+
+      const res = await fetch(`/api/v1/programs/${params.id}/work-program/batch`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "UPDATE",
+          itemIds: selectedActivityIds,
+          specificActivities: batchForm.specificActivities.trim() || undefined,
+          area: batchForm.area.trim() || undefined,
+          updates: Object.keys(updates).length > 0 ? updates : undefined,
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to update selected activities");
+
+      setIsBatchEditModalOpen(false);
+      setBatchActionFeedback(`✓ Na-update ang ${selectedActivityIds.length} napiling aktibidad!`);
+      setTimeout(() => setBatchActionFeedback(null), 5000);
+      setSelectedActivityIds([]);
+      fetchProgramAndWorkPrograms();
+    } catch (err: any) {
+      alert(err.message || "Failed to batch update");
+    } finally {
+      setIsBatchSubmitting(false);
+    }
+  };
+
+  // Batch Delete
+  const handleBatchDelete = async () => {
+    if (selectedActivityIds.length === 0) return;
+    if (
+      !confirm(
+        `Sigurado ka bang nais mong burahin ang ${selectedActivityIds.length} napiling aktibidad mula sa TUPAD Work Program?`
+      )
+    ) {
+      return;
+    }
+
+    setIsBatchSubmitting(true);
+    try {
+      const res = await fetch(`/api/v1/programs/${params.id}/work-program/batch`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "DELETE",
+          itemIds: selectedActivityIds,
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to delete selected activities");
+
+      setBatchActionFeedback(`✓ Nabura ang ${selectedActivityIds.length} aktibidad.`);
+      setTimeout(() => setBatchActionFeedback(null), 5000);
+      setSelectedActivityIds([]);
+      fetchProgramAndWorkPrograms();
+    } catch (err: any) {
+      alert(err.message || "Failed to batch delete");
+    } finally {
+      setIsBatchSubmitting(false);
+    }
+  };
+
+  // Single Activity Save
   const handleSaveActivity = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      const currentWp = workPrograms.find((w) => w.barangay === selectedBarangay);
       if (!currentWp) return;
 
       if (editingItem) {
@@ -241,19 +443,81 @@ export default function WorkProgramManagementPage() {
     }
   };
 
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      setFile(e.target.files[0]);
+      setPreview(null);
+      setError(null);
+    }
+  };
+
+  const handleUploadPreview = async () => {
+    if (!file) {
+      setError("Please select an Excel (.xlsx / .xls) or CSV spreadsheet.");
+      return;
+    }
+
+    setParsing(true);
+    setError(null);
+
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+
+      const res = await fetch(`/api/v1/programs/${params.id}/work-program/preview`, {
+        method: "POST",
+        body: formData,
+      });
+
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to parse work program spreadsheet");
+
+      setPreview(data.preview);
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setParsing(false);
+    }
+  };
+
+  const handleCommitWorkProgram = async () => {
+    if (!preview || preview.programs.length === 0) return;
+
+    setCommitting(true);
+    setError(null);
+
+    try {
+      const res = await fetch(`/api/v1/programs/${params.id}/work-program/commit`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ programs: preview.programs }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to commit work program");
+
+      alert(`Successfully saved TUPAD Work Program for ${data.committedBarangays} Barangays with ${data.committedActivities} activities!`);
+      setPreview(null);
+      setFile(null);
+      setIsUploadModalOpen(false);
+      fetchProgramAndWorkPrograms();
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setCommitting(false);
+    }
+  };
+
   if (loading) {
     return <div className="py-20 text-center text-xs text-slate-400">Loading TUPAD Work Program Hub...</div>;
   }
 
-  const currentWp = workPrograms.find((w) => w.barangay === selectedBarangay) || workPrograms[0];
-  const items = currentWp?.items || [];
-  const filteredItems = selectedDayFilter === "ALL" ? items : items.filter((it: any) => it.dayNumber === selectedDayFilter);
-
   const totalActivities = workPrograms.reduce((acc, wp) => acc + (wp.items?.length || 0), 0);
   const totalTargetBeneficiaries = workPrograms.reduce((acc, wp) => acc + (wp.beneficiaryCount || 0), 0);
+  const allFilteredSelected = filteredItems.length > 0 && filteredItems.every((it: any) => selectedActivityIds.includes(it.id));
 
   return (
-    <div className="space-y-6 max-w-7xl mx-auto">
+    <div className="space-y-6 max-w-7xl mx-auto pb-16">
       {/* Top Banner */}
       <div className="gov-card p-6 bg-white border-l-4 border-l-gov-blue flex flex-col md:flex-row md:items-center justify-between gap-4 shadow">
         <div className="space-y-1">
@@ -266,15 +530,15 @@ export default function WorkProgramManagementPage() {
             </span>
           </div>
           <h1 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">
-            TUPAD Work Program Management & Automation
+            TUPAD Work Program &amp; Day-to-Day Activity Management
           </h1>
           <p className="text-xs text-slate-500">
-            Official 10-day activity schedules, work area allocations (Sitio/Purok), and gender quotas per Barangay
+            Select/unselect daily activities to edit schedules, assign official purok/sitio deployment groupings, and automate gender quotas per Barangay
           </p>
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
-          {isAdmin && (
+          {canManage && (
             <button
               onClick={handleAutoDeployFromMasterlist}
               disabled={autoDeploying}
@@ -296,12 +560,21 @@ export default function WorkProgramManagementPage() {
           )}
 
           <a
+            href={`/beneficiaries?view=groupings&barangay=${encodeURIComponent(selectedBarangay)}`}
+            className="px-3.5 py-2 bg-gradient-to-r from-teal-600 to-teal-700 hover:from-teal-700 hover:to-teal-800 text-white font-black text-xs rounded-xl transition shadow flex items-center space-x-1.5"
+            title="View & Configure Purok/Sitio Groupings"
+          >
+            <Layers className="w-3.5 h-3.5 text-teal-200" />
+            <span>Purok Groupings Matrix</span>
+          </a>
+
+          <a
             href="/beneficiaries"
             className="px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl transition border border-slate-300 flex items-center space-x-1.5"
             title="View Final Implementation Masterlist"
           >
             <Users className="w-3.5 h-3.5 text-gov-blue" />
-            <span>Final Masterlist</span>
+            <span>Masterlist Roster</span>
           </a>
 
           <a
@@ -334,13 +607,6 @@ export default function WorkProgramManagementPage() {
             <Download className="w-3.5 h-3.5 text-emerald-200" />
             <span>Export 10-Day Plan</span>
           </a>
-
-          <a
-            href={`/programs/${params.id}`}
-            className="px-3 py-2 text-xs font-bold text-slate-600 hover:text-slate-900 border rounded-xl"
-          >
-            Back to Hub
-          </a>
         </div>
       </div>
 
@@ -361,11 +627,22 @@ export default function WorkProgramManagementPage() {
           <p className="text-2xl font-black text-slate-900 mt-1">{totalTargetBeneficiaries} <span className="text-xs font-normal text-slate-500">Pax</span></p>
         </div>
 
-        <div className="gov-card p-4 bg-white border-l-4 border-l-indigo-600">
-          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Standard Working Hours</span>
-          <p className="text-xs font-bold text-slate-800 mt-2 line-clamp-1">8:00 AM–12:00 NN | 1:00 PM–5:00 PM</p>
+        <div className="gov-card p-4 bg-white border-l-4 border-l-teal-600">
+          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Brgy Deployment Groups</span>
+          <p className="text-2xl font-black text-teal-900 mt-1">{currentBarangayGroups.length} <span className="text-xs font-normal text-slate-500">Groups in {selectedBarangay}</span></p>
         </div>
       </div>
+
+      {/* SUCCESS / FEEDBACK BANNER */}
+      {batchActionFeedback && (
+        <div className="p-4 bg-emerald-50 border-2 border-emerald-300 rounded-2xl flex items-center justify-between text-emerald-900 font-bold text-xs shadow-md animate-fadeIn">
+          <div className="flex items-center space-x-2">
+            <CheckCircle2 className="w-5 h-5 text-emerald-600 flex-shrink-0" />
+            <span>{batchActionFeedback}</span>
+          </div>
+          <button onClick={() => setBatchActionFeedback(null)} className="text-emerald-700 hover:text-emerald-900 text-sm">✕</button>
+        </div>
+      )}
 
       {/* UPLOAD & PREVIEW MODAL */}
       {isUploadModalOpen && (
@@ -554,7 +831,10 @@ export default function WorkProgramManagementPage() {
               return (
                 <button
                   key={wp.id}
-                  onClick={() => setSelectedBarangay(wp.barangay)}
+                  onClick={() => {
+                    setSelectedBarangay(wp.barangay);
+                    setSelectedActivityIds([]);
+                  }}
                   className={`px-3.5 py-2 rounded-lg text-xs font-bold transition flex items-center space-x-1.5 ${
                     isActive
                       ? "bg-gov-blue text-white shadow-sm"
@@ -579,7 +859,7 @@ export default function WorkProgramManagementPage() {
           {currentWp && (
             <div className="gov-card p-6 space-y-6">
               {/* Header Details Card */}
-              <div className="p-4 bg-slate-50 rounded-xl border border-slate-200 flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200 flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div className="space-y-1">
                   <div className="flex items-center space-x-2">
                     <h2 className="text-base font-black text-slate-900">
@@ -587,6 +867,9 @@ export default function WorkProgramManagementPage() {
                     </h2>
                     <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-blue-100 text-gov-blue">
                       Target: {currentWp.beneficiaryCount} Beneficiaries
+                    </span>
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-teal-50 text-teal-700 border border-teal-200">
+                      {currentBarangayGroups.length} Deployment Group(s)
                     </span>
                   </div>
                   <p className="text-xs text-slate-600">
@@ -597,7 +880,7 @@ export default function WorkProgramManagementPage() {
                   </p>
                 </div>
 
-                {isAdmin && (
+                {canManage && (
                   <div className="flex items-center space-x-2">
                     <button
                       onClick={() => {
@@ -614,7 +897,7 @@ export default function WorkProgramManagementPage() {
                         });
                         setIsActivityModalOpen(true);
                       }}
-                      className="px-3.5 py-2 bg-gov-blue hover:bg-gov-light text-white font-bold text-xs rounded-lg shadow flex items-center space-x-1"
+                      className="px-3.5 py-2 bg-gov-blue hover:bg-gov-light text-white font-bold text-xs rounded-xl shadow flex items-center space-x-1"
                     >
                       <PlusCircle className="w-3.5 h-3.5 text-gov-goldLight" />
                       <span>Add Activity</span>
@@ -623,33 +906,182 @@ export default function WorkProgramManagementPage() {
                 )}
               </div>
 
-              {/* Day Filter Pills */}
-              <div className="flex items-center space-x-2 overflow-x-auto pb-1">
-                <span className="text-xs font-bold text-slate-500 uppercase flex-shrink-0">Filter Day:</span>
-                <button
-                  onClick={() => setSelectedDayFilter("ALL")}
-                  className={`px-3 py-1 rounded-lg text-xs font-bold transition ${
-                    selectedDayFilter === "ALL"
-                      ? "bg-slate-900 text-white"
-                      : "bg-slate-100 text-slate-600 hover:bg-slate-200"
-                  }`}
-                >
-                  All 10 Days
-                </button>
-                {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((d) => (
+              {/* Day Filter & Multi-Select Control Bar */}
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 bg-slate-50/80 p-3 rounded-2xl border border-slate-200">
+                {/* Day Filter Pills */}
+                <div className="flex items-center space-x-1.5 overflow-x-auto pb-1 md:pb-0">
+                  <span className="text-[11px] font-bold text-slate-500 uppercase flex-shrink-0 mr-1">Talaan ng Araw:</span>
                   <button
-                    key={d}
-                    onClick={() => setSelectedDayFilter(d)}
-                    className={`px-3 py-1 rounded-lg text-xs font-bold transition flex-shrink-0 ${
-                      selectedDayFilter === d
-                        ? "bg-gov-blue text-white"
-                        : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                    onClick={() => setSelectedDayFilter("ALL")}
+                    className={`px-3 py-1 rounded-lg text-xs font-bold transition ${
+                      selectedDayFilter === "ALL"
+                        ? "bg-slate-900 text-white"
+                        : "bg-white text-slate-600 hover:bg-slate-200 border"
                     }`}
                   >
-                    Day {d}
+                    All 10 Days ({items.length})
                   </button>
-                ))}
+                  {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((d) => {
+                    const countForDay = items.filter((it: any) => it.dayNumber === d).length;
+                    return (
+                      <button
+                        key={d}
+                        onClick={() => setSelectedDayFilter(d)}
+                        className={`px-2.5 py-1 rounded-lg text-xs font-bold transition flex-shrink-0 flex items-center space-x-1 ${
+                          selectedDayFilter === d
+                            ? "bg-gov-blue text-white shadow-sm"
+                            : "bg-white text-slate-600 hover:bg-slate-200 border"
+                        }`}
+                      >
+                        <span>Day {d}</span>
+                        {countForDay > 0 && (
+                          <span className={`text-[9px] px-1 rounded-full ${selectedDayFilter === d ? "bg-blue-900 text-white" : "bg-slate-100 text-slate-500"}`}>
+                            {countForDay}
+                          </span>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {/* Day Multi-Selection Quick Presets */}
+                {canManage && (
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    <span className="text-[10px] font-bold text-slate-400 uppercase">Select:</span>
+                    <button
+                      type="button"
+                      onClick={handleSelectAllFiltered}
+                      className="px-2.5 py-1 text-[11px] font-bold bg-white hover:bg-slate-100 text-slate-700 border rounded-lg shadow-2xs flex items-center space-x-1"
+                    >
+                      <CheckSquare className="w-3 h-3 text-gov-blue" />
+                      <span>{allFilteredSelected ? "Deselect Filtered" : "Select Filtered"}</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleSelectAll10Days}
+                      className="px-2.5 py-1 text-[11px] font-bold bg-white hover:bg-slate-100 text-slate-700 border rounded-lg shadow-2xs"
+                    >
+                      All 10 Days
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleSelectDayRange(1, 5)}
+                      className="px-2.5 py-1 text-[11px] font-bold bg-white hover:bg-slate-100 text-slate-700 border rounded-lg shadow-2xs"
+                    >
+                      Days 1–5 (W1)
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleSelectDayRange(6, 10)}
+                      className="px-2.5 py-1 text-[11px] font-bold bg-white hover:bg-slate-100 text-slate-700 border rounded-lg shadow-2xs"
+                    >
+                      Days 6–10 (W2)
+                    </button>
+                    {selectedActivityIds.length > 0 && (
+                      <button
+                        type="button"
+                        onClick={handleUnselectAll}
+                        className="px-2.5 py-1 text-[11px] font-bold bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded-lg"
+                      >
+                        Unselect All ({selectedActivityIds.length})
+                      </button>
+                    )}
+                  </div>
+                )}
               </div>
+
+              {/* BATCH ACTION FLOATING TOOLBAR (WHEN ITEMS ARE SELECTED) */}
+              {canManage && selectedActivityIds.length > 0 && (
+                <div className="p-4 bg-gradient-to-r from-slate-900 via-blue-950 to-slate-900 text-white rounded-2xl border-2 border-gov-gold/60 shadow-xl space-y-3 animate-fadeIn">
+                  <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+                    <div className="flex items-center space-x-3">
+                      <div className="w-9 h-9 rounded-xl bg-gov-gold text-gov-dark flex items-center justify-center font-black text-sm shrink-0">
+                        {selectedActivityIds.length}
+                      </div>
+                      <div>
+                        <h4 className="text-xs sm:text-sm font-black text-gov-goldLight">
+                          {selectedActivityIds.length} Day-to-Day Activity(ies) Selected
+                        </h4>
+                        <p className="text-[11px] text-slate-300">
+                          Magsagawa ng batch grouping assignment, baguhin ang work area, o i-edit ang aktibidad para sa mga napiling araw.
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex flex-wrap items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setBatchForm({
+                            specificActivities: "",
+                            area: "",
+                            maleCount: "",
+                            femaleCount: "",
+                            scPwdMaleCount: "",
+                            scPwdFemaleCount: "",
+                            totalCount: "",
+                          });
+                          setIsBatchEditModalOpen(true);
+                        }}
+                        className="px-3.5 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-xl shadow transition flex items-center space-x-1.5"
+                      >
+                        <Edit2 className="w-3.5 h-3.5" />
+                        <span>Batch Edit Details</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={handleBatchDelete}
+                        disabled={isBatchSubmitting}
+                        className="px-3.5 py-2 bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs rounded-xl shadow transition flex items-center space-x-1.5 disabled:opacity-50"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                        <span>Batch Delete</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={handleUnselectAll}
+                        className="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white font-bold text-xs rounded-xl transition"
+                      >
+                        Clear
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Quick Assign Grouping Selector */}
+                  <div className="pt-3 border-t border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-slate-950/60 p-3 rounded-xl">
+                    <div className="flex items-center space-x-2">
+                      <Layers className="w-4 h-4 text-gov-gold shrink-0" />
+                      <span className="text-xs font-bold text-slate-200">
+                        Quick Assign Deployment Grouping to Selected:
+                      </span>
+                    </div>
+
+                    <div className="flex flex-wrap items-center gap-2">
+                      {currentBarangayGroups.length === 0 ? (
+                        <span className="text-xs text-slate-400">Walang naka-configure na grupo para sa {selectedBarangay}.</span>
+                      ) : (
+                        currentBarangayGroups.map((g) => (
+                          <button
+                            key={g.groupName}
+                            type="button"
+                            onClick={() => handleBatchAssignGroup(g)}
+                            disabled={isBatchSubmitting}
+                            className="px-3 py-1.5 bg-teal-900/80 hover:bg-teal-700 text-teal-200 hover:text-white text-xs font-bold rounded-lg border border-teal-700/60 transition flex items-center space-x-1.5 disabled:opacity-50"
+                            title={`Italaga ang ${g.groupLabel} (${g.designatedMainArea})`}
+                          >
+                            <span>{g.groupLabel}</span>
+                            <span className="text-[10px] font-mono px-1.5 py-0.2 rounded-full bg-teal-950 text-teal-300">
+                              {g.demographics.totalCount} Pax
+                            </span>
+                          </button>
+                        ))
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {/* Activities Table */}
               <div className="gov-card overflow-hidden border">
@@ -657,6 +1089,17 @@ export default function WorkProgramManagementPage() {
                   <table className="w-full text-left text-xs">
                     <thead className="bg-slate-100 text-slate-700 font-bold uppercase text-[10px] tracking-wider border-b">
                       <tr>
+                        {canManage && (
+                          <th className="px-3 py-3 w-10 text-center">
+                            <input
+                              type="checkbox"
+                              checked={allFilteredSelected}
+                              onChange={handleSelectAllFiltered}
+                              className="rounded border-slate-300 text-gov-blue focus:ring-gov-blue h-4 w-4 cursor-pointer"
+                              title="Select/Unselect All Visible"
+                            />
+                          </th>
+                        )}
                         <th className="px-4 py-3">Day #</th>
                         <th className="px-4 py-3">Specific Activities</th>
                         <th className="px-4 py-3">Assigned Work Area (Purok / Sitio)</th>
@@ -664,78 +1107,96 @@ export default function WorkProgramManagementPage() {
                         <th className="px-4 py-3 text-center">Female</th>
                         <th className="px-4 py-3 text-center">SC/PWD</th>
                         <th className="px-4 py-3 text-center">Total</th>
-                        {isAdmin && <th className="px-4 py-3 text-right">Actions</th>}
+                        {canManage && <th className="px-4 py-3 text-right">Actions</th>}
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
                       {filteredItems.length === 0 ? (
                         <tr>
-                          <td colSpan={isAdmin ? 8 : 7} className="px-4 py-8 text-center text-xs text-slate-400">
+                          <td colSpan={canManage ? 9 : 8} className="px-4 py-8 text-center text-xs text-slate-400">
                             No activities scheduled for this day filter.
                           </td>
                         </tr>
                       ) : (
-                        filteredItems.map((it: any) => (
-                          <tr key={it.id} className="hover:bg-slate-50">
-                            <td className="px-4 py-3 font-black text-gov-blue font-mono">
-                              Day {it.dayNumber}
-                            </td>
-                            <td className="px-4 py-3 font-semibold text-slate-900 max-w-sm">
-                              {it.specificActivities}
-                            </td>
-                            <td className="px-4 py-3 text-slate-700 font-medium">
-                              <span className="flex items-center space-x-1">
-                                <MapPin className="w-3 h-3 text-gov-gold flex-shrink-0" />
-                                <span>{it.area}</span>
-                              </span>
-                            </td>
-                            <td className="px-4 py-3 text-center font-mono font-bold text-slate-700">
-                              {it.maleCount || "-"}
-                            </td>
-                            <td className="px-4 py-3 text-center font-mono font-bold text-slate-700">
-                              {it.femaleCount || "-"}
-                            </td>
-                            <td className="px-4 py-3 text-center font-mono text-[11px] text-slate-500">
-                              {(it.scPwdMaleCount || 0) + (it.scPwdFemaleCount || 0) || "-"}
-                            </td>
-                            <td className="px-4 py-3 text-center">
-                              <span className="px-2.5 py-0.5 rounded-full text-xs font-black font-mono bg-blue-50 text-gov-blue border border-blue-200">
-                                {it.totalCount || it.maleCount + it.femaleCount} Pax
-                              </span>
-                            </td>
-                            {isAdmin && (
-                              <td className="px-4 py-3 text-right space-x-1">
-                                <button
-                                  onClick={() => {
-                                    setEditingItem(it);
-                                    setActivityForm({
-                                      dayNumber: it.dayNumber,
-                                      specificActivities: it.specificActivities,
-                                      area: it.area,
-                                      maleCount: it.maleCount || 0,
-                                      femaleCount: it.femaleCount || 0,
-                                      scPwdMaleCount: it.scPwdMaleCount || 0,
-                                      scPwdFemaleCount: it.scPwdFemaleCount || 0,
-                                      totalCount: it.totalCount || 0,
-                                    });
-                                    setIsActivityModalOpen(true);
-                                  }}
-                                  className="p-1 text-slate-500 hover:text-gov-blue rounded"
-                                  title="Edit activity"
-                                >
-                                  <Edit2 className="w-3.5 h-3.5" />
-                                </button>
-                                <button
-                                  onClick={() => handleDeleteActivity(it.id)}
-                                  className="p-1 text-slate-500 hover:text-rose-600 rounded"
-                                  title="Delete activity"
-                                >
-                                  <Trash2 className="w-3.5 h-3.5" />
-                                </button>
+                        filteredItems.map((it: any) => {
+                          const isSelected = selectedActivityIds.includes(it.id);
+                          return (
+                            <tr
+                              key={it.id}
+                              className={`transition-colors ${
+                                isSelected ? "bg-blue-50/80 border-l-4 border-l-gov-blue" : "hover:bg-slate-50"
+                              }`}
+                            >
+                              {canManage && (
+                                <td className="px-3 py-3 text-center">
+                                  <input
+                                    type="checkbox"
+                                    checked={isSelected}
+                                    onChange={() => toggleSelectActivity(it.id)}
+                                    className="rounded border-slate-300 text-gov-blue focus:ring-gov-blue h-4 w-4 cursor-pointer"
+                                  />
+                                </td>
+                              )}
+                              <td className="px-4 py-3 font-black text-gov-blue font-mono">
+                                Day {it.dayNumber}
                               </td>
-                            )}
-                          </tr>
-                        ))
+                              <td className="px-4 py-3 font-semibold text-slate-900 max-w-sm">
+                                {it.specificActivities}
+                              </td>
+                              <td className="px-4 py-3 text-slate-700 font-medium">
+                                <span className="flex items-center space-x-1">
+                                  <MapPin className="w-3.5 h-3.5 text-gov-gold flex-shrink-0" />
+                                  <span>{it.area}</span>
+                                </span>
+                              </td>
+                              <td className="px-4 py-3 text-center font-mono font-bold text-slate-700">
+                                {it.maleCount || "-"}
+                              </td>
+                              <td className="px-4 py-3 text-center font-mono font-bold text-slate-700">
+                                {it.femaleCount || "-"}
+                              </td>
+                              <td className="px-4 py-3 text-center font-mono text-[11px] text-slate-500">
+                                {(it.scPwdMaleCount || 0) + (it.scPwdFemaleCount || 0) || "-"}
+                              </td>
+                              <td className="px-4 py-3 text-center">
+                                <span className="px-2.5 py-0.5 rounded-full text-xs font-black font-mono bg-blue-50 text-gov-blue border border-blue-200">
+                                  {it.totalCount || it.maleCount + it.femaleCount} Pax
+                                </span>
+                              </td>
+                              {canManage && (
+                                <td className="px-4 py-3 text-right space-x-1">
+                                  <button
+                                    onClick={() => {
+                                      setEditingItem(it);
+                                      setActivityForm({
+                                        dayNumber: it.dayNumber,
+                                        specificActivities: it.specificActivities,
+                                        area: it.area,
+                                        maleCount: it.maleCount || 0,
+                                        femaleCount: it.femaleCount || 0,
+                                        scPwdMaleCount: it.scPwdMaleCount || 0,
+                                        scPwdFemaleCount: it.scPwdFemaleCount || 0,
+                                        totalCount: it.totalCount || 0,
+                                      });
+                                      setIsActivityModalOpen(true);
+                                    }}
+                                    className="p-1 text-slate-500 hover:text-gov-blue rounded"
+                                    title="Edit activity"
+                                  >
+                                    <Edit2 className="w-3.5 h-3.5" />
+                                  </button>
+                                  <button
+                                    onClick={() => handleDeleteActivity(it.id)}
+                                    className="p-1 text-slate-500 hover:text-rose-600 rounded"
+                                    title="Delete activity"
+                                  >
+                                    <Trash2 className="w-3.5 h-3.5" />
+                                  </button>
+                                </td>
+                              )}
+                            </tr>
+                          );
+                        })
                       )}
                     </tbody>
                   </table>
@@ -746,7 +1207,152 @@ export default function WorkProgramManagementPage() {
         </div>
       )}
 
-      {/* ADD / EDIT ACTIVITY MODAL */}
+      {/* BATCH EDIT MODAL */}
+      {isBatchEditModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 overflow-y-auto">
+          <form
+            onSubmit={handleSaveBatchEdit}
+            className="bg-white rounded-2xl max-w-lg w-full p-6 space-y-4 shadow-2xl animate-fadeIn"
+          >
+            <div className="flex items-center justify-between border-b pb-3">
+              <div>
+                <h3 className="text-sm font-black text-slate-900 uppercase tracking-wider flex items-center space-x-2">
+                  <Edit2 className="w-4 h-4 text-gov-blue" />
+                  <span>Batch Edit {selectedActivityIds.length} Activities</span>
+                </h3>
+                <p className="text-[11px] text-slate-500">
+                  Ang mga field na pupunan lamang ang ma-a-update sa lahat ng napiling aktibidad.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsBatchEditModalOpen(false)}
+                className="text-slate-400 hover:text-slate-600 text-lg font-bold"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Quick Fill from Group */}
+            {currentBarangayGroups.length > 0 && (
+              <div className="p-3 bg-teal-50 border border-teal-200 rounded-xl space-y-1">
+                <label className="block text-[10px] font-black text-teal-900 uppercase">
+                  ⚡ Auto-Fill Details from Official Grouping:
+                </label>
+                <select
+                  value={batchSelectedGroup}
+                  onChange={(e) => {
+                    const grpName = e.target.value;
+                    setBatchSelectedGroup(grpName);
+                    const grp = currentBarangayGroups.find((g) => g.groupName === grpName);
+                    if (grp) {
+                      setBatchForm({
+                        ...batchForm,
+                        area: grp.designatedMainArea,
+                        maleCount: String(grp.demographics.maleCount),
+                        femaleCount: String(grp.demographics.femaleCount),
+                        scPwdMaleCount: String(grp.demographics.scPwdMaleCount),
+                        scPwdFemaleCount: String(grp.demographics.scPwdFemaleCount),
+                        totalCount: String(grp.demographics.totalCount),
+                      });
+                    }
+                  }}
+                  className="w-full px-3 py-2 text-xs border border-teal-300 rounded-lg bg-white font-bold text-teal-950"
+                >
+                  <option value="">-- Pumili ng Grupo upang Auto-Fill --</option>
+                  {currentBarangayGroups.map((g) => (
+                    <option key={g.groupName} value={g.groupName}>
+                      {g.groupLabel} ({g.designatedMainArea}) - {g.demographics.totalCount} Pax
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            <div>
+              <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">
+                Assigned Work Area (Purok/Sitio)
+              </label>
+              <input
+                type="text"
+                placeholder="e.g. Purok Mulawin to Ipil-ipil (or leave blank to retain)"
+                value={batchForm.area}
+                onChange={(e) => setBatchForm({ ...batchForm, area: e.target.value })}
+                className="w-full px-3 py-2 text-xs border rounded-lg"
+              />
+            </div>
+
+            <div>
+              <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">
+                Specific Activity Description
+              </label>
+              <textarea
+                rows={2}
+                placeholder="e.g. De-clogging of canals, creeks, waterways, and drainage inlets... (leave blank to retain)"
+                value={batchForm.specificActivities}
+                onChange={(e) => setBatchForm({ ...batchForm, specificActivities: e.target.value })}
+                className="w-full px-3 py-2 text-xs border rounded-lg"
+              />
+            </div>
+
+            <div className="grid grid-cols-3 gap-3">
+              <div>
+                <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Male Quota</label>
+                <input
+                  type="number"
+                  min={0}
+                  placeholder="Leave blank"
+                  value={batchForm.maleCount}
+                  onChange={(e) => setBatchForm({ ...batchForm, maleCount: e.target.value })}
+                  className="w-full px-3 py-2 text-xs border rounded-lg font-mono font-bold"
+                />
+              </div>
+              <div>
+                <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Female Quota</label>
+                <input
+                  type="number"
+                  min={0}
+                  placeholder="Leave blank"
+                  value={batchForm.femaleCount}
+                  onChange={(e) => setBatchForm({ ...batchForm, femaleCount: e.target.value })}
+                  className="w-full px-3 py-2 text-xs border rounded-lg font-mono font-bold"
+                />
+              </div>
+              <div>
+                <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Total Pax</label>
+                <input
+                  type="number"
+                  min={0}
+                  placeholder="Leave blank"
+                  value={batchForm.totalCount}
+                  onChange={(e) => setBatchForm({ ...batchForm, totalCount: e.target.value })}
+                  className="w-full px-3 py-2 text-xs border rounded-lg font-mono font-bold bg-slate-50"
+                />
+              </div>
+            </div>
+
+            <div className="flex justify-end space-x-2 pt-3 border-t">
+              <button
+                type="button"
+                onClick={() => setIsBatchEditModalOpen(false)}
+                className="px-4 py-2 text-xs font-bold border rounded-lg text-slate-600 hover:bg-slate-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={isBatchSubmitting}
+                className="px-5 py-2 bg-gov-blue hover:bg-gov-light text-white font-bold text-xs rounded-lg shadow flex items-center space-x-1.5 disabled:opacity-50"
+              >
+                {isBatchSubmitting ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
+                <span>Apply Changes to {selectedActivityIds.length} Activities</span>
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {/* ADD / EDIT SINGLE ACTIVITY MODAL */}
       {isActivityModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
           <form
@@ -756,6 +1362,40 @@ export default function WorkProgramManagementPage() {
             <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider">
               {editingItem ? "Edit Work Program Activity" : `Add Activity for ${selectedBarangay}`}
             </h3>
+
+            {/* Quick Populate from Barangay Grouping */}
+            {currentBarangayGroups.length > 0 && (
+              <div className="p-3 bg-teal-50 border border-teal-200 rounded-xl space-y-1">
+                <label className="block text-[10px] font-black text-teal-900 uppercase">
+                  ⚡ Quick Auto-Fill from Official Grouping:
+                </label>
+                <select
+                  onChange={(e) => {
+                    const grpName = e.target.value;
+                    const grp = currentBarangayGroups.find((g) => g.groupName === grpName);
+                    if (grp) {
+                      setActivityForm({
+                        ...activityForm,
+                        area: grp.designatedMainArea,
+                        maleCount: grp.demographics.maleCount,
+                        femaleCount: grp.demographics.femaleCount,
+                        scPwdMaleCount: grp.demographics.scPwdMaleCount,
+                        scPwdFemaleCount: grp.demographics.scPwdFemaleCount,
+                        totalCount: grp.demographics.totalCount,
+                      });
+                    }
+                  }}
+                  className="w-full px-3 py-2 text-xs border border-teal-300 rounded-lg bg-white font-bold text-teal-950"
+                >
+                  <option value="">-- Pumili ng Grupo upang I-load ang Area &amp; Quotas --</option>
+                  {currentBarangayGroups.map((g) => (
+                    <option key={g.groupName} value={g.groupName}>
+                      {g.groupLabel} ({g.designatedMainArea}) - {g.demographics.totalCount} Pax
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
 
             <div className="grid grid-cols-2 gap-3">
               <div>
