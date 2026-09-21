@@ -23,7 +23,13 @@ import {
   X,
   QrCode,
   Filter,
+  CheckSquare,
+  Square,
+  FileArchive,
+  FolderDown,
+  Loader2,
 } from "lucide-react";
+import JSZip from "jszip";
 import { StatusBadge } from "@/components/common/StatusBadge";
 import { FieldQrPassGeneratorModal } from "@/components/field/FieldQrPassGeneratorCard";
 import { formatDate, normalizeBarangayName, DINGALAN_BARANGAYS } from "@/lib/utils";
@@ -40,11 +46,17 @@ export default function PhotosPage() {
   const [photos, setPhotos] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Multi-select for storage cleanup & batch actions
+  // Multi-select for storage cleanup & batch download actions
   const [selectedPhotoIds, setSelectedPhotoIds] = useState<string[]>([]);
   const [isPurgeModalOpen, setIsPurgeModalOpen] = useState(false);
   const [purgeType, setPurgeType] = useState<"SELECTED" | "ALL_APPROVED">("SELECTED");
   const [purging, setPurging] = useState(false);
+  const [isDownloadingZip, setIsDownloadingZip] = useState(false);
+  const [downloadProgress, setDownloadProgress] = useState<{ current: number; total: number; percent: number }>({
+    current: 0,
+    total: 0,
+    percent: 0,
+  });
 
   // Photo viewer modal
   const [viewingPhoto, setViewingPhoto] = useState<any | null>(null);
@@ -648,6 +660,127 @@ export default function PhotosPage() {
     }
   };
 
+  const downloadPhotosAsZip = async (photoIdsToDownload: string[]) => {
+    if (photoIdsToDownload.length === 0) {
+      alert("Please select at least one photo to download.");
+      return;
+    }
+    const targetPhotos = photos.filter((p) => photoIdsToDownload.includes(p.id));
+    if (targetPhotos.length === 0) return;
+
+    setIsDownloadingZip(true);
+    setDownloadProgress({ current: 0, total: targetPhotos.length, percent: 0 });
+
+    try {
+      const zip = new JSZip();
+      const currentProg = programs.find((p) => p.id === selectedProgramId);
+      const progCode = currentProg?.programCode || "TUPAD";
+
+      for (let i = 0; i < targetPhotos.length; i++) {
+        const photo = targetPhotos[i];
+        setDownloadProgress({
+          current: i + 1,
+          total: targetPhotos.length,
+          percent: Math.round(((i + 1) / targetPhotos.length) * 100),
+        });
+
+        try {
+          let arrayBuffer: ArrayBuffer | Uint8Array;
+
+          if (photo.isOfflineQueue && photo.fileKey) {
+            // Decode base64 data URI
+            const base64Str = photo.fileKey.split(",")[1] || photo.fileKey;
+            const binary = atob(base64Str);
+            const bytes = new Uint8Array(binary.length);
+            for (let b = 0; b < binary.length; b++) {
+              bytes[b] = binary.charCodeAt(b);
+            }
+            arrayBuffer = bytes;
+          } else {
+            const res = await fetch(`/api/v1/photos/${photo.id}/image`);
+            if (!res.ok) {
+              console.warn(`Could not fetch image for photo ID ${photo.id}`);
+              continue;
+            }
+            arrayBuffer = await res.arrayBuffer();
+          }
+
+          const stage = getPhotoStage(photo);
+          const dayNum = photo.workDay?.dayNumber || 1;
+          const brgy = (photo.barangay || "Dingalan").replace(/[^a-zA-Z0-9]/g, "");
+          const cleanActivity = (photo.specificActivity || "FieldWork")
+            .replace(/[^a-zA-Z0-9_-]/g, "_")
+            .slice(0, 30);
+          const shortId = (photo.id || String(i)).slice(-6);
+
+          const fileName = `Day${dayNum}_${brgy}_[${stage}]_${cleanActivity}_${shortId}.jpg`;
+          zip.file(fileName, arrayBuffer);
+        } catch (itemErr) {
+          console.error(`Error packing photo ${photo.id} to zip:`, itemErr);
+        }
+      }
+
+      const zipBlob = await zip.generateAsync({
+        type: "blob",
+        compression: "DEFLATE",
+        compressionOptions: { level: 6 },
+      });
+
+      const url = URL.createObjectURL(zipBlob);
+      const link = document.createElement("a");
+      const dateStr = new Date().toISOString().split("T")[0];
+      const brgySuffix = selectedBarangayFilter !== "ALL" ? `_${selectedBarangayFilter}` : "";
+      link.href = url;
+      link.download = `TUPAD_AccomplishmentPhotos_${progCode}${brgySuffix}_${dateStr}.zip`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    } catch (err: any) {
+      console.error("ZIP Generation error:", err);
+      alert("Failed to create ZIP download: " + (err.message || "Unknown error"));
+    } finally {
+      setIsDownloadingZip(false);
+      setDownloadProgress({ current: 0, total: 0, percent: 0 });
+    }
+  };
+
+  const handleSingleDownload = async (photo: any, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    try {
+      const stage = getPhotoStage(photo);
+      const dayNum = photo.workDay?.dayNumber || 1;
+      const brgy = (photo.barangay || "Dingalan").replace(/[^a-zA-Z0-9]/g, "");
+      const cleanActivity = (photo.specificActivity || "FieldWork").replace(/[^a-zA-Z0-9_-]/g, "_").slice(0, 30);
+      const fileName = `TUPAD_Accomplishment_${brgy}_Day${dayNum}_[${stage}]_${cleanActivity}.jpg`;
+
+      if (photo.isOfflineQueue && photo.fileKey) {
+        const link = document.createElement("a");
+        link.href = photo.fileKey;
+        link.download = fileName;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        return;
+      }
+
+      const res = await fetch(`/api/v1/photos/${photo.id}/image`);
+      if (!res.ok) throw new Error("Image download failed");
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = fileName;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error("Single download error:", err);
+      alert("Failed to download photo file");
+    }
+  };
+
   const currentProgram = programs.find((p) => p.id === selectedProgramId);
   const isDole = user?.role === "DOLE_COORDINATOR";
   const isAdmin = isAdminUser(user);
@@ -700,6 +833,39 @@ export default function PhotosPage() {
           >
             <QrCode className="w-3.5 h-3.5 text-amber-700" />
             <span>Generate / Screenshot QR</span>
+          </button>
+
+          {/* Download Photos (.ZIP) Button */}
+          <button
+            type="button"
+            onClick={() => {
+              if (selectedPhotoIds.length > 0) {
+                downloadPhotosAsZip(selectedPhotoIds);
+              } else if (displayedPhotos.length > 0) {
+                downloadPhotosAsZip(displayedPhotos.map((p) => p.id));
+              } else {
+                alert("No photos available to download");
+              }
+            }}
+            disabled={displayedPhotos.length === 0 || isDownloadingZip}
+            className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow-md flex items-center space-x-1.5 transition disabled:opacity-50"
+            title={selectedPhotoIds.length > 0 ? `Download ${selectedPhotoIds.length} selected photos as ZIP` : `Download all ${displayedPhotos.length} photos as ZIP`}
+          >
+            {isDownloadingZip ? (
+              <>
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                <span>Downloading ZIP ({downloadProgress.percent}%)...</span>
+              </>
+            ) : (
+              <>
+                <FileArchive className="w-3.5 h-3.5" />
+                <span>
+                  {selectedPhotoIds.length > 0
+                    ? `Download Selected (${selectedPhotoIds.length}) (.ZIP)`
+                    : `Download All (${displayedPhotos.length}) (.ZIP)`}
+                </span>
+              </>
+            )}
           </button>
 
           {/* Admin Storage Optimization Button */}
@@ -791,16 +957,40 @@ export default function PhotosPage() {
           </div>
         </div>
 
-        {/* Storage Metrics & Multi-Select bar */}
-        <div className="flex items-center space-x-3 text-xs">
-          {isAdmin && displayedPhotos.length > 0 && (
+        {/* Selection & Gallery Metrics bar */}
+        <div className="flex flex-wrap items-center gap-2.5 text-xs">
+          {displayedPhotos.length > 0 && (
             <button
+              type="button"
               onClick={toggleSelectAll}
-              className="text-gov-blue font-bold hover:underline"
+              className="px-2.5 py-1 bg-gov-blue/10 hover:bg-gov-blue/20 text-gov-blue font-bold rounded-lg transition flex items-center space-x-1"
             >
-              {selectedPhotoIds.length === displayedPhotos.length ? "Deselect All" : "Select All"}
+              {selectedPhotoIds.length === displayedPhotos.length ? (
+                <>
+                  <CheckSquare className="w-3.5 h-3.5" />
+                  <span>Deselect All</span>
+                </>
+              ) : (
+                <>
+                  <Square className="w-3.5 h-3.5" />
+                  <span>Select All ({displayedPhotos.length})</span>
+                </>
+              )}
             </button>
           )}
+
+          {selectedPhotoIds.length > 0 && (
+            <button
+              type="button"
+              onClick={() => downloadPhotosAsZip(selectedPhotoIds)}
+              disabled={isDownloadingZip}
+              className="px-2.5 py-1 bg-emerald-100 hover:bg-emerald-200 text-emerald-900 font-extrabold rounded-lg border border-emerald-300 transition flex items-center space-x-1 disabled:opacity-50"
+            >
+              <FileArchive className="w-3.5 h-3.5 text-emerald-700" />
+              <span>Download Selected ({selectedPhotoIds.length})</span>
+            </button>
+          )}
+
           <span className="px-2.5 py-1 bg-slate-100 text-slate-700 font-semibold rounded-lg">
             Total Photos: <strong>{displayedPhotos.length}</strong>
           </span>
@@ -861,12 +1051,15 @@ export default function PhotosPage() {
           const photoSrc = photo.isOfflineQueue
             ? photo.fileKey
             : (photo.imageUrl || `/api/v1/photos/${photo.id}/image`);
+          const isSelected = selectedPhotoIds.includes(photo.id);
 
           return (
             <div
               key={photo.id}
-              className={`gov-card overflow-hidden shadow-sm group hover:shadow-md transition flex flex-col justify-between border border-slate-200 ${
-                selectedPhotoIds.includes(photo.id) ? "ring-2 ring-rose-500 bg-rose-50/20" : ""
+              className={`gov-card overflow-hidden shadow-sm group hover:shadow-md transition flex flex-col justify-between border ${
+                isSelected
+                  ? "ring-2 ring-gov-blue border-gov-blue bg-blue-50/20"
+                  : "border-slate-200"
               }`}
             >
               {/* Image Box */}
@@ -874,19 +1067,28 @@ export default function PhotosPage() {
                 className="relative aspect-video bg-slate-900 overflow-hidden cursor-pointer"
                 onClick={() => setViewingPhoto(photo)}
               >
-                {/* Stage Badge & Admin Checkbox */}
+                {/* Stage Badge & Select Checkbox */}
                 <div
                   className="absolute top-2 left-2 z-20 flex items-center space-x-1.5"
                   onClick={(e) => e.stopPropagation()}
                 >
-                  {isAdmin && (
-                    <input
-                      type="checkbox"
-                      checked={selectedPhotoIds.includes(photo.id)}
-                      onChange={() => toggleSelectPhoto(photo.id)}
-                      className="w-4 h-4 text-rose-600 rounded bg-white/90 cursor-pointer shadow"
-                    />
-                  )}
+                  <button
+                    type="button"
+                    onClick={() => toggleSelectPhoto(photo.id)}
+                    className={`p-1.5 rounded-lg transition backdrop-blur-md shadow-md flex items-center justify-center ${
+                      isSelected
+                        ? "bg-gov-blue text-white ring-2 ring-blue-300"
+                        : "bg-black/60 text-slate-200 hover:bg-black/80 hover:text-white"
+                    }`}
+                    title={isSelected ? "Deselect photo" : "Select photo for download"}
+                  >
+                    {isSelected ? (
+                      <CheckSquare className="w-4 h-4 text-gov-goldLight" />
+                    ) : (
+                      <Square className="w-4 h-4" />
+                    )}
+                  </button>
+
                   <span
                     className={`text-[9px] font-black uppercase px-2 py-0.5 rounded-md shadow-md tracking-wider flex items-center space-x-1 ${
                       photoStage === "BEFORE"
@@ -957,25 +1159,38 @@ export default function PhotosPage() {
                   </span>
                 </div>
 
-                {/* Approval Buttons for PESO ADMIN */}
-                {!isDole && can("photo.approve") && photo.status === "FOR_REVIEW" && (
-                  <div className="flex space-x-2 pt-2 border-t border-slate-100">
-                    <button
-                      onClick={() => handleStatusChange(photo.id, "APPROVED")}
-                      className="flex-1 py-1.5 bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-[11px] rounded-lg shadow transition flex items-center justify-center space-x-1"
-                    >
-                      <CheckCircle2 className="w-3.5 h-3.5" />
-                      <span>Approve</span>
-                    </button>
-                    <button
-                      onClick={() => handleStatusChange(photo.id, "REJECTED")}
-                      className="flex-1 py-1.5 bg-rose-700 hover:bg-rose-800 text-white font-bold text-[11px] rounded-lg shadow transition flex items-center justify-center space-x-1"
-                    >
-                      <XCircle className="w-3.5 h-3.5" />
-                      <span>Reject</span>
-                    </button>
-                  </div>
-                )}
+                {/* Action Row: Quick Download & Status Approvals */}
+                <div className="flex items-center justify-between pt-2 border-t border-slate-100 gap-2">
+                  <button
+                    type="button"
+                    onClick={(e) => handleSingleDownload(photo, e)}
+                    className="px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 hover:text-slate-900 font-bold text-[11px] rounded-lg transition flex items-center space-x-1"
+                    title="Download this single photo"
+                  >
+                    <Download className="w-3.5 h-3.5 text-slate-600" />
+                    <span>Download</span>
+                  </button>
+
+                  {/* Approval Buttons for PESO ADMIN */}
+                  {!isDole && can("photo.approve") && photo.status === "FOR_REVIEW" && (
+                    <div className="flex space-x-1.5 flex-1 justify-end">
+                      <button
+                        onClick={() => handleStatusChange(photo.id, "APPROVED")}
+                        className="flex-1 py-1.5 bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-[11px] rounded-lg shadow transition flex items-center justify-center space-x-1"
+                      >
+                        <CheckCircle2 className="w-3 h-3" />
+                        <span>Approve</span>
+                      </button>
+                      <button
+                        onClick={() => handleStatusChange(photo.id, "REJECTED")}
+                        className="flex-1 py-1.5 bg-rose-700 hover:bg-rose-800 text-white font-bold text-[11px] rounded-lg shadow transition flex items-center justify-center space-x-1"
+                      >
+                        <XCircle className="w-3 h-3" />
+                        <span>Reject</span>
+                      </button>
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
           );
@@ -985,6 +1200,97 @@ export default function PhotosPage() {
       {displayedPhotos.length === 0 && (
         <div className="gov-card p-12 text-center text-xs text-slate-400">
           No accomplishment photos found for this selection.
+        </div>
+      )}
+
+      {/* Floating Batch Action Dock when photos are selected */}
+      {selectedPhotoIds.length > 0 && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 bg-slate-900/95 backdrop-blur-md text-white px-4 py-3 rounded-2xl shadow-2xl border border-slate-700 flex items-center space-x-3 max-w-[95vw]">
+          <div className="flex items-center space-x-2 text-xs font-bold whitespace-nowrap">
+            <CheckSquare className="w-4 h-4 text-gov-goldLight" />
+            <span>
+              <strong className="text-gov-goldLight font-extrabold">{selectedPhotoIds.length}</strong> photo(s) selected
+            </span>
+          </div>
+
+          <div className="h-4 w-px bg-slate-700 hidden sm:block" />
+
+          <button
+            type="button"
+            onClick={() => downloadPhotosAsZip(selectedPhotoIds)}
+            disabled={isDownloadingZip}
+            className="px-3.5 py-1.5 bg-gradient-to-r from-gov-gold to-amber-500 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-black text-xs rounded-xl shadow transition flex items-center space-x-1.5 disabled:opacity-50 whitespace-nowrap"
+          >
+            {isDownloadingZip ? (
+              <>
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                <span>Downloading ZIP ({downloadProgress.percent}%)...</span>
+              </>
+            ) : (
+              <>
+                <FileArchive className="w-3.5 h-3.5" />
+                <span>Download Selected ({selectedPhotoIds.length}) (.ZIP)</span>
+              </>
+            )}
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setSelectedPhotoIds([])}
+            className="text-xs text-slate-400 hover:text-white transition font-semibold whitespace-nowrap"
+          >
+            Clear
+          </button>
+
+          {isAdmin && (
+            <>
+              <div className="h-4 w-px bg-slate-700 hidden sm:block" />
+              <button
+                type="button"
+                onClick={() => {
+                  setPurgeType("SELECTED");
+                  setIsPurgeModalOpen(true);
+                }}
+                className="px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs rounded-xl transition flex items-center space-x-1 whitespace-nowrap"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                <span>Delete</span>
+              </button>
+            </>
+          )}
+        </div>
+      )}
+
+      {/* Downloading ZIP Progress Modal */}
+      {isDownloadingZip && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4">
+          <div className="bg-white rounded-2xl max-w-sm w-full p-6 space-y-4 shadow-2xl border border-slate-200 text-center animate-fadeIn">
+            <div className="w-12 h-12 rounded-full bg-emerald-50 text-emerald-600 border border-emerald-200 flex items-center justify-center mx-auto shadow-sm">
+              <Loader2 className="w-6 h-6 animate-spin text-emerald-600" />
+            </div>
+            <div className="space-y-1">
+              <h3 className="text-sm font-black text-slate-900 uppercase tracking-wide">
+                Packaging Geotagged Photos
+              </h3>
+              <p className="text-xs text-slate-500">
+                Fetching and compressing high-resolution field photos into a ZIP archive...
+              </p>
+            </div>
+
+            {/* Progress Bar */}
+            <div className="space-y-1.5">
+              <div className="w-full bg-slate-100 rounded-full h-2.5 overflow-hidden border border-slate-200">
+                <div
+                  className="bg-emerald-600 h-full rounded-full transition-all duration-300"
+                  style={{ width: `${downloadProgress.percent}%` }}
+                />
+              </div>
+              <div className="flex justify-between text-[11px] font-mono text-slate-500 font-semibold">
+                <span>{downloadProgress.current} of {downloadProgress.total} photos</span>
+                <span>{downloadProgress.percent}%</span>
+              </div>
+            </div>
+          </div>
         </div>
       )}
 
@@ -1035,14 +1341,14 @@ export default function PhotosPage() {
               <p className="max-w-md truncate">
                 <strong>Activity:</strong> {viewingPhoto.specificActivity || "General Field Work"}
               </p>
-              <a
-                href={viewingPhoto.isOfflineQueue ? viewingPhoto.fileKey : `/api/v1/photos/${viewingPhoto.id}/image?download=true`}
-                download={`TUPAD_Accomplishment_${viewingPhoto.barangay}_Day${viewingPhoto.workDay?.dayNumber || 1}_${getPhotoStage(viewingPhoto)}.jpg`}
-                className="px-3 py-1.5 bg-gov-blue hover:bg-gov-dark text-white rounded-lg font-bold flex items-center space-x-1.5 shadow"
+              <button
+                type="button"
+                onClick={() => handleSingleDownload(viewingPhoto)}
+                className="px-3.5 py-1.5 bg-gov-blue hover:bg-gov-dark text-white rounded-lg font-bold flex items-center space-x-1.5 shadow cursor-pointer"
               >
                 <Download className="w-3.5 h-3.5" />
                 <span>Download Geotagged Image</span>
-              </a>
+              </button>
             </div>
           </div>
         </div>
