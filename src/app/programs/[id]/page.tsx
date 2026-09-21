@@ -740,9 +740,14 @@ export default function ProgramDetailsHub() {
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             {photos.map((p) => (
-              <div key={p.id} className="gov-card overflow-hidden space-y-2">
-                <div className="h-40 bg-slate-900 relative flex items-center justify-center text-white">
-                  <Camera className="w-8 h-8 text-slate-500" />
+              <div key={p.id} className="gov-card overflow-hidden space-y-2 group">
+                <div className="h-40 bg-slate-900 relative flex items-center justify-center text-white overflow-hidden">
+                  <img
+                    src={p.imageUrl || `/api/v1/photos/${p.id}/image`}
+                    alt={`Brgy. ${p.barangay}`}
+                    loading="lazy"
+                    className="w-full h-full object-cover group-hover:scale-105 transition duration-300"
+                  />
                   <div className="absolute bottom-2 left-2 right-2 bg-black/70 p-2 rounded text-[10px] backdrop-blur-sm">
                     <p className="font-bold text-gov-goldLight">Brgy. {p.barangay}, Dingalan</p>
                     <p className="text-slate-300">GPS: {p.latitude?.toFixed(4)}, {p.longitude?.toFixed(4)}</p>

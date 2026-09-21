@@ -14,6 +14,7 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const programId = searchParams.get("programId");
     const barangay = searchParams.get("barangay");
+    const includeData = searchParams.get("includeData") === "true";
 
     const whereClause: any = {};
     if (programId) whereClause.programId = programId;
@@ -32,19 +33,65 @@ export async function GET(request: Request) {
       whereClause.status = "APPROVED";
     }
 
-    const photos = await prisma.accomplishmentPhoto.findMany({
+    const rawPhotos = await prisma.accomplishmentPhoto.findMany({
       where: whereClause,
-      include: {
-        program: true,
-        workDay: true,
-        workProgramItem: true,
+      select: {
+        id: true,
+        programId: true,
+        workDayId: true,
+        workProgramItemId: true,
+        barangay: true,
+        sitio: true,
+        workArea: true,
+        specificActivity: true,
+        fileName: true,
+        latitude: true,
+        longitude: true,
+        capturedAt: true,
+        uploadedAt: true,
+        uploadedById: true,
+        status: true,
+        isExported: true,
+        isPurged: true,
+        approvedById: true,
+        approvedAt: true,
+        rejectionReason: true,
+        fileKey: includeData, // Only load full multi-MB base64 data if explicitly requested
+        program: {
+          select: {
+            id: true,
+            programCode: true,
+            programName: true,
+          },
+        },
+        workDay: {
+          select: {
+            id: true,
+            dayNumber: true,
+            workDate: true,
+          },
+        },
+        workProgramItem: {
+          select: {
+            id: true,
+            dayNumber: true,
+            specificActivities: true,
+            area: true,
+          },
+        },
         uploadedBy: { select: { fullName: true } },
         approvedBy: { select: { fullName: true } },
       },
       orderBy: { uploadedAt: "desc" },
     });
 
-    return NextResponse.json({ photos });
+    const photos = rawPhotos.map((p) => ({
+      ...p,
+      imageUrl: `/api/v1/photos/${p.id}/image`,
+      hasImage: true,
+    }));
+
+    return NextResponse.json({ photos, total: photos.length });
   } catch (error: any) {
     console.error("GET photos error:", error);
     return NextResponse.json({ error: error.message }, { status: 500 });

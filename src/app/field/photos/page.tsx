@@ -97,16 +97,16 @@ export default function PhotosPage() {
   useEffect(() => {
     if (selectedProgramId) {
       setSelectedPhotoIds([]);
-      fetchPhotos(selectedProgramId);
+      fetchPhotos(selectedProgramId, selectedBarangayFilter);
       fetchWorkPrograms(selectedProgramId);
     }
-  }, [selectedProgramId]);
+  }, [selectedProgramId, selectedBarangayFilter]);
 
   // Listen for sync completions to auto-update photo roster
   useEffect(() => {
     const handleSyncUpdate = () => {
       if (selectedProgramId) {
-        fetchPhotos(selectedProgramId);
+        fetchPhotos(selectedProgramId, selectedBarangayFilter);
       }
     };
     window.addEventListener("tupad-offline-synced", handleSyncUpdate);
@@ -115,7 +115,7 @@ export default function PhotosPage() {
       window.removeEventListener("tupad-offline-synced", handleSyncUpdate);
       window.removeEventListener("tupad-photos-updated", handleSyncUpdate);
     };
-  }, [selectedProgramId]);
+  }, [selectedProgramId, selectedBarangayFilter]);
 
   // Track GPS location continuously when modal is open
   useEffect(() => {
@@ -225,10 +225,15 @@ export default function PhotosPage() {
     }
   };
 
-  const fetchPhotos = async (progId: string) => {
+  const fetchPhotos = async (progId: string, brgyFilter?: string) => {
     let serverPhotos: any[] = [];
     try {
-      const res = await fetch(`/api/v1/photos?programId=${progId}`);
+      const activeBrgy = brgyFilter !== undefined ? brgyFilter : selectedBarangayFilter;
+      let url = `/api/v1/photos?programId=${progId}`;
+      if (activeBrgy && activeBrgy !== "ALL") {
+        url += `&barangay=${encodeURIComponent(activeBrgy)}`;
+      }
+      const res = await fetch(url);
       if (res.ok) {
         const data = await res.json();
         serverPhotos = data.photos || [];
@@ -852,8 +857,10 @@ export default function PhotosPage() {
       {/* Photo Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
         {displayedPhotos.map((photo) => {
-          const isImageUri = photo.fileKey && photo.fileKey.startsWith("data:image");
           const photoStage = getPhotoStage(photo);
+          const photoSrc = photo.isOfflineQueue
+            ? photo.fileKey
+            : (photo.imageUrl || `/api/v1/photos/${photo.id}/image`);
 
           return (
             <div
@@ -900,10 +907,11 @@ export default function PhotosPage() {
                 </div>
 
                 {/* Real Geotagged Photo or Placeholder */}
-                {isImageUri ? (
+                {photoSrc ? (
                   <img
-                    src={photo.fileKey}
+                    src={photoSrc}
                     alt={photo.specificActivity || "Accomplishment Photo"}
+                    loading="lazy"
                     className="w-full h-full object-cover group-hover:scale-105 transition duration-500"
                   />
                 ) : (
@@ -1016,33 +1024,25 @@ export default function PhotosPage() {
             </div>
 
             <div className="flex-1 overflow-auto bg-black flex items-center justify-center p-2">
-              {viewingPhoto.fileKey && viewingPhoto.fileKey.startsWith("data:image") ? (
-                <img
-                  src={viewingPhoto.fileKey}
-                  alt={viewingPhoto.specificActivity || "Proof"}
-                  className="max-h-[65vh] w-auto object-contain rounded"
-                />
-              ) : (
-                <div className="p-12 text-center text-slate-500 font-mono text-xs">
-                  Photo placeholder metadata recorded.
-                </div>
-              )}
+              <img
+                src={viewingPhoto.isOfflineQueue ? viewingPhoto.fileKey : (viewingPhoto.imageUrl || `/api/v1/photos/${viewingPhoto.id}/image`)}
+                alt={viewingPhoto.specificActivity || "Proof"}
+                className="max-h-[65vh] w-auto object-contain rounded"
+              />
             </div>
 
             <div className="p-4 bg-slate-950 border-t border-slate-800 text-xs text-slate-300 flex items-center justify-between">
               <p className="max-w-md truncate">
                 <strong>Activity:</strong> {viewingPhoto.specificActivity || "General Field Work"}
               </p>
-              {viewingPhoto.fileKey && viewingPhoto.fileKey.startsWith("data:image") && (
-                <a
-                  href={viewingPhoto.fileKey}
-                  download={`TUPAD_Accomplishment_${viewingPhoto.barangay}_Day${viewingPhoto.workDay?.dayNumber || 1}_${getPhotoStage(viewingPhoto)}.jpg`}
-                  className="px-3 py-1.5 bg-gov-blue hover:bg-gov-dark text-white rounded-lg font-bold flex items-center space-x-1.5 shadow"
-                >
-                  <Download className="w-3.5 h-3.5" />
-                  <span>Download Geotagged Image</span>
-                </a>
-              )}
+              <a
+                href={viewingPhoto.isOfflineQueue ? viewingPhoto.fileKey : `/api/v1/photos/${viewingPhoto.id}/image?download=true`}
+                download={`TUPAD_Accomplishment_${viewingPhoto.barangay}_Day${viewingPhoto.workDay?.dayNumber || 1}_${getPhotoStage(viewingPhoto)}.jpg`}
+                className="px-3 py-1.5 bg-gov-blue hover:bg-gov-dark text-white rounded-lg font-bold flex items-center space-x-1.5 shadow"
+              >
+                <Download className="w-3.5 h-3.5" />
+                <span>Download Geotagged Image</span>
+              </a>
             </div>
           </div>
         </div>
