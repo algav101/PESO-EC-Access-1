@@ -14,6 +14,9 @@ export async function GET() {
     const programs = await prisma.program.findMany({
       orderBy: { createdAt: "desc" },
       include: {
+        workDays: {
+          orderBy: { dayNumber: "asc" },
+        },
         _count: {
           select: {
             programBeneficiaries: { where: { participationStatus: { not: "REPLACED" } } },

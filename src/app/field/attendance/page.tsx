@@ -62,17 +62,64 @@ export default function DailyAttendancePage() {
   useEffect(() => {
     if (selectedProgramId) {
       const prog = programs.find((p) => p.id === selectedProgramId);
-      if (prog) {
-        setWorkDays(prog.workDays || []);
-        if (prog.workDays?.length > 0) {
-          const todayStr = pht.dateStr;
-          const todayWd = prog.workDays.find((w: any) => w.workDate === todayStr);
-          setSelectedWorkDayId(todayWd ? todayWd.id : prog.workDays[0].id);
-        }
+      if (prog && prog.workDays && prog.workDays.length > 0) {
+        const sortedDays = [...prog.workDays].sort((a, b) => a.dayNumber - b.dayNumber);
+        setWorkDays(sortedDays);
+        const todayStr = pht.dateStr;
+        const todayWd = sortedDays.find((w: any) => w.workDate === todayStr);
+        setSelectedWorkDayId((prev) => {
+          if (prev && sortedDays.some((w: any) => w.id === prev)) {
+            return prev;
+          }
+          return todayWd ? todayWd.id : sortedDays[0].id;
+        });
+      } else {
+        fetchProgramDetail(selectedProgramId);
       }
       fetchWorkPrograms(selectedProgramId);
     }
   }, [selectedProgramId, programs]);
+
+  const fetchProgramDetail = async (progId: string) => {
+    try {
+      if (typeof navigator === "undefined" || navigator.onLine) {
+        const res = await fetch(`/api/v1/programs/${progId}`);
+        if (res.ok) {
+          const data = await res.json();
+          if (data.program?.workDays?.length > 0) {
+            const sortedDays = [...data.program.workDays].sort((a, b) => a.dayNumber - b.dayNumber);
+            setWorkDays(sortedDays);
+            const todayStr = pht.dateStr;
+            const todayWd = sortedDays.find((w: any) => w.workDate === todayStr);
+            setSelectedWorkDayId((prev) => {
+              if (prev && sortedDays.some((w: any) => w.id === prev)) return prev;
+              return todayWd ? todayWd.id : sortedDays[0].id;
+            });
+            return;
+          }
+        }
+      }
+    } catch (e) {
+      console.warn("Could not fetch detailed program work days:", e);
+    }
+
+    // Try offline IndexedDB
+    try {
+      const cachedDays = await offlineDb.cachedWorkDays.where("programId").equals(progId).toArray();
+      if (cachedDays && cachedDays.length > 0) {
+        const sortedDays = cachedDays.sort((a, b) => a.dayNumber - b.dayNumber);
+        setWorkDays(sortedDays);
+        const todayStr = pht.dateStr;
+        const todayWd = sortedDays.find((w: any) => w.workDate === todayStr);
+        setSelectedWorkDayId((prev) => {
+          if (prev && sortedDays.some((w: any) => w.id === prev)) return prev;
+          return todayWd ? todayWd.id : sortedDays[0].id;
+        });
+      }
+    } catch (err) {
+      console.warn("Offline cached work days fetch error:", err);
+    }
+  };
 
   const fetchPrograms = async () => {
     try {
@@ -151,8 +198,9 @@ export default function DailyAttendancePage() {
     }
   };
 
-  const selectedWorkDay = workDays.find((w) => w.id === selectedWorkDayId);
+  const selectedWorkDay = workDays.find((w) => w.id === selectedWorkDayId) || workDays[0];
   const currentDayNum = selectedWorkDay?.dayNumber || 1;
+  const isSelectedDayToday = selectedWorkDay?.workDate === pht.dateStr;
 
   // Aggregate available work program activities/areas for current selected day
   const availableDayAreas = workPrograms.flatMap((wp) =>
@@ -182,6 +230,7 @@ export default function DailyAttendancePage() {
             body: JSON.stringify({
               qrToken: token,
               workDayId: selectedWorkDayId,
+              targetDate: selectedWorkDay?.workDate,
               shiftMode,
               workProgramItemId: selectedAreaItemId !== "AUTO" ? selectedAreaItemId : undefined,
               deviceId: localStorage.getItem("tupad_device_id") || "MOBILE_SCANNER",
@@ -260,6 +309,7 @@ export default function DailyAttendancePage() {
                 await fetchPrograms();
                 if (selectedProgramId) {
                   await fetchWorkPrograms(selectedProgramId);
+                  await fetchProgramDetail(selectedProgramId);
                 }
               }
             }}
@@ -284,13 +334,13 @@ export default function DailyAttendancePage() {
       </div>
 
       {/* Program, WorkDay & Work Area Selector Card */}
-      <div className="gov-card p-4 space-y-3 bg-white">
+      <div className="gov-card p-4 space-y-3.5 bg-white">
         <div>
           <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Target Program</label>
           <select
             value={selectedProgramId}
             onChange={(e) => setSelectedProgramId(e.target.value)}
-            className="w-full px-3 py-1.5 text-xs border border-slate-300 rounded-lg bg-slate-50 font-bold focus:outline-none focus:border-gov-blue"
+            className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg bg-slate-50 font-bold text-slate-900 focus:outline-none focus:border-gov-blue"
           >
             {programs.map((p) => (
               <option key={p.id} value={p.id}>
@@ -300,19 +350,95 @@ export default function DailyAttendancePage() {
           </select>
         </div>
 
+        {/* Quick Work Day Selector Buttons (Day 1 - 10) */}
+        <div>
+          <div className="flex items-center justify-between mb-1.5">
+            <label className="text-[10px] font-bold text-slate-600 uppercase flex items-center space-x-1">
+              <Calendar className="w-3 h-3 text-gov-blue" />
+              <span>Select Attendance Day (Day 1 to 10)</span>
+            </label>
+            {isSelectedDayToday ? (
+              <span className="text-[9px] font-extrabold text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded flex items-center space-x-1">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                <span>Today is Day {currentDayNum}</span>
+              </span>
+            ) : (
+              <span className="text-[9px] font-medium text-slate-400">
+                Today: {pht.dateStr}
+              </span>
+            )}
+          </div>
+
+          <div className="grid grid-cols-5 gap-1.5">
+            {workDays.length > 0 ? (
+              workDays.map((wd) => {
+                const isSelected = wd.id === selectedWorkDayId || wd.dayNumber === currentDayNum;
+                const isToday = wd.workDate === pht.dateStr;
+                return (
+                  <button
+                    key={wd.id}
+                    type="button"
+                    onClick={() => setSelectedWorkDayId(wd.id)}
+                    className={`py-1.5 px-1 rounded-xl text-center transition flex flex-col items-center justify-center relative ${
+                      isSelected
+                        ? "bg-gov-blue text-white shadow-md ring-2 ring-gov-gold font-bold scale-[1.02]"
+                        : isToday
+                        ? "bg-amber-50 text-amber-900 border-2 border-amber-400 hover:bg-amber-100 font-bold"
+                        : "bg-slate-50 text-slate-700 border border-slate-200 hover:bg-slate-100 hover:border-slate-300"
+                    }`}
+                  >
+                    <span className="text-xs font-black">Day {wd.dayNumber}</span>
+                    <span
+                      className={`text-[9px] font-mono leading-none mt-0.5 ${
+                        isSelected ? "text-blue-100" : isToday ? "text-amber-800 font-bold" : "text-slate-400"
+                      }`}
+                    >
+                      {wd.workDate ? wd.workDate.slice(5) : ""}
+                    </span>
+                    {isToday && (
+                      <span
+                        className={`absolute -top-1.5 -right-1 text-[7px] font-black px-1 py-0.2 rounded-full uppercase tracking-tight shadow-xs ${
+                          isSelected ? "bg-amber-400 text-slate-950" : "bg-amber-500 text-white"
+                        }`}
+                      >
+                        TODAY
+                      </span>
+                    )}
+                  </button>
+                );
+              })
+            ) : (
+              // Fallback dummy buttons 1-10 while loading
+              Array.from({ length: 10 }).map((_, i) => (
+                <button
+                  key={i}
+                  type="button"
+                  disabled
+                  className="py-2 px-1 rounded-xl text-center bg-slate-50 border border-slate-200 text-slate-400 text-xs font-bold"
+                >
+                  Day {i + 1}
+                </button>
+              ))
+            )}
+          </div>
+        </div>
+
         <div className="grid grid-cols-2 gap-2">
           <div>
             <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Work Day #</label>
             <select
               value={selectedWorkDayId}
               onChange={(e) => setSelectedWorkDayId(e.target.value)}
-              className="w-full px-3 py-1.5 text-xs border border-slate-300 rounded-lg bg-slate-50 font-bold focus:outline-none focus:border-gov-blue"
+              className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg bg-slate-50 font-bold text-slate-800 focus:outline-none focus:border-gov-blue"
             >
-              {workDays.map((wd) => (
-                <option key={wd.id} value={wd.id}>
-                  Day {wd.dayNumber} ({wd.workDate})
-                </option>
-              ))}
+              {workDays.map((wd) => {
+                const isToday = wd.workDate === pht.dateStr;
+                return (
+                  <option key={wd.id} value={wd.id}>
+                    Day {wd.dayNumber} ({wd.workDate}) {isToday ? "⚡ (TODAY)" : ""}
+                  </option>
+                );
+              })}
             </select>
           </div>
 
@@ -321,7 +447,7 @@ export default function DailyAttendancePage() {
             <select
               value={shiftMode}
               onChange={(e) => setShiftMode(e.target.value)}
-              className="w-full px-3 py-1.5 text-xs border border-slate-300 rounded-lg bg-slate-50 font-semibold focus:outline-none focus:border-gov-blue"
+              className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg bg-slate-50 font-semibold text-slate-800 focus:outline-none focus:border-gov-blue"
             >
               <option value="AUTO">⚡ Auto Detect ({ATTENDANCE_SLOT_LABELS[autoDetectedSlot]})</option>
               <option value="MORNING_IN">AM IN (Morning In • 6:00 AM - 11:30 AM)</option>
@@ -337,12 +463,12 @@ export default function DailyAttendancePage() {
           <div>
             <label className="block text-[10px] font-bold text-gov-blue uppercase mb-1 flex items-center justify-between">
               <span>Assigned Work Area / Purok</span>
-              <span className="text-[9px] font-normal text-slate-400">TUPAD Work Program Basis</span>
+              <span className="text-[9px] font-normal text-slate-400">Day {currentDayNum} Work Program</span>
             </label>
             <select
               value={selectedAreaItemId}
               onChange={(e) => setSelectedAreaItemId(e.target.value)}
-              className="w-full px-3 py-1.5 text-xs border border-blue-200 rounded-lg bg-blue-50/50 font-semibold text-slate-800 focus:outline-none focus:border-gov-blue"
+              className="w-full px-3 py-2 text-xs border border-blue-200 rounded-lg bg-blue-50/50 font-semibold text-slate-800 focus:outline-none focus:border-gov-blue"
             >
               <option value="AUTO">⚡ Auto-Match by Beneficiary Sitio/Purok</option>
               {availableDayAreas.map((a) => (
@@ -357,18 +483,28 @@ export default function DailyAttendancePage() {
 
       {/* Main Scan Trigger */}
       {!scanResult && (
-        <div className="gov-card p-8 text-center space-y-6 shadow-xl border-t-4 border-t-gov-blue">
-          <div className="w-24 h-24 rounded-full bg-amber-50 text-amber-700 flex items-center justify-center mx-auto border-4 border-amber-100 shadow-inner">
-            <Clock className="w-12 h-12" />
+        <div className="gov-card p-6 sm:p-8 text-center space-y-5 shadow-xl border-t-4 border-t-gov-blue">
+          <div className="w-20 h-20 rounded-full bg-amber-50 text-amber-700 flex items-center justify-center mx-auto border-4 border-amber-100 shadow-inner">
+            <Clock className="w-10 h-10" />
           </div>
 
-          <div className="space-y-1">
-            <span className="text-[10px] font-bold uppercase font-mono px-2.5 py-1 rounded bg-blue-50 text-gov-blue border border-blue-200 inline-block">
-              Active Session: Day {selectedWorkDay?.dayNumber || 1} • {activeSlotLabel}
-            </span>
+          <div className="space-y-1.5">
+            <div className="inline-flex flex-wrap items-center justify-center gap-1.5 px-3 py-1.5 rounded-xl bg-blue-50 text-gov-blue border border-blue-200 font-mono text-xs font-black shadow-xs">
+              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping" />
+              <span>ACTIVE SESSION: DAY {currentDayNum}</span>
+              <span className="text-slate-400">•</span>
+              <span>{selectedWorkDay?.workDate || pht.dateStr}</span>
+              {isSelectedDayToday && (
+                <span className="px-1.5 py-0.5 bg-amber-400 text-slate-950 text-[10px] font-black rounded uppercase">
+                  TODAY
+                </span>
+              )}
+              <span className="text-slate-400">•</span>
+              <span>{activeSlotLabel}</span>
+            </div>
             <h3 className="text-base font-extrabold text-slate-900 mt-1">Ready for Attendance</h3>
             <p className="text-xs text-slate-500 max-w-xs mx-auto">
-              Scan the beneficiary's QR code on their printed stub or mobile pass.
+              Scanning for <strong>Day {currentDayNum} ({selectedWorkDay?.workDate || pht.dateStr})</strong>. Scan beneficiary's QR code on their printed stub or mobile pass.
             </p>
           </div>
 
@@ -377,7 +513,7 @@ export default function DailyAttendancePage() {
             className="w-full py-3.5 bg-gov-blue hover:bg-gov-light text-white font-extrabold text-sm rounded-xl shadow-lg flex items-center justify-center space-x-2 transition transform active:scale-95"
           >
             <Camera className="w-5 h-5 text-gov-goldLight" />
-            <span>SCAN ATTENDANCE QR</span>
+            <span>SCAN ATTENDANCE QR (DAY {currentDayNum})</span>
           </button>
 
           <a
@@ -389,6 +525,8 @@ export default function DailyAttendancePage() {
           </a>
         </div>
       )}
+
+
 
       {error && (
         <div className="p-4 bg-red-50 border border-red-200 rounded-xl flex items-start space-x-3 text-xs text-red-700 shadow">
