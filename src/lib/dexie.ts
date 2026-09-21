@@ -387,6 +387,63 @@ export async function recordOfflineAttendance(params: {
     );
   }
 
+  // =========================================================================
+  // 3-HOUR MINIMUM WORK DURATION ENFORCEMENT (Offline Engine)
+  // =========================================================================
+  const MIN_WORK_DURATION_MS = 3 * 60 * 60 * 1000; // 3 Hours (180 minutes)
+
+  if (targetSlot === "MORNING_OUT" && existingRecord?.morningTimeIn) {
+    const amInDate = new Date(existingRecord.morningTimeIn);
+    const diffMs = now.getTime() - amInDate.getTime();
+    if (diffMs < MIN_WORK_DURATION_MS) {
+      const remainingMs = MIN_WORK_DURATION_MS - Math.max(0, diffMs);
+      const remainingMinutes = Math.ceil(remainingMs / (60 * 1000));
+      const elapsedMinutes = Math.max(0, Math.floor(diffMs / (60 * 1000)));
+      const unlockTime = new Date(amInDate.getTime() + MIN_WORK_DURATION_MS);
+      const amInTimeFormatted = format(amInDate, "hh:mm a");
+      const unlockTimeFormatted = format(unlockTime, "hh:mm a");
+
+      const remainingText =
+        remainingMinutes >= 60
+          ? `${Math.floor(remainingMinutes / 60)} hr ${remainingMinutes % 60} mins`
+          : `${remainingMinutes} mins`;
+      const elapsedText =
+        elapsedMinutes >= 60
+          ? `${Math.floor(elapsedMinutes / 60)} hr ${elapsedMinutes % 60} mins`
+          : `${elapsedMinutes} mins`;
+
+      throw new Error(
+        `TIME-OUT BLOCKED: Morning Time-Out (AM OUT) requires at least 3 hours of active work duration. AM IN was recorded at ${amInTimeFormatted} (elapsed: ${elapsedText}). Re-scanning AM OUT is allowed at or after ${unlockTimeFormatted} (${remainingText} remaining).`
+      );
+    }
+  }
+
+  if (targetSlot === "AFTERNOON_OUT" && existingRecord?.afternoonTimeIn) {
+    const pmInDate = new Date(existingRecord.afternoonTimeIn);
+    const diffMs = now.getTime() - pmInDate.getTime();
+    if (diffMs < MIN_WORK_DURATION_MS) {
+      const remainingMs = MIN_WORK_DURATION_MS - Math.max(0, diffMs);
+      const remainingMinutes = Math.ceil(remainingMs / (60 * 1000));
+      const elapsedMinutes = Math.max(0, Math.floor(diffMs / (60 * 1000)));
+      const unlockTime = new Date(pmInDate.getTime() + MIN_WORK_DURATION_MS);
+      const pmInTimeFormatted = format(pmInDate, "hh:mm a");
+      const unlockTimeFormatted = format(unlockTime, "hh:mm a");
+
+      const remainingText =
+        remainingMinutes >= 60
+          ? `${Math.floor(remainingMinutes / 60)} hr ${remainingMinutes % 60} mins`
+          : `${remainingMinutes} mins`;
+      const elapsedText =
+        elapsedMinutes >= 60
+          ? `${Math.floor(elapsedMinutes / 60)} hr ${elapsedMinutes % 60} mins`
+          : `${elapsedMinutes} mins`;
+
+      throw new Error(
+        `TIME-OUT BLOCKED: Afternoon Time-Out (PM OUT) requires at least 3 hours of active work duration. PM IN was recorded at ${pmInTimeFormatted} (elapsed: ${elapsedText}). Re-scanning PM OUT is allowed at or after ${unlockTimeFormatted} (${remainingText} remaining).`
+      );
+    }
+  }
+
   // Work Area Matching from Offline Work Program Items
   let resolvedArea = workArea;
   let resolvedActivity = activityName;

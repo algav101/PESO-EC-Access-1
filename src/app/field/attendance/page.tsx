@@ -200,12 +200,15 @@ export default function DailyAttendancePage() {
           });
           return;
         } catch (onlineErr: any) {
-          // If sequence blocked or already scanned reported by server, rethrow error to user
+          // If sequence blocked, minimum duration not met, or already scanned reported by server, rethrow error to user
           if (
             onlineErr.message &&
             (onlineErr.message.includes("ALREADY SCANNED") ||
               onlineErr.message.includes("SEQUENCE BLOCKED") ||
-              onlineErr.message.includes("CANNOT"))
+              onlineErr.message.includes("TIME-OUT BLOCKED") ||
+              onlineErr.message.includes("CANNOT") ||
+              onlineErr.message.includes("MINIMUM") ||
+              onlineErr.message.includes("BLOCKED"))
           ) {
             throw onlineErr;
           }
