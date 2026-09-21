@@ -10,6 +10,13 @@ import { addDays, format, parseISO } from "date-fns";
 export async function POST(request: Request) {
   try {
     const user = await getCurrentUser();
+    if (user?.id) {
+      prisma.user.update({
+        where: { id: user.id },
+        data: { lastLoginAt: new Date() },
+      }).catch(() => {});
+    }
+
     const { transactions } = await request.json();
 
     if (!Array.isArray(transactions) || transactions.length === 0) {
