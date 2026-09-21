@@ -1,0 +1,3603 @@
+{
+  "metadata": {
+    "title": "Consolidated Master Data - Last 6 Hours (September 21, 2026)",
+    "retrievedAt": "2026-09-21T02:01:52.515Z",
+    "timeWindow": {
+      "startPST": "2026-09-21 04:00:00 PST",
+      "endPST": "2026-09-21 10:05:00 PST",
+      "startUTC": "2026-09-20T20:00:00.000Z",
+      "endUTC": "2026-09-21T02:01:52.515Z"
+    },
+    "superAdmin": {
+      "id": "0b1ffed3-c63e-4405-a7f3-83897c8e37be",
+      "username": "admin",
+      "name": "PESO Dingalan Admin Officer",
+      "role": "DOMAIN_MASTER"
+    }
+  },
+  "totals": {
+    "attendanceRecords": 69,
+    "accomplishmentPhotos": 2,
+    "auditTransactions": 110,
+    "stubDistributions": 0,
+    "orientationAttendances": 0,
+    "replacements": 0,
+    "payouts": 0,
+    "qrPrintLogs": 0,
+    "publicInquiries": 0
+  },
+  "breakdownByBarangay": {
+    "Ibona": 5,
+    "Caragsacan": 62,
+    "Paltic": 2
+  },
+  "breakdownByScannerUser": {
+    "GRACE (@peso_ibona1, TUPAD_COORDINATOR)": 5,
+    "MARVILYN (@peso caragsacan, TUPAD_ASSISTING_DOCUMENTOR)": 64
+  },
+  "breakdownByAction": {
+    "LOGIN_FAILED": 5,
+    "LOGIN_SUCCESS": 14,
+    "ATTENDANCE_SCANNED": 65,
+    "LOGOUT": 15,
+    "OFFLINE_TRANSACTION_SYNCED": 4,
+    "PHOTO_UPLOADED": 2,
+    "PHOTO_APPROVED": 4,
+    "USER_DELETED": 1
+  },
+  "transactionsByActor": {
+    "PESO Dingalan Admin Officer (@admin)": 19,
+    "GRACE (@peso_ibona1)": 5,
+    "MARVILYN (@peso caragsacan)": 68,
+    "RAMONITA (@peso_paltic)": 4,
+    "field test (@field test)": 4,
+    "Unauthenticated / System": 9,
+    "PESO Program Manager (@peso_manager)": 1
+  },
+  "attendanceRecords": [
+    {
+      "id": "94fc755d-4114-41ec-8c58-536c33f889fe",
+      "designatedNumber": "201",
+      "beneficiaryName": "SOTTO, MARIVIC",
+      "barangay": "Ibona",
+      "sitio": "Purok 2",
+      "dayNumber": 1,
+      "workDate": "2026-09-09",
+      "morningTimeIn": "2026-09-20T22:34:26.435Z",
+      "status": "PRESENT",
+      "syncStatus": "SYNCED",
+      "workArea": "Purok 1 and purok 2",
+      "specificActivity": "De-clogging of canals, creeks, waterways, catch basins, and drainage inlets; removal of silt, mud, plastics, and other obstructions",
+      "scannedBy": {
+        "id": "3d27b05c-5b3e-413e-a9cb-48d28810bcdb",
+        "name": "GRACE",
+        "username": "peso_ibona1",
+        "role": "TUPAD_COORDINATOR",
+        "assignedBarangay": "Ibona"
+      }
+    },
+    {
+      "id": "a085fcff-7cc5-40cb-895f-3b3d84261243",
+      "designatedNumber": "215",
+      "beneficiaryName": "FLORORITA, THELMA",
+      "barangay": "Ibona",
+      "sitio": "Purok 2",
+      "dayNumber": 1,
+      "workDate": "2026-09-09",
+      "morningTimeIn": "2026-09-20T22:35:18.410Z",
+      "status": "PRESENT",
+      "syncStatus": "SYNCED",
+      "workArea": "Purok 1 and purok 2",
+      "specificActivity": "De-clogging of canals, creeks, waterways, catch basins, and drainage inlets; removal of silt, mud, plastics, and other obstructions",
+      "scannedBy": {
+        "id": "3d27b05c-5b3e-413e-a9cb-48d28810bcdb",
+        "name": "GRACE",
+        "username": "peso_ibona1",
+        "role": "TUPAD_COORDINATOR",
+        "assignedBarangay": "Ibona"
+      }
+    },
+    {
+      "id": "ee71e97d-82e3-4f76-96ab-085bac437b1d",
+      "designatedNumber": "205",
+      "beneficiaryName": "CAGORANGAN, JERRY",
+      "barangay": "Ibona",
+      "sitio": "Purok 3",
+      "dayNumber": 1,
+      "workDate": "2026-09-09",
+      "morningTimeIn": "2026-09-20T22:36:40.307Z",
+      "status": "PRESENT",
+      "syncStatus": "SYNCED",
+      "workArea": "Purok 6 aves",
+      "specificActivity": "Community Gardening ( Weeding, Land preparation)",
+      "scannedBy": {
+        "id": "3d27b05c-5b3e-413e-a9cb-48d28810bcdb",
+        "name": "GRACE",
+        "username": "peso_ibona1",
+        "role": "TUPAD_COORDINATOR",
+        "assignedBarangay": "Ibona"
+      }
+    },
+    {
+      "id": "6181ff4e-0872-49b3-a06c-88016d05570d",
+      "designatedNumber": "232",
+      "beneficiaryName": "SUYAT, DAISY REE",
+      "barangay": "Ibona",
+      "sitio": "Purok 3",
+      "dayNumber": 1,
+      "workDate": "2026-09-09",
+      "morningTimeIn": "2026-09-20T22:38:32.107Z",
+      "status": "PRESENT",
+      "syncStatus": "SYNCED",
+      "workArea": "Purok 6 aves",
+      "specificActivity": "Community Gardening ( Weeding, Land preparation)",
+      "scannedBy": {
+        "id": "3d27b05c-5b3e-413e-a9cb-48d28810bcdb",
+        "name": "GRACE",
+        "username": "peso_ibona1",
+        "role": "TUPAD_COORDINATOR",
+        "assignedBarangay": "Ibona"
+      }
+    },
+    {
+      "id": "1c8f3793-f5ac-4946-9d91-5abd1f063ad8",
+      "designatedNumber": "224",
+      "beneficiaryName": "PALACIO, EDNA",
+      "barangay": "Ibona",
+      "sitio": "Purok 3",
+      "dayNumber": 1,
+      "workDate": "2026-09-09",
+      "morningTimeIn": "2026-09-20T22:41:47.873Z",
+      "status": "PRESENT",
+      "syncStatus": "SYNCED",
+      "workArea": "Purok 6 aves",
+      "specificActivity": "Community Gardening ( Weeding, Land preparation)",
+      "scannedBy": {
+        "id": "3d27b05c-5b3e-413e-a9cb-48d28810bcdb",
+        "name": "GRACE",
+        "username": "peso_ibona1",
+        "role": "TUPAD_COORDINATOR",
+        "assignedBarangay": "Ibona"
+      }
+    },
+    {
+      "id": "32f3499c-c637-4b99-8d96-31e0ea079551",
+      "designatedNumber": "125",
+      "beneficiaryName": "OROYAN, VILMA",
+      "barangay": "Caragsacan",
+      "sitio": "Purok 5 ADRA",
+      "dayNumber": 1,
+      "workDate": "2026-09-09",
+      "morningTimeIn": "2026-09-20T22:58:19.185Z",
+      "status": "PRESENT",
+      "syncStatus": "SYNCED",
+      "workArea": "Caragsacan Elementary School, Dingalan National Highschool",
+      "specificActivity": "De-clogging/Removal of Debris of Canals and Creeks outside/inside School perimeter",
+      "scannedBy": {
+        "id": "60222617-9b88-4753-9fd2-3b0c85d41cf9",
+        "name": "MARVILYN",
+        "username": "peso caragsacan",
+        "role": "TUPAD_ASSISTING_DOCUMENTOR",
+        "assignedBarangay": "Caragsacan"
+      }
+    },
+    {
+      "id": "b026c382-64af-46b2-bfa8-8a9b788c1550",
+      "designatedNumber": "122",
+      "beneficiaryName": "CHENILLA, THELMA",
+      "barangay": "Caragsacan",
+      "sitio": "Purok 2",
+      "dayNumber": 1,
+      "workDate": "2026-09-09",
+      "morningTimeIn": "2026-09-20T22:58:54.663Z",
+      "status": "PRESENT",
+      "syncStatus": "SYNCED",
+      "workArea": "Purok 5",
+      "specificActivity": "De-clogging of canals, creeks, waterways, catch basins, and drainage inlets; removal of silt, mud, plastics, and other obstructions",
+      "scannedBy": {
+        "id": "60222617-9b88-4753-9fd2-3b0c85d41cf9",
+        "name": "MARVILYN",
+        "username": "peso caragsacan",
+        "role": "TUPAD_ASSISTING_DOCUMENTOR",
+        "assignedBarangay": "Caragsacan"
+      }
+    },
+    {
+      "id": "84b357fb-37ae-4eae-a2a4-a5824e6c9e54",
+      "designatedNumber": "108",
+      "beneficiaryName": "FABROS, EMILY",
+      "barangay": "Caragsacan",
+      "sitio": "Purok 3",
+      "dayNumber": 1,
+      "workDate": "2026-09-09",
+      "morningTimeIn": "2026-09-20T22:58:37.175Z",
+      "status": "PRESENT",
+      "syncStatus": "SYNCED",
+      "workArea": "Caragsacan Elementary School, Dingalan National Highschool",
+      "specificActivity": "De-clogging/Removal of Debris of Canals and Creeks outside/inside School perimeter",
+      "scannedBy": {
+        "id": "60222617-9b88-4753-9fd2-3b0c85d41cf9",
+        "name": "MARVILYN",
+        "username": "peso caragsacan",
+        "role": "TUPAD_ASSISTING_DOCUMENTOR",
+        "assignedBarangay": "Caragsacan"
+      }
+    },
+    {
+      "id": "23f7e10e-930b-4b27-bc36-d56346f6ecdd",
+      "designatedNumber": "138",
+      "beneficiaryName": "REÑON, JESSA",
+      "barangay": "Caragsacan",
+      "sitio": "Purok 3",
+      "dayNumber": 1,
+      "workDate": "2026-09-09",
+      "morningTimeIn": "2026-09-20T22:59:12.638Z",
+      "status": "PRESENT",
+      "syncStatus": "SYNCED",
+      "workArea": "Purok 5",
+      "specificActivity": "De-clogging of canals, creeks, waterways, catch basins, and drainage inlets; removal of silt, mud, plastics, and other obstructions",
+      "scannedBy": {
+        "id": "60222617-9b88-4753-9fd2-3b0c85d41cf9",
+        "name": "MARVILYN",
+        "username": "peso caragsacan",
+        "role": "TUPAD_ASSISTING_DOCUMENTOR",
+        "assignedBarangay": "Caragsacan"
+      }
+    },
+    {
+      "id": "b5ab30a5-5373-4a80-ac17-da760a6a4d9c",
+      "designatedNumber": "143",
+      "beneficiaryName": "SALOMON, JULIANA",
+      "barangay": "Caragsacan",
+      "sitio": "Purok 5 Kailyo",
+      "dayNumber": 1,
+      "workDate": "2026-09-09",
+      "morningTimeIn": "2026-09-20T22:59:39.134Z",
+      "status": "PRESENT",
+      "syncStatus": "SYNCED",
+      "workArea": "Purok 5",
+      "specificActivity": "De-clogging of canals, creeks, waterways, catch basins, and drainage inlets; removal of silt, mud, plastics, and other obstructions",
+      "scannedBy": {
+        "id": "60222617-9b88-4753-9fd2-3b0c85d41cf9",
+        "name": "MARVILYN",
+        "username": "peso caragsacan",
+        "role": "TUPAD_ASSISTING_DOCUMENTOR",
+        "assignedBarangay": "Caragsacan"
+      }
+    },
+    {
+      "id": "26474e6e-db5b-48bb-857a-8ec5a3806113",
+      "designatedNumber": "112",
+      "beneficiaryName": "GUNIO, LEA MAY",
+      "barangay": "Caragsacan",
+      "sitio": "Purok 2",
+      "dayNumber": 1,
+      "workDate": "2026-09-09",
+      "morningTimeIn": "2026-09-20T22:59:58.687Z",
+      "status": "PRESENT",
+      "syncStatus": "SYNCED",
+      "workArea": "Purok 5",
+      "specificActivity": "De-clogging of canals, creeks, waterways, catch basins, and drainage inlets; removal of silt, mud, plastics, and other obstructions",
+      "scannedBy": {
+        "id": "60222617-9b88-4753-9fd2-3b0c85d41cf9",
+        "name": "MARVILYN",
+        "username": "peso caragsacan",
+        "role": "TUPAD_ASSISTING_DOCUMENTOR",
+        "assignedBarangay": "Caragsacan"
+      }
+    },
+    {
+      "id": "0093e302-6366-4d77-8377-7c212fc2935a",
+      "designatedNumber": "74",
+      "beneficiaryName": "BAGAPORO, JOSEPHINE",
+      "barangay": "Caragsacan",
+      "sitio": "Purok 5 Horseshoe",
+      "dayNumber": 1,
+      "workDate": "2026-09-09",
+      "morningTimeIn": "2026-09-20T23:00:31.173Z",
+      "status": "PRESENT",
+      "syncStatus": "SYNCED",
+      "workArea": "Purok 5",
+      "specificActivity": "De-clogging of canals, creeks, waterways, catch basins, and drainage inlets; removal of silt, mud, plastics, and other obstructions",
+      "scannedBy": {
+        "id": "60222617-9b88-4753-9fd2-3b0c85d41cf9",
+        "name": "MARVILYN",
+        "username": "peso caragsacan",
+        "role": "TUPAD_ASSISTING_DOCUMENTOR",
+        "assignedBarangay": "Caragsacan"
+      }
+    },
+    {
+      "id": "083bd65f-56df-4115-9b20-852026e16ff4",
+      "designatedNumber": "97",
+      "beneficiaryName": "DEL ROSARIO, JONALYN",
+      "barangay": "Caragsacan",
+      "sitio": "Purok 5",
+      "dayNumber": 1,
+      "workDate": "2026-09-09",
+      "morningTimeIn": "2026-09-20T23:00:45.989Z",
+      "status": "PRESENT",
+      "syncStatus": "SYNCED",
+      "workArea": "Purok 5",
+      "specificActivity": "De-clogging of canals, creeks, waterways, catch basins, and drainage inlets; removal of silt, mud, plastics, and other obstructions",
+      "scannedBy": {
+        "id": "60222617-9b88-4753-9fd2-3b0c85d41cf9",
+        "name": "MARVILYN",
+        "username": "peso caragsacan",
+        "role": "TUPAD_ASSISTING_DOCUMENTOR",
+        "assignedBarangay": "Caragsacan"
+      }
+    },
+    {
+      "id": "c5bdbf52-9c27-4a86-ba5a-06ff9a1b8492",
+      "designatedNumber": "144",
+      "beneficiaryName": "SANTOS, ROSALINA",
+      "barangay": "Caragsacan",
+      "sitio": "Purok 5 Gawad Kalinga",
+      "dayNumber": 1,
+      "workDate": "2026-09-09",
+      "morningTimeIn": "2026-09-20T23:00:55.263Z",
+      "status": "PRESENT",
+      "syncStatus": "SYNCED",
+      "workArea": "Purok 5",
+      "specificActivity": "De-clogging of canals, creeks, waterways, catch basins, and drainage inlets; removal of silt, mud, plastics, and other obstructions",
+      "scannedBy": {
+        "id": "60222617-9b88-4753-9fd2-3b0c85d41cf9",
+        "name": "MARVILYN",
+        "username": "peso caragsacan",
+        "role": "TUPAD_ASSISTING_DOCUMENTOR",
+        "assignedBarangay": "Caragsacan"
+      }
+    },
+    {
+      "id": "1f6ce775-a748-4560-a610-7527f0dc837c",
+      "designatedNumber": "133",
+      "beneficiaryName": "PAJARILLO, VIOLETA",
+      "barangay": "Caragsacan",
+      "sitio": "Purok 2",
+      "dayNumber": 1,
+      "workDate": "2026-09-09",
+      "morningTimeIn": "2026-09-20T23:01:10.503Z",
+      "status": "PRESENT",
+      "syncStatus": "SYNCED",
+      "workArea": "Purok 5",
+      "specificActivity": "De-clogging of canals, creeks, waterways, catch basins, and drainage inlets; removal of silt, mud, plastics, and other obstructions",
+      "scannedBy": {
+        "id": "60222617-9b88-4753-9fd2-3b0c85d41cf9",
+        "name": "MARVILYN",
+        "username": "peso caragsacan",
+        "role": "TUPAD_ASSISTING_DOCUMENTOR",
+        "assignedBarangay": "Caragsacan"
+      }
+    },
+    {
+      "id": "3db3dbf6-2445-4fa1-abd8-4ec038ba6ecf",
+      "designatedNumber": "95",
+      "beneficiaryName": "CORPUZ, FERDINAND",
+      "barangay": "Caragsacan",
+      "sitio": "Purok 1 Phase 2",
+      "dayNumber": 1,
+      "workDate": "2026-09-09",
+      "morningTimeIn": "2026-09-20T23:03:18.854Z",
+      "status": "PRESENT",
+      "syncStatus": "SYNCED",
+      "workArea": "Purok 5",
+      "specificActivity": "De-clogging of canals, creeks, waterways, catch basins, and drainage inlets; removal of silt, mud, plastics, and other obstructions",
+      "scannedBy": {
+        "id": "60222617-9b88-4753-9fd2-3b0c85d41cf9",
+        "name": "MARVILYN",
+        "username": "peso caragsacan",
+        "role": "TUPAD_ASSISTING_DOCUMENTOR",
+        "assignedBarangay": "Caragsacan"
+      }
+    },
+    {
+      "id": "0e906b09-c0f0-43d5-8716-587e6942b6ee",
+      "designatedNumber": "70",
+      "beneficiaryName": "AGUSTIN, JOSUE GIL",
+      "barangay": "Caragsacan",
+      "sitio": "Purok 2",
+      "dayNumber": 1,
+      "workDate": "2026-09-09",
+      "morningTimeIn": "2026-09-20T23:03:40.913Z",
+      "status": "PRESENT",
+      "syncStatus": "SYNCED",
+      "workArea": "Purok 5",
+      "specificActivity": "De-clogging of canals, creeks, waterways, catch basins, and drainage inlets; removal of silt, mud, plastics, and other obstructions",
+      "scannedBy": {
+        "id": "60222617-9b88-4753-9fd2-3b0c85d41cf9",
+        "name": "MARVILYN",
+        "username": "peso caragsacan",
+        "role": "TUPAD_ASSISTING_DOCUMENTOR",
+        "assignedBarangay": "Caragsacan"
+      }
+    },
+    {
+      "id": "e3b6a8c8-8892-47ba-8186-4ac5e161a527",
+      "designatedNumber": "126",
+      "beneficiaryName": "OSORIO, JOSEPHINE",
+      "barangay": "Caragsacan",
+      "sitio": "Purok 2",
+      "dayNumber": 1,
+      "workDate": "2026-09-09",
+      "morningTimeIn": "2026-09-20T23:03:57.101Z",
+      "status": "PRESENT",
+      "syncStatus": "SYNCED",
+      "workArea": "Purok 5",
+      "specificActivity": "De-clogging of canals, creeks, waterways, catch basins, and drainage inlets; removal of silt, mud, plastics, and other obstructions",
+      "scannedBy": {
+        "id": "60222617-9b88-4753-9fd2-3b0c85d41cf9",
+        "name": "MARVILYN",
+        "username": "peso caragsacan",
+        "role": "TUPAD_ASSISTING_DOCUMENTOR",
+        "assignedBarangay": "Caragsacan"
+      }
+    },
+    {
+      "id": "2c6ec026-daaf-42ee-b885-810165b40197",
+      "designatedNumber": "87",
+      "beneficiaryName": "BULATAO, REYNALYN",
+      "barangay": "Caragsacan",
+      "sitio": "Purok 3",
+      "dayNumber": 1,
+      "workDate": "2026-09-09",
+      "morningTimeIn": "2026-09-20T23:04:11.392Z",
+      "status": "PRESENT",
+      "syncStatus": "SYNCED",
+      "workArea": "Purok 5",
+      "specificActivity": "De-clogging of canals, creeks, waterways, catch basins, and drainage inlets; removal of silt, mud, plastics, and other obstructions",
+      "scannedBy": {
+        "id": "60222617-9b88-4753-9fd2-3b0c85d41cf9",
+        "name": "MARVILYN",
+        "username": "peso caragsacan",
+        "role": "TUPAD_ASSISTING_DOCUMENTOR",
+        "assignedBarangay": "Caragsacan"
+      }
+    },
+    {
+      "id": "e1204be7-ddcd-47bb-889c-cb393a2c4c99",
+      "designatedNumber": "110",
+      "beneficiaryName": "GAMOTEA, LUCILA",
+      "barangay": "Caragsacan",
+      "sitio": "Purok 1 Phase 1",
+      "dayNumber": 1,
+      "workDate": "2026-09-09",
+      "morningTimeIn": "2026-09-20T23:04:21.569Z",
+      "status": "PRESENT",
+      "syncStatus": "SYNCED",
+      "workArea": "Purok 1 Phase 1",
+      "specificActivity": "Community Gardening ( Weeding, Land preparation)",
+      "scannedBy": {
+        "id": "60222617-9b88-4753-9fd2-3b0c85d41cf9",
+        "name": "MARVILYN",
+        "username": "peso caragsacan",
+        "role": "TUPAD_ASSISTING_DOCUMENTOR",
+        "assignedBarangay": "Caragsacan"
+      }
+    },
+    {
+      "id": "d72539a6-c67d-49ff-b7a0-1084af900e59",
+      "designatedNumber": "75",
+      "beneficiaryName": "BAÑADERA, ELVIRA",
+      "barangay": "Caragsacan",
+      "sitio": "Purok 5 Kailyo",
+      "dayNumber": 1,
+      "workDate": "2026-09-09",
+      "morningTimeIn": "2026-09-20T23:04:42.040Z",
+      "status": "PRESENT",
+      "syncStatus": "SYNCED",
+      "workArea": "Purok 5",
+      "specificActivity": "De-clogging of canals, creeks, waterways, catch basins, and drainage inlets; removal of silt, mud, plastics, and other obstructions",
+      "scannedBy": {
+        "id": "60222617-9b88-4753-9fd2-3b0c85d41cf9",
+        "name": "MARVILYN",
+        "username": "peso caragsacan",
+        "role": "TUPAD_ASSISTING_DOCUMENTOR",
+        "assignedBarangay": "Caragsacan"
+      }
+    },
+    {
+      "id": "4cff65b3-2055-4bea-819c-edd2ad945ca9",
+      "designatedNumber": "146",
+      "beneficiaryName": "SIONICIO, REDEMCION",
+      "barangay": "Caragsacan",
+      "sitio": "Purok 5",
+      "dayNumber": 1,
+      "workDate": "2026-09-09",
+      "morningTimeIn": "2026-09-20T23:04:31.043Z",
+      "status": "PRESENT",
+      "syncStatus": "SYNCED",
+      "workArea": "Purok 5",
+      "specificActivity": "De-clogging of canals, creeks, waterways, catch basins, and drainage inlets; removal of silt, mud, plastics, and other obstructions",
+      "scannedBy": {
+        "id": "60222617-9b88-4753-9fd2-3b0c85d41cf9",
+        "name": "MARVILYN",
+        "username": "peso caragsacan",
+        "role": "TUPAD_ASSISTING_DOCUMENTOR",
+        "assignedBarangay": "Caragsacan"
+      }
+    },
+    {
+      "id": "17a4ab07-604e-469f-88ca-8346fdc8701f",
+      "designatedNumber": "94",
+      "beneficiaryName": "CORALDE, ANITA",
+      "barangay": "Caragsacan",
+      "sitio": "Purok 2",
+      "dayNumber": 1,
+      "workDate": "2026-09-09",
+      "morningTimeIn": "2026-09-20T23:04:52.917Z",
+      "status": "PRESENT",
+      "syncStatus": "SYNCED",
+      "workArea": "Purok 5",
+      "specificActivity": "De-clogging of canals, creeks, waterways, catch basins, and drainage inlets; removal of silt, mud, plastics, and other obstructions",
+      "scannedBy": {
+        "id": "60222617-9b88-4753-9fd2-3b0c85d41cf9",
+        "name": "MARVILYN",
+        "username": "peso caragsacan",
+        "role": "TUPAD_ASSISTING_DOCUMENTOR",
+        "assignedBarangay": "Caragsacan"
+      }
+    },
+    {
+      "id": "25dbaa5b-646c-4c96-aad8-93d57f983c78",
+      "designatedNumber": "136",
+      "beneficiaryName": "PORCALLA, NHENELYN",
+      "barangay": "Caragsacan",
+      "sitio": "Purok 3",
+      "dayNumber": 1,
+      "workDate": "2026-09-09",
+      "morningTimeIn": "2026-09-20T23:05:01.278Z",
+      "status": "PRESENT",
+      "syncStatus": "SYNCED",
+      "workArea": "Purok 5",
+      "specificActivity": "De-clogging of canals, creeks, waterways, catch basins, and drainage inlets; removal of silt, mud, plastics, and other obstructions",
+      "scannedBy": {
+        "id": "60222617-9b88-4753-9fd2-3b0c85d41cf9",
+        "name": "MARVILYN",
+        "username": "peso caragsacan",
+        "role": "TUPAD_ASSISTING_DOCUMENTOR",
+        "assignedBarangay": "Caragsacan"
+      }
+    },
+    {
+      "id": "a66df542-31dc-49c2-a619-476eff3c1a8d",
+      "designatedNumber": "120",
+      "beneficiaryName": "MARTINEZ, MARK LLOYD",
+      "barangay": "Caragsacan",
+      "sitio": "Purok 2",
+      "dayNumber": 1,
+      "workDate": "2026-09-09",
+      "morningTimeIn": "2026-09-20T23:05:16.029Z",
+      "status": "PRESENT",
+      "syncStatus": "SYNCED",
+      "workArea": "Purok 5",
+      "specificActivity": "De-clogging of canals, creeks, waterways, catch basins, and drainage inlets; removal of silt, mud, plastics, and other obstructions",
+      "scannedBy": {
+        "id": "60222617-9b88-4753-9fd2-3b0c85d41cf9",
+        "name": "MARVILYN",
+        "username": "peso caragsacan",
+        "role": "TUPAD_ASSISTING_DOCUMENTOR",
+        "assignedBarangay": "Caragsacan"
+      }
+    },
+    {
+      "id": "9048d9de-2aa2-4fe7-94f2-e59875ad63e2",
+      "designatedNumber": "141",
+      "beneficiaryName": "ROXAS, LIWAYWAY",
+      "barangay": "Caragsacan",
+      "sitio": "Purok 1 Phase 1",
+      "dayNumber": 1,
+      "workDate": "2026-09-09",
+      "morningTimeIn": "2026-09-20T23:05:25.310Z",
+      "status": "PRESENT",
+      "syncStatus": "SYNCED",
+      "workArea": "Purok 1 Phase 1",
+      "specificActivity": "Community Gardening ( Weeding, Land preparation)",
+      "scannedBy": {
+        "id": "60222617-9b88-4753-9fd2-3b0c85d41cf9",
+        "name": "MARVILYN",
+        "username": "peso caragsacan",
+        "role": "TUPAD_ASSISTING_DOCUMENTOR",
+        "assignedBarangay": "Caragsacan"
+      }
+    },
+    {
+      "id": "0515ef08-20f3-43e9-b679-833cc8b2b02a",
+      "designatedNumber": "96",
+      "beneficiaryName": "DAR, MARIBEL",
+      "barangay": "Caragsacan",
+      "sitio": "Purok 2",
+      "dayNumber": 1,
+      "workDate": "2026-09-09",
+      "morningTimeIn": "2026-09-20T23:05:38.164Z",
+      "status": "PRESENT",
+      "syncStatus": "SYNCED",
+      "workArea": "Purok 5",
+      "specificActivity": "De-clogging of canals, creeks, waterways, catch basins, and drainage inlets; removal of silt, mud, plastics, and other obstructions",
+      "scannedBy": {
+        "id": "60222617-9b88-4753-9fd2-3b0c85d41cf9",
+        "name": "MARVILYN",
+        "username": "peso caragsacan",
+        "role": "TUPAD_ASSISTING_DOCUMENTOR",
+        "assignedBarangay": "Caragsacan"
+      }
+    },
+    {
+      "id": "09208215-5ebf-455a-b7f5-b2496273f16a",
+      "designatedNumber": "100",
+      "beneficiaryName": "DOMINGO, MERCY",
+      "barangay": "Caragsacan",
+      "sitio": "Purok 3",
+      "dayNumber": 1,
+      "workDate": "2026-09-09",
+      "morningTimeIn": "2026-09-20T23:05:53.720Z",
+      "status": "PRESENT",
+      "syncStatus": "SYNCED",
+      "workArea": "Purok 5",
+      "specificActivity": "De-clogging of canals, creeks, waterways, catch basins, and drainage inlets; removal of silt, mud, plastics, and other obstructions",
+      "scannedBy": {
+        "id": "60222617-9b88-4753-9fd2-3b0c85d41cf9",
+        "name": "MARVILYN",
+        "username": "peso caragsacan",
+        "role": "TUPAD_ASSISTING_DOCUMENTOR",
+        "assignedBarangay": "Caragsacan"
+      }
+    },
+    {
+      "id": "eca1d0e7-0282-484e-8841-b1b0264961ce",
+      "designatedNumber": "102",
+      "beneficiaryName": "DOMINGO, NIDA",
+      "barangay": "Caragsacan",
+      "sitio": "Purok 3",
+      "dayNumber": 1,
+      "workDate": "2026-09-09",
+      "morningTimeIn": "2026-09-20T23:06:02.423Z",
+      "status": "PRESENT",
+      "syncStatus": "SYNCED",
+      "workArea": "Purok 5",
+      "specificActivity": "De-clogging of canals, creeks, waterways, catch basins, and drainage inlets; removal of silt, mud, plastics, and other obstructions",
+      "scannedBy": {
+        "id": "60222617-9b88-4753-9fd2-3b0c85d41cf9",
+        "name": "MARVILYN",
+        "username": "peso caragsacan",
+        "role": "TUPAD_ASSISTING_DOCUMENTOR",
+        "assignedBarangay": "Caragsacan"
+      }
+    },
+    {
+      "id": "e92c3c75-c254-47a2-a5ce-ea8804fb7bbf",
+      "designatedNumber": "92",
+      "beneficiaryName": "CATIGDAY, GEMALYN",
+      "barangay": "Caragsacan",
+      "sitio": "Purok 2",
+      "dayNumber": 1,
+      "workDate": "2026-09-09",
+      "morningTimeIn": "2026-09-20T23:06:30.797Z",
+      "status": "PRESENT",
+      "syncStatus": "SYNCED",
+      "workArea": "Purok 5",
+      "specificActivity": "De-clogging of canals, creeks, waterways, catch basins, and drainage inlets; removal of silt, mud, plastics, and other obstructions",
+      "scannedBy": {
+        "id": "60222617-9b88-4753-9fd2-3b0c85d41cf9",
+        "name": "MARVILYN",
+        "username": "peso caragsacan",
+        "role": "TUPAD_ASSISTING_DOCUMENTOR",
+        "assignedBarangay": "Caragsacan"
+      }
+    },
+    {
+      "id": "bd9a8f67-9d61-45a4-b8a7-5df596db171e",
+      "designatedNumber": "83",
+      "beneficiaryName": "BONTOC, VIVIAN",
+      "barangay": "Caragsacan",
+      "sitio": "Purok 3",
+      "dayNumber": 1,
+      "workDate": "2026-09-09",
+      "morningTimeIn": "2026-09-20T23:06:16.816Z",
+      "status": "PRESENT",
+      "syncStatus": "SYNCED",
+      "workArea": "Caragsacan Elementary School, Dingalan National Highschool",
+      "specificActivity": "De-clogging/Removal of Debris of Canals and Creeks outside/inside School perimeter",
+      "scannedBy": {
+        "id": "60222617-9b88-4753-9fd2-3b0c85d41cf9",
+        "name": "MARVILYN",
+        "username": "peso caragsacan",
+        "role": "TUPAD_ASSISTING_DOCUMENTOR",
+        "assignedBarangay": "Caragsacan"
+      }
+    },
+    {
+      "id": "8c12450f-021d-48af-8e46-f25598fe8f39",
+      "designatedNumber": "79",
+      "beneficiaryName": "BAYANG, ROMMEL",
+      "barangay": "Caragsacan",
+      "sitio": "Purok 2",
+      "dayNumber": 1,
+      "workDate": "2026-09-09",
+      "morningTimeIn": "2026-09-20T23:07:02.580Z",
+      "status": "PRESENT",
+      "syncStatus": "SYNCED",
+      "workArea": "Purok 5",
+      "specificActivity": "De-clogging of canals, creeks, waterways, catch basins, and drainage inlets; removal of silt, mud, plastics, and other obstructions",
+      "scannedBy": {
+        "id": "60222617-9b88-4753-9fd2-3b0c85d41cf9",
+        "name": "MARVILYN",
+        "username": "peso caragsacan",
+        "role": "TUPAD_ASSISTING_DOCUMENTOR",
+        "assignedBarangay": "Caragsacan"
+      }
+    },
+    {
+      "id": "655ce706-5064-4884-a4ca-00ad05e483b3",
+      "designatedNumber": "111",
+      "beneficiaryName": "GARCIA, JOANNA",
+      "barangay": "Caragsacan",
+      "sitio": "Purok 1",
+      "dayNumber": 1,
+      "workDate": "2026-09-09",
+      "morningTimeIn": "2026-09-20T23:07:11.773Z",
+      "status": "PRESENT",
+      "syncStatus": "SYNCED",
+      "workArea": "Purok 1 Phase 1",
+      "specificActivity": "Community Gardening ( Weeding, Land preparation)",
+      "scannedBy": {
+        "id": "60222617-9b88-4753-9fd2-3b0c85d41cf9",
+        "name": "MARVILYN",
+        "username": "peso caragsacan",
+        "role": "TUPAD_ASSISTING_DOCUMENTOR",
+        "assignedBarangay": "Caragsacan"
+      }
+    },
+    {
+      "id": "af2b7d4a-8f3e-4f25-b43e-214bcad56ed7",
+      "designatedNumber": "360",
+      "beneficiaryName": "TAN, LEA",
+      "barangay": "Paltic",
+      "sitio": "Mulawin",
+      "dayNumber": 1,
+      "workDate": "2026-09-09",
+      "morningTimeIn": "2026-09-20T23:07:23.526Z",
+      "status": "PRESENT",
+      "syncStatus": "SYNCED",
+      "workArea": "Purok Mulawin to Ipil-ipil",
+      "specificActivity": "De-clogging of canals, creeks, waterways, catch basins, and drainage inlets; removal of silt, mud, plastics, and other obstructions",
+      "scannedBy": {
+        "id": "60222617-9b88-4753-9fd2-3b0c85d41cf9",
+        "name": "MARVILYN",
+        "username": "peso caragsacan",
+        "role": "TUPAD_ASSISTING_DOCUMENTOR",
+        "assignedBarangay": "Caragsacan"
+      }
+    },
+    {
+      "id": "16d9142a-5452-43aa-8fd6-044aa566d0b8",
+      "designatedNumber": "295",
+      "beneficiaryName": "CERVANTES, PAZ",
+      "barangay": "Paltic",
+      "sitio": "Narra",
+      "dayNumber": 1,
+      "workDate": "2026-09-09",
+      "morningTimeIn": "2026-09-20T23:07:33.469Z",
+      "status": "PRESENT",
+      "syncStatus": "SYNCED",
+      "workArea": "Purok Mulawin to Ipil-ipil",
+      "specificActivity": "De-clogging of canals, creeks, waterways, catch basins, and drainage inlets; removal of silt, mud, plastics, and other obstructions",
+      "scannedBy": {
+        "id": "60222617-9b88-4753-9fd2-3b0c85d41cf9",
+        "name": "MARVILYN",
+        "username": "peso caragsacan",
+        "role": "TUPAD_ASSISTING_DOCUMENTOR",
+        "assignedBarangay": "Caragsacan"
+      }
+    },
+    {
+      "id": "26585f51-db1e-4a33-96b0-e96b4ac62d39",
+      "designatedNumber": "135",
+      "beneficiaryName": "PINERA, JENNYLYN",
+      "barangay": "Caragsacan",
+      "sitio": "Purok 2",
+      "dayNumber": 1,
+      "workDate": "2026-09-09",
+      "morningTimeIn": "2026-09-20T23:08:13.677Z",
+      "status": "PRESENT",
+      "syncStatus": "SYNCED",
+      "workArea": "Purok 5",
+      "specificActivity": "De-clogging of canals, creeks, waterways, catch basins, and drainage inlets; removal of silt, mud, plastics, and other obstructions",
+      "scannedBy": {
+        "id": "60222617-9b88-4753-9fd2-3b0c85d41cf9",
+        "name": "MARVILYN",
+        "username": "peso caragsacan",
+        "role": "TUPAD_ASSISTING_DOCUMENTOR",
+        "assignedBarangay": "Caragsacan"
+      }
+    },
+    {
+      "id": "b13c72a5-19b8-44b8-a628-cff8a7ee321d",
+      "designatedNumber": "98",
+      "beneficiaryName": "DOMINGO, ANNALYN",
+      "barangay": "Caragsacan",
+      "sitio": "Purok 3",
+      "dayNumber": 1,
+      "workDate": "2026-09-09",
+      "morningTimeIn": "2026-09-20T23:08:24.889Z",
+      "status": "PRESENT",
+      "syncStatus": "SYNCED",
+      "workArea": "Purok 5",
+      "specificActivity": "De-clogging of canals, creeks, waterways, catch basins, and drainage inlets; removal of silt, mud, plastics, and other obstructions",
+      "scannedBy": {
+        "id": "60222617-9b88-4753-9fd2-3b0c85d41cf9",
+        "name": "MARVILYN",
+        "username": "peso caragsacan",
+        "role": "TUPAD_ASSISTING_DOCUMENTOR",
+        "assignedBarangay": "Caragsacan"
+      }
+    },
+    {
+      "id": "4a6cc6ab-c617-4d35-9211-b118e676498c",
+      "designatedNumber": "114",
+      "beneficiaryName": "LIGGAYU, AILENE",
+      "barangay": "Caragsacan",
+      "sitio": "Purok 2",
+      "dayNumber": 1,
+      "workDate": "2026-09-09",
+      "morningTimeIn": "2026-09-20T23:08:38.535Z",
+      "status": "PRESENT",
+      "syncStatus": "SYNCED",
+      "workArea": "Purok 5",
+      "specificActivity": "De-clogging of canals, creeks, waterways, catch basins, and drainage inlets; removal of silt, mud, plastics, and other obstructions",
+      "scannedBy": {
+        "id": "60222617-9b88-4753-9fd2-3b0c85d41cf9",
+        "name": "MARVILYN",
+        "username": "peso caragsacan",
+        "role": "TUPAD_ASSISTING_DOCUMENTOR",
+        "assignedBarangay": "Caragsacan"
+      }
+    },
+    {
+      "id": "2e1a60f7-9f9b-442b-b104-7a7b590127b3",
+      "designatedNumber": "121",
+      "beneficiaryName": "MERGAL, LESLIE",
+      "barangay": "Caragsacan",
+      "sitio": "Purok 2",
+      "dayNumber": 1,
+      "workDate": "2026-09-09",
+      "morningTimeIn": "2026-09-20T23:08:50.686Z",
+      "status": "PRESENT",
+      "syncStatus": "SYNCED",
+      "workArea": "Purok 5",
+      "specificActivity": "De-clogging of canals, creeks, waterways, catch basins, and drainage inlets; removal of silt, mud, plastics, and other obstructions",
+      "scannedBy": {
+        "id": "60222617-9b88-4753-9fd2-3b0c85d41cf9",
+        "name": "MARVILYN",
+        "username": "peso caragsacan",
+        "role": "TUPAD_ASSISTING_DOCUMENTOR",
+        "assignedBarangay": "Caragsacan"
+      }
+    },
+    {
+      "id": "0aaaa05f-5e46-4923-8fd4-724af80fb15b",
+      "designatedNumber": "150",
+      "beneficiaryName": "VALDEZ, MA. JULINETH",
+      "barangay": "Caragsacan",
+      "sitio": "Purok 1",
+      "dayNumber": 1,
+      "workDate": "2026-09-09",
+      "morningTimeIn": "2026-09-20T23:09:23.554Z",
+      "status": "PRESENT",
+      "syncStatus": "SYNCED",
+      "workArea": "Purok 1 Phase 1",
+      "specificActivity": "Community Gardening ( Weeding, Land preparation)",
+      "scannedBy": {
+        "id": "60222617-9b88-4753-9fd2-3b0c85d41cf9",
+        "name": "MARVILYN",
+        "username": "peso caragsacan",
+        "role": "TUPAD_ASSISTING_DOCUMENTOR",
+        "assignedBarangay": "Caragsacan"
+      }
+    },
+    {
+      "id": "22373bd2-a63a-4657-a6dd-8b96c87c9038",
+      "designatedNumber": "89",
+      "beneficiaryName": "CAÑETE, DANILO",
+      "barangay": "Caragsacan",
+      "sitio": "Purok 1",
+      "dayNumber": 1,
+      "workDate": "2026-09-09",
+      "morningTimeIn": "2026-09-20T23:10:09.950Z",
+      "status": "PRESENT",
+      "syncStatus": "SYNCED",
+      "workArea": "Purok 1 Phase 1",
+      "specificActivity": "Community Gardening ( Weeding, Land preparation)",
+      "scannedBy": {
+        "id": "60222617-9b88-4753-9fd2-3b0c85d41cf9",
+        "name": "MARVILYN",
+        "username": "peso caragsacan",
+        "role": "TUPAD_ASSISTING_DOCUMENTOR",
+        "assignedBarangay": "Caragsacan"
+      }
+    },
+    {
+      "id": "547135fe-74ef-4d85-a156-5943d0d508a0",
+      "designatedNumber": "82",
+      "beneficiaryName": "BIANES, ANTHONY",
+      "barangay": "Caragsacan",
+      "sitio": "Purok 5 ADRA",
+      "dayNumber": 1,
+      "workDate": "2026-09-09",
+      "morningTimeIn": "2026-09-20T23:10:20.144Z",
+      "status": "PRESENT",
+      "syncStatus": "SYNCED",
+      "workArea": "Purok 5",
+      "specificActivity": "De-clogging of canals, creeks, waterways, catch basins, and drainage inlets; removal of silt, mud, plastics, and other obstructions",
+      "scannedBy": {
+        "id": "60222617-9b88-4753-9fd2-3b0c85d41cf9",
+        "name": "MARVILYN",
+        "username": "peso caragsacan",
+        "role": "TUPAD_ASSISTING_DOCUMENTOR",
+        "assignedBarangay": "Caragsacan"
+      }
+    },
+    {
+      "id": "a1c6e856-72e7-4af6-b205-f78fe2e6ed23",
+      "designatedNumber": "78",
+      "beneficiaryName": "BATALLER, RHEALYN",
+      "barangay": "Caragsacan",
+      "sitio": "Purok 2",
+      "dayNumber": 1,
+      "workDate": "2026-09-09",
+      "morningTimeIn": "2026-09-20T23:11:09.124Z",
+      "status": "PRESENT",
+      "syncStatus": "SYNCED",
+      "workArea": "Purok 5",
+      "specificActivity": "De-clogging of canals, creeks, waterways, catch basins, and drainage inlets; removal of silt, mud, plastics, and other obstructions",
+      "scannedBy": {
+        "id": "60222617-9b88-4753-9fd2-3b0c85d41cf9",
+        "name": "MARVILYN",
+        "username": "peso caragsacan",
+        "role": "TUPAD_ASSISTING_DOCUMENTOR",
+        "assignedBarangay": "Caragsacan"
+      }
+    },
+    {
+      "id": "832f7e5a-d415-413e-990a-d9888328fe40",
+      "designatedNumber": "124",
+      "beneficiaryName": "ORDOÑEZ, JACKSON",
+      "barangay": "Caragsacan",
+      "sitio": "Purok 2",
+      "dayNumber": 1,
+      "workDate": "2026-09-09",
+      "morningTimeIn": "2026-09-20T23:12:32.483Z",
+      "status": "PRESENT",
+      "syncStatus": "SYNCED",
+      "workArea": "Purok 5",
+      "specificActivity": "De-clogging of canals, creeks, waterways, catch basins, and drainage inlets; removal of silt, mud, plastics, and other obstructions",
+      "scannedBy": {
+        "id": "60222617-9b88-4753-9fd2-3b0c85d41cf9",
+        "name": "MARVILYN",
+        "username": "peso caragsacan",
+        "role": "TUPAD_ASSISTING_DOCUMENTOR",
+        "assignedBarangay": "Caragsacan"
+      }
+    },
+    {
+      "id": "5a35d4da-6369-432d-ac61-fdbc331a44cd",
+      "designatedNumber": "116",
+      "beneficiaryName": "LLAMES, JAYMAR",
+      "barangay": "Caragsacan",
+      "sitio": "Purok 3",
+      "dayNumber": 1,
+      "workDate": "2026-09-09",
+      "morningTimeIn": "2026-09-20T23:12:47.651Z",
+      "status": "PRESENT",
+      "syncStatus": "SYNCED",
+      "workArea": "Purok 5",
+      "specificActivity": "De-clogging of canals, creeks, waterways, catch basins, and drainage inlets; removal of silt, mud, plastics, and other obstructions",
+      "scannedBy": {
+        "id": "60222617-9b88-4753-9fd2-3b0c85d41cf9",
+        "name": "MARVILYN",
+        "username": "peso caragsacan",
+        "role": "TUPAD_ASSISTING_DOCUMENTOR",
+        "assignedBarangay": "Caragsacan"
+      }
+    },
+    {
+      "id": "8f701cf4-ef6b-4fc0-9ec8-294d3e3abe97",
+      "designatedNumber": "148",
+      "beneficiaryName": "TUGADE, ELMOR",
+      "barangay": "Caragsacan",
+      "sitio": "Purok 5 Kailyo",
+      "dayNumber": 1,
+      "workDate": "2026-09-09",
+      "morningTimeIn": "2026-09-20T23:12:56.070Z",
+      "status": "PRESENT",
+      "syncStatus": "SYNCED",
+      "workArea": "Purok 5",
+      "specificActivity": "De-clogging of canals, creeks, waterways, catch basins, and drainage inlets; removal of silt, mud, plastics, and other obstructions",
+      "scannedBy": {
+        "id": "60222617-9b88-4753-9fd2-3b0c85d41cf9",
+        "name": "MARVILYN",
+        "username": "peso caragsacan",
+        "role": "TUPAD_ASSISTING_DOCUMENTOR",
+        "assignedBarangay": "Caragsacan"
+      }
+    },
+    {
+      "id": "c2d7b711-0f14-48c0-a78c-b78708bd406e",
+      "designatedNumber": "71",
+      "beneficiaryName": "ALFORNON, ALONA",
+      "barangay": "Caragsacan",
+      "sitio": "Purok 5",
+      "dayNumber": 1,
+      "workDate": "2026-09-09",
+      "morningTimeIn": "2026-09-20T23:13:08.276Z",
+      "status": "PRESENT",
+      "syncStatus": "SYNCED",
+      "workArea": "Purok 5",
+      "specificActivity": "De-clogging of canals, creeks, waterways, catch basins, and drainage inlets; removal of silt, mud, plastics, and other obstructions",
+      "scannedBy": {
+        "id": "60222617-9b88-4753-9fd2-3b0c85d41cf9",
+        "name": "MARVILYN",
+        "username": "peso caragsacan",
+        "role": "TUPAD_ASSISTING_DOCUMENTOR",
+        "assignedBarangay": "Caragsacan"
+      }
+    },
+    {
+      "id": "43155f91-7d23-434e-a1d1-9eee8dac230e",
+      "designatedNumber": "106",
+      "beneficiaryName": "ESQUILONA, ROSEBEL",
+      "barangay": "Caragsacan",
+      "sitio": "Purok 5 Kailyo",
+      "dayNumber": 1,
+      "workDate": "2026-09-09",
+      "morningTimeIn": "2026-09-20T23:13:17.105Z",
+      "status": "PRESENT",
+      "syncStatus": "SYNCED",
+      "workArea": "Purok 5",
+      "specificActivity": "De-clogging of canals, creeks, waterways, catch basins, and drainage inlets; removal of silt, mud, plastics, and other obstructions",
+      "scannedBy": {
+        "id": "60222617-9b88-4753-9fd2-3b0c85d41cf9",
+        "name": "MARVILYN",
+        "username": "peso caragsacan",
+        "role": "TUPAD_ASSISTING_DOCUMENTOR",
+        "assignedBarangay": "Caragsacan"
+      }
+    },
+    {
+      "id": "c8599343-75ed-46dc-9033-6c2fb4dfa552",
+      "designatedNumber": "77",
+      "beneficiaryName": "IGNACIO, RIZZA",
+      "barangay": "Caragsacan",
+      "sitio": "Purok 2",
+      "dayNumber": 1,
+      "workDate": "2026-09-09",
+      "morningTimeIn": "2026-09-20T23:13:36.697Z",
+      "status": "PRESENT",
+      "syncStatus": "SYNCED",
+      "workArea": "Purok 5",
+      "specificActivity": "De-clogging of canals, creeks, waterways, catch basins, and drainage inlets; removal of silt, mud, plastics, and other obstructions",
+      "scannedBy": {
+        "id": "60222617-9b88-4753-9fd2-3b0c85d41cf9",
+        "name": "MARVILYN",
+        "username": "peso caragsacan",
+        "role": "TUPAD_ASSISTING_DOCUMENTOR",
+        "assignedBarangay": "Caragsacan"
+      }
+    },
+    {
+      "id": "2a7de330-4a3b-4a17-b669-fe6b0a16fb90",
+      "designatedNumber": "149",
+      "beneficiaryName": "VALDERAMA, MARILOU",
+      "barangay": "Caragsacan",
+      "sitio": "Purok 5 Gawad Kalinga",
+      "dayNumber": 1,
+      "workDate": "2026-09-09",
+      "morningTimeIn": "2026-09-20T23:14:37.194Z",
+      "status": "PRESENT",
+      "syncStatus": "SYNCED",
+      "workArea": "Purok 5",
+      "specificActivity": "De-clogging of canals, creeks, waterways, catch basins, and drainage inlets; removal of silt, mud, plastics, and other obstructions",
+      "scannedBy": {
+        "id": "60222617-9b88-4753-9fd2-3b0c85d41cf9",
+        "name": "MARVILYN",
+        "username": "peso caragsacan",
+        "role": "TUPAD_ASSISTING_DOCUMENTOR",
+        "assignedBarangay": "Caragsacan"
+      }
+    },
+    {
+      "id": "182eed2a-f874-45a0-b4fe-3f8b9bfc53ed",
+      "designatedNumber": "140",
+      "beneficiaryName": "RIVERO, ANNIE",
+      "barangay": "Caragsacan",
+      "sitio": "Purok 5 Gawad Kalinga",
+      "dayNumber": 1,
+      "workDate": "2026-09-09",
+      "morningTimeIn": "2026-09-20T23:14:56.723Z",
+      "status": "PRESENT",
+      "syncStatus": "SYNCED",
+      "workArea": "Purok 5",
+      "specificActivity": "De-clogging of canals, creeks, waterways, catch basins, and drainage inlets; removal of silt, mud, plastics, and other obstructions",
+      "scannedBy": {
+        "id": "60222617-9b88-4753-9fd2-3b0c85d41cf9",
+        "name": "MARVILYN",
+        "username": "peso caragsacan",
+        "role": "TUPAD_ASSISTING_DOCUMENTOR",
+        "assignedBarangay": "Caragsacan"
+      }
+    },
+    {
+      "id": "6b532b69-e49f-4c96-bb9f-2c046777655c",
+      "designatedNumber": "115",
+      "beneficiaryName": "LINDA, MARY JOY",
+      "barangay": "Caragsacan",
+      "sitio": "Purok 1",
+      "dayNumber": 1,
+      "workDate": "2026-09-09",
+      "morningTimeIn": "2026-09-20T23:15:10.924Z",
+      "status": "PRESENT",
+      "syncStatus": "SYNCED",
+      "workArea": "Purok 1 Phase 1",
+      "specificActivity": "Community Gardening ( Weeding, Land preparation)",
+      "scannedBy": {
+        "id": "60222617-9b88-4753-9fd2-3b0c85d41cf9",
+        "name": "MARVILYN",
+        "username": "peso caragsacan",
+        "role": "TUPAD_ASSISTING_DOCUMENTOR",
+        "assignedBarangay": "Caragsacan"
+      }
+    },
+    {
+      "id": "30c4724f-111e-4792-967d-9ae953270581",
+      "designatedNumber": "119",
+      "beneficiaryName": "MARIANO, RICA MAY",
+      "barangay": "Caragsacan",
+      "sitio": "Purok 1",
+      "dayNumber": 1,
+      "workDate": "2026-09-09",
+      "morningTimeIn": "2026-09-20T23:16:37.653Z",
+      "status": "PRESENT",
+      "syncStatus": "SYNCED",
+      "workArea": "Purok 1 Phase 1",
+      "specificActivity": "Community Gardening ( Weeding, Land preparation)",
+      "scannedBy": {
+        "id": "60222617-9b88-4753-9fd2-3b0c85d41cf9",
+        "name": "MARVILYN",
+        "username": "peso caragsacan",
+        "role": "TUPAD_ASSISTING_DOCUMENTOR",
+        "assignedBarangay": "Caragsacan"
+      }
+    },
+    {
+      "id": "ca8c2d9c-f933-4450-b9b7-2507a9c2140e",
+      "designatedNumber": "118",
+      "beneficiaryName": "MARIANO, MARCELITA",
+      "barangay": "Caragsacan",
+      "sitio": "Purok 1",
+      "dayNumber": 1,
+      "workDate": "2026-09-09",
+      "morningTimeIn": "2026-09-20T23:16:52.638Z",
+      "status": "PRESENT",
+      "syncStatus": "SYNCED",
+      "workArea": "Purok 1 Phase 1",
+      "specificActivity": "Community Gardening ( Weeding, Land preparation)",
+      "scannedBy": {
+        "id": "60222617-9b88-4753-9fd2-3b0c85d41cf9",
+        "name": "MARVILYN",
+        "username": "peso caragsacan",
+        "role": "TUPAD_ASSISTING_DOCUMENTOR",
+        "assignedBarangay": "Caragsacan"
+      }
+    },
+    {
+      "id": "2bca2116-b761-4eff-b479-477f85a3b8f4",
+      "designatedNumber": "101",
+      "beneficiaryName": "DOMINGO, MYRA",
+      "barangay": "Caragsacan",
+      "sitio": "Purok 1 Phase 1",
+      "dayNumber": 1,
+      "workDate": "2026-09-09",
+      "morningTimeIn": "2026-09-20T23:17:02.675Z",
+      "status": "PRESENT",
+      "syncStatus": "SYNCED",
+      "workArea": "Purok 1 Phase 1",
+      "specificActivity": "Community Gardening ( Weeding, Land preparation)",
+      "scannedBy": {
+        "id": "60222617-9b88-4753-9fd2-3b0c85d41cf9",
+        "name": "MARVILYN",
+        "username": "peso caragsacan",
+        "role": "TUPAD_ASSISTING_DOCUMENTOR",
+        "assignedBarangay": "Caragsacan"
+      }
+    },
+    {
+      "id": "f763a47b-00f3-4709-a4d6-744a245fc727",
+      "designatedNumber": "72",
+      "beneficiaryName": "AQUITANIA, JODIL",
+      "barangay": "Caragsacan",
+      "sitio": "Purok 1",
+      "dayNumber": 1,
+      "workDate": "2026-09-09",
+      "morningTimeIn": "2026-09-20T23:24:17.256Z",
+      "status": "PRESENT",
+      "syncStatus": "SYNCED",
+      "workArea": "Purok 1 Phase 1",
+      "specificActivity": "Community Gardening ( Weeding, Land preparation)",
+      "scannedBy": {
+        "id": "60222617-9b88-4753-9fd2-3b0c85d41cf9",
+        "name": "MARVILYN",
+        "username": "peso caragsacan",
+        "role": "TUPAD_ASSISTING_DOCUMENTOR",
+        "assignedBarangay": "Caragsacan"
+      }
+    },
+    {
+      "id": "3d605854-0664-46f9-a8e8-852e74df5320",
+      "designatedNumber": "123",
+      "beneficiaryName": "NOMBRERE, JECYBEL",
+      "barangay": "Caragsacan",
+      "sitio": "Purok 3",
+      "dayNumber": 1,
+      "workDate": "2026-09-09",
+      "morningTimeIn": "2026-09-20T23:24:26.908Z",
+      "status": "PRESENT",
+      "syncStatus": "SYNCED",
+      "workArea": "Purok 5",
+      "specificActivity": "De-clogging of canals, creeks, waterways, catch basins, and drainage inlets; removal of silt, mud, plastics, and other obstructions",
+      "scannedBy": {
+        "id": "60222617-9b88-4753-9fd2-3b0c85d41cf9",
+        "name": "MARVILYN",
+        "username": "peso caragsacan",
+        "role": "TUPAD_ASSISTING_DOCUMENTOR",
+        "assignedBarangay": "Caragsacan"
+      }
+    },
+    {
+      "id": "279d2a90-8ec8-4553-8219-0ec1307e1d29",
+      "designatedNumber": "80",
+      "beneficiaryName": "ROSEL, JUDILYN",
+      "barangay": "Caragsacan",
+      "sitio": "Purok 1",
+      "dayNumber": 1,
+      "workDate": "2026-09-09",
+      "morningTimeIn": "2026-09-20T23:24:35.545Z",
+      "status": "PRESENT",
+      "syncStatus": "SYNCED",
+      "workArea": "Purok 1 Phase 1",
+      "specificActivity": "Community Gardening ( Weeding, Land preparation)",
+      "scannedBy": {
+        "id": "60222617-9b88-4753-9fd2-3b0c85d41cf9",
+        "name": "MARVILYN",
+        "username": "peso caragsacan",
+        "role": "TUPAD_ASSISTING_DOCUMENTOR",
+        "assignedBarangay": "Caragsacan"
+      }
+    },
+    {
+      "id": "2afd62eb-c744-4445-94f0-67109c033ace",
+      "designatedNumber": "93",
+      "beneficiaryName": "CONCHADA, FILIPINA",
+      "barangay": "Caragsacan",
+      "sitio": "Purok 2",
+      "dayNumber": 1,
+      "workDate": "2026-09-09",
+      "morningTimeIn": "2026-09-20T23:27:12.748Z",
+      "status": "PRESENT",
+      "syncStatus": "SYNCED",
+      "workArea": "Purok 5",
+      "specificActivity": "De-clogging of canals, creeks, waterways, catch basins, and drainage inlets; removal of silt, mud, plastics, and other obstructions",
+      "scannedBy": {
+        "id": "60222617-9b88-4753-9fd2-3b0c85d41cf9",
+        "name": "MARVILYN",
+        "username": "peso caragsacan",
+        "role": "TUPAD_ASSISTING_DOCUMENTOR",
+        "assignedBarangay": "Caragsacan"
+      }
+    },
+    {
+      "id": "291af4e7-82a2-46ca-b046-0a1b852801f7",
+      "designatedNumber": "145",
+      "beneficiaryName": "SARMIENTO, BABY JANE",
+      "barangay": "Caragsacan",
+      "sitio": "Purok 1",
+      "dayNumber": 1,
+      "workDate": "2026-09-09",
+      "morningTimeIn": "2026-09-20T23:27:21.287Z",
+      "status": "PRESENT",
+      "syncStatus": "SYNCED",
+      "workArea": "Purok 1 Phase 1",
+      "specificActivity": "Community Gardening ( Weeding, Land preparation)",
+      "scannedBy": {
+        "id": "60222617-9b88-4753-9fd2-3b0c85d41cf9",
+        "name": "MARVILYN",
+        "username": "peso caragsacan",
+        "role": "TUPAD_ASSISTING_DOCUMENTOR",
+        "assignedBarangay": "Caragsacan"
+      }
+    },
+    {
+      "id": "334f9741-48a2-435a-857c-fcb3536d4d94",
+      "designatedNumber": "90",
+      "beneficiaryName": "CARREON, MARVIN",
+      "barangay": "Caragsacan",
+      "sitio": "Purok 5",
+      "dayNumber": 1,
+      "workDate": "2026-09-09",
+      "morningTimeIn": "2026-09-20T23:27:55.199Z",
+      "status": "PRESENT",
+      "syncStatus": "SYNCED",
+      "workArea": "Purok 5",
+      "specificActivity": "De-clogging of canals, creeks, waterways, catch basins, and drainage inlets; removal of silt, mud, plastics, and other obstructions",
+      "scannedBy": {
+        "id": "60222617-9b88-4753-9fd2-3b0c85d41cf9",
+        "name": "MARVILYN",
+        "username": "peso caragsacan",
+        "role": "TUPAD_ASSISTING_DOCUMENTOR",
+        "assignedBarangay": "Caragsacan"
+      }
+    },
+    {
+      "id": "7ee2fe98-724d-41bc-a277-3883c114e3c0",
+      "designatedNumber": "91",
+      "beneficiaryName": "CARREON, MARY ANN",
+      "barangay": "Caragsacan",
+      "sitio": "Purok 5 Gawad Kalinga",
+      "dayNumber": 1,
+      "workDate": "2026-09-09",
+      "morningTimeIn": "2026-09-20T23:28:06.962Z",
+      "status": "PRESENT",
+      "syncStatus": "SYNCED",
+      "workArea": "Purok 5",
+      "specificActivity": "De-clogging of canals, creeks, waterways, catch basins, and drainage inlets; removal of silt, mud, plastics, and other obstructions",
+      "scannedBy": {
+        "id": "60222617-9b88-4753-9fd2-3b0c85d41cf9",
+        "name": "MARVILYN",
+        "username": "peso caragsacan",
+        "role": "TUPAD_ASSISTING_DOCUMENTOR",
+        "assignedBarangay": "Caragsacan"
+      }
+    },
+    {
+      "id": "b2632a6f-03b8-4d07-939e-cf97e9aa99fc",
+      "designatedNumber": "84",
+      "beneficiaryName": "BUESING, JULIETA",
+      "barangay": "Caragsacan",
+      "sitio": "Purok 1 Phase 1",
+      "dayNumber": 1,
+      "workDate": "2026-09-09",
+      "morningTimeIn": "2026-09-20T23:29:51.588Z",
+      "status": "PRESENT",
+      "syncStatus": "SYNCED",
+      "workArea": "Purok 1 Phase 1",
+      "specificActivity": "Community Gardening ( Weeding, Land preparation)",
+      "scannedBy": {
+        "id": "60222617-9b88-4753-9fd2-3b0c85d41cf9",
+        "name": "MARVILYN",
+        "username": "peso caragsacan",
+        "role": "TUPAD_ASSISTING_DOCUMENTOR",
+        "assignedBarangay": "Caragsacan"
+      }
+    },
+    {
+      "id": "a630ac84-66ee-467f-bb18-3b9c64bb9aea",
+      "designatedNumber": "104",
+      "beneficiaryName": "DURAN, JENNIFER",
+      "barangay": "Caragsacan",
+      "sitio": "Purok 1 Phase 1",
+      "dayNumber": 1,
+      "workDate": "2026-09-09",
+      "morningTimeIn": "2026-09-20T23:30:16.892Z",
+      "status": "PRESENT",
+      "syncStatus": "SYNCED",
+      "workArea": "Purok 1 Phase 1",
+      "specificActivity": "Community Gardening ( Weeding, Land preparation)",
+      "scannedBy": {
+        "id": "60222617-9b88-4753-9fd2-3b0c85d41cf9",
+        "name": "MARVILYN",
+        "username": "peso caragsacan",
+        "role": "TUPAD_ASSISTING_DOCUMENTOR",
+        "assignedBarangay": "Caragsacan"
+      }
+    },
+    {
+      "id": "819a2bed-bbc1-4f5d-b7b1-46f02cac575f",
+      "designatedNumber": "76",
+      "beneficiaryName": "BARRIOS, AGAPITA",
+      "barangay": "Caragsacan",
+      "sitio": "Purok 2",
+      "dayNumber": 1,
+      "workDate": "2026-09-09",
+      "morningTimeIn": "2026-09-20T23:30:27.689Z",
+      "status": "PRESENT",
+      "syncStatus": "SYNCED",
+      "workArea": "Purok 5",
+      "specificActivity": "De-clogging of canals, creeks, waterways, catch basins, and drainage inlets; removal of silt, mud, plastics, and other obstructions",
+      "scannedBy": {
+        "id": "60222617-9b88-4753-9fd2-3b0c85d41cf9",
+        "name": "MARVILYN",
+        "username": "peso caragsacan",
+        "role": "TUPAD_ASSISTING_DOCUMENTOR",
+        "assignedBarangay": "Caragsacan"
+      }
+    },
+    {
+      "id": "e945b94c-2a24-4258-a158-e837f0036d35",
+      "designatedNumber": "107",
+      "beneficiaryName": "FABROS, EMERSON",
+      "barangay": "Caragsacan",
+      "sitio": "Purok 3",
+      "dayNumber": 1,
+      "workDate": "2026-09-09",
+      "morningTimeIn": "2026-09-20T23:36:08.565Z",
+      "status": "PRESENT",
+      "syncStatus": "SYNCED",
+      "workArea": "Purok 5",
+      "specificActivity": "De-clogging of canals, creeks, waterways, catch basins, and drainage inlets; removal of silt, mud, plastics, and other obstructions",
+      "scannedBy": {
+        "id": "60222617-9b88-4753-9fd2-3b0c85d41cf9",
+        "name": "MARVILYN",
+        "username": "peso caragsacan",
+        "role": "TUPAD_ASSISTING_DOCUMENTOR",
+        "assignedBarangay": "Caragsacan"
+      }
+    },
+    {
+      "id": "a6022bb3-1792-48be-b5e3-c2454c33af97",
+      "designatedNumber": "105",
+      "beneficiaryName": "ESMILLA, REGIE",
+      "barangay": "Caragsacan",
+      "sitio": "Purok 1 Phase 1",
+      "dayNumber": 1,
+      "workDate": "2026-09-09",
+      "morningTimeIn": "2026-09-20T23:45:51.733Z",
+      "status": "PRESENT",
+      "syncStatus": "SYNCED",
+      "workArea": "Purok 1 Phase 1",
+      "specificActivity": "Community Gardening ( Weeding, Land preparation)",
+      "scannedBy": {
+        "id": "60222617-9b88-4753-9fd2-3b0c85d41cf9",
+        "name": "MARVILYN",
+        "username": "peso caragsacan",
+        "role": "TUPAD_ASSISTING_DOCUMENTOR",
+        "assignedBarangay": "Caragsacan"
+      }
+    },
+    {
+      "id": "3b0cae54-2e29-4273-b1a1-59f6a7ee1a35",
+      "designatedNumber": "142",
+      "beneficiaryName": "SAHOL, CESAR",
+      "barangay": "Caragsacan",
+      "sitio": "Purok 1",
+      "dayNumber": 1,
+      "workDate": "2026-09-09",
+      "morningTimeIn": "2026-09-21T00:41:09.795Z",
+      "status": "PRESENT",
+      "syncStatus": "SYNCED",
+      "workArea": "Purok 1 Phase 1",
+      "specificActivity": "Community Gardening ( Weeding, Land preparation)",
+      "scannedBy": {
+        "id": "60222617-9b88-4753-9fd2-3b0c85d41cf9",
+        "name": "MARVILYN",
+        "username": "peso caragsacan",
+        "role": "TUPAD_ASSISTING_DOCUMENTOR",
+        "assignedBarangay": "Caragsacan"
+      }
+    },
+    {
+      "id": "118272e9-b83b-408e-960c-36dab5bac3df",
+      "designatedNumber": "88",
+      "beneficiaryName": "CANDIDO, MA. LIZA",
+      "barangay": "Caragsacan",
+      "sitio": "Purok 5 Gawad Kalinga",
+      "dayNumber": 1,
+      "workDate": "2026-09-09",
+      "morningTimeIn": "2026-09-21T01:37:24.376Z",
+      "status": "PRESENT",
+      "syncStatus": "SYNCED",
+      "workArea": "Purok 5",
+      "specificActivity": "De-clogging of canals, creeks, waterways, catch basins, and drainage inlets; removal of silt, mud, plastics, and other obstructions",
+      "scannedBy": {
+        "id": "60222617-9b88-4753-9fd2-3b0c85d41cf9",
+        "name": "MARVILYN",
+        "username": "peso caragsacan",
+        "role": "TUPAD_ASSISTING_DOCUMENTOR",
+        "assignedBarangay": "Caragsacan"
+      }
+    }
+  ],
+  "accomplishmentPhotos": [
+    {
+      "id": "aeffe7e7-2e9b-4e06-952d-272953860969",
+      "barangay": "Caragsacan",
+      "sitio": "Centro",
+      "workArea": "Centro",
+      "dayNumber": 1,
+      "workDate": "2026-09-09",
+      "latitude": 15.3941,
+      "longitude": 121.3965,
+      "capturedAt": "2026-09-21T00:13:08.128Z",
+      "uploadedAt": "2026-09-21T00:13:11.032Z",
+      "status": "APPROVED",
+      "uploadedBy": {
+        "id": "60222617-9b88-4753-9fd2-3b0c85d41cf9",
+        "name": "MARVILYN",
+        "username": "peso caragsacan",
+        "role": "TUPAD_ASSISTING_DOCUMENTOR",
+        "assignedBarangay": "Caragsacan"
+      },
+      "approvedBy": {
+        "id": "0b1ffed3-c63e-4405-a7f3-83897c8e37be",
+        "name": "PESO Dingalan Admin Officer",
+        "username": "admin",
+        "role": "DOMAIN_MASTER"
+      }
+    },
+    {
+      "id": "b61701a5-929e-481f-940c-c062096d49c2",
+      "barangay": "Caragsacan",
+      "sitio": "Centro",
+      "workArea": "Centro",
+      "dayNumber": 1,
+      "workDate": "2026-09-09",
+      "latitude": 15.3941,
+      "longitude": 121.3965,
+      "capturedAt": "2026-09-21T00:32:05.857Z",
+      "uploadedAt": "2026-09-21T00:32:08.400Z",
+      "status": "APPROVED",
+      "uploadedBy": {
+        "id": "60222617-9b88-4753-9fd2-3b0c85d41cf9",
+        "name": "MARVILYN",
+        "username": "peso caragsacan",
+        "role": "TUPAD_ASSISTING_DOCUMENTOR",
+        "assignedBarangay": "Caragsacan"
+      },
+      "approvedBy": {
+        "id": "0b1ffed3-c63e-4405-a7f3-83897c8e37be",
+        "name": "PESO Dingalan Admin Officer",
+        "username": "admin",
+        "role": "DOMAIN_MASTER"
+      }
+    }
+  ],
+  "auditTrail": [
+    {
+      "id": "91331d4c-fd7e-49eb-979c-383b863e5b44",
+      "timestamp": "2026-09-20T21:19:32.018Z",
+      "action": "LOGIN_FAILED",
+      "entityType": "USER",
+      "entityId": null,
+      "actor": {
+        "id": "0b1ffed3-c63e-4405-a7f3-83897c8e37be",
+        "username": "admin",
+        "name": "PESO Dingalan Admin Officer",
+        "role": "DOMAIN_MASTER",
+        "assignedBarangay": null
+      },
+      "metadata": {
+        "username": "admin",
+        "reason": "Incorrect password"
+      }
+    },
+    {
+      "id": "9a2af463-a756-49ba-93ce-1a9893aa265e",
+      "timestamp": "2026-09-20T21:19:33.527Z",
+      "action": "LOGIN_FAILED",
+      "entityType": "USER",
+      "entityId": null,
+      "actor": {
+        "id": "0b1ffed3-c63e-4405-a7f3-83897c8e37be",
+        "username": "admin",
+        "name": "PESO Dingalan Admin Officer",
+        "role": "DOMAIN_MASTER",
+        "assignedBarangay": null
+      },
+      "metadata": {
+        "username": "admin",
+        "reason": "Incorrect password"
+      }
+    },
+    {
+      "id": "621a1dea-71a3-488d-a663-ba146dfb0a3e",
+      "timestamp": "2026-09-20T21:19:43.186Z",
+      "action": "LOGIN_SUCCESS",
+      "entityType": "USER",
+      "entityId": "0b1ffed3-c63e-4405-a7f3-83897c8e37be",
+      "actor": {
+        "id": "0b1ffed3-c63e-4405-a7f3-83897c8e37be",
+        "username": "admin",
+        "name": "PESO Dingalan Admin Officer",
+        "role": "DOMAIN_MASTER",
+        "assignedBarangay": null
+      },
+      "metadata": null
+    },
+    {
+      "id": "042077c2-1ed9-412b-b6c8-54829f13a2a8",
+      "timestamp": "2026-09-20T22:34:27.700Z",
+      "action": "ATTENDANCE_SCANNED",
+      "entityType": "ATTENDANCE_RECORD",
+      "entityId": "94fc755d-4114-41ec-8c58-536c33f889fe",
+      "actor": {
+        "id": "3d27b05c-5b3e-413e-a9cb-48d28810bcdb",
+        "username": "peso_ibona1",
+        "name": "GRACE",
+        "role": "TUPAD_COORDINATOR",
+        "assignedBarangay": "Ibona"
+      },
+      "metadata": {
+        "designatedNumber": "201",
+        "workDayNumber": 1,
+        "slotRecorded": "Morning Time-In (AM IN)",
+        "workArea": "Purok 1 and purok 2",
+        "activityName": "De-clogging of canals, creeks, waterways, catch basins, and drainage inlets; removal of silt, mud, plastics, and other obstructions"
+      }
+    },
+    {
+      "id": "ea584453-4a3f-4bb8-b24d-fdc492b41894",
+      "timestamp": "2026-09-20T22:35:19.648Z",
+      "action": "ATTENDANCE_SCANNED",
+      "entityType": "ATTENDANCE_RECORD",
+      "entityId": "a085fcff-7cc5-40cb-895f-3b3d84261243",
+      "actor": {
+        "id": "3d27b05c-5b3e-413e-a9cb-48d28810bcdb",
+        "username": "peso_ibona1",
+        "name": "GRACE",
+        "role": "TUPAD_COORDINATOR",
+        "assignedBarangay": "Ibona"
+      },
+      "metadata": {
+        "designatedNumber": "215",
+        "workDayNumber": 1,
+        "slotRecorded": "Morning Time-In (AM IN)",
+        "workArea": "Purok 1 and purok 2",
+        "activityName": "De-clogging of canals, creeks, waterways, catch basins, and drainage inlets; removal of silt, mud, plastics, and other obstructions"
+      }
+    },
+    {
+      "id": "d88f06ac-a280-4b49-afb1-cc17da450a32",
+      "timestamp": "2026-09-20T22:36:42.102Z",
+      "action": "ATTENDANCE_SCANNED",
+      "entityType": "ATTENDANCE_RECORD",
+      "entityId": "ee71e97d-82e3-4f76-96ab-085bac437b1d",
+      "actor": {
+        "id": "3d27b05c-5b3e-413e-a9cb-48d28810bcdb",
+        "username": "peso_ibona1",
+        "name": "GRACE",
+        "role": "TUPAD_COORDINATOR",
+        "assignedBarangay": "Ibona"
+      },
+      "metadata": {
+        "designatedNumber": "205",
+        "workDayNumber": 1,
+        "slotRecorded": "Morning Time-In (AM IN)",
+        "workArea": "Purok 6 aves",
+        "activityName": "Community Gardening ( Weeding, Land preparation)"
+      }
+    },
+    {
+      "id": "d5982f28-c946-401b-8155-f58080950a51",
+      "timestamp": "2026-09-20T22:38:34.004Z",
+      "action": "ATTENDANCE_SCANNED",
+      "entityType": "ATTENDANCE_RECORD",
+      "entityId": "6181ff4e-0872-49b3-a06c-88016d05570d",
+      "actor": {
+        "id": "3d27b05c-5b3e-413e-a9cb-48d28810bcdb",
+        "username": "peso_ibona1",
+        "name": "GRACE",
+        "role": "TUPAD_COORDINATOR",
+        "assignedBarangay": "Ibona"
+      },
+      "metadata": {
+        "designatedNumber": "232",
+        "workDayNumber": 1,
+        "slotRecorded": "Morning Time-In (AM IN)",
+        "workArea": "Purok 6 aves",
+        "activityName": "Community Gardening ( Weeding, Land preparation)"
+      }
+    },
+    {
+      "id": "6e2f61ca-524b-453d-925b-0d7c5acef6f7",
+      "timestamp": "2026-09-20T22:41:49.667Z",
+      "action": "ATTENDANCE_SCANNED",
+      "entityType": "ATTENDANCE_RECORD",
+      "entityId": "1c8f3793-f5ac-4946-9d91-5abd1f063ad8",
+      "actor": {
+        "id": "3d27b05c-5b3e-413e-a9cb-48d28810bcdb",
+        "username": "peso_ibona1",
+        "name": "GRACE",
+        "role": "TUPAD_COORDINATOR",
+        "assignedBarangay": "Ibona"
+      },
+      "metadata": {
+        "designatedNumber": "224",
+        "workDayNumber": 1,
+        "slotRecorded": "Morning Time-In (AM IN)",
+        "workArea": "Purok 6 aves",
+        "activityName": "Community Gardening ( Weeding, Land preparation)"
+      }
+    },
+    {
+      "id": "7f212653-ce86-43ca-a38c-f85c23f3f428",
+      "timestamp": "2026-09-20T22:47:43.154Z",
+      "action": "LOGOUT",
+      "entityType": "USER",
+      "entityId": "0b1ffed3-c63e-4405-a7f3-83897c8e37be",
+      "actor": {
+        "id": "0b1ffed3-c63e-4405-a7f3-83897c8e37be",
+        "username": "admin",
+        "name": "PESO Dingalan Admin Officer",
+        "role": "DOMAIN_MASTER",
+        "assignedBarangay": null
+      },
+      "metadata": null
+    },
+    {
+      "id": "8df701c4-e9d5-4442-a64c-163e1d08f1fd",
+      "timestamp": "2026-09-20T22:58:34.819Z",
+      "action": "OFFLINE_TRANSACTION_SYNCED",
+      "entityType": "ATTENDANCE",
+      "entityId": null,
+      "actor": {
+        "id": "60222617-9b88-4753-9fd2-3b0c85d41cf9",
+        "username": "peso caragsacan",
+        "name": "MARVILYN",
+        "role": "TUPAD_ASSISTING_DOCUMENTOR",
+        "assignedBarangay": "Caragsacan"
+      },
+      "metadata": {
+        "clientTransactionId": "TX-1789945099298-opa3c8f",
+        "entityType": "ATTENDANCE"
+      }
+    },
+    {
+      "id": "d887188d-16d7-49c8-aa93-cbec4341b95b",
+      "timestamp": "2026-09-20T22:58:56.625Z",
+      "action": "ATTENDANCE_SCANNED",
+      "entityType": "ATTENDANCE_RECORD",
+      "entityId": "b026c382-64af-46b2-bfa8-8a9b788c1550",
+      "actor": {
+        "id": "60222617-9b88-4753-9fd2-3b0c85d41cf9",
+        "username": "peso caragsacan",
+        "name": "MARVILYN",
+        "role": "TUPAD_ASSISTING_DOCUMENTOR",
+        "assignedBarangay": "Caragsacan"
+      },
+      "metadata": {
+        "designatedNumber": "122",
+        "workDayNumber": 1,
+        "slotRecorded": "Morning Time-In (AM IN)",
+        "workArea": "Purok 5",
+        "activityName": "De-clogging of canals, creeks, waterways, catch basins, and drainage inlets; removal of silt, mud, plastics, and other obstructions"
+      }
+    },
+    {
+      "id": "9b4c7263-6eca-4e30-966d-a1cea1fad846",
+      "timestamp": "2026-09-20T22:58:58.457Z",
+      "action": "OFFLINE_TRANSACTION_SYNCED",
+      "entityType": "ATTENDANCE",
+      "entityId": null,
+      "actor": {
+        "id": "60222617-9b88-4753-9fd2-3b0c85d41cf9",
+        "username": "peso caragsacan",
+        "name": "MARVILYN",
+        "role": "TUPAD_ASSISTING_DOCUMENTOR",
+        "assignedBarangay": "Caragsacan"
+      },
+      "metadata": {
+        "clientTransactionId": "TX-1789945117203-b9ht0db",
+        "entityType": "ATTENDANCE"
+      }
+    },
+    {
+      "id": "d724164b-255a-4973-8318-ac522681479c",
+      "timestamp": "2026-09-20T22:59:14.414Z",
+      "action": "ATTENDANCE_SCANNED",
+      "entityType": "ATTENDANCE_RECORD",
+      "entityId": "23f7e10e-930b-4b27-bc36-d56346f6ecdd",
+      "actor": {
+        "id": "60222617-9b88-4753-9fd2-3b0c85d41cf9",
+        "username": "peso caragsacan",
+        "name": "MARVILYN",
+        "role": "TUPAD_ASSISTING_DOCUMENTOR",
+        "assignedBarangay": "Caragsacan"
+      },
+      "metadata": {
+        "designatedNumber": "138",
+        "workDayNumber": 1,
+        "slotRecorded": "Morning Time-In (AM IN)",
+        "workArea": "Purok 5",
+        "activityName": "De-clogging of canals, creeks, waterways, catch basins, and drainage inlets; removal of silt, mud, plastics, and other obstructions"
+      }
+    },
+    {
+      "id": "f6ed2741-0053-4c2d-a1e1-5821cce97420",
+      "timestamp": "2026-09-20T22:59:40.904Z",
+      "action": "ATTENDANCE_SCANNED",
+      "entityType": "ATTENDANCE_RECORD",
+      "entityId": "b5ab30a5-5373-4a80-ac17-da760a6a4d9c",
+      "actor": {
+        "id": "60222617-9b88-4753-9fd2-3b0c85d41cf9",
+        "username": "peso caragsacan",
+        "name": "MARVILYN",
+        "role": "TUPAD_ASSISTING_DOCUMENTOR",
+        "assignedBarangay": "Caragsacan"
+      },
+      "metadata": {
+        "designatedNumber": "143",
+        "workDayNumber": 1,
+        "slotRecorded": "Morning Time-In (AM IN)",
+        "workArea": "Purok 5",
+        "activityName": "De-clogging of canals, creeks, waterways, catch basins, and drainage inlets; removal of silt, mud, plastics, and other obstructions"
+      }
+    },
+    {
+      "id": "bcdeb3bb-c71d-4fc7-9d1f-fe1c728808c6",
+      "timestamp": "2026-09-20T23:00:00.459Z",
+      "action": "ATTENDANCE_SCANNED",
+      "entityType": "ATTENDANCE_RECORD",
+      "entityId": "26474e6e-db5b-48bb-857a-8ec5a3806113",
+      "actor": {
+        "id": "60222617-9b88-4753-9fd2-3b0c85d41cf9",
+        "username": "peso caragsacan",
+        "name": "MARVILYN",
+        "role": "TUPAD_ASSISTING_DOCUMENTOR",
+        "assignedBarangay": "Caragsacan"
+      },
+      "metadata": {
+        "designatedNumber": "112",
+        "workDayNumber": 1,
+        "slotRecorded": "Morning Time-In (AM IN)",
+        "workArea": "Purok 5",
+        "activityName": "De-clogging of canals, creeks, waterways, catch basins, and drainage inlets; removal of silt, mud, plastics, and other obstructions"
+      }
+    },
+    {
+      "id": "978008c9-8d77-49ad-b88e-b86e75da7575",
+      "timestamp": "2026-09-20T23:00:10.049Z",
+      "action": "LOGIN_SUCCESS",
+      "entityType": "USER",
+      "entityId": "c9243c56-172f-499e-a3c0-d75395bd9f83",
+      "actor": {
+        "id": "c9243c56-172f-499e-a3c0-d75395bd9f83",
+        "username": "peso_paltic",
+        "name": "RAMONITA",
+        "role": "TUPAD_COORDINATOR",
+        "assignedBarangay": "Paltic"
+      },
+      "metadata": null
+    },
+    {
+      "id": "df1857e4-8540-4fb6-ba6f-40ae9c5b08ef",
+      "timestamp": "2026-09-20T23:00:16.603Z",
+      "action": "LOGOUT",
+      "entityType": "USER",
+      "entityId": "c9243c56-172f-499e-a3c0-d75395bd9f83",
+      "actor": {
+        "id": "c9243c56-172f-499e-a3c0-d75395bd9f83",
+        "username": "peso_paltic",
+        "name": "RAMONITA",
+        "role": "TUPAD_COORDINATOR",
+        "assignedBarangay": "Paltic"
+      },
+      "metadata": null
+    },
+    {
+      "id": "c4631fe4-66c6-49c1-b8b2-d79bb419632d",
+      "timestamp": "2026-09-20T23:00:21.438Z",
+      "action": "LOGOUT",
+      "entityType": "USER",
+      "entityId": "c9243c56-172f-499e-a3c0-d75395bd9f83",
+      "actor": {
+        "id": "c9243c56-172f-499e-a3c0-d75395bd9f83",
+        "username": "peso_paltic",
+        "name": "RAMONITA",
+        "role": "TUPAD_COORDINATOR",
+        "assignedBarangay": "Paltic"
+      },
+      "metadata": null
+    },
+    {
+      "id": "d19e1ed0-e7e4-4200-bc0a-cacc1f911c91",
+      "timestamp": "2026-09-20T23:00:22.652Z",
+      "action": "LOGOUT",
+      "entityType": "USER",
+      "entityId": "c9243c56-172f-499e-a3c0-d75395bd9f83",
+      "actor": {
+        "id": "c9243c56-172f-499e-a3c0-d75395bd9f83",
+        "username": "peso_paltic",
+        "name": "RAMONITA",
+        "role": "TUPAD_COORDINATOR",
+        "assignedBarangay": "Paltic"
+      },
+      "metadata": null
+    },
+    {
+      "id": "9e4d109a-037b-45c0-b4d1-dcaf840f83d6",
+      "timestamp": "2026-09-20T23:00:33.322Z",
+      "action": "ATTENDANCE_SCANNED",
+      "entityType": "ATTENDANCE_RECORD",
+      "entityId": "0093e302-6366-4d77-8377-7c212fc2935a",
+      "actor": {
+        "id": "60222617-9b88-4753-9fd2-3b0c85d41cf9",
+        "username": "peso caragsacan",
+        "name": "MARVILYN",
+        "role": "TUPAD_ASSISTING_DOCUMENTOR",
+        "assignedBarangay": "Caragsacan"
+      },
+      "metadata": {
+        "designatedNumber": "74",
+        "workDayNumber": 1,
+        "slotRecorded": "Morning Time-In (AM IN)",
+        "workArea": "Purok 5",
+        "activityName": "De-clogging of canals, creeks, waterways, catch basins, and drainage inlets; removal of silt, mud, plastics, and other obstructions"
+      }
+    },
+    {
+      "id": "01497c74-b935-4713-9ee9-83f1b5386b89",
+      "timestamp": "2026-09-20T23:00:47.976Z",
+      "action": "ATTENDANCE_SCANNED",
+      "entityType": "ATTENDANCE_RECORD",
+      "entityId": "083bd65f-56df-4115-9b20-852026e16ff4",
+      "actor": {
+        "id": "60222617-9b88-4753-9fd2-3b0c85d41cf9",
+        "username": "peso caragsacan",
+        "name": "MARVILYN",
+        "role": "TUPAD_ASSISTING_DOCUMENTOR",
+        "assignedBarangay": "Caragsacan"
+      },
+      "metadata": {
+        "designatedNumber": "97",
+        "workDayNumber": 1,
+        "slotRecorded": "Morning Time-In (AM IN)",
+        "workArea": "Purok 5",
+        "activityName": "De-clogging of canals, creeks, waterways, catch basins, and drainage inlets; removal of silt, mud, plastics, and other obstructions"
+      }
+    },
+    {
+      "id": "7d5351c8-4d02-4787-b711-bfb9054058cc",
+      "timestamp": "2026-09-20T23:00:57.124Z",
+      "action": "ATTENDANCE_SCANNED",
+      "entityType": "ATTENDANCE_RECORD",
+      "entityId": "c5bdbf52-9c27-4a86-ba5a-06ff9a1b8492",
+      "actor": {
+        "id": "60222617-9b88-4753-9fd2-3b0c85d41cf9",
+        "username": "peso caragsacan",
+        "name": "MARVILYN",
+        "role": "TUPAD_ASSISTING_DOCUMENTOR",
+        "assignedBarangay": "Caragsacan"
+      },
+      "metadata": {
+        "designatedNumber": "144",
+        "workDayNumber": 1,
+        "slotRecorded": "Morning Time-In (AM IN)",
+        "workArea": "Purok 5",
+        "activityName": "De-clogging of canals, creeks, waterways, catch basins, and drainage inlets; removal of silt, mud, plastics, and other obstructions"
+      }
+    },
+    {
+      "id": "d727b5fe-02d4-4b76-ae35-009658f13e94",
+      "timestamp": "2026-09-20T23:01:12.365Z",
+      "action": "ATTENDANCE_SCANNED",
+      "entityType": "ATTENDANCE_RECORD",
+      "entityId": "1f6ce775-a748-4560-a610-7527f0dc837c",
+      "actor": {
+        "id": "60222617-9b88-4753-9fd2-3b0c85d41cf9",
+        "username": "peso caragsacan",
+        "name": "MARVILYN",
+        "role": "TUPAD_ASSISTING_DOCUMENTOR",
+        "assignedBarangay": "Caragsacan"
+      },
+      "metadata": {
+        "designatedNumber": "133",
+        "workDayNumber": 1,
+        "slotRecorded": "Morning Time-In (AM IN)",
+        "workArea": "Purok 5",
+        "activityName": "De-clogging of canals, creeks, waterways, catch basins, and drainage inlets; removal of silt, mud, plastics, and other obstructions"
+      }
+    },
+    {
+      "id": "f1726746-86b1-4e81-bed1-48fff3c61610",
+      "timestamp": "2026-09-20T23:03:20.765Z",
+      "action": "ATTENDANCE_SCANNED",
+      "entityType": "ATTENDANCE_RECORD",
+      "entityId": "3db3dbf6-2445-4fa1-abd8-4ec038ba6ecf",
+      "actor": {
+        "id": "60222617-9b88-4753-9fd2-3b0c85d41cf9",
+        "username": "peso caragsacan",
+        "name": "MARVILYN",
+        "role": "TUPAD_ASSISTING_DOCUMENTOR",
+        "assignedBarangay": "Caragsacan"
+      },
+      "metadata": {
+        "designatedNumber": "95",
+        "workDayNumber": 1,
+        "slotRecorded": "Morning Time-In (AM IN)",
+        "workArea": "Purok 5",
+        "activityName": "De-clogging of canals, creeks, waterways, catch basins, and drainage inlets; removal of silt, mud, plastics, and other obstructions"
+      }
+    },
+    {
+      "id": "4925fd4c-46f7-46ea-a55f-f8d185abbeba",
+      "timestamp": "2026-09-20T23:03:42.780Z",
+      "action": "ATTENDANCE_SCANNED",
+      "entityType": "ATTENDANCE_RECORD",
+      "entityId": "0e906b09-c0f0-43d5-8716-587e6942b6ee",
+      "actor": {
+        "id": "60222617-9b88-4753-9fd2-3b0c85d41cf9",
+        "username": "peso caragsacan",
+        "name": "MARVILYN",
+        "role": "TUPAD_ASSISTING_DOCUMENTOR",
+        "assignedBarangay": "Caragsacan"
+      },
+      "metadata": {
+        "designatedNumber": "70",
+        "workDayNumber": 1,
+        "slotRecorded": "Morning Time-In (AM IN)",
+        "workArea": "Purok 5",
+        "activityName": "De-clogging of canals, creeks, waterways, catch basins, and drainage inlets; removal of silt, mud, plastics, and other obstructions"
+      }
+    },
+    {
+      "id": "48b240f3-ad35-4e24-a502-e5145fc9aaa2",
+      "timestamp": "2026-09-20T23:03:58.969Z",
+      "action": "ATTENDANCE_SCANNED",
+      "entityType": "ATTENDANCE_RECORD",
+      "entityId": "e3b6a8c8-8892-47ba-8186-4ac5e161a527",
+      "actor": {
+        "id": "60222617-9b88-4753-9fd2-3b0c85d41cf9",
+        "username": "peso caragsacan",
+        "name": "MARVILYN",
+        "role": "TUPAD_ASSISTING_DOCUMENTOR",
+        "assignedBarangay": "Caragsacan"
+      },
+      "metadata": {
+        "designatedNumber": "126",
+        "workDayNumber": 1,
+        "slotRecorded": "Morning Time-In (AM IN)",
+        "workArea": "Purok 5",
+        "activityName": "De-clogging of canals, creeks, waterways, catch basins, and drainage inlets; removal of silt, mud, plastics, and other obstructions"
+      }
+    },
+    {
+      "id": "b9ecd60a-b789-480f-800e-216defaf9048",
+      "timestamp": "2026-09-20T23:04:13.263Z",
+      "action": "ATTENDANCE_SCANNED",
+      "entityType": "ATTENDANCE_RECORD",
+      "entityId": "2c6ec026-daaf-42ee-b885-810165b40197",
+      "actor": {
+        "id": "60222617-9b88-4753-9fd2-3b0c85d41cf9",
+        "username": "peso caragsacan",
+        "name": "MARVILYN",
+        "role": "TUPAD_ASSISTING_DOCUMENTOR",
+        "assignedBarangay": "Caragsacan"
+      },
+      "metadata": {
+        "designatedNumber": "87",
+        "workDayNumber": 1,
+        "slotRecorded": "Morning Time-In (AM IN)",
+        "workArea": "Purok 5",
+        "activityName": "De-clogging of canals, creeks, waterways, catch basins, and drainage inlets; removal of silt, mud, plastics, and other obstructions"
+      }
+    },
+    {
+      "id": "b62b40bc-9d8e-44a0-855b-2b85cd1247fb",
+      "timestamp": "2026-09-20T23:04:23.453Z",
+      "action": "ATTENDANCE_SCANNED",
+      "entityType": "ATTENDANCE_RECORD",
+      "entityId": "e1204be7-ddcd-47bb-889c-cb393a2c4c99",
+      "actor": {
+        "id": "60222617-9b88-4753-9fd2-3b0c85d41cf9",
+        "username": "peso caragsacan",
+        "name": "MARVILYN",
+        "role": "TUPAD_ASSISTING_DOCUMENTOR",
+        "assignedBarangay": "Caragsacan"
+      },
+      "metadata": {
+        "designatedNumber": "110",
+        "workDayNumber": 1,
+        "slotRecorded": "Morning Time-In (AM IN)",
+        "workArea": "Purok 1 Phase 1",
+        "activityName": "Community Gardening ( Weeding, Land preparation)"
+      }
+    },
+    {
+      "id": "d5d7cad0-2fc4-4074-912f-01a52d56d803",
+      "timestamp": "2026-09-20T23:04:43.818Z",
+      "action": "ATTENDANCE_SCANNED",
+      "entityType": "ATTENDANCE_RECORD",
+      "entityId": "d72539a6-c67d-49ff-b7a0-1084af900e59",
+      "actor": {
+        "id": "60222617-9b88-4753-9fd2-3b0c85d41cf9",
+        "username": "peso caragsacan",
+        "name": "MARVILYN",
+        "role": "TUPAD_ASSISTING_DOCUMENTOR",
+        "assignedBarangay": "Caragsacan"
+      },
+      "metadata": {
+        "designatedNumber": "75",
+        "workDayNumber": 1,
+        "slotRecorded": "Morning Time-In (AM IN)",
+        "workArea": "Purok 5",
+        "activityName": "De-clogging of canals, creeks, waterways, catch basins, and drainage inlets; removal of silt, mud, plastics, and other obstructions"
+      }
+    },
+    {
+      "id": "8897031a-9702-4cd6-bb1a-928c47eb085c",
+      "timestamp": "2026-09-20T23:04:47.286Z",
+      "action": "OFFLINE_TRANSACTION_SYNCED",
+      "entityType": "ATTENDANCE",
+      "entityId": null,
+      "actor": {
+        "id": "60222617-9b88-4753-9fd2-3b0c85d41cf9",
+        "username": "peso caragsacan",
+        "name": "MARVILYN",
+        "role": "TUPAD_ASSISTING_DOCUMENTOR",
+        "assignedBarangay": "Caragsacan"
+      },
+      "metadata": {
+        "clientTransactionId": "TX-1789945471071-ux9zebn",
+        "entityType": "ATTENDANCE"
+      }
+    },
+    {
+      "id": "21412802-164d-474f-89c3-85496078635f",
+      "timestamp": "2026-09-20T23:04:54.816Z",
+      "action": "ATTENDANCE_SCANNED",
+      "entityType": "ATTENDANCE_RECORD",
+      "entityId": "17a4ab07-604e-469f-88ca-8346fdc8701f",
+      "actor": {
+        "id": "60222617-9b88-4753-9fd2-3b0c85d41cf9",
+        "username": "peso caragsacan",
+        "name": "MARVILYN",
+        "role": "TUPAD_ASSISTING_DOCUMENTOR",
+        "assignedBarangay": "Caragsacan"
+      },
+      "metadata": {
+        "designatedNumber": "94",
+        "workDayNumber": 1,
+        "slotRecorded": "Morning Time-In (AM IN)",
+        "workArea": "Purok 5",
+        "activityName": "De-clogging of canals, creeks, waterways, catch basins, and drainage inlets; removal of silt, mud, plastics, and other obstructions"
+      }
+    },
+    {
+      "id": "aea007c8-fdc8-4b4b-bbd0-972924f1c15d",
+      "timestamp": "2026-09-20T23:05:03.056Z",
+      "action": "ATTENDANCE_SCANNED",
+      "entityType": "ATTENDANCE_RECORD",
+      "entityId": "25dbaa5b-646c-4c96-aad8-93d57f983c78",
+      "actor": {
+        "id": "60222617-9b88-4753-9fd2-3b0c85d41cf9",
+        "username": "peso caragsacan",
+        "name": "MARVILYN",
+        "role": "TUPAD_ASSISTING_DOCUMENTOR",
+        "assignedBarangay": "Caragsacan"
+      },
+      "metadata": {
+        "designatedNumber": "136",
+        "workDayNumber": 1,
+        "slotRecorded": "Morning Time-In (AM IN)",
+        "workArea": "Purok 5",
+        "activityName": "De-clogging of canals, creeks, waterways, catch basins, and drainage inlets; removal of silt, mud, plastics, and other obstructions"
+      }
+    },
+    {
+      "id": "9076666f-efcc-4a84-96ec-c7327cb2d43b",
+      "timestamp": "2026-09-20T23:05:17.807Z",
+      "action": "ATTENDANCE_SCANNED",
+      "entityType": "ATTENDANCE_RECORD",
+      "entityId": "a66df542-31dc-49c2-a619-476eff3c1a8d",
+      "actor": {
+        "id": "60222617-9b88-4753-9fd2-3b0c85d41cf9",
+        "username": "peso caragsacan",
+        "name": "MARVILYN",
+        "role": "TUPAD_ASSISTING_DOCUMENTOR",
+        "assignedBarangay": "Caragsacan"
+      },
+      "metadata": {
+        "designatedNumber": "120",
+        "workDayNumber": 1,
+        "slotRecorded": "Morning Time-In (AM IN)",
+        "workArea": "Purok 5",
+        "activityName": "De-clogging of canals, creeks, waterways, catch basins, and drainage inlets; removal of silt, mud, plastics, and other obstructions"
+      }
+    },
+    {
+      "id": "b68363f3-fe53-4cc6-aa4f-f380f9d722c1",
+      "timestamp": "2026-09-20T23:05:27.087Z",
+      "action": "ATTENDANCE_SCANNED",
+      "entityType": "ATTENDANCE_RECORD",
+      "entityId": "9048d9de-2aa2-4fe7-94f2-e59875ad63e2",
+      "actor": {
+        "id": "60222617-9b88-4753-9fd2-3b0c85d41cf9",
+        "username": "peso caragsacan",
+        "name": "MARVILYN",
+        "role": "TUPAD_ASSISTING_DOCUMENTOR",
+        "assignedBarangay": "Caragsacan"
+      },
+      "metadata": {
+        "designatedNumber": "141",
+        "workDayNumber": 1,
+        "slotRecorded": "Morning Time-In (AM IN)",
+        "workArea": "Purok 1 Phase 1",
+        "activityName": "Community Gardening ( Weeding, Land preparation)"
+      }
+    },
+    {
+      "id": "61a0ad19-bea5-41f6-8744-dfa348f727c9",
+      "timestamp": "2026-09-20T23:05:39.942Z",
+      "action": "ATTENDANCE_SCANNED",
+      "entityType": "ATTENDANCE_RECORD",
+      "entityId": "0515ef08-20f3-43e9-b679-833cc8b2b02a",
+      "actor": {
+        "id": "60222617-9b88-4753-9fd2-3b0c85d41cf9",
+        "username": "peso caragsacan",
+        "name": "MARVILYN",
+        "role": "TUPAD_ASSISTING_DOCUMENTOR",
+        "assignedBarangay": "Caragsacan"
+      },
+      "metadata": {
+        "designatedNumber": "96",
+        "workDayNumber": 1,
+        "slotRecorded": "Morning Time-In (AM IN)",
+        "workArea": "Purok 5",
+        "activityName": "De-clogging of canals, creeks, waterways, catch basins, and drainage inlets; removal of silt, mud, plastics, and other obstructions"
+      }
+    },
+    {
+      "id": "3e27464c-5e21-4b7a-9cce-f778a1c0a895",
+      "timestamp": "2026-09-20T23:05:55.497Z",
+      "action": "ATTENDANCE_SCANNED",
+      "entityType": "ATTENDANCE_RECORD",
+      "entityId": "09208215-5ebf-455a-b7f5-b2496273f16a",
+      "actor": {
+        "id": "60222617-9b88-4753-9fd2-3b0c85d41cf9",
+        "username": "peso caragsacan",
+        "name": "MARVILYN",
+        "role": "TUPAD_ASSISTING_DOCUMENTOR",
+        "assignedBarangay": "Caragsacan"
+      },
+      "metadata": {
+        "designatedNumber": "100",
+        "workDayNumber": 1,
+        "slotRecorded": "Morning Time-In (AM IN)",
+        "workArea": "Purok 5",
+        "activityName": "De-clogging of canals, creeks, waterways, catch basins, and drainage inlets; removal of silt, mud, plastics, and other obstructions"
+      }
+    },
+    {
+      "id": "f5324627-58d2-4ee5-a8b5-2fdd706092a8",
+      "timestamp": "2026-09-20T23:06:04.199Z",
+      "action": "ATTENDANCE_SCANNED",
+      "entityType": "ATTENDANCE_RECORD",
+      "entityId": "eca1d0e7-0282-484e-8841-b1b0264961ce",
+      "actor": {
+        "id": "60222617-9b88-4753-9fd2-3b0c85d41cf9",
+        "username": "peso caragsacan",
+        "name": "MARVILYN",
+        "role": "TUPAD_ASSISTING_DOCUMENTOR",
+        "assignedBarangay": "Caragsacan"
+      },
+      "metadata": {
+        "designatedNumber": "102",
+        "workDayNumber": 1,
+        "slotRecorded": "Morning Time-In (AM IN)",
+        "workArea": "Purok 5",
+        "activityName": "De-clogging of canals, creeks, waterways, catch basins, and drainage inlets; removal of silt, mud, plastics, and other obstructions"
+      }
+    },
+    {
+      "id": "ff0cd992-274b-4b35-95ae-ede1129a64c3",
+      "timestamp": "2026-09-20T23:06:32.575Z",
+      "action": "ATTENDANCE_SCANNED",
+      "entityType": "ATTENDANCE_RECORD",
+      "entityId": "e92c3c75-c254-47a2-a5ce-ea8804fb7bbf",
+      "actor": {
+        "id": "60222617-9b88-4753-9fd2-3b0c85d41cf9",
+        "username": "peso caragsacan",
+        "name": "MARVILYN",
+        "role": "TUPAD_ASSISTING_DOCUMENTOR",
+        "assignedBarangay": "Caragsacan"
+      },
+      "metadata": {
+        "designatedNumber": "92",
+        "workDayNumber": 1,
+        "slotRecorded": "Morning Time-In (AM IN)",
+        "workArea": "Purok 5",
+        "activityName": "De-clogging of canals, creeks, waterways, catch basins, and drainage inlets; removal of silt, mud, plastics, and other obstructions"
+      }
+    },
+    {
+      "id": "c0d53806-16f6-4773-aa1b-db0c3709439f",
+      "timestamp": "2026-09-20T23:06:40.274Z",
+      "action": "OFFLINE_TRANSACTION_SYNCED",
+      "entityType": "ATTENDANCE",
+      "entityId": null,
+      "actor": {
+        "id": "60222617-9b88-4753-9fd2-3b0c85d41cf9",
+        "username": "peso caragsacan",
+        "name": "MARVILYN",
+        "role": "TUPAD_ASSISTING_DOCUMENTOR",
+        "assignedBarangay": "Caragsacan"
+      },
+      "metadata": {
+        "clientTransactionId": "TX-1789945576842-3xus6k3",
+        "entityType": "ATTENDANCE"
+      }
+    },
+    {
+      "id": "2169ab7a-3047-4c7c-9191-1fc8dc115c7e",
+      "timestamp": "2026-09-20T23:07:04.356Z",
+      "action": "ATTENDANCE_SCANNED",
+      "entityType": "ATTENDANCE_RECORD",
+      "entityId": "8c12450f-021d-48af-8e46-f25598fe8f39",
+      "actor": {
+        "id": "60222617-9b88-4753-9fd2-3b0c85d41cf9",
+        "username": "peso caragsacan",
+        "name": "MARVILYN",
+        "role": "TUPAD_ASSISTING_DOCUMENTOR",
+        "assignedBarangay": "Caragsacan"
+      },
+      "metadata": {
+        "designatedNumber": "79",
+        "workDayNumber": 1,
+        "slotRecorded": "Morning Time-In (AM IN)",
+        "workArea": "Purok 5",
+        "activityName": "De-clogging of canals, creeks, waterways, catch basins, and drainage inlets; removal of silt, mud, plastics, and other obstructions"
+      }
+    },
+    {
+      "id": "ec014b88-51e0-45eb-afe4-33863b742fe3",
+      "timestamp": "2026-09-20T23:07:13.635Z",
+      "action": "ATTENDANCE_SCANNED",
+      "entityType": "ATTENDANCE_RECORD",
+      "entityId": "655ce706-5064-4884-a4ca-00ad05e483b3",
+      "actor": {
+        "id": "60222617-9b88-4753-9fd2-3b0c85d41cf9",
+        "username": "peso caragsacan",
+        "name": "MARVILYN",
+        "role": "TUPAD_ASSISTING_DOCUMENTOR",
+        "assignedBarangay": "Caragsacan"
+      },
+      "metadata": {
+        "designatedNumber": "111",
+        "workDayNumber": 1,
+        "slotRecorded": "Morning Time-In (AM IN)",
+        "workArea": "Purok 1 Phase 1",
+        "activityName": "Community Gardening ( Weeding, Land preparation)"
+      }
+    },
+    {
+      "id": "ed3ab56f-292f-4d78-b3d1-b7f10053a625",
+      "timestamp": "2026-09-20T23:07:25.508Z",
+      "action": "ATTENDANCE_SCANNED",
+      "entityType": "ATTENDANCE_RECORD",
+      "entityId": "af2b7d4a-8f3e-4f25-b43e-214bcad56ed7",
+      "actor": {
+        "id": "60222617-9b88-4753-9fd2-3b0c85d41cf9",
+        "username": "peso caragsacan",
+        "name": "MARVILYN",
+        "role": "TUPAD_ASSISTING_DOCUMENTOR",
+        "assignedBarangay": "Caragsacan"
+      },
+      "metadata": {
+        "designatedNumber": "360",
+        "workDayNumber": 1,
+        "slotRecorded": "Morning Time-In (AM IN)",
+        "workArea": "Purok Mulawin to Ipil-ipil",
+        "activityName": "De-clogging of canals, creeks, waterways, catch basins, and drainage inlets; removal of silt, mud, plastics, and other obstructions"
+      }
+    },
+    {
+      "id": "cbb7a181-0971-421a-b18c-0640bcd934da",
+      "timestamp": "2026-09-20T23:07:35.326Z",
+      "action": "ATTENDANCE_SCANNED",
+      "entityType": "ATTENDANCE_RECORD",
+      "entityId": "16d9142a-5452-43aa-8fd6-044aa566d0b8",
+      "actor": {
+        "id": "60222617-9b88-4753-9fd2-3b0c85d41cf9",
+        "username": "peso caragsacan",
+        "name": "MARVILYN",
+        "role": "TUPAD_ASSISTING_DOCUMENTOR",
+        "assignedBarangay": "Caragsacan"
+      },
+      "metadata": {
+        "designatedNumber": "295",
+        "workDayNumber": 1,
+        "slotRecorded": "Morning Time-In (AM IN)",
+        "workArea": "Purok Mulawin to Ipil-ipil",
+        "activityName": "De-clogging of canals, creeks, waterways, catch basins, and drainage inlets; removal of silt, mud, plastics, and other obstructions"
+      }
+    },
+    {
+      "id": "82696108-7daa-47f1-a17f-554fead1b2b1",
+      "timestamp": "2026-09-20T23:08:15.535Z",
+      "action": "ATTENDANCE_SCANNED",
+      "entityType": "ATTENDANCE_RECORD",
+      "entityId": "26585f51-db1e-4a33-96b0-e96b4ac62d39",
+      "actor": {
+        "id": "60222617-9b88-4753-9fd2-3b0c85d41cf9",
+        "username": "peso caragsacan",
+        "name": "MARVILYN",
+        "role": "TUPAD_ASSISTING_DOCUMENTOR",
+        "assignedBarangay": "Caragsacan"
+      },
+      "metadata": {
+        "designatedNumber": "135",
+        "workDayNumber": 1,
+        "slotRecorded": "Morning Time-In (AM IN)",
+        "workArea": "Purok 5",
+        "activityName": "De-clogging of canals, creeks, waterways, catch basins, and drainage inlets; removal of silt, mud, plastics, and other obstructions"
+      }
+    },
+    {
+      "id": "2cd36846-0615-42c9-a367-b6856d141614",
+      "timestamp": "2026-09-20T23:08:26.877Z",
+      "action": "ATTENDANCE_SCANNED",
+      "entityType": "ATTENDANCE_RECORD",
+      "entityId": "b13c72a5-19b8-44b8-a628-cff8a7ee321d",
+      "actor": {
+        "id": "60222617-9b88-4753-9fd2-3b0c85d41cf9",
+        "username": "peso caragsacan",
+        "name": "MARVILYN",
+        "role": "TUPAD_ASSISTING_DOCUMENTOR",
+        "assignedBarangay": "Caragsacan"
+      },
+      "metadata": {
+        "designatedNumber": "98",
+        "workDayNumber": 1,
+        "slotRecorded": "Morning Time-In (AM IN)",
+        "workArea": "Purok 5",
+        "activityName": "De-clogging of canals, creeks, waterways, catch basins, and drainage inlets; removal of silt, mud, plastics, and other obstructions"
+      }
+    },
+    {
+      "id": "2ff2c8fc-18fa-465f-807e-514e37555907",
+      "timestamp": "2026-09-20T23:08:40.433Z",
+      "action": "ATTENDANCE_SCANNED",
+      "entityType": "ATTENDANCE_RECORD",
+      "entityId": "4a6cc6ab-c617-4d35-9211-b118e676498c",
+      "actor": {
+        "id": "60222617-9b88-4753-9fd2-3b0c85d41cf9",
+        "username": "peso caragsacan",
+        "name": "MARVILYN",
+        "role": "TUPAD_ASSISTING_DOCUMENTOR",
+        "assignedBarangay": "Caragsacan"
+      },
+      "metadata": {
+        "designatedNumber": "114",
+        "workDayNumber": 1,
+        "slotRecorded": "Morning Time-In (AM IN)",
+        "workArea": "Purok 5",
+        "activityName": "De-clogging of canals, creeks, waterways, catch basins, and drainage inlets; removal of silt, mud, plastics, and other obstructions"
+      }
+    },
+    {
+      "id": "0fa7a19b-e4ed-45af-b826-c00ef2675735",
+      "timestamp": "2026-09-20T23:08:52.464Z",
+      "action": "ATTENDANCE_SCANNED",
+      "entityType": "ATTENDANCE_RECORD",
+      "entityId": "2e1a60f7-9f9b-442b-b104-7a7b590127b3",
+      "actor": {
+        "id": "60222617-9b88-4753-9fd2-3b0c85d41cf9",
+        "username": "peso caragsacan",
+        "name": "MARVILYN",
+        "role": "TUPAD_ASSISTING_DOCUMENTOR",
+        "assignedBarangay": "Caragsacan"
+      },
+      "metadata": {
+        "designatedNumber": "121",
+        "workDayNumber": 1,
+        "slotRecorded": "Morning Time-In (AM IN)",
+        "workArea": "Purok 5",
+        "activityName": "De-clogging of canals, creeks, waterways, catch basins, and drainage inlets; removal of silt, mud, plastics, and other obstructions"
+      }
+    },
+    {
+      "id": "d4656d62-4b0a-4592-a512-0c12120447ca",
+      "timestamp": "2026-09-20T23:09:25.412Z",
+      "action": "ATTENDANCE_SCANNED",
+      "entityType": "ATTENDANCE_RECORD",
+      "entityId": "0aaaa05f-5e46-4923-8fd4-724af80fb15b",
+      "actor": {
+        "id": "60222617-9b88-4753-9fd2-3b0c85d41cf9",
+        "username": "peso caragsacan",
+        "name": "MARVILYN",
+        "role": "TUPAD_ASSISTING_DOCUMENTOR",
+        "assignedBarangay": "Caragsacan"
+      },
+      "metadata": {
+        "designatedNumber": "150",
+        "workDayNumber": 1,
+        "slotRecorded": "Morning Time-In (AM IN)",
+        "workArea": "Purok 1 Phase 1",
+        "activityName": "Community Gardening ( Weeding, Land preparation)"
+      }
+    },
+    {
+      "id": "66f5a694-fbc3-43eb-a318-ad2117ee7990",
+      "timestamp": "2026-09-20T23:10:11.806Z",
+      "action": "ATTENDANCE_SCANNED",
+      "entityType": "ATTENDANCE_RECORD",
+      "entityId": "22373bd2-a63a-4657-a6dd-8b96c87c9038",
+      "actor": {
+        "id": "60222617-9b88-4753-9fd2-3b0c85d41cf9",
+        "username": "peso caragsacan",
+        "name": "MARVILYN",
+        "role": "TUPAD_ASSISTING_DOCUMENTOR",
+        "assignedBarangay": "Caragsacan"
+      },
+      "metadata": {
+        "designatedNumber": "89",
+        "workDayNumber": 1,
+        "slotRecorded": "Morning Time-In (AM IN)",
+        "workArea": "Purok 1 Phase 1",
+        "activityName": "Community Gardening ( Weeding, Land preparation)"
+      }
+    },
+    {
+      "id": "bbbd225e-b828-46a5-8d15-9afdc498b83b",
+      "timestamp": "2026-09-20T23:10:22.001Z",
+      "action": "ATTENDANCE_SCANNED",
+      "entityType": "ATTENDANCE_RECORD",
+      "entityId": "547135fe-74ef-4d85-a156-5943d0d508a0",
+      "actor": {
+        "id": "60222617-9b88-4753-9fd2-3b0c85d41cf9",
+        "username": "peso caragsacan",
+        "name": "MARVILYN",
+        "role": "TUPAD_ASSISTING_DOCUMENTOR",
+        "assignedBarangay": "Caragsacan"
+      },
+      "metadata": {
+        "designatedNumber": "82",
+        "workDayNumber": 1,
+        "slotRecorded": "Morning Time-In (AM IN)",
+        "workArea": "Purok 5",
+        "activityName": "De-clogging of canals, creeks, waterways, catch basins, and drainage inlets; removal of silt, mud, plastics, and other obstructions"
+      }
+    },
+    {
+      "id": "b0ce5ccc-9ca3-4389-aa23-dfec0eb01542",
+      "timestamp": "2026-09-20T23:11:10.982Z",
+      "action": "ATTENDANCE_SCANNED",
+      "entityType": "ATTENDANCE_RECORD",
+      "entityId": "a1c6e856-72e7-4af6-b205-f78fe2e6ed23",
+      "actor": {
+        "id": "60222617-9b88-4753-9fd2-3b0c85d41cf9",
+        "username": "peso caragsacan",
+        "name": "MARVILYN",
+        "role": "TUPAD_ASSISTING_DOCUMENTOR",
+        "assignedBarangay": "Caragsacan"
+      },
+      "metadata": {
+        "designatedNumber": "78",
+        "workDayNumber": 1,
+        "slotRecorded": "Morning Time-In (AM IN)",
+        "workArea": "Purok 5",
+        "activityName": "De-clogging of canals, creeks, waterways, catch basins, and drainage inlets; removal of silt, mud, plastics, and other obstructions"
+      }
+    },
+    {
+      "id": "6fd43222-4853-46d9-85c0-6d1b8a086073",
+      "timestamp": "2026-09-20T23:12:34.342Z",
+      "action": "ATTENDANCE_SCANNED",
+      "entityType": "ATTENDANCE_RECORD",
+      "entityId": "832f7e5a-d415-413e-990a-d9888328fe40",
+      "actor": {
+        "id": "60222617-9b88-4753-9fd2-3b0c85d41cf9",
+        "username": "peso caragsacan",
+        "name": "MARVILYN",
+        "role": "TUPAD_ASSISTING_DOCUMENTOR",
+        "assignedBarangay": "Caragsacan"
+      },
+      "metadata": {
+        "designatedNumber": "124",
+        "workDayNumber": 1,
+        "slotRecorded": "Morning Time-In (AM IN)",
+        "workArea": "Purok 5",
+        "activityName": "De-clogging of canals, creeks, waterways, catch basins, and drainage inlets; removal of silt, mud, plastics, and other obstructions"
+      }
+    },
+    {
+      "id": "e8e348e0-22e7-405d-87a5-4b8a61a66a4f",
+      "timestamp": "2026-09-20T23:12:49.659Z",
+      "action": "ATTENDANCE_SCANNED",
+      "entityType": "ATTENDANCE_RECORD",
+      "entityId": "5a35d4da-6369-432d-ac61-fdbc331a44cd",
+      "actor": {
+        "id": "60222617-9b88-4753-9fd2-3b0c85d41cf9",
+        "username": "peso caragsacan",
+        "name": "MARVILYN",
+        "role": "TUPAD_ASSISTING_DOCUMENTOR",
+        "assignedBarangay": "Caragsacan"
+      },
+      "metadata": {
+        "designatedNumber": "116",
+        "workDayNumber": 1,
+        "slotRecorded": "Morning Time-In (AM IN)",
+        "workArea": "Purok 5",
+        "activityName": "De-clogging of canals, creeks, waterways, catch basins, and drainage inlets; removal of silt, mud, plastics, and other obstructions"
+      }
+    },
+    {
+      "id": "f9677025-e3d3-41ef-ade0-a78989a41844",
+      "timestamp": "2026-09-20T23:12:57.950Z",
+      "action": "ATTENDANCE_SCANNED",
+      "entityType": "ATTENDANCE_RECORD",
+      "entityId": "8f701cf4-ef6b-4fc0-9ec8-294d3e3abe97",
+      "actor": {
+        "id": "60222617-9b88-4753-9fd2-3b0c85d41cf9",
+        "username": "peso caragsacan",
+        "name": "MARVILYN",
+        "role": "TUPAD_ASSISTING_DOCUMENTOR",
+        "assignedBarangay": "Caragsacan"
+      },
+      "metadata": {
+        "designatedNumber": "148",
+        "workDayNumber": 1,
+        "slotRecorded": "Morning Time-In (AM IN)",
+        "workArea": "Purok 5",
+        "activityName": "De-clogging of canals, creeks, waterways, catch basins, and drainage inlets; removal of silt, mud, plastics, and other obstructions"
+      }
+    },
+    {
+      "id": "a93ccb9b-1bfd-427b-82de-c5994e04b012",
+      "timestamp": "2026-09-20T23:13:10.134Z",
+      "action": "ATTENDANCE_SCANNED",
+      "entityType": "ATTENDANCE_RECORD",
+      "entityId": "c2d7b711-0f14-48c0-a78c-b78708bd406e",
+      "actor": {
+        "id": "60222617-9b88-4753-9fd2-3b0c85d41cf9",
+        "username": "peso caragsacan",
+        "name": "MARVILYN",
+        "role": "TUPAD_ASSISTING_DOCUMENTOR",
+        "assignedBarangay": "Caragsacan"
+      },
+      "metadata": {
+        "designatedNumber": "71",
+        "workDayNumber": 1,
+        "slotRecorded": "Morning Time-In (AM IN)",
+        "workArea": "Purok 5",
+        "activityName": "De-clogging of canals, creeks, waterways, catch basins, and drainage inlets; removal of silt, mud, plastics, and other obstructions"
+      }
+    },
+    {
+      "id": "dea01b8d-b57b-4dbc-bf30-5a95d20aef5a",
+      "timestamp": "2026-09-20T23:13:18.963Z",
+      "action": "ATTENDANCE_SCANNED",
+      "entityType": "ATTENDANCE_RECORD",
+      "entityId": "43155f91-7d23-434e-a1d1-9eee8dac230e",
+      "actor": {
+        "id": "60222617-9b88-4753-9fd2-3b0c85d41cf9",
+        "username": "peso caragsacan",
+        "name": "MARVILYN",
+        "role": "TUPAD_ASSISTING_DOCUMENTOR",
+        "assignedBarangay": "Caragsacan"
+      },
+      "metadata": {
+        "designatedNumber": "106",
+        "workDayNumber": 1,
+        "slotRecorded": "Morning Time-In (AM IN)",
+        "workArea": "Purok 5",
+        "activityName": "De-clogging of canals, creeks, waterways, catch basins, and drainage inlets; removal of silt, mud, plastics, and other obstructions"
+      }
+    },
+    {
+      "id": "92f0919d-bf96-4189-ab46-f3d6a217043a",
+      "timestamp": "2026-09-20T23:13:38.556Z",
+      "action": "ATTENDANCE_SCANNED",
+      "entityType": "ATTENDANCE_RECORD",
+      "entityId": "c8599343-75ed-46dc-9033-6c2fb4dfa552",
+      "actor": {
+        "id": "60222617-9b88-4753-9fd2-3b0c85d41cf9",
+        "username": "peso caragsacan",
+        "name": "MARVILYN",
+        "role": "TUPAD_ASSISTING_DOCUMENTOR",
+        "assignedBarangay": "Caragsacan"
+      },
+      "metadata": {
+        "designatedNumber": "77",
+        "workDayNumber": 1,
+        "slotRecorded": "Morning Time-In (AM IN)",
+        "workArea": "Purok 5",
+        "activityName": "De-clogging of canals, creeks, waterways, catch basins, and drainage inlets; removal of silt, mud, plastics, and other obstructions"
+      }
+    },
+    {
+      "id": "836d263a-81fa-4cf1-83a3-c28b3aea1ba0",
+      "timestamp": "2026-09-20T23:14:39.054Z",
+      "action": "ATTENDANCE_SCANNED",
+      "entityType": "ATTENDANCE_RECORD",
+      "entityId": "2a7de330-4a3b-4a17-b669-fe6b0a16fb90",
+      "actor": {
+        "id": "60222617-9b88-4753-9fd2-3b0c85d41cf9",
+        "username": "peso caragsacan",
+        "name": "MARVILYN",
+        "role": "TUPAD_ASSISTING_DOCUMENTOR",
+        "assignedBarangay": "Caragsacan"
+      },
+      "metadata": {
+        "designatedNumber": "149",
+        "workDayNumber": 1,
+        "slotRecorded": "Morning Time-In (AM IN)",
+        "workArea": "Purok 5",
+        "activityName": "De-clogging of canals, creeks, waterways, catch basins, and drainage inlets; removal of silt, mud, plastics, and other obstructions"
+      }
+    },
+    {
+      "id": "7ef022c6-083b-45f5-9536-0bf25ca81330",
+      "timestamp": "2026-09-20T23:14:58.740Z",
+      "action": "ATTENDANCE_SCANNED",
+      "entityType": "ATTENDANCE_RECORD",
+      "entityId": "182eed2a-f874-45a0-b4fe-3f8b9bfc53ed",
+      "actor": {
+        "id": "60222617-9b88-4753-9fd2-3b0c85d41cf9",
+        "username": "peso caragsacan",
+        "name": "MARVILYN",
+        "role": "TUPAD_ASSISTING_DOCUMENTOR",
+        "assignedBarangay": "Caragsacan"
+      },
+      "metadata": {
+        "designatedNumber": "140",
+        "workDayNumber": 1,
+        "slotRecorded": "Morning Time-In (AM IN)",
+        "workArea": "Purok 5",
+        "activityName": "De-clogging of canals, creeks, waterways, catch basins, and drainage inlets; removal of silt, mud, plastics, and other obstructions"
+      }
+    },
+    {
+      "id": "f2a7f3da-313e-49e2-8d67-8dd9219d36c9",
+      "timestamp": "2026-09-20T23:15:12.782Z",
+      "action": "ATTENDANCE_SCANNED",
+      "entityType": "ATTENDANCE_RECORD",
+      "entityId": "6b532b69-e49f-4c96-bb9f-2c046777655c",
+      "actor": {
+        "id": "60222617-9b88-4753-9fd2-3b0c85d41cf9",
+        "username": "peso caragsacan",
+        "name": "MARVILYN",
+        "role": "TUPAD_ASSISTING_DOCUMENTOR",
+        "assignedBarangay": "Caragsacan"
+      },
+      "metadata": {
+        "designatedNumber": "115",
+        "workDayNumber": 1,
+        "slotRecorded": "Morning Time-In (AM IN)",
+        "workArea": "Purok 1 Phase 1",
+        "activityName": "Community Gardening ( Weeding, Land preparation)"
+      }
+    },
+    {
+      "id": "7bd8bc4f-e96b-4c32-ba3b-6b3a36e7bf20",
+      "timestamp": "2026-09-20T23:16:39.523Z",
+      "action": "ATTENDANCE_SCANNED",
+      "entityType": "ATTENDANCE_RECORD",
+      "entityId": "30c4724f-111e-4792-967d-9ae953270581",
+      "actor": {
+        "id": "60222617-9b88-4753-9fd2-3b0c85d41cf9",
+        "username": "peso caragsacan",
+        "name": "MARVILYN",
+        "role": "TUPAD_ASSISTING_DOCUMENTOR",
+        "assignedBarangay": "Caragsacan"
+      },
+      "metadata": {
+        "designatedNumber": "119",
+        "workDayNumber": 1,
+        "slotRecorded": "Morning Time-In (AM IN)",
+        "workArea": "Purok 1 Phase 1",
+        "activityName": "Community Gardening ( Weeding, Land preparation)"
+      }
+    },
+    {
+      "id": "99024bf2-e6cf-4a2c-88a6-97de2b0b98a4",
+      "timestamp": "2026-09-20T23:16:54.500Z",
+      "action": "ATTENDANCE_SCANNED",
+      "entityType": "ATTENDANCE_RECORD",
+      "entityId": "ca8c2d9c-f933-4450-b9b7-2507a9c2140e",
+      "actor": {
+        "id": "60222617-9b88-4753-9fd2-3b0c85d41cf9",
+        "username": "peso caragsacan",
+        "name": "MARVILYN",
+        "role": "TUPAD_ASSISTING_DOCUMENTOR",
+        "assignedBarangay": "Caragsacan"
+      },
+      "metadata": {
+        "designatedNumber": "118",
+        "workDayNumber": 1,
+        "slotRecorded": "Morning Time-In (AM IN)",
+        "workArea": "Purok 1 Phase 1",
+        "activityName": "Community Gardening ( Weeding, Land preparation)"
+      }
+    },
+    {
+      "id": "ef9a7a92-bfe7-4f76-9e7a-482fa2ff7bb2",
+      "timestamp": "2026-09-20T23:17:04.539Z",
+      "action": "ATTENDANCE_SCANNED",
+      "entityType": "ATTENDANCE_RECORD",
+      "entityId": "2bca2116-b761-4eff-b479-477f85a3b8f4",
+      "actor": {
+        "id": "60222617-9b88-4753-9fd2-3b0c85d41cf9",
+        "username": "peso caragsacan",
+        "name": "MARVILYN",
+        "role": "TUPAD_ASSISTING_DOCUMENTOR",
+        "assignedBarangay": "Caragsacan"
+      },
+      "metadata": {
+        "designatedNumber": "101",
+        "workDayNumber": 1,
+        "slotRecorded": "Morning Time-In (AM IN)",
+        "workArea": "Purok 1 Phase 1",
+        "activityName": "Community Gardening ( Weeding, Land preparation)"
+      }
+    },
+    {
+      "id": "23aeb7a7-c81d-4da3-b891-5070899c077f",
+      "timestamp": "2026-09-20T23:24:19.345Z",
+      "action": "ATTENDANCE_SCANNED",
+      "entityType": "ATTENDANCE_RECORD",
+      "entityId": "f763a47b-00f3-4709-a4d6-744a245fc727",
+      "actor": {
+        "id": "60222617-9b88-4753-9fd2-3b0c85d41cf9",
+        "username": "peso caragsacan",
+        "name": "MARVILYN",
+        "role": "TUPAD_ASSISTING_DOCUMENTOR",
+        "assignedBarangay": "Caragsacan"
+      },
+      "metadata": {
+        "designatedNumber": "72",
+        "workDayNumber": 1,
+        "slotRecorded": "Morning Time-In (AM IN)",
+        "workArea": "Purok 1 Phase 1",
+        "activityName": "Community Gardening ( Weeding, Land preparation)"
+      }
+    },
+    {
+      "id": "e213f90a-1442-4afc-afb2-3f3dea32cebc",
+      "timestamp": "2026-09-20T23:24:28.759Z",
+      "action": "ATTENDANCE_SCANNED",
+      "entityType": "ATTENDANCE_RECORD",
+      "entityId": "3d605854-0664-46f9-a8e8-852e74df5320",
+      "actor": {
+        "id": "60222617-9b88-4753-9fd2-3b0c85d41cf9",
+        "username": "peso caragsacan",
+        "name": "MARVILYN",
+        "role": "TUPAD_ASSISTING_DOCUMENTOR",
+        "assignedBarangay": "Caragsacan"
+      },
+      "metadata": {
+        "designatedNumber": "123",
+        "workDayNumber": 1,
+        "slotRecorded": "Morning Time-In (AM IN)",
+        "workArea": "Purok 5",
+        "activityName": "De-clogging of canals, creeks, waterways, catch basins, and drainage inlets; removal of silt, mud, plastics, and other obstructions"
+      }
+    },
+    {
+      "id": "89f60c70-5804-4f36-a1ad-68784e7606b1",
+      "timestamp": "2026-09-20T23:24:37.397Z",
+      "action": "ATTENDANCE_SCANNED",
+      "entityType": "ATTENDANCE_RECORD",
+      "entityId": "279d2a90-8ec8-4553-8219-0ec1307e1d29",
+      "actor": {
+        "id": "60222617-9b88-4753-9fd2-3b0c85d41cf9",
+        "username": "peso caragsacan",
+        "name": "MARVILYN",
+        "role": "TUPAD_ASSISTING_DOCUMENTOR",
+        "assignedBarangay": "Caragsacan"
+      },
+      "metadata": {
+        "designatedNumber": "80",
+        "workDayNumber": 1,
+        "slotRecorded": "Morning Time-In (AM IN)",
+        "workArea": "Purok 1 Phase 1",
+        "activityName": "Community Gardening ( Weeding, Land preparation)"
+      }
+    },
+    {
+      "id": "6e294819-b005-447a-bf72-919df6916593",
+      "timestamp": "2026-09-20T23:27:14.769Z",
+      "action": "ATTENDANCE_SCANNED",
+      "entityType": "ATTENDANCE_RECORD",
+      "entityId": "2afd62eb-c744-4445-94f0-67109c033ace",
+      "actor": {
+        "id": "60222617-9b88-4753-9fd2-3b0c85d41cf9",
+        "username": "peso caragsacan",
+        "name": "MARVILYN",
+        "role": "TUPAD_ASSISTING_DOCUMENTOR",
+        "assignedBarangay": "Caragsacan"
+      },
+      "metadata": {
+        "designatedNumber": "93",
+        "workDayNumber": 1,
+        "slotRecorded": "Morning Time-In (AM IN)",
+        "workArea": "Purok 5",
+        "activityName": "De-clogging of canals, creeks, waterways, catch basins, and drainage inlets; removal of silt, mud, plastics, and other obstructions"
+      }
+    },
+    {
+      "id": "3732db7d-7f6c-4d00-93cb-e0e9988ae1f0",
+      "timestamp": "2026-09-20T23:27:23.256Z",
+      "action": "ATTENDANCE_SCANNED",
+      "entityType": "ATTENDANCE_RECORD",
+      "entityId": "291af4e7-82a2-46ca-b046-0a1b852801f7",
+      "actor": {
+        "id": "60222617-9b88-4753-9fd2-3b0c85d41cf9",
+        "username": "peso caragsacan",
+        "name": "MARVILYN",
+        "role": "TUPAD_ASSISTING_DOCUMENTOR",
+        "assignedBarangay": "Caragsacan"
+      },
+      "metadata": {
+        "designatedNumber": "145",
+        "workDayNumber": 1,
+        "slotRecorded": "Morning Time-In (AM IN)",
+        "workArea": "Purok 1 Phase 1",
+        "activityName": "Community Gardening ( Weeding, Land preparation)"
+      }
+    },
+    {
+      "id": "cbbf823e-34cf-4b66-b3b8-12231748f2c2",
+      "timestamp": "2026-09-20T23:27:57.042Z",
+      "action": "ATTENDANCE_SCANNED",
+      "entityType": "ATTENDANCE_RECORD",
+      "entityId": "334f9741-48a2-435a-857c-fcb3536d4d94",
+      "actor": {
+        "id": "60222617-9b88-4753-9fd2-3b0c85d41cf9",
+        "username": "peso caragsacan",
+        "name": "MARVILYN",
+        "role": "TUPAD_ASSISTING_DOCUMENTOR",
+        "assignedBarangay": "Caragsacan"
+      },
+      "metadata": {
+        "designatedNumber": "90",
+        "workDayNumber": 1,
+        "slotRecorded": "Morning Time-In (AM IN)",
+        "workArea": "Purok 5",
+        "activityName": "De-clogging of canals, creeks, waterways, catch basins, and drainage inlets; removal of silt, mud, plastics, and other obstructions"
+      }
+    },
+    {
+      "id": "a42726a1-222d-4e21-95d7-134b575610cb",
+      "timestamp": "2026-09-20T23:28:08.927Z",
+      "action": "ATTENDANCE_SCANNED",
+      "entityType": "ATTENDANCE_RECORD",
+      "entityId": "7ee2fe98-724d-41bc-a277-3883c114e3c0",
+      "actor": {
+        "id": "60222617-9b88-4753-9fd2-3b0c85d41cf9",
+        "username": "peso caragsacan",
+        "name": "MARVILYN",
+        "role": "TUPAD_ASSISTING_DOCUMENTOR",
+        "assignedBarangay": "Caragsacan"
+      },
+      "metadata": {
+        "designatedNumber": "91",
+        "workDayNumber": 1,
+        "slotRecorded": "Morning Time-In (AM IN)",
+        "workArea": "Purok 5",
+        "activityName": "De-clogging of canals, creeks, waterways, catch basins, and drainage inlets; removal of silt, mud, plastics, and other obstructions"
+      }
+    },
+    {
+      "id": "9eb17919-41ac-44ed-b9dd-a703792cc184",
+      "timestamp": "2026-09-20T23:29:53.453Z",
+      "action": "ATTENDANCE_SCANNED",
+      "entityType": "ATTENDANCE_RECORD",
+      "entityId": "b2632a6f-03b8-4d07-939e-cf97e9aa99fc",
+      "actor": {
+        "id": "60222617-9b88-4753-9fd2-3b0c85d41cf9",
+        "username": "peso caragsacan",
+        "name": "MARVILYN",
+        "role": "TUPAD_ASSISTING_DOCUMENTOR",
+        "assignedBarangay": "Caragsacan"
+      },
+      "metadata": {
+        "designatedNumber": "84",
+        "workDayNumber": 1,
+        "slotRecorded": "Morning Time-In (AM IN)",
+        "workArea": "Purok 1 Phase 1",
+        "activityName": "Community Gardening ( Weeding, Land preparation)"
+      }
+    },
+    {
+      "id": "dbf8fdb9-a0dc-4fee-be1a-a35fa25236e7",
+      "timestamp": "2026-09-20T23:30:18.741Z",
+      "action": "ATTENDANCE_SCANNED",
+      "entityType": "ATTENDANCE_RECORD",
+      "entityId": "a630ac84-66ee-467f-bb18-3b9c64bb9aea",
+      "actor": {
+        "id": "60222617-9b88-4753-9fd2-3b0c85d41cf9",
+        "username": "peso caragsacan",
+        "name": "MARVILYN",
+        "role": "TUPAD_ASSISTING_DOCUMENTOR",
+        "assignedBarangay": "Caragsacan"
+      },
+      "metadata": {
+        "designatedNumber": "104",
+        "workDayNumber": 1,
+        "slotRecorded": "Morning Time-In (AM IN)",
+        "workArea": "Purok 1 Phase 1",
+        "activityName": "Community Gardening ( Weeding, Land preparation)"
+      }
+    },
+    {
+      "id": "8cd54a66-8352-4cf0-8d56-d85fa5418c01",
+      "timestamp": "2026-09-20T23:30:29.540Z",
+      "action": "ATTENDANCE_SCANNED",
+      "entityType": "ATTENDANCE_RECORD",
+      "entityId": "819a2bed-bbc1-4f5d-b7b1-46f02cac575f",
+      "actor": {
+        "id": "60222617-9b88-4753-9fd2-3b0c85d41cf9",
+        "username": "peso caragsacan",
+        "name": "MARVILYN",
+        "role": "TUPAD_ASSISTING_DOCUMENTOR",
+        "assignedBarangay": "Caragsacan"
+      },
+      "metadata": {
+        "designatedNumber": "76",
+        "workDayNumber": 1,
+        "slotRecorded": "Morning Time-In (AM IN)",
+        "workArea": "Purok 5",
+        "activityName": "De-clogging of canals, creeks, waterways, catch basins, and drainage inlets; removal of silt, mud, plastics, and other obstructions"
+      }
+    },
+    {
+      "id": "b8e1fcdc-5e7b-471c-a279-1fc511d3a6b5",
+      "timestamp": "2026-09-20T23:36:10.341Z",
+      "action": "ATTENDANCE_SCANNED",
+      "entityType": "ATTENDANCE_RECORD",
+      "entityId": "e945b94c-2a24-4258-a158-e837f0036d35",
+      "actor": {
+        "id": "60222617-9b88-4753-9fd2-3b0c85d41cf9",
+        "username": "peso caragsacan",
+        "name": "MARVILYN",
+        "role": "TUPAD_ASSISTING_DOCUMENTOR",
+        "assignedBarangay": "Caragsacan"
+      },
+      "metadata": {
+        "designatedNumber": "107",
+        "workDayNumber": 1,
+        "slotRecorded": "Morning Time-In (AM IN)",
+        "workArea": "Purok 5",
+        "activityName": "De-clogging of canals, creeks, waterways, catch basins, and drainage inlets; removal of silt, mud, plastics, and other obstructions"
+      }
+    },
+    {
+      "id": "a9f9e618-0809-4842-851b-fb87cf6b081e",
+      "timestamp": "2026-09-20T23:45:53.620Z",
+      "action": "ATTENDANCE_SCANNED",
+      "entityType": "ATTENDANCE_RECORD",
+      "entityId": "a6022bb3-1792-48be-b5e3-c2454c33af97",
+      "actor": {
+        "id": "60222617-9b88-4753-9fd2-3b0c85d41cf9",
+        "username": "peso caragsacan",
+        "name": "MARVILYN",
+        "role": "TUPAD_ASSISTING_DOCUMENTOR",
+        "assignedBarangay": "Caragsacan"
+      },
+      "metadata": {
+        "designatedNumber": "105",
+        "workDayNumber": 1,
+        "slotRecorded": "Morning Time-In (AM IN)",
+        "workArea": "Purok 1 Phase 1",
+        "activityName": "Community Gardening ( Weeding, Land preparation)"
+      }
+    },
+    {
+      "id": "967a28a9-c300-43db-89e9-adc6b68c05e6",
+      "timestamp": "2026-09-21T00:13:14.092Z",
+      "action": "PHOTO_UPLOADED",
+      "entityType": "ACCOMPLISHMENT_PHOTO",
+      "entityId": "aeffe7e7-2e9b-4e06-952d-272953860969",
+      "actor": {
+        "id": "60222617-9b88-4753-9fd2-3b0c85d41cf9",
+        "username": "peso caragsacan",
+        "name": "MARVILYN",
+        "role": "TUPAD_ASSISTING_DOCUMENTOR",
+        "assignedBarangay": "Caragsacan"
+      },
+      "metadata": {
+        "barangay": "Caragsacan",
+        "latitude": 15.3941,
+        "longitude": 121.3965,
+        "specificActivity": ""
+      }
+    },
+    {
+      "id": "0c7f6643-37b2-473d-be05-6b05043c9ce6",
+      "timestamp": "2026-09-21T00:28:54.683Z",
+      "action": "LOGIN_SUCCESS",
+      "entityType": "USER",
+      "entityId": "0b1ffed3-c63e-4405-a7f3-83897c8e37be",
+      "actor": {
+        "id": "0b1ffed3-c63e-4405-a7f3-83897c8e37be",
+        "username": "admin",
+        "name": "PESO Dingalan Admin Officer",
+        "role": "DOMAIN_MASTER",
+        "assignedBarangay": null
+      },
+      "metadata": null
+    },
+    {
+      "id": "c5f3af1c-bd47-42f6-8223-769e6bbb9edd",
+      "timestamp": "2026-09-21T00:29:57.330Z",
+      "action": "PHOTO_APPROVED",
+      "entityType": "ACCOMPLISHMENT_PHOTO",
+      "entityId": "aeffe7e7-2e9b-4e06-952d-272953860969",
+      "actor": {
+        "id": "0b1ffed3-c63e-4405-a7f3-83897c8e37be",
+        "username": "admin",
+        "name": "PESO Dingalan Admin Officer",
+        "role": "DOMAIN_MASTER",
+        "assignedBarangay": null
+      },
+      "metadata": {
+        "status": "APPROVED",
+        "rejectionReason": null
+      }
+    },
+    {
+      "id": "05c96131-5e50-4053-9dad-52546483c2f0",
+      "timestamp": "2026-09-21T00:29:58.032Z",
+      "action": "PHOTO_APPROVED",
+      "entityType": "ACCOMPLISHMENT_PHOTO",
+      "entityId": "aeffe7e7-2e9b-4e06-952d-272953860969",
+      "actor": {
+        "id": "0b1ffed3-c63e-4405-a7f3-83897c8e37be",
+        "username": "admin",
+        "name": "PESO Dingalan Admin Officer",
+        "role": "DOMAIN_MASTER",
+        "assignedBarangay": null
+      },
+      "metadata": {
+        "status": "APPROVED",
+        "rejectionReason": null
+      }
+    },
+    {
+      "id": "185019c0-d38a-4f72-8b85-1fdc5b368e37",
+      "timestamp": "2026-09-21T00:29:58.928Z",
+      "action": "PHOTO_APPROVED",
+      "entityType": "ACCOMPLISHMENT_PHOTO",
+      "entityId": "aeffe7e7-2e9b-4e06-952d-272953860969",
+      "actor": {
+        "id": "0b1ffed3-c63e-4405-a7f3-83897c8e37be",
+        "username": "admin",
+        "name": "PESO Dingalan Admin Officer",
+        "role": "DOMAIN_MASTER",
+        "assignedBarangay": null
+      },
+      "metadata": {
+        "status": "APPROVED",
+        "rejectionReason": null
+      }
+    },
+    {
+      "id": "de910c09-51ce-4814-ad6f-f81fd5cb1490",
+      "timestamp": "2026-09-21T00:30:01.828Z",
+      "action": "PHOTO_APPROVED",
+      "entityType": "ACCOMPLISHMENT_PHOTO",
+      "entityId": "aeffe7e7-2e9b-4e06-952d-272953860969",
+      "actor": {
+        "id": "0b1ffed3-c63e-4405-a7f3-83897c8e37be",
+        "username": "admin",
+        "name": "PESO Dingalan Admin Officer",
+        "role": "DOMAIN_MASTER",
+        "assignedBarangay": null
+      },
+      "metadata": {
+        "status": "APPROVED",
+        "rejectionReason": null
+      }
+    },
+    {
+      "id": "75843547-fc97-4b06-ba79-c4417df294e6",
+      "timestamp": "2026-09-21T00:32:11.462Z",
+      "action": "PHOTO_UPLOADED",
+      "entityType": "ACCOMPLISHMENT_PHOTO",
+      "entityId": "b61701a5-929e-481f-940c-c062096d49c2",
+      "actor": {
+        "id": "60222617-9b88-4753-9fd2-3b0c85d41cf9",
+        "username": "peso caragsacan",
+        "name": "MARVILYN",
+        "role": "TUPAD_ASSISTING_DOCUMENTOR",
+        "assignedBarangay": "Caragsacan"
+      },
+      "metadata": {
+        "barangay": "Caragsacan",
+        "latitude": 15.3941,
+        "longitude": 121.3965,
+        "specificActivity": ""
+      }
+    },
+    {
+      "id": "62e404e2-b9eb-49cf-ae82-493039858763",
+      "timestamp": "2026-09-21T00:41:11.679Z",
+      "action": "ATTENDANCE_SCANNED",
+      "entityType": "ATTENDANCE_RECORD",
+      "entityId": "3b0cae54-2e29-4273-b1a1-59f6a7ee1a35",
+      "actor": {
+        "id": "60222617-9b88-4753-9fd2-3b0c85d41cf9",
+        "username": "peso caragsacan",
+        "name": "MARVILYN",
+        "role": "TUPAD_ASSISTING_DOCUMENTOR",
+        "assignedBarangay": "Caragsacan"
+      },
+      "metadata": {
+        "designatedNumber": "142",
+        "workDayNumber": 1,
+        "slotRecorded": "Morning Time-In (AM IN)",
+        "workArea": "Purok 1 Phase 1",
+        "activityName": "Community Gardening ( Weeding, Land preparation)"
+      }
+    },
+    {
+      "id": "923fde74-6717-445d-b04a-d1764af79f63",
+      "timestamp": "2026-09-21T01:24:25.359Z",
+      "action": "LOGIN_SUCCESS",
+      "entityType": "USER",
+      "entityId": "0b1ffed3-c63e-4405-a7f3-83897c8e37be",
+      "actor": {
+        "id": "0b1ffed3-c63e-4405-a7f3-83897c8e37be",
+        "username": "admin",
+        "name": "PESO Dingalan Admin Officer",
+        "role": "DOMAIN_MASTER",
+        "assignedBarangay": null
+      },
+      "metadata": null
+    },
+    {
+      "id": "56768bef-c71d-47d7-aa8d-c990d9437d5f",
+      "timestamp": "2026-09-21T01:25:52.746Z",
+      "action": "LOGOUT",
+      "entityType": "USER",
+      "entityId": "0b1ffed3-c63e-4405-a7f3-83897c8e37be",
+      "actor": {
+        "id": "0b1ffed3-c63e-4405-a7f3-83897c8e37be",
+        "username": "admin",
+        "name": "PESO Dingalan Admin Officer",
+        "role": "DOMAIN_MASTER",
+        "assignedBarangay": null
+      },
+      "metadata": null
+    },
+    {
+      "id": "b31e1056-d8fa-43d7-b5ad-517d8da02a3e",
+      "timestamp": "2026-09-21T01:25:53.912Z",
+      "action": "LOGOUT",
+      "entityType": "USER",
+      "entityId": "0b1ffed3-c63e-4405-a7f3-83897c8e37be",
+      "actor": {
+        "id": "0b1ffed3-c63e-4405-a7f3-83897c8e37be",
+        "username": "admin",
+        "name": "PESO Dingalan Admin Officer",
+        "role": "DOMAIN_MASTER",
+        "assignedBarangay": null
+      },
+      "metadata": null
+    },
+    {
+      "id": "2d751586-c8bc-46e9-b5d7-f9e62dc6244a",
+      "timestamp": "2026-09-21T01:26:07.618Z",
+      "action": "LOGIN_SUCCESS",
+      "entityType": "USER",
+      "entityId": "5252bfc1-8c0b-4983-b790-fbc91de40b67",
+      "actor": {
+        "id": "5252bfc1-8c0b-4983-b790-fbc91de40b67",
+        "username": "field test",
+        "name": "field test",
+        "role": "TUPAD_COORDINATOR",
+        "assignedBarangay": "Aplaya"
+      },
+      "metadata": null
+    },
+    {
+      "id": "e4b2c8be-daeb-4589-87e5-9dbbbb02e69b",
+      "timestamp": "2026-09-21T01:28:53.036Z",
+      "action": "LOGOUT",
+      "entityType": "USER",
+      "entityId": "0b1ffed3-c63e-4405-a7f3-83897c8e37be",
+      "actor": {
+        "id": "0b1ffed3-c63e-4405-a7f3-83897c8e37be",
+        "username": "admin",
+        "name": "PESO Dingalan Admin Officer",
+        "role": "DOMAIN_MASTER",
+        "assignedBarangay": null
+      },
+      "metadata": null
+    },
+    {
+      "id": "5441f0ef-a2ce-4a27-843a-3df31e87e398",
+      "timestamp": "2026-09-21T01:29:04.015Z",
+      "action": "LOGIN_SUCCESS",
+      "entityType": "USER",
+      "entityId": "cf955cb0-14b0-42b0-81b5-92b7483344bd",
+      "actor": null,
+      "metadata": null
+    },
+    {
+      "id": "8c59c699-947f-438f-8b4f-9e5594324a8c",
+      "timestamp": "2026-09-21T01:31:52.645Z",
+      "action": "LOGOUT",
+      "entityType": "USER",
+      "entityId": "cf955cb0-14b0-42b0-81b5-92b7483344bd",
+      "actor": null,
+      "metadata": null
+    },
+    {
+      "id": "ec33b353-f8a8-43ec-94d1-7a03989823b4",
+      "timestamp": "2026-09-21T01:32:15.677Z",
+      "action": "LOGIN_SUCCESS",
+      "entityType": "USER",
+      "entityId": "0b1ffed3-c63e-4405-a7f3-83897c8e37be",
+      "actor": {
+        "id": "0b1ffed3-c63e-4405-a7f3-83897c8e37be",
+        "username": "admin",
+        "name": "PESO Dingalan Admin Officer",
+        "role": "DOMAIN_MASTER",
+        "assignedBarangay": null
+      },
+      "metadata": null
+    },
+    {
+      "id": "6d41f4f0-a0ce-4bc8-a443-4d2612a3be64",
+      "timestamp": "2026-09-21T01:36:38.940Z",
+      "action": "LOGOUT",
+      "entityType": "USER",
+      "entityId": "5252bfc1-8c0b-4983-b790-fbc91de40b67",
+      "actor": {
+        "id": "5252bfc1-8c0b-4983-b790-fbc91de40b67",
+        "username": "field test",
+        "name": "field test",
+        "role": "TUPAD_COORDINATOR",
+        "assignedBarangay": "Aplaya"
+      },
+      "metadata": null
+    },
+    {
+      "id": "c7c87640-5e2d-4604-9465-49f124841330",
+      "timestamp": "2026-09-21T01:36:51.428Z",
+      "action": "LOGIN_SUCCESS",
+      "entityType": "USER",
+      "entityId": "cf955cb0-14b0-42b0-81b5-92b7483344bd",
+      "actor": null,
+      "metadata": null
+    },
+    {
+      "id": "c45fd091-a2c4-4baa-9d59-811bf62987ed",
+      "timestamp": "2026-09-21T01:37:26.534Z",
+      "action": "ATTENDANCE_SCANNED",
+      "entityType": "ATTENDANCE_RECORD",
+      "entityId": "118272e9-b83b-408e-960c-36dab5bac3df",
+      "actor": {
+        "id": "60222617-9b88-4753-9fd2-3b0c85d41cf9",
+        "username": "peso caragsacan",
+        "name": "MARVILYN",
+        "role": "TUPAD_ASSISTING_DOCUMENTOR",
+        "assignedBarangay": "Caragsacan"
+      },
+      "metadata": {
+        "designatedNumber": "88",
+        "workDayNumber": 1,
+        "slotRecorded": "Morning Time-In (AM IN)",
+        "workArea": "Purok 5",
+        "activityName": "De-clogging of canals, creeks, waterways, catch basins, and drainage inlets; removal of silt, mud, plastics, and other obstructions"
+      }
+    },
+    {
+      "id": "aa9f12dc-6859-4bf2-a632-83411f2c808c",
+      "timestamp": "2026-09-21T01:40:01.996Z",
+      "action": "LOGOUT",
+      "entityType": "USER",
+      "entityId": "cf955cb0-14b0-42b0-81b5-92b7483344bd",
+      "actor": null,
+      "metadata": null
+    },
+    {
+      "id": "2aabee1e-cdfc-4205-adbd-f6f3daeba58f",
+      "timestamp": "2026-09-21T01:40:11.891Z",
+      "action": "LOGIN_SUCCESS",
+      "entityType": "USER",
+      "entityId": "cf955cb0-14b0-42b0-81b5-92b7483344bd",
+      "actor": null,
+      "metadata": null
+    },
+    {
+      "id": "9f91bb5f-2d81-4a8f-9856-a046c23b5bac",
+      "timestamp": "2026-09-21T01:44:39.432Z",
+      "action": "USER_DELETED",
+      "entityType": "USER",
+      "entityId": "cf955cb0-14b0-42b0-81b5-92b7483344bd",
+      "actor": {
+        "id": "0b1ffed3-c63e-4405-a7f3-83897c8e37be",
+        "username": "admin",
+        "name": "PESO Dingalan Admin Officer",
+        "role": "DOMAIN_MASTER",
+        "assignedBarangay": null
+      },
+      "metadata": null
+    },
+    {
+      "id": "eb4d8a7f-112f-4e15-a37b-c6bcac9d3625",
+      "timestamp": "2026-09-21T01:45:59.804Z",
+      "action": "LOGOUT",
+      "entityType": "USER",
+      "entityId": "60222617-9b88-4753-9fd2-3b0c85d41cf9",
+      "actor": {
+        "id": "60222617-9b88-4753-9fd2-3b0c85d41cf9",
+        "username": "peso caragsacan",
+        "name": "MARVILYN",
+        "role": "TUPAD_ASSISTING_DOCUMENTOR",
+        "assignedBarangay": "Caragsacan"
+      },
+      "metadata": null
+    },
+    {
+      "id": "a9f6c9c1-b644-4b5a-8579-3975c17bf7cf",
+      "timestamp": "2026-09-21T01:46:20.670Z",
+      "action": "LOGOUT",
+      "entityType": "USER",
+      "entityId": "cf955cb0-14b0-42b0-81b5-92b7483344bd",
+      "actor": null,
+      "metadata": {
+        "unmatchedUserId": "cf955cb0-14b0-42b0-81b5-92b7483344bd"
+      }
+    },
+    {
+      "id": "447be325-eefd-4fd5-9d45-1903d0b2b9e7",
+      "timestamp": "2026-09-21T01:46:20.829Z",
+      "action": "LOGOUT",
+      "entityType": "USER",
+      "entityId": "cf955cb0-14b0-42b0-81b5-92b7483344bd",
+      "actor": null,
+      "metadata": {
+        "unmatchedUserId": "cf955cb0-14b0-42b0-81b5-92b7483344bd"
+      }
+    },
+    {
+      "id": "11bb45fc-34f4-40be-9e78-46666f8eae89",
+      "timestamp": "2026-09-21T01:47:23.276Z",
+      "action": "LOGIN_FAILED",
+      "entityType": "USER",
+      "entityId": null,
+      "actor": null,
+      "metadata": {
+        "username": "PESO CARAGCASAN",
+        "reason": "User not found"
+      }
+    },
+    {
+      "id": "2d8825d3-de07-45f5-a4e6-fdaf2ee0ef4f",
+      "timestamp": "2026-09-21T01:47:41.962Z",
+      "action": "LOGIN_FAILED",
+      "entityType": "USER",
+      "entityId": null,
+      "actor": null,
+      "metadata": {
+        "username": "PESO CARAGCASAN",
+        "reason": "User not found"
+      }
+    },
+    {
+      "id": "b0121477-2380-49b3-afff-c10712bdda5c",
+      "timestamp": "2026-09-21T01:48:00.066Z",
+      "action": "LOGIN_FAILED",
+      "entityType": "USER",
+      "entityId": null,
+      "actor": {
+        "id": "5252bfc1-8c0b-4983-b790-fbc91de40b67",
+        "username": "field test",
+        "name": "field test",
+        "role": "TUPAD_COORDINATOR",
+        "assignedBarangay": "Aplaya"
+      },
+      "metadata": {
+        "username": "field test",
+        "reason": "Incorrect password"
+      }
+    },
+    {
+      "id": "0271232f-6fb4-4e53-a1cd-23187f108b8d",
+      "timestamp": "2026-09-21T01:48:12.429Z",
+      "action": "LOGIN_SUCCESS",
+      "entityType": "USER",
+      "entityId": "60222617-9b88-4753-9fd2-3b0c85d41cf9",
+      "actor": {
+        "id": "60222617-9b88-4753-9fd2-3b0c85d41cf9",
+        "username": "peso caragsacan",
+        "name": "MARVILYN",
+        "role": "TUPAD_ASSISTING_DOCUMENTOR",
+        "assignedBarangay": "Caragsacan"
+      },
+      "metadata": null
+    },
+    {
+      "id": "ed6cf763-c9aa-44dd-9074-ef9efcf0aa0f",
+      "timestamp": "2026-09-21T01:48:15.983Z",
+      "action": "LOGIN_SUCCESS",
+      "entityType": "USER",
+      "entityId": "5252bfc1-8c0b-4983-b790-fbc91de40b67",
+      "actor": {
+        "id": "5252bfc1-8c0b-4983-b790-fbc91de40b67",
+        "username": "field test",
+        "name": "field test",
+        "role": "TUPAD_COORDINATOR",
+        "assignedBarangay": "Aplaya"
+      },
+      "metadata": null
+    },
+    {
+      "id": "9e4ee622-c8f4-4318-9437-67c494f5c818",
+      "timestamp": "2026-09-21T01:57:00.249Z",
+      "action": "LOGOUT",
+      "entityType": "USER",
+      "entityId": "0b1ffed3-c63e-4405-a7f3-83897c8e37be",
+      "actor": {
+        "id": "0b1ffed3-c63e-4405-a7f3-83897c8e37be",
+        "username": "admin",
+        "name": "PESO Dingalan Admin Officer",
+        "role": "DOMAIN_MASTER",
+        "assignedBarangay": null
+      },
+      "metadata": null
+    },
+    {
+      "id": "a3a96a8b-fca0-4dca-aa00-d6ba2de46fe6",
+      "timestamp": "2026-09-21T01:57:16.111Z",
+      "action": "LOGIN_SUCCESS",
+      "entityType": "USER",
+      "entityId": "0b1ffed3-c63e-4405-a7f3-83897c8e37be",
+      "actor": {
+        "id": "0b1ffed3-c63e-4405-a7f3-83897c8e37be",
+        "username": "admin",
+        "name": "PESO Dingalan Admin Officer",
+        "role": "DOMAIN_MASTER",
+        "assignedBarangay": null
+      },
+      "metadata": null
+    },
+    {
+      "id": "7eb9ec04-7494-49c2-9540-d05a28a1c8a5",
+      "timestamp": "2026-09-21T01:57:39.036Z",
+      "action": "LOGOUT",
+      "entityType": "USER",
+      "entityId": "0b1ffed3-c63e-4405-a7f3-83897c8e37be",
+      "actor": {
+        "id": "0b1ffed3-c63e-4405-a7f3-83897c8e37be",
+        "username": "admin",
+        "name": "PESO Dingalan Admin Officer",
+        "role": "DOMAIN_MASTER",
+        "assignedBarangay": null
+      },
+      "metadata": null
+    },
+    {
+      "id": "05e64e17-832d-4f35-bd5c-d56ee089a12e",
+      "timestamp": "2026-09-21T01:57:54.875Z",
+      "action": "LOGIN_SUCCESS",
+      "entityType": "USER",
+      "entityId": "358af55e-8070-489b-b0de-3640957a3b9a",
+      "actor": {
+        "id": "358af55e-8070-489b-b0de-3640957a3b9a",
+        "username": "peso_manager",
+        "name": "PESO Program Manager",
+        "role": "PESO_ADMIN",
+        "assignedBarangay": null
+      },
+      "metadata": null
+    },
+    {
+      "id": "981b37bd-1fad-4f71-b89b-aa1e016d174f",
+      "timestamp": "2026-09-21T01:58:47.746Z",
+      "action": "LOGIN_SUCCESS",
+      "entityType": "USER",
+      "entityId": "0b1ffed3-c63e-4405-a7f3-83897c8e37be",
+      "actor": {
+        "id": "0b1ffed3-c63e-4405-a7f3-83897c8e37be",
+        "username": "admin",
+        "name": "PESO Dingalan Admin Officer",
+        "role": "DOMAIN_MASTER",
+        "assignedBarangay": null
+      },
+      "metadata": null
+    }
+  ]
+}
