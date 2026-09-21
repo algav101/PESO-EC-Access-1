@@ -4,7 +4,7 @@ import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getCurrentUser, isAdminUser } from "@/lib/auth";
 import { logAudit } from "@/lib/audit";
-import { formatBirthdayPin } from "@/lib/utils";
+import { formatBirthdayPin, normalizeBarangayName } from "@/lib/utils";
 import { addDays, format, parseISO } from "date-fns";
 
 export async function POST(request: Request) {
@@ -469,13 +469,13 @@ export async function POST(request: Request) {
           } = payload || {};
 
           let validWorkDayId: string | null = null;
-          if (workDayId && !String(workDayId).startsWith("WD-")) {
+          if (workDayId && !String(workDayId).startsWith("WD-") && String(workDayId).length > 10) {
             const wdExists = await prisma.workDay.findUnique({ where: { id: workDayId } });
             if (wdExists) validWorkDayId = wdExists.id;
           }
           if (!validWorkDayId && (workDayNumber || workDayId)) {
             const dayNum = Number(workDayNumber || String(workDayId).replace("WD-", ""));
-            if (!isNaN(dayNum)) {
+            if (!isNaN(dayNum) && dayNum > 0) {
               const wd = await prisma.workDay.findFirst({
                 where: { programId, dayNumber: dayNum },
               });
@@ -484,9 +484,13 @@ export async function POST(request: Request) {
           }
 
           let validWorkProgramItemId: string | null = null;
-          if (workProgramItemId && workProgramItemId !== "AUTO") {
-            const wpExists = await prisma.tupadWorkProgramItem.findUnique({ where: { id: workProgramItemId } });
-            if (wpExists) validWorkProgramItemId = wpExists.id;
+          if (workProgramItemId && workProgramItemId !== "AUTO" && !String(workProgramItemId).startsWith("WP-")) {
+            try {
+              const wpExists = await prisma.tupadWorkProgramItem.findUnique({ where: { id: workProgramItemId } });
+              if (wpExists) validWorkProgramItemId = wpExists.id;
+            } catch (err) {
+              console.warn("Offline photo wpItem check fallback:", workProgramItemId);
+            }
           }
 
           let validUploadedById: string | null = null;
@@ -500,13 +504,14 @@ export async function POST(request: Request) {
           }
 
           const finalFileKey = photoData || fileKey || `photo_offline_${Date.now()}`;
+          const normalizedBrgy = normalizeBarangayName(barangay || user?.assignedBarangay || "Paltic");
 
-          await prisma.accomplishmentPhoto.create({
+          const photo = await prisma.accomplishmentPhoto.create({
             data: {
               programId,
               workDayId: validWorkDayId,
               workProgramItemId: validWorkProgramItemId,
-              barangay: barangay || "Paltic",
+              barangay: normalizedBrgy,
               sitio: sitio || null,
               workArea: workArea || sitio || null,
               specificActivity: specificActivity || null,
@@ -521,6 +526,15 @@ export async function POST(request: Request) {
               approvedAt: isAdminUser(user) ? new Date() : null,
             },
           });
+
+          await logAudit({
+            userId: validUploadedById || user?.id,
+            action: "PHOTO_UPLOADED",
+            entityType: "ACCOMPLISHMENT_PHOTO",
+            entityId: photo.id,
+            metadata: { clientTransactionId, barangay: normalizedBrgy, latitude, longitude, specificActivity },
+          });
+
           accepted.push(clientTransactionId);
         } else if (entityType === "REPLACEMENT") {
           const {

@@ -56,6 +56,10 @@ export async function POST(request: Request) {
         peso_paltic_doc: { fullName: "MARIA (Brgy. Paltic Documentor)", role: "TUPAD_ASSISTING_DOCUMENTOR", brgy: "Paltic", pass: "PALTIC123" },
         peso_umiray_doc: { fullName: "JUAN (Brgy. Umiray Documentor)", role: "TUPAD_ASSISTING_DOCUMENTOR", brgy: "Umiray", pass: "UMIRAY123" },
         peso_aplaya_doc: { fullName: "LIZA (Brgy. Aplaya Documentor)", role: "TUPAD_ASSISTING_DOCUMENTOR", brgy: "Aplaya", pass: "APLAYA123" },
+        peso_bnb_doc: { fullName: "SHEM (Brgy. Butas na Bato Documentor)", role: "TUPAD_ASSISTING_DOCUMENTOR", brgy: "Butas na Bato", pass: "BUTAS NA BATO123" },
+        peso_davildavilan_doc: { fullName: "DAVILDAVILAN DOC (Brgy. Davildavilan Documentor)", role: "TUPAD_ASSISTING_DOCUMENTOR", brgy: "Davildavilan", pass: "DAVILDAVILAN123" },
+        peso_tanawan_doc: { fullName: "TANAWAN DOC (Brgy. Tanawan Documentor)", role: "TUPAD_ASSISTING_DOCUMENTOR", brgy: "Tanawan", pass: "TANAWAN123" },
+        peso_dika_doc: { fullName: "DIKAPANIKIAN DOC (Brgy. Dikapanikian Documentor)", role: "TUPAD_ASSISTING_DOCUMENTOR", brgy: "Dikapanikian", pass: "DIKAPANIKIAN123" },
         peso_paltic: { fullName: "RAMONITA", role: "TUPAD_COORDINATOR", brgy: "Paltic", pass: "PALTIC123" },
       };
 

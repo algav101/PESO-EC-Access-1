@@ -540,75 +540,130 @@ export async function getPendingQueueCount(): Promise<number> {
 }
 
 export async function pushSyncQueue() {
-  if (typeof window === "undefined") return { accepted: 0, failed: 0 };
+  if (typeof window === "undefined") return { accepted: [], failed: [], duplicates: [], conflicts: [], errors: {} };
   const queueToSync = await offlineDb.offlineQueue
     .where("status")
     .anyOf(["PENDING", "FAILED"])
     .toArray();
-  if (queueToSync.length === 0) return { accepted: 0, failed: 0 };
+  if (queueToSync.length === 0) return { accepted: [], failed: [], duplicates: [], conflicts: [], errors: {} };
 
-  // Mark in-flight as SYNCING
+  // Mark in-flight items as SYNCING
   for (const item of queueToSync) {
     if (item.id) {
       await offlineDb.offlineQueue.update(item.id, { status: "SYNCING" });
     }
   }
 
-  try {
-    const res = await fetch("/api/v1/sync/push", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ transactions: queueToSync }),
-    });
+  // Split queue into chunks: PHOTO items pushed individually (or in pairs) to keep HTTP payload < 1MB, other items in batches of 20
+  const chunks: OfflineTransaction[][] = [];
+  let currentNonPhotoChunk: OfflineTransaction[] = [];
 
-    if (!res.ok) {
-      const errData = await res.json().catch(() => ({}));
-      throw new Error(errData.error || `Sync push failed with status ${res.status}`);
-    }
-
-    const result = await res.json();
-    const errors = result.errors || {};
-
-    // Remove accepted / duplicates from offline queue; update failed / conflicts
-    for (const item of queueToSync) {
-      if (
-        result.accepted?.includes(item.clientTransactionId) ||
-        result.duplicates?.includes(item.clientTransactionId)
-      ) {
-        // Successful sync to system main storage: remove from local offline queue
-        if (item.id) {
-          await offlineDb.offlineQueue.delete(item.id);
-        }
-      } else if (result.conflicts?.includes(item.clientTransactionId)) {
-        await offlineDb.offlineQueue.update(item.id!, {
-          status: "CONFLICT",
-          lastError: errors[item.clientTransactionId] || "Conflict detected on server",
-        });
-      } else {
-        await offlineDb.offlineQueue.update(item.id!, {
-          status: "FAILED",
-          retryCount: (item.retryCount || 0) + 1,
-          lastError: errors[item.clientTransactionId] || "Failed during sync processing",
-        });
+  for (const item of queueToSync) {
+    if (item.entityType === "PHOTO") {
+      // Photos get their own dedicated single-item chunk
+      chunks.push([item]);
+    } else {
+      currentNonPhotoChunk.push(item);
+      if (currentNonPhotoChunk.length >= 20) {
+        chunks.push(currentNonPhotoChunk);
+        currentNonPhotoChunk = [];
       }
     }
-
-    if (typeof window !== "undefined") {
-      window.dispatchEvent(new CustomEvent("tupad-offline-synced", { detail: result }));
-    }
-
-    return result;
-  } catch (error: any) {
-    console.error("Sync push error:", error);
-    for (const item of queueToSync) {
-      await offlineDb.offlineQueue.update(item.id!, {
-        status: "FAILED",
-        retryCount: (item.retryCount || 0) + 1,
-        lastError: error.message || "Network or server connection error",
-      });
-    }
-    return { accepted: 0, failed: queueToSync.length, error: error.message };
   }
+  if (currentNonPhotoChunk.length > 0) {
+    chunks.push(currentNonPhotoChunk);
+  }
+
+  const aggregateResult = {
+    accepted: [] as string[],
+    duplicates: [] as string[],
+    conflicts: [] as string[],
+    failed: [] as string[],
+    errors: {} as Record<string, string>,
+  };
+
+  for (const chunk of chunks) {
+    try {
+      const res = await fetch("/api/v1/sync/push", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ transactions: chunk }),
+      });
+
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        const errMsg = errData.error || `Sync push failed with status ${res.status}`;
+        for (const item of chunk) {
+          aggregateResult.failed.push(item.clientTransactionId);
+          aggregateResult.errors[item.clientTransactionId] = errMsg;
+          if (item.id) {
+            await offlineDb.offlineQueue.update(item.id, {
+              status: "FAILED",
+              retryCount: (item.retryCount || 0) + 1,
+              lastError: errMsg,
+            });
+          }
+        }
+        continue;
+      }
+
+      const result = await res.json();
+      const errors = result.errors || {};
+
+      for (const item of chunk) {
+        const txId = item.clientTransactionId;
+        if (result.accepted?.includes(txId) || result.duplicates?.includes(txId)) {
+          if (result.accepted?.includes(txId)) aggregateResult.accepted.push(txId);
+          if (result.duplicates?.includes(txId)) aggregateResult.duplicates.push(txId);
+          // Successfully synced to central storage: remove from local offline queue
+          if (item.id) {
+            await offlineDb.offlineQueue.delete(item.id);
+          }
+        } else if (result.conflicts?.includes(txId)) {
+          aggregateResult.conflicts.push(txId);
+          const err = errors[txId] || "Conflict detected on server";
+          aggregateResult.errors[txId] = err;
+          if (item.id) {
+            await offlineDb.offlineQueue.update(item.id, {
+              status: "CONFLICT",
+              lastError: err,
+            });
+          }
+        } else {
+          aggregateResult.failed.push(txId);
+          const err = errors[txId] || "Failed during sync processing";
+          aggregateResult.errors[txId] = err;
+          if (item.id) {
+            await offlineDb.offlineQueue.update(item.id, {
+              status: "FAILED",
+              retryCount: (item.retryCount || 0) + 1,
+              lastError: err,
+            });
+          }
+        }
+      }
+    } catch (chunkErr: any) {
+      console.error("Chunk sync push error:", chunkErr);
+      for (const item of chunk) {
+        aggregateResult.failed.push(item.clientTransactionId);
+        aggregateResult.errors[item.clientTransactionId] = chunkErr.message || "Network or connection error";
+        if (item.id) {
+          await offlineDb.offlineQueue.update(item.id, {
+            status: "FAILED",
+            retryCount: (item.retryCount || 0) + 1,
+            lastError: chunkErr.message || "Network or connection error",
+          });
+        }
+      }
+    }
+  }
+
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new CustomEvent("tupad-offline-synced", { detail: aggregateResult }));
+    window.dispatchEvent(new CustomEvent("tupad-photos-updated"));
+  }
+
+  return aggregateResult;
 }
 
 export async function retryOfflineTransaction(id: number) {

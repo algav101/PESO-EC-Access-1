@@ -4,6 +4,7 @@ import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getCurrentUser, isAdminUser, hasPermission } from "@/lib/auth";
 import { logAudit } from "@/lib/audit";
+import { normalizeBarangayName } from "@/lib/utils";
 
 export async function GET(request: Request) {
   try {
@@ -19,9 +20,11 @@ export async function GET(request: Request) {
 
     // Enforce coordinator / assisting documentor barangay scope
     if ((user.role === "TUPAD_COORDINATOR" || user.role === "TUPAD_ASSISTING_DOCUMENTOR") && user.assignedBarangay) {
-      whereClause.barangay = user.assignedBarangay;
+      const canonicalBrgy = normalizeBarangayName(user.assignedBarangay);
+      whereClause.barangay = { contains: canonicalBrgy, mode: "insensitive" };
     } else if (barangay && barangay !== "ALL") {
-      whereClause.barangay = barangay;
+      const canonicalBrgy = normalizeBarangayName(barangay);
+      whereClause.barangay = { contains: canonicalBrgy, mode: "insensitive" };
     }
 
     // DOLE coordinator sees only approved photos
@@ -73,22 +76,47 @@ export async function POST(request: Request) {
       capturedAt,
     } = body;
 
-    const actualBarangay =
+    const rawBarangay =
       (user.role === "TUPAD_COORDINATOR" || user.role === "TUPAD_ASSISTING_DOCUMENTOR") && user.assignedBarangay
         ? user.assignedBarangay
         : barangay;
 
-    if (!programId || !actualBarangay) {
+    if (!programId || !rawBarangay) {
       return NextResponse.json({ error: "Program and Barangay are required" }, { status: 400 });
     }
 
-    // If workDayId is not given but workDayNumber is provided, resolve workDay
-    let resolvedWorkDayId = workDayId || null;
-    if (!resolvedWorkDayId && workDayNumber) {
-      const wd = await prisma.workDay.findFirst({
-        where: { programId, dayNumber: Number(workDayNumber) },
-      });
-      if (wd) resolvedWorkDayId = wd.id;
+    const actualBarangay = normalizeBarangayName(rawBarangay);
+
+    // If workDayId is not given or is a client placeholder, resolve real workDay
+    let resolvedWorkDayId: string | null = null;
+    if (workDayId && !String(workDayId).startsWith("WD-") && String(workDayId).length > 10) {
+      const wdExists = await prisma.workDay.findUnique({ where: { id: workDayId } });
+      if (wdExists) resolvedWorkDayId = wdExists.id;
+    }
+
+    if (!resolvedWorkDayId && (workDayNumber || workDayId)) {
+      const dayNum = Number(workDayNumber || String(workDayId).replace("WD-", ""));
+      if (!isNaN(dayNum) && dayNum > 0) {
+        const wd = await prisma.workDay.findFirst({
+          where: { programId, dayNumber: dayNum },
+        });
+        if (wd) resolvedWorkDayId = wd.id;
+      }
+    }
+
+    // Validate workProgramItemId if provided to prevent Foreign Key constraint crash
+    let validWorkProgramItemId: string | null = null;
+    if (workProgramItemId && workProgramItemId !== "AUTO" && !String(workProgramItemId).startsWith("WP-")) {
+      try {
+        const itemExists = await prisma.tupadWorkProgramItem.findUnique({
+          where: { id: workProgramItemId },
+        });
+        if (itemExists) {
+          validWorkProgramItemId = itemExists.id;
+        }
+      } catch (err) {
+        console.warn("Invalid workProgramItemId format, falling back to null:", workProgramItemId);
+      }
     }
 
     const finalFileKey = photoData || fileKey || `photo_${Date.now()}`;
@@ -97,7 +125,7 @@ export async function POST(request: Request) {
       data: {
         programId,
         workDayId: resolvedWorkDayId,
-        workProgramItemId: workProgramItemId || null,
+        workProgramItemId: validWorkProgramItemId,
         barangay: actualBarangay,
         sitio: sitio || null,
         workArea: workArea || sitio || null,
@@ -119,7 +147,7 @@ export async function POST(request: Request) {
       action: "PHOTO_UPLOADED",
       entityType: "ACCOMPLISHMENT_PHOTO",
       entityId: photo.id,
-      metadata: { barangay: actualBarangay, latitude, longitude, specificActivity },
+      metadata: { barangay: actualBarangay, latitude, longitude, specificActivity, workDayNumber: workDayNumber || null },
     });
 
     return NextResponse.json({ success: true, photo }, { status: 201 });

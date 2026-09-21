@@ -5,6 +5,8 @@ import { getCurrentUser, isAdminUser, hasPermission } from "@/lib/auth";
 import prisma from "@/lib/prisma";
 import { logAudit } from "@/lib/audit";
 
+import { normalizeBarangayName } from "@/lib/utils";
+
 export async function GET(request: Request, { params }: { params: { id: string } }) {
   try {
     const user = await getCurrentUser();
@@ -18,9 +20,11 @@ export async function GET(request: Request, { params }: { params: { id: string }
 
     const whereClause: any = { programId: params.id };
     if ((user.role === "TUPAD_COORDINATOR" || user.role === "TUPAD_ASSISTING_DOCUMENTOR") && user.assignedBarangay) {
-      whereClause.barangay = { contains: user.assignedBarangay };
-    } else if (barangay) {
-      whereClause.barangay = { contains: barangay };
+      const canonicalBrgy = normalizeBarangayName(user.assignedBarangay);
+      whereClause.barangay = { contains: canonicalBrgy, mode: "insensitive" };
+    } else if (barangay && barangay !== "ALL") {
+      const canonicalBrgy = normalizeBarangayName(barangay);
+      whereClause.barangay = { contains: canonicalBrgy, mode: "insensitive" };
     }
 
     const workPrograms = await prisma.tupadWorkProgram.findMany({
