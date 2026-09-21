@@ -316,68 +316,94 @@ export default function PhotosPage() {
         : uploadBarangay
     );
 
-    // 1. Top Header Banner
-    const topBannerHeight = Math.round(height * 0.09);
-    ctx.fillStyle = "rgba(10, 25, 47, 0.88)";
-    ctx.fillRect(0, 0, width, topBannerHeight);
+    // Helper to finish drawing banners and export dataUrl
+    const renderBannersAndFinalize = (logoImage?: HTMLImageElement) => {
+      // 1. Top Header Banner
+      const topBannerHeight = Math.round(height * 0.09);
+      ctx.fillStyle = "rgba(10, 25, 47, 0.90)";
+      ctx.fillRect(0, 0, width, topBannerHeight);
 
-    ctx.fillStyle = "#F59E0B"; // Gold
-    ctx.font = `bold ${baseFontSize}px sans-serif`;
-    ctx.fillText("🇵🇭 LGU DINGALAN • DOLE TUPAD ACCOMPLISHMENT PROOF", padding, topBannerHeight * 0.48);
+      let textStartX = padding;
 
-    ctx.fillStyle = "#FFFFFF";
-    ctx.font = `bold ${smallFontSize}px monospace`;
-    ctx.textAlign = "right";
-    ctx.fillText(`DAY ${uploadWorkDayNumber} • BRGY. ${targetBrgy.toUpperCase()}`, width - padding, topBannerHeight * 0.48);
-    ctx.textAlign = "left";
+      // Draw PESO EC Access Emblem Logo if available
+      if (logoImage && logoImage.complete && logoImage.naturalWidth > 0) {
+        const logoSize = Math.round(topBannerHeight * 0.72);
+        const logoY = Math.round((topBannerHeight - logoSize) / 2);
+        ctx.drawImage(logoImage, padding, logoY, logoSize, logoSize);
+        textStartX = padding + logoSize + Math.round(width * 0.01);
+      }
 
-    // 2. Bottom Geotag & Activity Banner
-    const bottomBannerHeight = Math.round(height * 0.22);
-    const bottomY = height - bottomBannerHeight;
+      ctx.fillStyle = "#F59E0B"; // Gold
+      ctx.font = `bold ${baseFontSize}px sans-serif`;
+      ctx.textBaseline = "middle";
+      ctx.fillText("PESO-Dingalan TUPAD EC Management", textStartX, topBannerHeight / 2);
 
-    ctx.fillStyle = "rgba(0, 0, 0, 0.88)";
-    ctx.fillRect(0, bottomY, width, bottomBannerHeight);
+      ctx.fillStyle = "#FFFFFF";
+      ctx.font = `bold ${smallFontSize}px monospace`;
+      ctx.textAlign = "right";
+      ctx.fillText(`DAY ${uploadWorkDayNumber} • BRGY. ${targetBrgy.toUpperCase()}`, width - padding, topBannerHeight / 2);
+      ctx.textAlign = "left";
+      ctx.textBaseline = "alphabetic";
 
-    // Top blue accent line
-    ctx.fillStyle = "#3B82F6";
-    ctx.fillRect(0, bottomY, width, 4);
+      // 2. Bottom Geotag & Activity Banner
+      const bottomBannerHeight = Math.round(height * 0.22);
+      const bottomY = height - bottomBannerHeight;
 
-    const lineSpacing = Math.round(bottomBannerHeight * 0.22);
+      ctx.fillStyle = "rgba(0, 0, 0, 0.88)";
+      ctx.fillRect(0, bottomY, width, bottomBannerHeight);
 
-    // Line 1: Work Area & Location
-    ctx.fillStyle = "#93C5FD"; // Light Blue
-    ctx.font = `bold ${smallFontSize}px monospace`;
-    ctx.fillText("📍 LOCATION & WORK AREA:", padding, bottomY + lineSpacing * 1);
-    ctx.fillStyle = "#FFFFFF";
-    ctx.font = `bold ${baseFontSize}px sans-serif`;
-    ctx.fillText(`${uploadWorkArea || uploadSitio || targetBrgy} (Barangay ${targetBrgy})`, padding + Math.round(width * 0.28), bottomY + lineSpacing * 1);
+      // Top blue accent line
+      ctx.fillStyle = "#3B82F6";
+      ctx.fillRect(0, bottomY, width, 4);
 
-    // Line 2: Specific Activity
-    ctx.fillStyle = "#FDE68A"; // Yellow
-    ctx.font = `bold ${smallFontSize}px monospace`;
-    ctx.fillText("🔨 SPECIFIC ACTIVITY:", padding, bottomY + lineSpacing * 2);
-    ctx.fillStyle = "#FFFFFF";
-    ctx.font = `bold ${smallFontSize + 1}px sans-serif`;
-    const activityText = uploadSpecificActivity || "Emergency Employment Community Work";
-    const truncatedActivity = activityText.length > 70 ? activityText.slice(0, 67) + "..." : activityText;
-    ctx.fillText(truncatedActivity, padding + Math.round(width * 0.28), bottomY + lineSpacing * 2);
+      const lineSpacing = Math.round(bottomBannerHeight * 0.22);
 
-    // Line 3: GPS Coordinates & Timestamp
-    const now = new Date();
-    const formattedDate = formatDate(now.toISOString(), "MM/dd/yyyy hh:mm:ss a");
-    ctx.fillStyle = "#34D399"; // Emerald
-    ctx.font = `bold ${smallFontSize}px monospace`;
-    ctx.fillText("🌐 GPS / TIMESTAMP:", padding, bottomY + lineSpacing * 3);
-    ctx.fillStyle = "#E2E8F0";
-    ctx.fillText(`GPS: ${gpsCoords.lat.toFixed(5)}°N, ${gpsCoords.lng.toFixed(5)}°E  •  PST: ${formattedDate}`, padding + Math.round(width * 0.28), bottomY + lineSpacing * 3);
+      // Line 1: Work Area & Location
+      ctx.fillStyle = "#93C5FD"; // Light Blue
+      ctx.font = `bold ${smallFontSize}px monospace`;
+      ctx.fillText("📍 LOCATION & WORK AREA:", padding, bottomY + lineSpacing * 1);
+      ctx.fillStyle = "#FFFFFF";
+      ctx.font = `bold ${baseFontSize}px sans-serif`;
+      ctx.fillText(`${uploadWorkArea || uploadSitio || targetBrgy} (Barangay ${targetBrgy})`, padding + Math.round(width * 0.28), bottomY + lineSpacing * 1);
 
-    // Line 4: Coordinator Sign
-    ctx.fillStyle = "#CBD5E1";
-    ctx.font = `italic ${smallFontSize - 1}px sans-serif`;
-    ctx.fillText(`Documented by: ${user?.fullName || "Field Coordinator"} • LGU Dingalan TUPAD Engine`, padding, bottomY + lineSpacing * 3.9);
+      // Line 2: Specific Activity
+      ctx.fillStyle = "#FDE68A"; // Yellow
+      ctx.font = `bold ${smallFontSize}px monospace`;
+      ctx.fillText("🔨 SPECIFIC ACTIVITY:", padding, bottomY + lineSpacing * 2);
+      ctx.fillStyle = "#FFFFFF";
+      ctx.font = `bold ${smallFontSize + 1}px sans-serif`;
+      const activityText = uploadSpecificActivity || "Emergency Employment Community Work";
+      const truncatedActivity = activityText.length > 70 ? activityText.slice(0, 67) + "..." : activityText;
+      ctx.fillText(truncatedActivity, padding + Math.round(width * 0.28), bottomY + lineSpacing * 2);
 
-    const dataUrl = canvas.toDataURL("image/jpeg", 0.78);
-    setCapturedImagePreview(dataUrl);
+      // Line 3: GPS Coordinates & Timestamp
+      const now = new Date();
+      const formattedDate = formatDate(now.toISOString(), "MM/dd/yyyy hh:mm:ss a");
+      ctx.fillStyle = "#34D399"; // Emerald
+      ctx.font = `bold ${smallFontSize}px monospace`;
+      ctx.fillText("🌐 GPS / TIMESTAMP:", padding, bottomY + lineSpacing * 3);
+      ctx.fillStyle = "#E2E8F0";
+      ctx.fillText(`GPS: ${gpsCoords.lat.toFixed(5)}°N, ${gpsCoords.lng.toFixed(5)}°E  •  PST: ${formattedDate}`, padding + Math.round(width * 0.28), bottomY + lineSpacing * 3);
+
+      // Line 4: Coordinator Sign
+      ctx.fillStyle = "#CBD5E1";
+      ctx.font = `italic ${smallFontSize - 1}px sans-serif`;
+      ctx.fillText(`Documented by: ${user?.fullName || "Field Coordinator"} • PESO-Dingalan TUPAD EC Management`, padding, bottomY + lineSpacing * 3.9);
+
+      const dataUrl = canvas.toDataURL("image/jpeg", 0.78);
+      setCapturedImagePreview(dataUrl);
+    };
+
+    // Load PESO EC Access Emblem logo
+    const logoImg = new Image();
+    logoImg.crossOrigin = "anonymous";
+    logoImg.onload = () => {
+      renderBannersAndFinalize(logoImg);
+    };
+    logoImg.onerror = () => {
+      renderBannersAndFinalize();
+    };
+    logoImg.src = "/images/peso-ec-access-emblem.png";
   };
 
   // Handle native mobile file input capture
