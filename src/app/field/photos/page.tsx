@@ -50,8 +50,12 @@ export default function PhotosPage() {
   const [viewingPhoto, setViewingPhoto] = useState<any | null>(null);
   const [qrGeneratorOpen, setQrGeneratorOpen] = useState(false);
 
+  // Stage filter for photo gallery
+  const [selectedStageFilter, setSelectedStageFilter] = useState<string>("ALL");
+
   // Camera & Capture Modal state
   const [isUploadOpen, setIsUploadOpen] = useState(false);
+  const [uploadPhotoStage, setUploadPhotoStage] = useState<"BEFORE" | "DURING" | "AFTER">("DURING");
   const [uploadBarangay, setUploadBarangay] = useState("Paltic");
   const [uploadSitio, setUploadSitio] = useState("Centro");
   const [uploadWorkDayNumber, setUploadWorkDayNumber] = useState<number>(1);
@@ -66,7 +70,19 @@ export default function PhotosPage() {
   const [gpsStatus, setGpsStatus] = useState<string>("Locating GPS...");
 
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const rawImageElementRef = useRef<HTMLImageElement | null>(null);
   const [workPrograms, setWorkPrograms] = useState<any[]>([]);
+
+  // Helper to extract or detect stage (BEFORE, DURING, AFTER) from photo object
+  const getPhotoStage = (photo: any): "BEFORE" | "DURING" | "AFTER" => {
+    if (photo.photoStage && ["BEFORE", "DURING", "AFTER"].includes(String(photo.photoStage).toUpperCase())) {
+      return String(photo.photoStage).toUpperCase() as "BEFORE" | "DURING" | "AFTER";
+    }
+    const act = (photo.specificActivity || "").toUpperCase();
+    if (act.includes("[BEFORE]") || act.startsWith("BEFORE:") || act.startsWith("BEFORE -")) return "BEFORE";
+    if (act.includes("[AFTER]") || act.startsWith("AFTER:") || act.startsWith("AFTER -")) return "AFTER";
+    return "DURING";
+  };
 
   useEffect(() => {
     fetchPrograms();
@@ -280,7 +296,11 @@ export default function PhotosPage() {
   };
 
   // Burn Geotag Data Directly into Image Canvas with optimized dimensions
-  const processAndBurnGeotag = (sourceElement: HTMLImageElement) => {
+  const processAndBurnGeotag = (
+    sourceElement: HTMLImageElement,
+    stageOverride?: "BEFORE" | "DURING" | "AFTER"
+  ) => {
+    rawImageElementRef.current = sourceElement;
     const canvas = document.createElement("canvas");
     let width = sourceElement.naturalWidth || 1280;
     let height = sourceElement.naturalHeight || 720;
@@ -309,6 +329,7 @@ export default function PhotosPage() {
     const baseFontSize = Math.max(13, Math.round(width * 0.022));
     const smallFontSize = Math.max(10, Math.round(width * 0.016));
     const padding = Math.round(width * 0.02);
+    const activeStage = stageOverride || uploadPhotoStage;
 
     const targetBrgy = normalizeBarangayName(
       (user?.role === "TUPAD_COORDINATOR" || user?.role === "TUPAD_ASSISTING_DOCUMENTOR") && user.assignedBarangay
@@ -338,10 +359,59 @@ export default function PhotosPage() {
       ctx.textBaseline = "middle";
       ctx.fillText("PESO-Dingalan TUPAD EC Management", textStartX, topBannerHeight / 2);
 
+      // Right Text: DAY # • BRGY. ...
+      const rightText = `DAY ${uploadWorkDayNumber} • BRGY. ${targetBrgy.toUpperCase()}`;
+      ctx.font = `bold ${smallFontSize}px monospace`;
+      const rightTextWidth = ctx.measureText(rightText).width;
+
+      // Stage Pill Badge (BEFORE / DURING / AFTER)
+      const stagePillText = activeStage;
+      ctx.font = `bold ${Math.max(10, Math.round(smallFontSize * 0.95))}px sans-serif`;
+      const stagePillMetrics = ctx.measureText(stagePillText);
+      const pillPadX = Math.max(7, Math.round(width * 0.008));
+      const pillW = stagePillMetrics.width + pillPadX * 2;
+      const pillH = Math.round(topBannerHeight * 0.52);
+      const pillX = width - padding - rightTextWidth - pillW - Math.round(width * 0.014);
+      const pillY = Math.round((topBannerHeight - pillH) / 2);
+
+      let stageBgColor = "#3B82F6"; // DURING (Blue)
+      let stageTextColor = "#FFFFFF";
+      if (activeStage === "BEFORE") {
+        stageBgColor = "#F59E0B"; // BEFORE (Amber)
+        stageTextColor = "#0F172A";
+      } else if (activeStage === "AFTER") {
+        stageBgColor = "#10B981"; // AFTER (Emerald)
+        stageTextColor = "#FFFFFF";
+      }
+
+      if (pillX > textStartX + Math.round(width * 0.28)) {
+        ctx.fillStyle = stageBgColor;
+        const r = 4;
+        ctx.beginPath();
+        ctx.moveTo(pillX + r, pillY);
+        ctx.lineTo(pillX + pillW - r, pillY);
+        ctx.quadraticCurveTo(pillX + pillW, pillY, pillX + pillW, pillY + r);
+        ctx.lineTo(pillX + pillW, pillY + pillH - r);
+        ctx.quadraticCurveTo(pillX + pillW, pillY + pillH, pillX + pillW - r, pillY + pillH);
+        ctx.lineTo(pillX + r, pillY + pillH);
+        ctx.quadraticCurveTo(pillX, pillY + pillH, pillX, pillY + pillH - r);
+        ctx.lineTo(pillX, pillY + r);
+        ctx.quadraticCurveTo(pillX, pillY, pillX + r, pillY);
+        ctx.closePath();
+        ctx.fill();
+
+        ctx.fillStyle = stageTextColor;
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText(stagePillText, pillX + pillW / 2, topBannerHeight / 2);
+      }
+
+      // Draw Right Text
       ctx.fillStyle = "#FFFFFF";
       ctx.font = `bold ${smallFontSize}px monospace`;
       ctx.textAlign = "right";
-      ctx.fillText(`DAY ${uploadWorkDayNumber} • BRGY. ${targetBrgy.toUpperCase()}`, width - padding, topBannerHeight / 2);
+      ctx.textBaseline = "middle";
+      ctx.fillText(rightText, width - padding, topBannerHeight / 2);
       ctx.textAlign = "left";
       ctx.textBaseline = "alphabetic";
 
@@ -366,13 +436,15 @@ export default function PhotosPage() {
       ctx.font = `bold ${baseFontSize}px sans-serif`;
       ctx.fillText(`${uploadWorkArea || uploadSitio || targetBrgy} (Barangay ${targetBrgy})`, padding + Math.round(width * 0.28), bottomY + lineSpacing * 1);
 
-      // Line 2: Specific Activity
+      // Line 2: Specific Activity with Stage
       ctx.fillStyle = "#FDE68A"; // Yellow
       ctx.font = `bold ${smallFontSize}px monospace`;
-      ctx.fillText("🔨 SPECIFIC ACTIVITY:", padding, bottomY + lineSpacing * 2);
+      ctx.fillText(`🔨 ACTIVITY [${activeStage}]:`, padding, bottomY + lineSpacing * 2);
       ctx.fillStyle = "#FFFFFF";
       ctx.font = `bold ${smallFontSize + 1}px sans-serif`;
-      const activityText = uploadSpecificActivity || "Emergency Employment Community Work";
+      const baseActivity = uploadSpecificActivity || "Emergency Employment Community Work";
+      const cleanActivity = baseActivity.replace(/^\[(BEFORE|DURING|AFTER)\]\s*/i, "");
+      const activityText = `[${activeStage}] ${cleanActivity}`;
       const truncatedActivity = activityText.length > 70 ? activityText.slice(0, 67) + "..." : activityText;
       ctx.fillText(truncatedActivity, padding + Math.round(width * 0.28), bottomY + lineSpacing * 2);
 
@@ -406,6 +478,14 @@ export default function PhotosPage() {
     logoImg.src = "/images/peso-ec-access-emblem.png";
   };
 
+  // Stage toggle handler that dynamically updates live preview
+  const handleStageSelect = (newStage: "BEFORE" | "DURING" | "AFTER") => {
+    setUploadPhotoStage(newStage);
+    if (rawImageElementRef.current) {
+      processAndBurnGeotag(rawImageElementRef.current, newStage);
+    }
+  };
+
   // Handle native mobile file input capture
   const handleNativeFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -437,6 +517,10 @@ export default function PhotosPage() {
         : uploadBarangay
     );
 
+    const baseActivity = uploadSpecificActivity || "Emergency Employment Community Work";
+    const cleanActivity = baseActivity.replace(/^\[(BEFORE|DURING|AFTER)\]\s*/i, "");
+    const formattedSpecificActivity = `[${uploadPhotoStage}] ${cleanActivity}`;
+
     const photoPayload = {
       programId: selectedProgramId || programs[0]?.id,
       workDayNumber: uploadWorkDayNumber,
@@ -444,7 +528,8 @@ export default function PhotosPage() {
       barangay: targetBarangay,
       sitio: uploadSitio,
       workArea: uploadWorkArea || uploadSitio,
-      specificActivity: uploadSpecificActivity,
+      specificActivity: formattedSpecificActivity,
+      photoStage: uploadPhotoStage,
       photoData: capturedImagePreview,
       latitude: gpsCoords.lat,
       longitude: gpsCoords.lng,
@@ -463,6 +548,7 @@ export default function PhotosPage() {
           if (res.ok) {
             setIsUploadOpen(false);
             setCapturedImagePreview(null);
+            rawImageElementRef.current = null;
             setUploadWorkProgramItemId("");
             setUploadWorkArea("");
             setUploadSpecificActivity("");
@@ -482,6 +568,7 @@ export default function PhotosPage() {
 
       setIsUploadOpen(false);
       setCapturedImagePreview(null);
+      rawImageElementRef.current = null;
       setUploadWorkProgramItemId("");
       setUploadWorkArea("");
       setUploadSpecificActivity("");
@@ -568,10 +655,18 @@ export default function PhotosPage() {
     (it: any) => it.dayNumber === uploadWorkDayNumber
   );
 
-  // Filter displayed photos by selected barangay if Admin selected a filter
+  // Filter displayed photos by selected barangay and stage
   const displayedPhotos = photos.filter((photo) => {
-    if (!isAdmin || selectedBarangayFilter === "ALL") return true;
-    return normalizeBarangayName(photo.barangay).toUpperCase() === selectedBarangayFilter.toUpperCase();
+    if (isAdmin && selectedBarangayFilter !== "ALL") {
+      if (normalizeBarangayName(photo.barangay).toUpperCase() !== selectedBarangayFilter.toUpperCase()) {
+        return false;
+      }
+    }
+    if (selectedStageFilter !== "ALL") {
+      const stage = getPhotoStage(photo);
+      if (stage !== selectedStageFilter) return false;
+    }
+    return true;
   });
 
   const pendingOfflineCount = photos.filter((p) => p.status === "PENDING_SYNC" || p.isOfflineQueue).length;
@@ -622,6 +717,7 @@ export default function PhotosPage() {
               onClick={() => {
                 setIsUploadOpen(true);
                 setCapturedImagePreview(null);
+                rawImageElementRef.current = null;
               }}
               className="px-4 py-2 bg-gov-blue hover:bg-gov-dark text-white font-bold text-xs rounded-xl shadow-md flex items-center space-x-2 transition"
             >
@@ -671,6 +767,23 @@ export default function PhotosPage() {
               </select>
             </div>
           )}
+
+          {/* Documentation Phase / Stage Filter */}
+          <div className="flex items-center space-x-2">
+            <label className="text-xs font-bold text-slate-700 uppercase flex items-center space-x-1">
+              <span>Phase:</span>
+            </label>
+            <select
+              value={selectedStageFilter}
+              onChange={(e) => setSelectedStageFilter(e.target.value)}
+              className="px-2.5 py-1.5 text-xs font-bold border rounded-lg bg-slate-50 font-semibold"
+            >
+              <option value="ALL">All Phases</option>
+              <option value="BEFORE">🟡 Before Work</option>
+              <option value="DURING">🔵 During Work</option>
+              <option value="AFTER">🟢 After Work</option>
+            </select>
+          </div>
         </div>
 
         {/* Storage Metrics & Multi-Select bar */}
@@ -740,6 +853,7 @@ export default function PhotosPage() {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
         {displayedPhotos.map((photo) => {
           const isImageUri = photo.fileKey && photo.fileKey.startsWith("data:image");
+          const photoStage = getPhotoStage(photo);
 
           return (
             <div
@@ -753,20 +867,32 @@ export default function PhotosPage() {
                 className="relative aspect-video bg-slate-900 overflow-hidden cursor-pointer"
                 onClick={() => setViewingPhoto(photo)}
               >
-                {/* Checkbox for Admin selection */}
-                {isAdmin && (
-                  <div
-                    className="absolute top-2 left-2 z-20"
-                    onClick={(e) => e.stopPropagation()}
-                  >
+                {/* Stage Badge & Admin Checkbox */}
+                <div
+                  className="absolute top-2 left-2 z-20 flex items-center space-x-1.5"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  {isAdmin && (
                     <input
                       type="checkbox"
                       checked={selectedPhotoIds.includes(photo.id)}
                       onChange={() => toggleSelectPhoto(photo.id)}
                       className="w-4 h-4 text-rose-600 rounded bg-white/90 cursor-pointer shadow"
                     />
-                  </div>
-                )}
+                  )}
+                  <span
+                    className={`text-[9px] font-black uppercase px-2 py-0.5 rounded-md shadow-md tracking-wider flex items-center space-x-1 ${
+                      photoStage === "BEFORE"
+                        ? "bg-amber-500 text-slate-950 font-black ring-1 ring-amber-300"
+                        : photoStage === "AFTER"
+                        ? "bg-emerald-600 text-white font-black ring-1 ring-emerald-400"
+                        : "bg-blue-600 text-white font-black ring-1 ring-blue-400"
+                    }`}
+                  >
+                    <span>{photoStage === "BEFORE" ? "🟡" : photoStage === "AFTER" ? "🟢" : "🔵"}</span>
+                    <span>{photoStage}</span>
+                  </span>
+                </div>
 
                 {/* Status Badge Overlay */}
                 <div className="absolute top-2 right-2 z-20">
@@ -860,9 +986,22 @@ export default function PhotosPage() {
           <div className="relative max-w-3xl w-full bg-slate-900 rounded-2xl overflow-hidden shadow-2xl border border-slate-700 flex flex-col max-h-[90vh]">
             <div className="p-4 bg-slate-950 flex items-center justify-between border-b border-slate-800 text-white">
               <div className="space-y-0.5">
-                <h3 className="text-sm font-bold text-gov-goldLight">
-                  Accomplishment Photo Proof • Day {viewingPhoto.workDay?.dayNumber || 1} (Brgy. {viewingPhoto.barangay})
-                </h3>
+                <div className="flex items-center space-x-2">
+                  <span
+                    className={`text-[10px] font-black uppercase px-2 py-0.5 rounded shadow ${
+                      getPhotoStage(viewingPhoto) === "BEFORE"
+                        ? "bg-amber-500 text-slate-950 font-black"
+                        : getPhotoStage(viewingPhoto) === "AFTER"
+                        ? "bg-emerald-600 text-white font-black"
+                        : "bg-blue-600 text-white font-black"
+                    }`}
+                  >
+                    {getPhotoStage(viewingPhoto)}
+                  </span>
+                  <h3 className="text-sm font-bold text-gov-goldLight">
+                    Accomplishment Photo Proof • Day {viewingPhoto.workDay?.dayNumber || 1} (Brgy. {viewingPhoto.barangay})
+                  </h3>
+                </div>
                 <p className="text-[11px] text-slate-400 font-mono">
                   GPS: {viewingPhoto.latitude}°N, {viewingPhoto.longitude}°E • By {viewingPhoto.uploadedBy?.fullName || "Coordinator"}
                 </p>
@@ -897,7 +1036,7 @@ export default function PhotosPage() {
               {viewingPhoto.fileKey && viewingPhoto.fileKey.startsWith("data:image") && (
                 <a
                   href={viewingPhoto.fileKey}
-                  download={`TUPAD_Accomplishment_${viewingPhoto.barangay}_Day${viewingPhoto.workDay?.dayNumber || 1}.jpg`}
+                  download={`TUPAD_Accomplishment_${viewingPhoto.barangay}_Day${viewingPhoto.workDay?.dayNumber || 1}_${getPhotoStage(viewingPhoto)}.jpg`}
                   className="px-3 py-1.5 bg-gov-blue hover:bg-gov-dark text-white rounded-lg font-bold flex items-center space-x-1.5 shadow"
                 >
                   <Download className="w-3.5 h-3.5" />
@@ -943,7 +1082,53 @@ export default function PhotosPage() {
               onSubmit={handleSavePhoto}
               className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-3 sm:space-y-4 text-xs"
             >
-              {/* Step 1: Select Scope & Activity */}
+              {/* Step 1: Select Stage / Phase */}
+              <div>
+                <label className="block text-[11px] font-black text-slate-800 uppercase mb-1.5 flex items-center justify-between">
+                  <span>Photo Stage / Phase *</span>
+                  <span className="text-[10px] text-slate-500 font-normal">Select Before, During, or After</span>
+                </label>
+                <div className="grid grid-cols-3 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => handleStageSelect("BEFORE")}
+                    className={`py-2 px-2 rounded-xl font-extrabold text-xs transition border flex items-center justify-center space-x-1.5 ${
+                      uploadPhotoStage === "BEFORE"
+                        ? "bg-amber-500 text-slate-950 border-amber-600 shadow-md ring-2 ring-amber-300 font-black"
+                        : "bg-amber-50/70 text-amber-900 border-amber-200 hover:bg-amber-100"
+                    }`}
+                  >
+                    <span>🟡</span>
+                    <span>BEFORE</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleStageSelect("DURING")}
+                    className={`py-2 px-2 rounded-xl font-extrabold text-xs transition border flex items-center justify-center space-x-1.5 ${
+                      uploadPhotoStage === "DURING"
+                        ? "bg-blue-600 text-white border-blue-700 shadow-md ring-2 ring-blue-300 font-black"
+                        : "bg-blue-50/70 text-blue-900 border-blue-200 hover:bg-blue-100"
+                    }`}
+                  >
+                    <span>🔵</span>
+                    <span>DURING</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleStageSelect("AFTER")}
+                    className={`py-2 px-2 rounded-xl font-extrabold text-xs transition border flex items-center justify-center space-x-1.5 ${
+                      uploadPhotoStage === "AFTER"
+                        ? "bg-emerald-600 text-white border-emerald-700 shadow-md ring-2 ring-emerald-300 font-black"
+                        : "bg-emerald-50/70 text-emerald-900 border-emerald-200 hover:bg-emerald-100"
+                    }`}
+                  >
+                    <span>🟢</span>
+                    <span>AFTER</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Step 2: Select Scope & Activity */}
               <div className="space-y-2.5">
                 <div className="grid grid-cols-2 gap-2.5">
                   <div>
