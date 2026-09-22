@@ -851,11 +851,11 @@ function BeneficiariesMasterlistContent() {
             </div>
           </div>
 
-          {(selectedBarangay !== "ALL" || selectedSitio !== "ALL" || selectedStubStatus !== "ALL" || searchQuery) && (
+          {((selectedBarangays.length > 0 && !selectedBarangays.includes("ALL")) || (selectedSitios.length > 0 && !selectedSitios.includes("ALL")) || selectedStubStatus !== "ALL" || searchQuery) && (
             <button
               onClick={() => {
-                setSelectedBarangay("ALL");
-                setSelectedSitio("ALL");
+                setSelectedBarangays(["ALL"]);
+                setSelectedSitios(["ALL"]);
                 setSelectedStubStatus("ALL");
                 setSearchQuery("");
                 setSortBy("designatedNumber");

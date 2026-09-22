@@ -17,6 +17,7 @@ export async function GET(request: Request, { params }: { params: { id: string }
     const barangay = searchParams.get("barangay");
     const status = searchParams.get("status");
     const query = searchParams.get("q");
+    const withSchedule = searchParams.get("withSchedule") === "true";
 
     const whereClause: any = { programId: params.id };
     if (status) {
@@ -102,6 +103,10 @@ export async function GET(request: Request, { params }: { params: { id: string }
       }
       return String(a.designatedNumber).localeCompare(String(b.designatedNumber), undefined, { numeric: true });
     });
+
+    if (!withSchedule) {
+      return NextResponse.json({ beneficiaries });
+    }
 
     // Query program details and work program items to attach 10-day nearest purok schedule
     const program = await prisma.program.findUnique({

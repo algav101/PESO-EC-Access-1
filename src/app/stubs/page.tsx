@@ -250,7 +250,7 @@ function StubsContent() {
   const fetchBeneficiaries = async (programId: string) => {
     setLoading(true);
     try {
-      const res = await fetch(`/api/v1/programs/${programId}/beneficiaries`);
+      const res = await fetch(`/api/v1/programs/${programId}/beneficiaries?withSchedule=true`);
       if (res.ok) {
         const data = await res.json();
         const benelist = data.beneficiaries || [];
@@ -520,8 +520,8 @@ function StubsContent() {
     setRangeStart("");
     setRangeEnd("");
     setFilterTable("ALL");
-    setSelectedBarangay("ALL");
-    setSelectedSitio("ALL");
+    setSelectedBarangays(["ALL"]);
+    setSelectedSitios(["ALL"]);
     setSortField("NUMERIC");
     setPreviewSheetPage(1);
   };
@@ -1345,7 +1345,7 @@ function StubsContent() {
                 />
               </div>
 
-              {(rangeStart || rangeEnd || selectedBarangay !== "ALL" || selectedSitio !== "ALL" || filterTable !== "ALL" || sortField !== "NUMERIC") && (
+              {(rangeStart || rangeEnd || (selectedBarangays.length > 0 && !selectedBarangays.includes("ALL")) || (selectedSitios.length > 0 && !selectedSitios.includes("ALL")) || filterTable !== "ALL" || sortField !== "NUMERIC") && (
                 <button
                   onClick={handleClearRange}
                   className="px-2 py-1 text-[11px] font-bold text-rose-600 hover:bg-rose-50 rounded"

@@ -111,19 +111,28 @@ export default function FieldWorkProgramPage() {
   const fetchProgramDetail = async (progId: string) => {
     try {
       setLoading(true);
-      // 1. Program details & workDays
-      const resProg = await fetch(`/api/v1/programs/${progId}`);
+
+      let wpUrl = `/api/v1/programs/${progId}/work-program`;
+      if (selectedBarangay && selectedBarangay !== "ALL") {
+        wpUrl += `?barangay=${encodeURIComponent(selectedBarangay)}`;
+      }
+
+      let beneUrl = `/api/v1/programs/${progId}/beneficiaries?withSchedule=false`;
+      if (selectedBarangay && selectedBarangay !== "ALL") {
+        beneUrl += `&barangay=${encodeURIComponent(selectedBarangay)}`;
+      }
+
+      const [resProg, resWp, resBene] = await Promise.all([
+        fetch(`/api/v1/programs/${progId}`),
+        fetch(wpUrl),
+        fetch(beneUrl),
+      ]);
+
       if (resProg.ok) {
         const data = await resProg.json();
         setProgram(data.program);
       }
 
-      // 2. Work Program activities for target barangay
-      let wpUrl = `/api/v1/programs/${progId}/work-program`;
-      if (selectedBarangay && selectedBarangay !== "ALL") {
-        wpUrl += `?barangay=${encodeURIComponent(selectedBarangay)}`;
-      }
-      const resWp = await fetch(wpUrl);
       if (resWp.ok) {
         const data = await resWp.json();
         const wps = data.workPrograms || [];
@@ -133,12 +142,6 @@ export default function FieldWorkProgramPage() {
         }
       }
 
-      // 3. Beneficiaries scoped to target barangay
-      let beneUrl = `/api/v1/programs/${progId}/beneficiaries`;
-      if (selectedBarangay && selectedBarangay !== "ALL") {
-        beneUrl += `?barangay=${encodeURIComponent(selectedBarangay)}`;
-      }
-      const resBene = await fetch(beneUrl);
       if (resBene.ok) {
         const data = await resBene.json();
         setBeneficiaries(data.beneficiaries || []);

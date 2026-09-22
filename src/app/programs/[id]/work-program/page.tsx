@@ -143,9 +143,43 @@ export default function WorkProgramManagementPage() {
   });
 
   useEffect(() => {
-    fetchProgramAndWorkPrograms();
     loadCustomGroups();
+    loadCachedData();
+    fetchProgramAndWorkPrograms(true);
   }, [params.id]);
+
+  const loadCachedData = () => {
+    try {
+      const cachedProg = sessionStorage.getItem(`tupad_cache_prog_${params.id}`);
+      const cachedWp = sessionStorage.getItem(`tupad_cache_wp_${params.id}`);
+      const cachedBen = sessionStorage.getItem(`tupad_cache_ben_${params.id}`);
+
+      let hasCached = false;
+      if (cachedProg) {
+        setProgram(JSON.parse(cachedProg));
+        hasCached = true;
+      }
+      if (cachedWp) {
+        const wps = JSON.parse(cachedWp);
+        setWorkPrograms(wps);
+        if (user?.role === "TUPAD_COORDINATOR" && user.assignedBarangay) {
+          setSelectedBarangay(user.assignedBarangay);
+        } else if (wps.length > 0 && !selectedBarangay) {
+          setSelectedBarangay(wps[0].barangay);
+        }
+        hasCached = true;
+      }
+      if (cachedBen) {
+        setBeneficiaries(JSON.parse(cachedBen));
+        hasCached = true;
+      }
+      if (hasCached) {
+        setLoading(false);
+      }
+    } catch (e) {
+      console.warn("Failed to load cached program hub data", e);
+    }
+  };
 
   const loadCustomGroups = () => {
     try {
@@ -162,16 +196,24 @@ export default function WorkProgramManagementPage() {
     }
   };
 
-  const fetchProgramAndWorkPrograms = async () => {
+  const fetchProgramAndWorkPrograms = async (silent = false) => {
     try {
-      setLoading(true);
-      const resProg = await fetch(`/api/v1/programs/${params.id}`);
+      if (!silent) setLoading(true);
+
+      const [resProg, resWp, resBen] = await Promise.all([
+        fetch(`/api/v1/programs/${params.id}`),
+        fetch(`/api/v1/programs/${params.id}/work-program`),
+        fetch(`/api/v1/programs/${params.id}/beneficiaries?withSchedule=false`),
+      ]);
+
       if (resProg.ok) {
         const data = await resProg.json();
         setProgram(data.program);
+        try {
+          sessionStorage.setItem(`tupad_cache_prog_${params.id}`, JSON.stringify(data.program));
+        } catch (_) {}
       }
 
-      const resWp = await fetch(`/api/v1/programs/${params.id}/work-program`);
       if (resWp.ok) {
         const data = await resWp.json();
         const wps = data.workPrograms || [];
@@ -181,16 +223,22 @@ export default function WorkProgramManagementPage() {
         } else if (wps.length > 0 && !selectedBarangay) {
           setSelectedBarangay(wps[0].barangay);
         }
+        try {
+          sessionStorage.setItem(`tupad_cache_wp_${params.id}`, JSON.stringify(wps));
+        } catch (_) {}
       }
 
-      // Also fetch authoritative masterlist beneficiaries for accurate demographic quotas
-      const resBen = await fetch(`/api/v1/programs/${params.id}/beneficiaries`);
+      // Authoritative masterlist beneficiaries for accurate demographic quotas
       if (resBen.ok) {
         const data = await resBen.json();
-        setBeneficiaries(data.beneficiaries || []);
+        const bens = data.beneficiaries || [];
+        setBeneficiaries(bens);
+        try {
+          sessionStorage.setItem(`tupad_cache_ben_${params.id}`, JSON.stringify(bens));
+        } catch (_) {}
       }
     } catch (e) {
-      console.error(e);
+      console.error("fetchProgramAndWorkPrograms error:", e);
     } finally {
       setLoading(false);
     }
@@ -912,8 +960,14 @@ export default function WorkProgramManagementPage() {
     }
   };
 
-  if (loading) {
-    return <div className="py-20 text-center text-xs text-slate-400">Loading TUPAD Work Program Hub...</div>;
+  if (loading && !program) {
+    return (
+      <div className="py-24 text-center text-xs text-slate-500 flex flex-col items-center justify-center space-y-3">
+        <RefreshCw className="w-7 h-7 animate-spin text-gov-blue" />
+        <p className="font-semibold text-slate-700">Loading TUPAD Work Program Hub...</p>
+        <p className="text-[11px] text-slate-400">Fetching program details, barangay work plans, and allocations</p>
+      </div>
+    );
   }
 
   const totalActivities = workPrograms.reduce((acc, wp) => acc + (wp.items?.length || 0), 0);
