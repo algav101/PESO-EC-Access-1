@@ -28,8 +28,9 @@ const DEFAULT_10_DAY_ACTIVITIES = [
 export async function POST(request: Request, { params }: { params: { id: string } }) {
   try {
     const user = await getCurrentUser();
-    if (!user || (!hasPermission(user.role, "program.update") && !hasPermission(user.role, "program.create"))) {
-      return NextResponse.json({ error: "Forbidden: insufficient permissions" }, { status: 403 });
+    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    if (!isAdminUser(user)) {
+      return NextResponse.json({ error: "Forbidden: Work program auto-deployment is restricted to PESO Admins." }, { status: 403 });
     }
 
     const { barangay: targetBarangay } = await request.json().catch(() => ({}));

@@ -25,6 +25,15 @@ import { useAuth } from "@/context/AuthContext";
 
 const FIELD_OPERATIONS = [
   {
+    title: "TUPAD Work Program & Groupings",
+    href: "/field/work-program",
+    icon: Users,
+    permission: "work_program.read",
+    color: "from-teal-600 to-teal-800",
+    badge: "Official 10-Day Plan",
+    description: "Tingnan ang opisyal na 10-araw na iskedyul ng aktibidad, mga grupo sa purok, at listahan ng mga nakatalagang benepisyaryo para sa iyong barangay.",
+  },
+  {
     title: "Stub Distribution & Affirmation",
     href: "/field/stub-distribution",
     icon: QrCode,

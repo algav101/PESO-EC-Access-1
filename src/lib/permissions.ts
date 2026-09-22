@@ -80,7 +80,7 @@ export const PERMISSIONS = {
     "dashboard.view",
     "field.scan",
     "program.read",
-    "program.update",
+    "work_program.read",
     "beneficiary.read",
     "qr.read", "qr.scan",
     "stub.distribution.scan",
@@ -94,6 +94,8 @@ export const PERMISSIONS = {
   ],
   TUPAD_ASSISTING_DOCUMENTOR: [
     "field.scan",
+    "program.read",
+    "work_program.read",
     "qr.read", "qr.scan",
     "attendance.scan",
     "photo.upload",

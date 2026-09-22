@@ -9,9 +9,9 @@ export async function POST(request: Request, { params }: { params: { id: string 
   try {
     const user = await getCurrentUser();
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    if (!isAdminUser(user) && user.role !== "TUPAD_COORDINATOR" && !hasPermission(user.role, "program.update")) {
+    if (!isAdminUser(user)) {
       return NextResponse.json(
-        { error: "Forbidden: Only PESO Admins and Field Coordinators can sync groupings to the work program" },
+        { error: "Forbidden: Work program is strictly in view-only mode for field coordinators. Only PESO Admins can sync groupings." },
         { status: 403 }
       );
     }

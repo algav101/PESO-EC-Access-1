@@ -52,10 +52,9 @@ import {
 export default function WorkProgramManagementPage() {
   const params = useParams();
   const router = useRouter();
-  const { user } = useAuth();
   const isAdmin = isAdminUser(user);
   const isCoordinator = isFieldCoordinator(user);
-  const canManage = isAdmin || isCoordinator;
+  const canManage = isAdmin; // Strictly PESO Admins only; coordinators and documentors are view-only
 
   const [program, setProgram] = useState<any>(null);
   const [workPrograms, setWorkPrograms] = useState<any[]>([]);
@@ -1230,15 +1229,22 @@ export default function WorkProgramManagementPage() {
         <div className="space-y-4">
           {/* Barangay Tabs Navigation */}
           <div className="gov-card p-2 bg-slate-100 flex flex-wrap gap-1.5 overflow-x-auto">
-            {workPrograms.map((wp) => {
-              const isActive = wp.barangay === selectedBarangay;
-              return (
-                <button
-                  key={wp.id}
-                  onClick={() => {
-                    setSelectedBarangay(wp.barangay);
-                    setSelectedActivityIds([]);
-                  }}
+            {workPrograms
+              .filter((wp) => {
+                if ((user?.role === "TUPAD_COORDINATOR" || user?.role === "TUPAD_ASSISTING_DOCUMENTOR") && user.assignedBarangay) {
+                  return getStandardBarangayName(wp.barangay) === getStandardBarangayName(user.assignedBarangay);
+                }
+                return true;
+              })
+              .map((wp) => {
+                const isActive = wp.barangay === selectedBarangay;
+                return (
+                  <button
+                    key={wp.id}
+                    onClick={() => {
+                      setSelectedBarangay(wp.barangay);
+                      setSelectedActivityIds([]);
+                    }}
                   className={`px-3.5 py-2 rounded-lg text-xs font-bold transition flex items-center space-x-1.5 ${
                     isActive
                       ? "bg-gov-blue text-white shadow-sm"
