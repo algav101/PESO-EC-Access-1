@@ -301,7 +301,7 @@ export async function POST(request: Request, { params }: { params: { id: string 
       });
 
       return progBeneficiary;
-    });
+    }, { timeout: 30000, maxWait: 10000 });
 
     await logAudit({
       userId: user.id,
@@ -388,7 +388,7 @@ export async function DELETE(request: Request, { params }: { params: { id: strin
         await tx.beneficiaryRestriction.deleteMany({ where: { beneficiaryId: targetPb.beneficiaryId } });
         await tx.beneficiary.delete({ where: { id: targetPb.beneficiaryId } });
       }
-    });
+    }, { timeout: 30000, maxWait: 10000 });
 
     await logAudit({
       userId: user.id,
@@ -696,7 +696,7 @@ export async function PATCH(request: Request, { params }: { params: { id: string
           payouts: true,
         },
       });
-    });
+    }, { timeout: 30000, maxWait: 10000 });
 
     await logAudit({
       userId: user.id,

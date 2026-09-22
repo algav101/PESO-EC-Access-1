@@ -23,6 +23,8 @@ import { TableScrollWrapper } from "@/components/common/TableScrollWrapper";
 import * as XLSX from "xlsx";
 import { useAuth } from "@/context/AuthContext";
 import { isAdminUser, isFieldCoordinator } from "@/lib/permissions";
+import { MultiSelectFilter } from "@/components/common/MultiSelectFilter";
+import { CANONICAL_BARANGAYS, normalizeBarangayName } from "@/lib/dingalan-groupings";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 
@@ -31,6 +33,7 @@ export default function RestrictionsPage() {
   const router = useRouter();
   const isAdmin = isAdminUser(user);
   const [restrictions, setRestrictions] = useState<any[]>([]);
+  const [selectedBarangays, setSelectedBarangays] = useState<string[]>(["ALL"]);
   const [searchQuery, setSearchQuery] = useState("");
   const [loading, setLoading] = useState(true);
 
@@ -184,13 +187,35 @@ export default function RestrictionsPage() {
     }
   };
 
-  const filtered = restrictions.filter((r) => {
-    const name = r.beneficiary?.fullName?.toLowerCase() || "";
-    const adl = r.adlNo?.toLowerCase() || "";
-    const brgy = (r.barangay || r.beneficiary?.barangay || "").toLowerCase();
-    const query = searchQuery.toLowerCase();
-    return name.includes(query) || adl.includes(query) || brgy.includes(query);
-  });
+  const barangayOptions = React.useMemo(() => {
+    return CANONICAL_BARANGAYS.map((b) => {
+      const stdB = normalizeBarangayName(b);
+      const count = restrictions.filter((r) => {
+        const rBrgy = normalizeBarangayName(r.barangay || r.beneficiary?.barangay);
+        return rBrgy === stdB;
+      }).length;
+      return {
+        value: b,
+        label: `Brgy. ${b}`,
+        count,
+      };
+    });
+  }, [restrictions]);
+
+  const filtered = React.useMemo(() => {
+    return restrictions.filter((r) => {
+      const name = r.beneficiary?.fullName?.toLowerCase() || "";
+      const adl = r.adlNo?.toLowerCase() || "";
+      const rBrgy = normalizeBarangayName(r.barangay || r.beneficiary?.barangay);
+      const query = searchQuery.toLowerCase();
+      const matchesSearch = name.includes(query) || adl.includes(query) || rBrgy.toLowerCase().includes(query);
+
+      const isAllBrgy = selectedBarangays.length === 0 || selectedBarangays.includes("ALL");
+      const matchesBrgy = isAllBrgy || selectedBarangays.some((sb) => normalizeBarangayName(sb) === rBrgy);
+
+      return matchesSearch && matchesBrgy;
+    });
+  }, [restrictions, searchQuery, selectedBarangays]);
 
   return (
     <div className="space-y-6">
@@ -250,8 +275,8 @@ export default function RestrictionsPage() {
         </div>
       </div>
 
-      {/* Quick Search & Summary Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      {/* Quick Search & Multi-Select Barangay Filter */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <div className="gov-card p-3 md:col-span-2 flex items-center space-x-2">
           <Search className="w-4 h-4 text-slate-400" />
           <input
@@ -268,10 +293,20 @@ export default function RestrictionsPage() {
           )}
         </div>
 
+        <div className="md:col-span-1">
+          <MultiSelectFilter
+            label="Filter Barangay"
+            options={barangayOptions}
+            selectedValues={selectedBarangays}
+            onChange={(vals) => setSelectedBarangays(vals)}
+            allLabel="All Barangays (11)"
+          />
+        </div>
+
         <div className="gov-card p-3 flex items-center justify-between bg-rose-50/50 border border-rose-200">
           <div>
             <span className="text-[10px] font-bold text-rose-700 uppercase block">Registered Lockouts</span>
-            <span className="text-base font-black text-rose-900">{restrictions.length} Individuals</span>
+            <span className="text-base font-black text-rose-900">{filtered.length} of {restrictions.length}</span>
           </div>
           <ShieldCheck className="w-6 h-6 text-rose-600 opacity-80" />
         </div>

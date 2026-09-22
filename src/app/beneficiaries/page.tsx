@@ -47,7 +47,9 @@ import {
   normalizeSitioName,
   getStandardBarangayName,
   CANONICAL_SITIOS_BY_BARANGAY,
+  CANONICAL_BARANGAYS,
 } from "@/lib/dingalan-groupings";
+import { MultiSelectFilter } from "@/components/common/MultiSelectFilter";
 import { useRouter, useSearchParams } from "next/navigation";
 
 export default function BeneficiariesMasterlistPage() {
@@ -66,8 +68,8 @@ function BeneficiariesMasterlistContent() {
   const [beneficiaries, setBeneficiaries] = useState<any[]>([]);
   const [programs, setPrograms] = useState<any[]>([]);
   const [selectedProgram, setSelectedProgram] = useState<string>("");
-  const [selectedBarangay, setSelectedBarangay] = useState<string>("ALL");
-  const [selectedSitio, setSelectedSitio] = useState<string>("ALL");
+  const [selectedBarangays, setSelectedBarangays] = useState<string[]>(["ALL"]);
+  const [selectedSitios, setSelectedSitios] = useState<string[]>(["ALL"]);
   const [selectedStubStatus, setSelectedStubStatus] = useState<string>("ALL");
   const [searchQuery, setSearchQuery] = useState("");
   const [loading, setLoading] = useState(true);
@@ -93,9 +95,9 @@ function BeneficiariesMasterlistContent() {
       setActiveViewMode("GROUPING");
     }
     if (brgyParam) {
-      setSelectedBarangay(brgyParam);
+      setSelectedBarangays([brgyParam]);
     } else if (isFieldCoordinator(user) && user?.assignedBarangay) {
-      setSelectedBarangay(user.assignedBarangay);
+      setSelectedBarangays([user.assignedBarangay]);
     }
   }, [searchParams, user]);
 
@@ -274,39 +276,84 @@ function BeneficiariesMasterlistContent() {
 
   const handleProgramChange = (progId: string) => {
     setSelectedProgram(progId);
-    setSelectedSitio("ALL");
+    setSelectedSitios(["ALL"]);
     setLoading(true);
     fetchBeneficiaries(progId);
   };
 
+  // Barangay Multi-Select Options with counts
+  const barangayOptions = useMemo(() => {
+    const isRestricted =
+      (user?.role === "TUPAD_COORDINATOR" || user?.role === "TUPAD_ASSISTING_DOCUMENTOR") &&
+      !!user.assignedBarangay;
+    const available = isRestricted ? [user.assignedBarangay] : CANONICAL_BARANGAYS;
+    return available.map((b) => {
+      const stdB = normalizeBarangayName(b);
+      const count = beneficiaries.filter(
+        (pb) => normalizeBarangayName(pb.beneficiary?.barangay) === stdB
+      ).length;
+      return {
+        value: b,
+        label: `Brgy. ${b}`,
+        count,
+      };
+    });
+  }, [beneficiaries, user]);
+
   // Collect unique Puroks / Sitios dynamically (Canonical & Normalized)
   const uniqueSitios = useMemo(() => {
-    const list = beneficiaries
-      .filter((pb) => {
-        if (selectedBarangay === "ALL") return true;
-        return (
-          normalizeBarangayName(pb.beneficiary?.barangay) ===
-          normalizeBarangayName(selectedBarangay)
-        );
-      })
-      .map((pb) => normalizeSitioName(pb.beneficiary?.sitio, pb.beneficiary?.barangay))
-      .filter((s) => Boolean(s) && s !== "None" && s !== "N/A" && s !== "Centro");
+    const list: string[] = [];
+    const isAllBrgy = selectedBarangays.length === 0 || selectedBarangays.includes("ALL");
 
-    // When a specific barangay is selected, ensure all canonical sitios for that barangay are available
-    if (selectedBarangay !== "ALL") {
-      const stdBrgy = getStandardBarangayName(selectedBarangay);
-      const canon = CANONICAL_SITIOS_BY_BARANGAY[stdBrgy] || [];
-      for (const c of canon) {
-        list.push(c);
+    beneficiaries.forEach((pb) => {
+      const bBrgy = normalizeBarangayName(pb.beneficiary?.barangay);
+      if (isAllBrgy || selectedBarangays.some((sb) => normalizeBarangayName(sb) === bBrgy)) {
+        const s = normalizeSitioName(pb.beneficiary?.sitio, pb.beneficiary?.barangay);
+        if (s && s !== "None" && s !== "N/A" && s !== "Centro") {
+          list.push(s);
+        }
       }
+    });
+
+    if (!isAllBrgy) {
+      selectedBarangays.forEach((sb) => {
+        const stdBrgy = getStandardBarangayName(sb);
+        const canon = CANONICAL_SITIOS_BY_BARANGAY[stdBrgy] || [];
+        canon.forEach((c) => list.push(c));
+      });
+    } else {
+      Object.values(CANONICAL_SITIOS_BY_BARANGAY).forEach((sitios) => {
+        sitios.forEach((c) => list.push(c));
+      });
     }
 
-    return Array.from(new Set(list)).sort((a: any, b: any) =>
+    return Array.from(new Set(list)).sort((a, b) =>
       a.localeCompare(b, undefined, { numeric: true })
     );
-  }, [beneficiaries, selectedBarangay]);
+  }, [beneficiaries, selectedBarangays]);
 
-  // Filter beneficiaries with robust canonical normalization
+  // Sitio Multi-Select Options with counts
+  const sitioOptions = useMemo(() => {
+    return uniqueSitios.map((s) => {
+      const count = beneficiaries.filter((pb) => {
+        const bBrgy = normalizeBarangayName(pb.beneficiary?.barangay);
+        const isBrgyMatch =
+          selectedBarangays.length === 0 ||
+          selectedBarangays.includes("ALL") ||
+          selectedBarangays.some((sb) => normalizeBarangayName(sb) === bBrgy);
+        if (!isBrgyMatch) return false;
+        const bSitio = normalizeSitioName(pb.beneficiary?.sitio, pb.beneficiary?.barangay);
+        return bSitio === s;
+      }).length;
+      return {
+        value: s,
+        label: s,
+        count,
+      };
+    });
+  }, [uniqueSitios, beneficiaries, selectedBarangays]);
+
+  // Filter beneficiaries with multi-select canonical normalization
   const filtered = useMemo(() => {
     return beneficiaries.filter((pb) => {
       const q = searchQuery.toLowerCase();
@@ -320,13 +367,17 @@ function BeneficiariesMasterlistContent() {
         (pb.beneficiary?.sitio && pb.beneficiary.sitio.toLowerCase().includes(q)) ||
         (pb.tableNumber && pb.tableNumber.toLowerCase().includes(q));
 
+      const isAllBrgy = selectedBarangays.length === 0 || selectedBarangays.includes("ALL");
       const matchesBrgy =
-        selectedBarangay === "ALL" ||
-        bBrgy === normalizeBarangayName(selectedBarangay);
+        isAllBrgy ||
+        selectedBarangays.some((sb) => normalizeBarangayName(sb) === bBrgy);
 
+      const isAllSitio = selectedSitios.length === 0 || selectedSitios.includes("ALL");
       const matchesSitio =
-        selectedSitio === "ALL" ||
-        bSitio === selectedSitio;
+        isAllSitio ||
+        selectedSitios.some(
+          (st) => normalizeSitioName(st, pb.beneficiary?.barangay) === bSitio || st === bSitio
+        );
 
       const isReplaced = pb.participationStatus === "REPLACED";
       if (selectedStubStatus === "REPLACED") {
@@ -347,7 +398,7 @@ function BeneficiariesMasterlistContent() {
 
       return matchesSearch && matchesBrgy && matchesSitio && matchesStub;
     });
-  }, [beneficiaries, searchQuery, selectedBarangay, selectedSitio, selectedStubStatus]);
+  }, [beneficiaries, searchQuery, selectedBarangays, selectedSitios, selectedStubStatus]);
 
   // Sort beneficiaries (supports Purok/Sitio, Designated #, Name, Barangay, Table, Stub & Affirmation, Orientation, etc.)
   const sortedBeneficiaries = useMemo(() => {
@@ -677,7 +728,7 @@ function BeneficiariesMasterlistContent() {
       {activeViewMode === "GROUPING" ? (
         <DeploymentGroupingMatrix
           beneficiaries={beneficiaries}
-          selectedBarangay={selectedBarangay}
+          selectedBarangay={selectedBarangays.includes("ALL") ? "ALL" : selectedBarangays[0] || "ALL"}
           onEditBeneficiary={(pb) => setBeneficiaryToEdit(pb)}
           onDeleteBeneficiary={(pb) => setBeneficiaryToDelete(pb)}
           programId={selectedProgram}
@@ -703,50 +754,31 @@ function BeneficiariesMasterlistContent() {
             </select>
           </div>
 
-          {/* Filter Barangay */}
-          <div>
-            <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Filter Barangay</label>
-            <select
-              value={selectedBarangay}
-              disabled={(user?.role === "TUPAD_COORDINATOR" || user?.role === "TUPAD_ASSISTING_DOCUMENTOR") && !!user.assignedBarangay}
-              onChange={(e) => {
-                setSelectedBarangay(e.target.value);
-                setSelectedSitio("ALL");
-              }}
-              className="w-full px-3 py-1.5 text-xs border border-slate-300 rounded-lg bg-slate-50 focus:outline-none focus:border-gov-blue font-semibold disabled:bg-slate-100 disabled:text-slate-500"
-            >
-              {!((user?.role === "TUPAD_COORDINATOR" || user?.role === "TUPAD_ASSISTING_DOCUMENTOR") && user.assignedBarangay) && (
-                <option value="ALL">All Barangays</option>
-              )}
-              {barangays
-                .filter((b) => !((user?.role === "TUPAD_COORDINATOR" || user?.role === "TUPAD_ASSISTING_DOCUMENTOR") && user.assignedBarangay) || b === user.assignedBarangay)
-                .map((b) => (
-                  <option key={b} value={b}>
-                    {b}
-                  </option>
-                ))}
-            </select>
-          </div>
+          {/* Filter Barangay (Multi-Select) */}
+          <MultiSelectFilter
+            label="Filter Barangay"
+            options={barangayOptions}
+            selectedValues={selectedBarangays}
+            onChange={(vals) => {
+              setSelectedBarangays(vals);
+              setSelectedSitios(["ALL"]);
+            }}
+            disabled={
+              (user?.role === "TUPAD_COORDINATOR" || user?.role === "TUPAD_ASSISTING_DOCUMENTOR") &&
+              !!user.assignedBarangay
+            }
+            allLabel="All Barangays (11)"
+          />
 
-          {/* Filter Purok / Sitio */}
-          <div>
-            <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1 flex items-center space-x-1">
-              <MapPin className="w-3 h-3 text-gov-blue" />
-              <span>Filter Purok / Sitio</span>
-            </label>
-            <select
-              value={selectedSitio}
-              onChange={(e) => setSelectedSitio(e.target.value)}
-              className="w-full px-3 py-1.5 text-xs border border-slate-300 rounded-lg bg-slate-50 focus:outline-none focus:border-gov-blue font-semibold text-slate-800"
-            >
-              <option value="ALL">All Puroks & Sitios ({uniqueSitios.length})</option>
-              {uniqueSitios.map((s: any) => (
-                <option key={s} value={s}>
-                  {s}
-                </option>
-              ))}
-            </select>
-          </div>
+          {/* Filter Purok / Sitio (Multi-Select) */}
+          <MultiSelectFilter
+            label="Filter Purok / Sitio"
+            icon={<MapPin className="w-3 h-3 text-gov-blue" />}
+            options={sitioOptions}
+            selectedValues={selectedSitios}
+            onChange={(vals) => setSelectedSitios(vals)}
+            allLabel={`All Puroks & Sitios (${uniqueSitios.length})`}
+          />
 
           {/* Filter Stub & Affirmation */}
           <div>

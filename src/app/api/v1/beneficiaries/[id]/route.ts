@@ -95,7 +95,7 @@ export async function DELETE(request: Request, { params }: { params: { id: strin
 
       // Delete the beneficiary
       await tx.beneficiary.delete({ where: { id: params.id } });
-    });
+    }, { timeout: 30000, maxWait: 10000 });
 
     await logAudit({
       userId: user.id,
