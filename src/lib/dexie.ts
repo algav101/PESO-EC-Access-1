@@ -246,8 +246,9 @@ export async function recordOfflineAttendance(params: {
   workArea?: string;
   activityName?: string;
   deviceId?: string;
+  bypass3HourRule?: boolean;
 }) {
-  const { rawToken, programId, workDayId, shiftMode, workProgramItemId, workArea, activityName, deviceId } = params;
+  const { rawToken, programId, workDayId, shiftMode, workProgramItemId, workArea, activityName, deviceId, bypass3HourRule } = params;
 
   const bene = await findBeneficiaryOffline(rawToken, programId);
   if (!bene) {
@@ -374,73 +375,73 @@ export async function recordOfflineAttendance(params: {
     };
   }
 
-  // Sequence check within day: Cannot scan Time-Out before Time-In!
-  if (targetSlot === "MORNING_OUT" && !existingRecord?.morningTimeIn) {
-    throw new Error(
-      `CANNOT RECORD TIME-OUT: Morning Time-In (AM IN) has not been recorded yet on this unit for #${bene.designatedNumber} (${bene.fullName}). Please scan AM IN first, or select "AM IN" from the Shift dropdown.`
-    );
-  }
-
-  if (targetSlot === "AFTERNOON_OUT" && !existingRecord?.afternoonTimeIn) {
-    throw new Error(
-      `CANNOT RECORD TIME-OUT: Afternoon Time-In (PM IN) has not been recorded yet on this unit for #${bene.designatedNumber} (${bene.fullName}). Please scan PM IN first, or select "PM IN" from the Shift dropdown.`
-    );
-  }
-
   // =========================================================================
-  // 3-HOUR MINIMUM WORK DURATION ENFORCEMENT (Offline Engine)
+  // 3-HOUR RULE & SEQUENCE CHECKS (Offline Engine)
+  // Disabled by default to allow users to record and catch up on backlogs
   // =========================================================================
-  const MIN_WORK_DURATION_MS = 3 * 60 * 60 * 1000; // 3 Hours (180 minutes)
+  const isBypassActive =
+    bypass3HourRule === true ||
+    (typeof window !== "undefined" &&
+      (localStorage.getItem("tupad_bypass_3hr_rule") !== "false" &&
+        localStorage.getItem("bypass_three_hour_rule") !== "false"));
 
-  if (targetSlot === "MORNING_OUT" && existingRecord?.morningTimeIn) {
-    const amInDate = new Date(existingRecord.morningTimeIn);
-    const diffMs = now.getTime() - amInDate.getTime();
-    if (diffMs < MIN_WORK_DURATION_MS) {
-      const remainingMs = MIN_WORK_DURATION_MS - Math.max(0, diffMs);
-      const remainingMinutes = Math.ceil(remainingMs / (60 * 1000));
-      const elapsedMinutes = Math.max(0, Math.floor(diffMs / (60 * 1000)));
-      const unlockTime = new Date(amInDate.getTime() + MIN_WORK_DURATION_MS);
-      const amInTimeFormatted = format(amInDate, "hh:mm a");
-      const unlockTimeFormatted = format(unlockTime, "hh:mm a");
+  const isEnforceActive =
+    typeof window !== "undefined" &&
+    (localStorage.getItem("tupad_bypass_3hr_rule") === "false_enforce" ||
+      localStorage.getItem("bypass_three_hour_rule") === "false_enforce");
 
-      const remainingText =
-        remainingMinutes >= 60
-          ? `${Math.floor(remainingMinutes / 60)} hr ${remainingMinutes % 60} mins`
-          : `${remainingMinutes} mins`;
-      const elapsedText =
-        elapsedMinutes >= 60
-          ? `${Math.floor(elapsedMinutes / 60)} hr ${elapsedMinutes % 60} mins`
-          : `${elapsedMinutes} mins`;
+  if (isEnforceActive) {
+    const MIN_WORK_DURATION_MS = 3 * 60 * 60 * 1000; // 3 Hours (180 minutes)
+    if (targetSlot === "MORNING_OUT" && existingRecord?.morningTimeIn) {
+      const amInDate = new Date(existingRecord.morningTimeIn);
+      const diffMs = now.getTime() - amInDate.getTime();
+      if (diffMs < MIN_WORK_DURATION_MS) {
+        const remainingMs = MIN_WORK_DURATION_MS - Math.max(0, diffMs);
+        const remainingMinutes = Math.ceil(remainingMs / (60 * 1000));
+        const elapsedMinutes = Math.max(0, Math.floor(diffMs / (60 * 1000)));
+        const unlockTime = new Date(amInDate.getTime() + MIN_WORK_DURATION_MS);
+        const amInTimeFormatted = format(amInDate, "hh:mm a");
+        const unlockTimeFormatted = format(unlockTime, "hh:mm a");
 
-      throw new Error(
-        `TIME-OUT BLOCKED: Morning Time-Out (AM OUT) requires at least 3 hours of active work duration. AM IN was recorded at ${amInTimeFormatted} (elapsed: ${elapsedText}). Re-scanning AM OUT is allowed at or after ${unlockTimeFormatted} (${remainingText} remaining).`
-      );
+        const remainingText =
+          remainingMinutes >= 60
+            ? `${Math.floor(remainingMinutes / 60)} hr ${remainingMinutes % 60} mins`
+            : `${remainingMinutes} mins`;
+        const elapsedText =
+          elapsedMinutes >= 60
+            ? `${Math.floor(elapsedMinutes / 60)} hr ${elapsedMinutes % 60} mins`
+            : `${elapsedMinutes} mins`;
+
+        throw new Error(
+          `TIME-OUT BLOCKED: Morning Time-Out (AM OUT) requires at least 3 hours of active work duration. AM IN was recorded at ${amInTimeFormatted} (elapsed: ${elapsedText}). Re-scanning AM OUT is allowed at or after ${unlockTimeFormatted} (${remainingText} remaining).`
+        );
+      }
     }
-  }
 
-  if (targetSlot === "AFTERNOON_OUT" && existingRecord?.afternoonTimeIn) {
-    const pmInDate = new Date(existingRecord.afternoonTimeIn);
-    const diffMs = now.getTime() - pmInDate.getTime();
-    if (diffMs < MIN_WORK_DURATION_MS) {
-      const remainingMs = MIN_WORK_DURATION_MS - Math.max(0, diffMs);
-      const remainingMinutes = Math.ceil(remainingMs / (60 * 1000));
-      const elapsedMinutes = Math.max(0, Math.floor(diffMs / (60 * 1000)));
-      const unlockTime = new Date(pmInDate.getTime() + MIN_WORK_DURATION_MS);
-      const pmInTimeFormatted = format(pmInDate, "hh:mm a");
-      const unlockTimeFormatted = format(unlockTime, "hh:mm a");
+    if (targetSlot === "AFTERNOON_OUT" && existingRecord?.afternoonTimeIn) {
+      const pmInDate = new Date(existingRecord.afternoonTimeIn);
+      const diffMs = now.getTime() - pmInDate.getTime();
+      if (diffMs < MIN_WORK_DURATION_MS) {
+        const remainingMs = MIN_WORK_DURATION_MS - Math.max(0, diffMs);
+        const remainingMinutes = Math.ceil(remainingMs / (60 * 1000));
+        const elapsedMinutes = Math.max(0, Math.floor(diffMs / (60 * 1000)));
+        const unlockTime = new Date(pmInDate.getTime() + MIN_WORK_DURATION_MS);
+        const pmInTimeFormatted = format(pmInDate, "hh:mm a");
+        const unlockTimeFormatted = format(unlockTime, "hh:mm a");
 
-      const remainingText =
-        remainingMinutes >= 60
-          ? `${Math.floor(remainingMinutes / 60)} hr ${remainingMinutes % 60} mins`
-          : `${remainingMinutes} mins`;
-      const elapsedText =
-        elapsedMinutes >= 60
-          ? `${Math.floor(elapsedMinutes / 60)} hr ${elapsedMinutes % 60} mins`
-          : `${elapsedMinutes} mins`;
+        const remainingText =
+          remainingMinutes >= 60
+            ? `${Math.floor(remainingMinutes / 60)} hr ${remainingMinutes % 60} mins`
+            : `${remainingMinutes} mins`;
+        const elapsedText =
+          elapsedMinutes >= 60
+            ? `${Math.floor(elapsedMinutes / 60)} hr ${elapsedMinutes % 60} mins`
+            : `${elapsedMinutes} mins`;
 
-      throw new Error(
-        `TIME-OUT BLOCKED: Afternoon Time-Out (PM OUT) requires at least 3 hours of active work duration. PM IN was recorded at ${pmInTimeFormatted} (elapsed: ${elapsedText}). Re-scanning PM OUT is allowed at or after ${unlockTimeFormatted} (${remainingText} remaining).`
-      );
+        throw new Error(
+          `TIME-OUT BLOCKED: Afternoon Time-Out (PM OUT) requires at least 3 hours of active work duration. PM IN was recorded at ${pmInTimeFormatted} (elapsed: ${elapsedText}). Re-scanning PM OUT is allowed at or after ${unlockTimeFormatted} (${remainingText} remaining).`
+        );
+      }
     }
   }
 

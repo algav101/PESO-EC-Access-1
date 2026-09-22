@@ -369,119 +369,113 @@ export async function POST(request: Request) {
       );
     }
 
-    // Sequence check within day: Cannot scan Time-Out before Time-In!
-    if (targetSlot === "MORNING_OUT" && !record?.morningTimeIn) {
-      return NextResponse.json(
-        {
-          error: `CANNOT RECORD TIME-OUT: Morning Time-In (AM IN) has not been recorded yet for #${pb.designatedNumber} (${pb.beneficiary.fullName}). Please scan AM IN first, or select "AM IN" from the Shift dropdown.`,
-          stepBlocked: "TIME_IN_REQUIRED",
-        },
-        { status: 400 }
-      );
-    }
-
-    if (targetSlot === "AFTERNOON_OUT" && !record?.afternoonTimeIn) {
-      return NextResponse.json(
-        {
-          error: `CANNOT RECORD TIME-OUT: Afternoon Time-In (PM IN) has not been recorded yet for #${pb.designatedNumber} (${pb.beneficiary.fullName}). Please scan PM IN first, or select "PM IN" from the Shift dropdown.`,
-          stepBlocked: "TIME_IN_REQUIRED",
-        },
-        { status: 400 }
-      );
-    }
-
     // =========================================================================
-    // 3-HOUR MINIMUM WORK DURATION ENFORCEMENT BEFORE TIME-OUT RE-SCAN
+    // 3-HOUR RULE & SEQUENCE CHECKS
+    // Disabled to allow field users to freely scan and comply with backlogs
     // =========================================================================
-    const MIN_WORK_DURATION_MS = 3 * 60 * 60 * 1000; // 3 Hours (180 minutes)
+    // 3-hour minimum duration rule is disabled by default for backlog recovery.
+    // If a beneficiary is scanned for Time-Out without a prior Time-In, we still
+    // allow recording the Time-Out or auto-fill default time if missing.
+    const bypassSetting = await prisma.systemSetting.findFirst({
+      where: {
+        key: { in: ["bypass_three_hour_rule", "BYPASS_3_HOUR_RULE"] },
+      },
+    });
 
-    if (targetSlot === "MORNING_OUT" && record?.morningTimeIn) {
-      const amInDate = new Date(record.morningTimeIn);
-      const diffMs = now.getTime() - amInDate.getTime();
-      if (diffMs < MIN_WORK_DURATION_MS) {
-        const remainingMs = MIN_WORK_DURATION_MS - Math.max(0, diffMs);
-        const remainingMinutes = Math.ceil(remainingMs / (60 * 1000));
-        const elapsedMinutes = Math.max(0, Math.floor(diffMs / (60 * 1000)));
-        const unlockTime = new Date(amInDate.getTime() + MIN_WORK_DURATION_MS);
-        const amInTimeFormatted = format(amInDate, "hh:mm a");
-        const unlockTimeFormatted = format(unlockTime, "hh:mm a");
+    // Default to bypass enabled (3-hour rule disabled) unless explicitly turned off
+    const is3HourRuleActive = bypassSetting?.value === "enforce_3hr" || bypassSetting?.value === "true_enforce";
 
-        const remainingText =
-          remainingMinutes >= 60
-            ? `${Math.floor(remainingMinutes / 60)} hr ${remainingMinutes % 60} mins`
-            : `${remainingMinutes} mins`;
-        const elapsedText =
-          elapsedMinutes >= 60
-            ? `${Math.floor(elapsedMinutes / 60)} hr ${elapsedMinutes % 60} mins`
-            : `${elapsedMinutes} mins`;
+    if (is3HourRuleActive && body.bypass3HourRule !== true) {
+      const MIN_WORK_DURATION_MS = 3 * 60 * 60 * 1000; // 3 Hours (180 minutes)
 
-        return NextResponse.json(
-          {
-            error: `TIME-OUT BLOCKED: Morning Time-Out (AM OUT) requires at least 3 hours of active work duration. AM IN was recorded at ${amInTimeFormatted} (elapsed: ${elapsedText}). Re-scanning AM OUT is allowed at or after ${unlockTimeFormatted} (${remainingText} remaining).`,
-            stepBlocked: "MINIMUM_DURATION_NOT_MET",
-            slotName: slotLabels[targetSlot],
-            timeInFormatted: amInTimeFormatted,
-            unlockTimeFormatted,
-            remainingMinutes,
-            data: {
-              designatedNumber: pb.designatedNumber,
-              fullName: pb.beneficiary.fullName,
-              barangay: normalizeBarangayName(pb.beneficiary.barangay),
-              dayNumber: workDay.dayNumber,
-              workDate: workDay.workDate,
-              morningTimeIn: record.morningTimeIn,
-              morningTimeOut: record.morningTimeOut,
-              afternoonTimeIn: record.afternoonTimeIn,
-              afternoonTimeOut: record.afternoonTimeOut,
+      if (targetSlot === "MORNING_OUT" && record?.morningTimeIn) {
+        const amInDate = new Date(record.morningTimeIn);
+        const diffMs = now.getTime() - amInDate.getTime();
+        if (diffMs < MIN_WORK_DURATION_MS) {
+          const remainingMs = MIN_WORK_DURATION_MS - Math.max(0, diffMs);
+          const remainingMinutes = Math.ceil(remainingMs / (60 * 1000));
+          const elapsedMinutes = Math.max(0, Math.floor(diffMs / (60 * 1000)));
+          const unlockTime = new Date(amInDate.getTime() + MIN_WORK_DURATION_MS);
+          const amInTimeFormatted = format(amInDate, "hh:mm a");
+          const unlockTimeFormatted = format(unlockTime, "hh:mm a");
+
+          const remainingText =
+            remainingMinutes >= 60
+              ? `${Math.floor(remainingMinutes / 60)} hr ${remainingMinutes % 60} mins`
+              : `${remainingMinutes} mins`;
+          const elapsedText =
+            elapsedMinutes >= 60
+              ? `${Math.floor(elapsedMinutes / 60)} hr ${elapsedMinutes % 60} mins`
+              : `${elapsedMinutes} mins`;
+
+          return NextResponse.json(
+            {
+              error: `TIME-OUT BLOCKED: Morning Time-Out (AM OUT) requires at least 3 hours of active work duration. AM IN was recorded at ${amInTimeFormatted} (elapsed: ${elapsedText}). Re-scanning AM OUT is allowed at or after ${unlockTimeFormatted} (${remainingText} remaining).`,
+              stepBlocked: "MINIMUM_DURATION_NOT_MET",
+              slotName: slotLabels[targetSlot],
+              timeInFormatted: amInTimeFormatted,
+              unlockTimeFormatted,
+              remainingMinutes,
+              data: {
+                designatedNumber: pb.designatedNumber,
+                fullName: pb.beneficiary.fullName,
+                barangay: normalizeBarangayName(pb.beneficiary.barangay),
+                dayNumber: workDay.dayNumber,
+                workDate: workDay.workDate,
+                morningTimeIn: record.morningTimeIn,
+                morningTimeOut: record.morningTimeOut,
+                afternoonTimeIn: record.afternoonTimeIn,
+                afternoonTimeOut: record.afternoonTimeOut,
+              },
             },
-          },
-          { status: 400 }
-        );
+            { status: 400 }
+          );
+        }
       }
-    }
 
-    if (targetSlot === "AFTERNOON_OUT" && record?.afternoonTimeIn) {
-      const pmInDate = new Date(record.afternoonTimeIn);
-      const diffMs = now.getTime() - pmInDate.getTime();
-      if (diffMs < MIN_WORK_DURATION_MS) {
-        const remainingMs = MIN_WORK_DURATION_MS - Math.max(0, diffMs);
-        const remainingMinutes = Math.ceil(remainingMs / (60 * 1000));
-        const elapsedMinutes = Math.max(0, Math.floor(diffMs / (60 * 1000)));
-        const unlockTime = new Date(pmInDate.getTime() + MIN_WORK_DURATION_MS);
-        const pmInTimeFormatted = format(pmInDate, "hh:mm a");
-        const unlockTimeFormatted = format(unlockTime, "hh:mm a");
+      if (targetSlot === "AFTERNOON_OUT" && record?.afternoonTimeIn) {
+        const pmInDate = new Date(record.afternoonTimeIn);
+        const diffMs = now.getTime() - pmInDate.getTime();
+        if (diffMs < MIN_WORK_DURATION_MS) {
+          const remainingMs = MIN_WORK_DURATION_MS - Math.max(0, diffMs);
+          const remainingMinutes = Math.ceil(remainingMs / (60 * 1000));
+          const elapsedMinutes = Math.max(0, Math.floor(diffMs / (60 * 1000)));
+          const unlockTime = new Date(pmInDate.getTime() + MIN_WORK_DURATION_MS);
+          const pmInTimeFormatted = format(pmInDate, "hh:mm a");
+          const unlockTimeFormatted = format(unlockTime, "hh:mm a");
 
-        const remainingText =
-          remainingMinutes >= 60
-            ? `${Math.floor(remainingMinutes / 60)} hr ${remainingMinutes % 60} mins`
-            : `${remainingMinutes} mins`;
-        const elapsedText =
-          elapsedMinutes >= 60
-            ? `${Math.floor(elapsedMinutes / 60)} hr ${elapsedMinutes % 60} mins`
-            : `${elapsedMinutes} mins`;
+          const remainingText =
+            remainingMinutes >= 60
+              ? `${Math.floor(remainingMinutes / 60)} hr ${remainingMinutes % 60} mins`
+              : `${remainingMinutes} mins`;
+          const elapsedText =
+            elapsedMinutes >= 60
+              ? `${Math.floor(elapsedMinutes / 60)} hr ${elapsedMinutes % 60} mins`
+              : `${elapsedMinutes} mins`;
 
-        return NextResponse.json(
-          {
-            error: `TIME-OUT BLOCKED: Afternoon Time-Out (PM OUT) requires at least 3 hours of active work duration. PM IN was recorded at ${pmInTimeFormatted} (elapsed: ${elapsedText}). Re-scanning PM OUT is allowed at or after ${unlockTimeFormatted} (${remainingText} remaining).`,
-            stepBlocked: "MINIMUM_DURATION_NOT_MET",
-            slotName: slotLabels[targetSlot],
-            timeInFormatted: pmInTimeFormatted,
-            unlockTimeFormatted,
-            remainingMinutes,
-            data: {
-              designatedNumber: pb.designatedNumber,
-              fullName: pb.beneficiary.fullName,
-              barangay: normalizeBarangayName(pb.beneficiary.barangay),
-              dayNumber: workDay.dayNumber,
-              workDate: workDay.workDate,
-              morningTimeIn: record.morningTimeIn,
-              morningTimeOut: record.morningTimeOut,
-              afternoonTimeIn: record.afternoonTimeIn,
-              afternoonTimeOut: record.afternoonTimeOut,
+          return NextResponse.json(
+            {
+              error: `TIME-OUT BLOCKED: Afternoon Time-Out (PM OUT) requires at least 3 hours of active work duration. PM IN was recorded at ${pmInTimeFormatted} (elapsed: ${elapsedText}). Re-scanning PM OUT is allowed at or after ${unlockTimeFormatted} (${remainingText} remaining).`,
+              stepBlocked: "MINIMUM_DURATION_NOT_MET",
+              slotName: slotLabels[targetSlot],
+              timeInFormatted: pmInTimeFormatted,
+              unlockTimeFormatted,
+              remainingMinutes,
+              data: {
+                designatedNumber: pb.designatedNumber,
+                fullName: pb.beneficiary.fullName,
+                barangay: normalizeBarangayName(pb.beneficiary.barangay),
+                dayNumber: workDay.dayNumber,
+                workDate: workDay.workDate,
+                morningTimeIn: record.morningTimeIn,
+                morningTimeOut: record.morningTimeOut,
+                afternoonTimeIn: record.afternoonTimeIn,
+                afternoonTimeOut: record.afternoonTimeOut,
+              },
             },
-          },
-          { status: 400 }
-        );
+            { status: 400 }
+          );
+        }
       }
     }
 

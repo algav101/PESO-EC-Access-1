@@ -242,11 +242,11 @@ export default function SystemSettingsPage() {
           </div>
         </div>
 
-        {/* Work Day Defaults */}
+        {/* Work Day Defaults & Field Rules */}
         <div className="space-y-4 pt-2">
           <h2 className="text-xs font-bold text-slate-800 uppercase tracking-wider border-b pb-2 flex items-center space-x-1.5">
             <Clock className="w-4 h-4 text-gov-gold" />
-            <span>TUPAD Standard Operational Defaults</span>
+            <span>TUPAD Standard Operational Defaults & Field Rules</span>
           </h2>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
@@ -267,6 +267,23 @@ export default function SystemSettingsPage() {
                 onChange={(e) => updateSetting("DEFAULT_DAILY_HOURS", e.target.value)}
                 className="w-full px-3 py-2 border rounded-lg font-bold"
               />
+            </div>
+
+            <div className="sm:col-span-2 p-3.5 bg-amber-500/10 border border-amber-300 rounded-xl space-y-1.5">
+              <label className="block font-black text-amber-950 uppercase text-[11px]">
+                ⚡ 3-Hour Minimum Duration Rule Bypass (Backlog Recovery Mode)
+              </label>
+              <p className="text-[11px] text-amber-900 leading-snug">
+                When enabled (default), field coordinators and documentors can freely scan AM In, AM Out, PM In, or PM Out anytime to resolve failed/missed scans without being blocked by the 3-hour waiting interval.
+              </p>
+              <select
+                value={settings.bypass_three_hour_rule || "true"}
+                onChange={(e) => updateSetting("bypass_three_hour_rule", e.target.value)}
+                className="w-full px-3 py-2 border border-amber-400 rounded-lg bg-white font-bold text-xs text-slate-900 focus:outline-none"
+              >
+                <option value="true">⚡ BYPASS ENABLED (3-Hour Rule Disabled — Field Backlog Recovery Mode Active)</option>
+                <option value="enforce_3hr">🔒 STRICT ENFORCEMENT (Require 3 Hours Elapsed Time Before AM/PM Out)</option>
+              </select>
             </div>
           </div>
         </div>
