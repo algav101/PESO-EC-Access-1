@@ -52,6 +52,7 @@ import {
 export default function WorkProgramManagementPage() {
   const params = useParams();
   const router = useRouter();
+  const { user } = useAuth();
   const isAdmin = isAdminUser(user);
   const isCoordinator = isFieldCoordinator(user);
   const canManage = isAdmin; // Strictly PESO Admins only; coordinators and documentors are view-only
