@@ -7,6 +7,7 @@ import {
   Download,
   Search,
   Filter,
+  MapPin,
   Users,
   Clock,
   Printer,
@@ -21,6 +22,13 @@ import { formatTime } from "@/lib/utils";
 import { useAuth } from "@/context/AuthContext";
 import { useOffline } from "@/context/OfflineContext";
 import { isAdminUser } from "@/lib/permissions";
+import {
+  normalizeBarangayName,
+  normalizeSitioName,
+  getStandardBarangayName,
+  CANONICAL_BARANGAYS,
+  CANONICAL_SITIOS_BY_BARANGAY,
+} from "@/lib/dingalan-groupings";
 import { AdminStubOverrideModal } from "@/components/beneficiaries/AdminStubOverrideModal";
 import { TableScrollWrapper } from "@/components/common/TableScrollWrapper";
 import { offlineDb } from "@/lib/dexie";
@@ -37,10 +45,42 @@ function AttendanceMatrixContent() {
   const [program, setProgram] = useState<any | null>(null);
   const [beneficiaries, setBeneficiaries] = useState<any[]>([]);
   const [selectedBarangay, setSelectedBarangay] = useState("ALL");
+  const [selectedSitio, setSelectedSitio] = useState("ALL");
   const [searchQuery, setSearchQuery] = useState("");
   const [loading, setLoading] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [selectedPbForOverride, setSelectedPbForOverride] = useState<any | null>(null);
+
+  const handleBarangayChange = (brgy: string) => {
+    setSelectedBarangay(brgy);
+    setSelectedSitio("ALL");
+  };
+
+  // Collect unique Puroks / Sitios dynamically (Canonical & Normalized)
+  const uniqueSitios = React.useMemo(() => {
+    const list = beneficiaries
+      .filter((pb) => {
+        if (selectedBarangay === "ALL") return true;
+        return (
+          normalizeBarangayName(pb.beneficiary?.barangay) ===
+          normalizeBarangayName(selectedBarangay)
+        );
+      })
+      .map((pb) => normalizeSitioName(pb.beneficiary?.sitio, pb.beneficiary?.barangay))
+      .filter((s) => Boolean(s) && s !== "None" && s !== "N/A" && s !== "Centro");
+
+    if (selectedBarangay !== "ALL") {
+      const stdBrgy = getStandardBarangayName(selectedBarangay);
+      const canon = CANONICAL_SITIOS_BY_BARANGAY[stdBrgy] || [];
+      for (const c of canon) {
+        list.push(c);
+      }
+    }
+
+    return Array.from(new Set(list)).sort((a: any, b: any) =>
+      a.localeCompare(b, undefined, { numeric: true })
+    );
+  }, [beneficiaries, selectedBarangay]);
 
   // 1. Merge server attendance records with local offline scans
   const mergeWithOfflineScans = useCallback(
@@ -279,14 +319,30 @@ function AttendanceMatrixContent() {
     };
   }, [selectedProgramId, loadFromLocalCache, fetchProgramAndMatrix]);
 
-  const filtered = beneficiaries.filter((pb) => {
-    const q = searchQuery.toLowerCase();
-    const matchesSearch =
-      pb.designatedNumber?.toLowerCase().includes(q) ||
-      pb.beneficiary?.fullName?.toLowerCase().includes(q);
-    const matchesBrgy = selectedBarangay === "ALL" || pb.beneficiary?.barangay === selectedBarangay;
-    return matchesSearch && matchesBrgy;
-  });
+  const filtered = React.useMemo(() => {
+    return beneficiaries.filter((pb) => {
+      const q = searchQuery.toLowerCase();
+      const bBrgy = normalizeBarangayName(pb.beneficiary?.barangay);
+      const bSitio = normalizeSitioName(pb.beneficiary?.sitio, pb.beneficiary?.barangay);
+
+      const matchesSearch =
+        pb.designatedNumber?.toLowerCase().includes(q) ||
+        pb.beneficiary?.fullName?.toLowerCase().includes(q) ||
+        (bSitio && bSitio.toLowerCase().includes(q)) ||
+        (pb.beneficiary?.sitio && pb.beneficiary.sitio.toLowerCase().includes(q)) ||
+        (pb.tableNumber && pb.tableNumber.toLowerCase().includes(q));
+
+      const matchesBrgy =
+        selectedBarangay === "ALL" ||
+        bBrgy === normalizeBarangayName(selectedBarangay);
+
+      const matchesSitio =
+        selectedSitio === "ALL" ||
+        bSitio === selectedSitio;
+
+      return matchesSearch && matchesBrgy && matchesSitio;
+    });
+  }, [beneficiaries, searchQuery, selectedBarangay, selectedSitio]);
 
   const numWorkDays = program?.workDays?.length || program?.requiredWorkDays || 10;
   const workDaysList = program?.workDays || [];
@@ -354,12 +410,15 @@ function AttendanceMatrixContent() {
       </div>
 
       {/* Filter Bar */}
-      <div className="gov-card p-4 grid grid-cols-1 sm:grid-cols-3 gap-3">
+      <div className="gov-card p-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
         <div>
           <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Select Program</label>
           <select
             value={selectedProgramId}
-            onChange={(e) => setSelectedProgramId(e.target.value)}
+            onChange={(e) => {
+              setSelectedProgramId(e.target.value);
+              setSelectedSitio("ALL");
+            }}
             className="w-full px-3 py-1.5 text-xs border border-slate-300 rounded-lg bg-slate-50 font-bold focus:outline-none focus:border-gov-blue"
           >
             {programs.map((p) => (
@@ -371,28 +430,38 @@ function AttendanceMatrixContent() {
         </div>
 
         <div>
-          <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Filter Barangay</label>
+          <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1 flex items-center space-x-1">
+            <Filter className="w-3 h-3 text-gov-blue" />
+            <span>Filter Barangay</span>
+          </label>
           <select
             value={selectedBarangay}
-            onChange={(e) => setSelectedBarangay(e.target.value)}
-            className="w-full px-3 py-1.5 text-xs border border-slate-300 rounded-lg bg-slate-50 focus:outline-none focus:border-gov-blue"
+            onChange={(e) => handleBarangayChange(e.target.value)}
+            className="w-full px-3 py-1.5 text-xs border border-slate-300 rounded-lg bg-slate-50 focus:outline-none focus:border-gov-blue font-semibold text-slate-800"
           >
-            <option value="ALL">All Barangays</option>
-            {[
-              "Aplaya",
-              "Butas na Bato",
-              "Caragsacan",
-              "Davildavilan",
-              "Dikapanikian",
-              "Ibona",
-              "Matawe",
-              "Paltic",
-              "Poblacion",
-              "Tanawan",
-              "Umiray",
-            ].map((b) => (
+            <option value="ALL">All Barangays (11)</option>
+            {CANONICAL_BARANGAYS.map((b) => (
               <option key={b} value={b}>
                 {b}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div>
+          <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1 flex items-center space-x-1">
+            <MapPin className="w-3 h-3 text-gov-blue" />
+            <span>Filter Purok / Sitio</span>
+          </label>
+          <select
+            value={selectedSitio}
+            onChange={(e) => setSelectedSitio(e.target.value)}
+            className="w-full px-3 py-1.5 text-xs border border-slate-300 rounded-lg bg-slate-50 focus:outline-none focus:border-gov-blue font-semibold text-slate-800"
+          >
+            <option value="ALL">All Puroks & Sitios ({uniqueSitios.length})</option>
+            {uniqueSitios.map((s) => (
+              <option key={s} value={s}>
+                {s}
               </option>
             ))}
           </select>
@@ -406,8 +475,8 @@ function AttendanceMatrixContent() {
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search by name or designated #..."
-              className="w-full pl-8 pr-3 py-1.5 text-xs border border-slate-300 rounded-lg focus:outline-none focus:border-gov-blue bg-white"
+              placeholder="Search by name, #, table, sitio..."
+              className="w-full pl-8 pr-3 py-1.5 text-xs border border-slate-300 rounded-lg focus:outline-none focus:border-gov-blue bg-white font-medium"
             />
           </div>
         </div>
@@ -449,8 +518,8 @@ function AttendanceMatrixContent() {
                   <th rowSpan={2} className="px-3 py-2 border-r bg-slate-200 text-left min-w-[180px]">
                     Beneficiary Name
                   </th>
-                  <th rowSpan={2} className="px-3 py-2 border-r bg-slate-200 text-left">
-                    Barangay
+                  <th rowSpan={2} className="px-3 py-2 border-r bg-slate-200 text-left min-w-[130px]">
+                    Barangay / Sitio
                   </th>
                   <th rowSpan={2} className="px-3 py-2 border-r bg-slate-200">
                     Table
@@ -505,8 +574,13 @@ function AttendanceMatrixContent() {
                     <td className="px-3 py-2 text-left font-bold text-slate-900 font-sans border-r truncate">
                       {pb.beneficiary?.fullName || "Unnamed"}
                     </td>
-                    <td className="px-3 py-2 text-left text-slate-700 font-sans border-r">
-                      {pb.beneficiary?.barangay || "-"}
+                    <td className="px-3 py-2 text-left font-sans border-r">
+                      <span className="font-bold text-slate-900 block">
+                        {normalizeBarangayName(pb.beneficiary?.barangay) || "-"}
+                      </span>
+                      <span className="text-[10px] font-bold text-slate-700 bg-slate-100 px-1.5 py-0.5 rounded border border-slate-300 inline-block mt-0.5">
+                        {normalizeSitioName(pb.beneficiary?.sitio, pb.beneficiary?.barangay) || "Centro"}
+                      </span>
                     </td>
                     <td className="px-3 py-2 font-bold text-slate-800 border-r">
                       {pb.tableNumber || "T1"}
