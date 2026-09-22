@@ -42,6 +42,12 @@ import { TableScrollWrapper } from "@/components/common/TableScrollWrapper";
 import { useAuth } from "@/context/AuthContext";
 import { offlineDb } from "@/lib/dexie";
 import { isAdminUser, isFieldCoordinator } from "@/lib/permissions";
+import {
+  normalizeBarangayName,
+  normalizeSitioName,
+  getStandardBarangayName,
+  CANONICAL_SITIOS_BY_BARANGAY,
+} from "@/lib/dingalan-groupings";
 import { useRouter, useSearchParams } from "next/navigation";
 
 export default function BeneficiariesMasterlistPage() {
@@ -273,28 +279,54 @@ function BeneficiariesMasterlistContent() {
     fetchBeneficiaries(progId);
   };
 
-  // Collect unique Puroks / Sitios dynamically
+  // Collect unique Puroks / Sitios dynamically (Canonical & Normalized)
   const uniqueSitios = useMemo(() => {
     const list = beneficiaries
-      .filter((pb) => selectedBarangay === "ALL" || pb.beneficiary?.barangay === selectedBarangay)
-      .map((pb) => pb.beneficiary?.sitio)
-      .filter(Boolean);
+      .filter((pb) => {
+        if (selectedBarangay === "ALL") return true;
+        return (
+          normalizeBarangayName(pb.beneficiary?.barangay) ===
+          normalizeBarangayName(selectedBarangay)
+        );
+      })
+      .map((pb) => normalizeSitioName(pb.beneficiary?.sitio, pb.beneficiary?.barangay))
+      .filter((s) => Boolean(s) && s !== "None" && s !== "N/A" && s !== "Centro");
+
+    // When a specific barangay is selected, ensure all canonical sitios for that barangay are available
+    if (selectedBarangay !== "ALL") {
+      const stdBrgy = getStandardBarangayName(selectedBarangay);
+      const canon = CANONICAL_SITIOS_BY_BARANGAY[stdBrgy] || [];
+      for (const c of canon) {
+        list.push(c);
+      }
+    }
+
     return Array.from(new Set(list)).sort((a: any, b: any) =>
       a.localeCompare(b, undefined, { numeric: true })
     );
   }, [beneficiaries, selectedBarangay]);
 
-  // Filter beneficiaries
+  // Filter beneficiaries with robust canonical normalization
   const filtered = useMemo(() => {
     return beneficiaries.filter((pb) => {
       const q = searchQuery.toLowerCase();
+      const bBrgy = normalizeBarangayName(pb.beneficiary?.barangay);
+      const bSitio = normalizeSitioName(pb.beneficiary?.sitio, pb.beneficiary?.barangay);
+
       const matchesSearch =
         pb.designatedNumber?.toLowerCase().includes(q) ||
         pb.beneficiary?.fullName?.toLowerCase().includes(q) ||
+        (bSitio && bSitio.toLowerCase().includes(q)) ||
         (pb.beneficiary?.sitio && pb.beneficiary.sitio.toLowerCase().includes(q)) ||
         (pb.tableNumber && pb.tableNumber.toLowerCase().includes(q));
-      const matchesBrgy = selectedBarangay === "ALL" || pb.beneficiary?.barangay === selectedBarangay;
-      const matchesSitio = selectedSitio === "ALL" || pb.beneficiary?.sitio === selectedSitio;
+
+      const matchesBrgy =
+        selectedBarangay === "ALL" ||
+        bBrgy === normalizeBarangayName(selectedBarangay);
+
+      const matchesSitio =
+        selectedSitio === "ALL" ||
+        bSitio === selectedSitio;
 
       const isReplaced = pb.participationStatus === "REPLACED";
       if (selectedStubStatus === "REPLACED") {
@@ -327,8 +359,8 @@ function BeneficiariesMasterlistContent() {
         if (!isNaN(numA) && !isNaN(numB)) comp = numA - numB;
         else comp = String(a.designatedNumber || "").localeCompare(String(b.designatedNumber || ""), undefined, { numeric: true });
       } else if (sortBy === "sitio") {
-        const sitioA = (a.beneficiary?.sitio || "").trim();
-        const sitioB = (b.beneficiary?.sitio || "").trim();
+        const sitioA = normalizeSitioName(a.beneficiary?.sitio, a.beneficiary?.barangay);
+        const sitioB = normalizeSitioName(b.beneficiary?.sitio, b.beneficiary?.barangay);
         comp = sitioA.localeCompare(sitioB, undefined, { numeric: true });
         if (comp === 0) {
           comp = (a.beneficiary?.fullName || "").localeCompare(b.beneficiary?.fullName || "");
@@ -338,10 +370,12 @@ function BeneficiariesMasterlistContent() {
       } else if (sortBy === "birthday") {
         comp = (a.beneficiary?.birthday || "").localeCompare(b.beneficiary?.birthday || "");
       } else if (sortBy === "barangay") {
-        comp = (a.beneficiary?.barangay || "").localeCompare(b.beneficiary?.barangay || "");
+        const brgyA = normalizeBarangayName(a.beneficiary?.barangay);
+        const brgyB = normalizeBarangayName(b.beneficiary?.barangay);
+        comp = brgyA.localeCompare(brgyB, undefined, { numeric: true });
         if (comp === 0) {
-          const sitioA = (a.beneficiary?.sitio || "").trim();
-          const sitioB = (b.beneficiary?.sitio || "").trim();
+          const sitioA = normalizeSitioName(a.beneficiary?.sitio, a.beneficiary?.barangay);
+          const sitioB = normalizeSitioName(b.beneficiary?.sitio, b.beneficiary?.barangay);
           comp = sitioA.localeCompare(sitioB, undefined, { numeric: true });
         }
       } else if (sortBy === "tableNumber") {
@@ -1026,9 +1060,11 @@ function BeneficiariesMasterlistContent() {
                         {pb.beneficiary?.birthday || "-"}
                       </td>
                       <td className="px-4 py-3">
-                        <span className="font-bold text-slate-950 block">{pb.beneficiary?.barangay || "-"}</span>
+                        <span className="font-bold text-slate-950 block">
+                          {normalizeBarangayName(pb.beneficiary?.barangay) || "-"}
+                        </span>
                         <span className="text-[11px] font-black text-slate-900 bg-slate-100 px-2 py-0.5 rounded border border-slate-300 inline-block mt-0.5">
-                          {pb.beneficiary?.sitio || "Centro"}
+                          {normalizeSitioName(pb.beneficiary?.sitio, pb.beneficiary?.barangay) || "Centro"}
                         </span>
                       </td>
                       <td className="px-4 py-3 font-black text-slate-950">

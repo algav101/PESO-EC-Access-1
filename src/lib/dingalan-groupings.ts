@@ -226,10 +226,67 @@ export const DINGALAN_BARANGAY_GROUPINGS: Record<string, BarangayGroupingConfig>
   },
 };
 
+export const CANONICAL_BARANGAYS = [
+  "Aplaya",
+  "Butas na Bato",
+  "Caragsacan",
+  "Davildavilan",
+  "Dikapanikian",
+  "Ibona",
+  "Matawe",
+  "Paltic",
+  "Poblacion",
+  "Tanawan",
+  "Umiray",
+] as const;
+
+export const CANONICAL_SITIOS_BY_BARANGAY: Record<string, string[]> = {
+  Aplaya: ["Lapu-Lapu", "Maya-Maya", "Tanigue"],
+  "Butas na Bato": ["Purok 1", "Purok 2", "Purok 3", "Purok 4"],
+  Caragsacan: [
+    "Purok 1",
+    "Purok 1 Phase 1",
+    "Purok 1 Phase 2",
+    "Purok 2",
+    "Purok 3",
+    "Purok 4",
+    "Purok 5",
+    "Purok 5 ADRA",
+    "Purok 5 EVNAI",
+    "Purok 5 Gawad Kalinga",
+    "Purok 5 Horseshoe",
+    "Purok 5 Kailyo",
+    "Purok 6",
+  ],
+  Davildavilan: ["Purok 1", "Purok 2", "Purok 3", "Purok 5", "Purok 6"],
+  Dikapanikian: ["Core Housing", "Pundongan", "Sagingan", "Saint Paul 1", "Saint Paul 2", "Sentro"],
+  Ibona: ["Abungan", "Camiling", "Purok 1", "Purok 2", "Purok 3", "Purok 4", "Purok 5", "Purok 6", "Purok 7"],
+  Matawe: ["Purok 2", "Purok 3", "Purok 4", "Purok 5", "Purok 6", "Purok 6B", "Purok 7"],
+  Paltic: ["Almaciga", "Ipil-Ipil", "Kamagong", "Mahogany", "Mulawin", "Narra", "Purok 2", "Yakal 1", "Yakal 2"],
+  Poblacion: ["Market Site", "Purok 1", "Purok 2", "Purok 3", "Purok 4", "Purok 5"],
+  Tanawan: ["Purok 1", "Purok 2", "Purok 3"],
+  Umiray: [
+    "Bacong",
+    "Bakahan",
+    "Dugyan",
+    "Ferry",
+    "Iyapit",
+    "Kamandag",
+    "Limbok",
+    "Malacauayan",
+    "Malamig",
+    "Market Site",
+    "Pinamaypayan",
+    "Sabang",
+    "Singawan",
+    "Tabi",
+  ],
+};
+
 /**
  * Normalizes Barangay Name to standard capital key
  */
-export function getBarangayKey(rawBarangay: string): string {
+export function getBarangayKey(rawBarangay?: string | null): string {
   if (!rawBarangay) return "PALTIC";
   const clean = rawBarangay.trim().toUpperCase().replace(/[^A-Z0-9 ]/g, " ").replace(/\s+/g, " ");
   if (clean.includes("BUTAS") || clean === "BNB") return "BUTAS NA BATO";
@@ -249,23 +306,248 @@ export function getBarangayKey(rawBarangay: string): string {
 /**
  * Returns clean standard title-cased barangay name
  */
-export function getStandardBarangayName(rawBarangay: string): string {
+export function getStandardBarangayName(rawBarangay?: string | null): string {
   const key = getBarangayKey(rawBarangay);
   const cfg = DINGALAN_BARANGAY_GROUPINGS[key];
-  return cfg ? cfg.barangay : rawBarangay.trim();
+  return cfg ? cfg.barangay : (rawBarangay || "").trim();
+}
+
+export function normalizeBarangayName(input?: string | null): string {
+  return getStandardBarangayName(input);
 }
 
 /**
  * Normalizes Purok/Sitio strings for reliable matching against uploaded names
  */
-export function normalizeSitioString(str: string): string {
+export function normalizeSitioString(str?: string | null): string {
   return (str || "")
     .trim()
     .toLowerCase()
     .replace(/^purok\s*/i, "")
     .replace(/^sitio\s*/i, "")
-    .replace(/^so\s*/i, "")
+    .replace(/^s[\.\/]?o[\.,\s]*/i, "")
     .replace(/[^a-z0-9]/g, "");
+}
+
+/**
+ * Unifies raw Sitio and Purok spellings into canonical Dingalan reference names
+ */
+export function normalizeSitioName(rawSitio?: string | null, rawBarangay?: string | null): string {
+  if (!rawSitio) return "";
+  let s = rawSitio.trim();
+  if (!s || ["NONE", "N/A", "NA", "UNKNOWN", "(EMPTY)", "-", "NULL"].includes(s.toUpperCase())) {
+    return "";
+  }
+
+  const bKey = rawBarangay ? getBarangayKey(rawBarangay) : "";
+
+  // Strip prefixes like "SITIO ", "SO ", "SO. ", "SO, ", "S.O. ", "S/O "
+  const upper = s
+    .toUpperCase()
+    .replace(/^SITIO\s+/i, "")
+    .replace(/^S[\.\/]?O[\.,\s]+\s*/i, "")
+    .replace(/^PUROK\s+/i, "PUROK ")
+    .replace(/^P\-(\d)/i, "PUROK $1")
+    .replace(/^P(\d)/i, "PUROK $1")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  // Alias Map for full precision across all 11 Barangays
+  const aliasMap: Record<string, string> = {
+    // Umiray
+    "SINGAWAN": "Singawan",
+    "SO SINGAWAN": "Singawan",
+    "SITIO SINGAWAN": "Singawan",
+    "PINAMAYPAYAN": "Pinamaypayan",
+    "SO PINAMAYPAYAN": "Pinamaypayan",
+    "SITIO PINAMAYPAYAN": "Pinamaypayan",
+    "DUGYAN": "Dugyan",
+    "SO DUGYAN": "Dugyan",
+    "SITIO DUGYAN": "Dugyan",
+    "MALACAUAYAN": "Malacauayan",
+    "MALACAUYAN": "Malacauayan",
+    "MALAKAWAYAN": "Malacauayan",
+    "SO MALACAUAYAN": "Malacauayan",
+    "SO MALAKAWAYAN": "Malacauayan",
+    "SITIO MALACAUAYAN": "Malacauayan",
+    "SITIO MALAKAWAYAN": "Malacauayan",
+    "SABANG": "Sabang",
+    "SO SABANG": "Sabang",
+    "SITIO SABANG": "Sabang",
+    "LIMBOK": "Limbok",
+    "SO LIMBOK": "Limbok",
+    "SO, LIMBOK": "Limbok",
+    "SITIO LIMBOK": "Limbok",
+    "MALAMIG": "Malamig",
+    "SO MALAMIG": "Malamig",
+    "SITIO MALAMIG": "Malamig",
+    "IYAPIT": "Iyapit",
+    "SO IYAPIT": "Iyapit",
+    "SITIO IYAPIT": "Iyapit",
+    "BAKAHAN": "Bakahan",
+    "SO BAKAHAN": "Bakahan",
+    "SITIO BAKAHAN": "Bakahan",
+    "TABI": "Tabi",
+    "TAPI": "Tabi",
+    "SO TABI": "Tabi",
+    "SITIO TABI": "Tabi",
+    "SITIO TAPI": "Tabi",
+    "BACONG": "Bacong",
+    "BACOONG": "Bacong",
+    "BACONG UMIRAY": "Bacong",
+    "SO BACONG": "Bacong",
+    "SO BACOONG": "Bacong",
+    "SO.BACONG": "Bacong",
+    "SO, BACONG": "Bacong",
+    "SITIO BACONG": "Bacong",
+    "FERRY": "Ferry",
+    "SO FERRY": "Ferry",
+    "SITIO FERRY": "Ferry",
+    "KAMANDAG": "Kamandag",
+    "SO KAMANDAG": "Kamandag",
+    "SITIO KAMANDAG": "Kamandag",
+    "PALENGKE UMIRAY": "Market Site",
+    "PALENGKE": "Market Site",
+    "SO MARKET SITE": "Market Site",
+    "SITIO MARKET SITE": "Market Site",
+    "BOUNDARY": "Boundary",
+
+    // Aplaya
+    "LAPU LAPU": "Lapu-Lapu",
+    "LAPU-LAPU": "Lapu-Lapu",
+    "PUROK LAPU LAPU": "Lapu-Lapu",
+    "PUROK LAPU-LAPU": "Lapu-Lapu",
+    "MAYA-MAYA": "Maya-Maya",
+    "MAYA MAYA": "Maya-Maya",
+    "MAY MAYA": "Maya-Maya",
+    "PUROK MAYA-MAYA": "Maya-Maya",
+    "PUROK MAYA MAYA": "Maya-Maya",
+    "TANGIGUE": "Tanigue",
+    "TANGGUE": "Tanigue",
+    "TANIGUE": "Tanigue",
+    "PUROK TANIGUE": "Tanigue",
+    "PUROK TANGIGUE": "Tanigue",
+    "SEASIDE": "Seaside",
+
+    // Butas na Bato / General Puroks
+    "PUROK 1": "Purok 1",
+    "PUROK 2": "Purok 2",
+    "PUROK 3": "Purok 3",
+    "PUROK 4": "Purok 4",
+    "PUROK 5": "Purok 5",
+    "PUROK 6": "Purok 6",
+    "PUROK 7": "Purok 7",
+    "ROCK VIEW": "Rock View",
+    "UNO": "Purok 1",
+
+    // Caragsacan
+    "PUROK 1 PHASE 1": "Purok 1 Phase 1",
+    "PUROK 1PHASE 1": "Purok 1 Phase 1",
+    "PHASE 1": "Purok 1 Phase 1",
+    "PUROK 1 PHASE 2": "Purok 1 Phase 2",
+    "PUROK 1PHASE 2": "Purok 1 Phase 2",
+    "PHASE 2": "Purok 1 Phase 2",
+    "PUROK 5 ADRA": "Purok 5 ADRA",
+    "ADRA": "Purok 5 ADRA",
+    "PUROK 5 EVNAI": "Purok 5 EVNAI",
+    "EVNAI": "Purok 5 EVNAI",
+    "PUROK 5 GAWAD KALINGA": "Purok 5 Gawad Kalinga",
+    "PUROK 5 KALINGA": "Purok 5 Gawad Kalinga",
+    "GAWAD KALINGA": "Purok 5 Gawad Kalinga",
+    "GK": "Purok 5 Gawad Kalinga",
+    "PUROK 5 HORSHOE": "Purok 5 Horseshoe",
+    "PUROK 5 HORSESHOE": "Purok 5 Horseshoe",
+    "HORSESHOE": "Purok 5 Horseshoe",
+    "PUROK 5 KAILYO": "Purok 5 Kailyo",
+    "KAILYO": "Purok 5 Kailyo",
+    "MAIN ROAD": "Main Road",
+
+    // Dikapanikian
+    "SENTRO": "Sentro",
+    "CENTRO": "Sentro",
+    "PROPER": "Sentro",
+    "CORE HOUSING": "Core Housing",
+    "PUROK PUNDONGAN": "Pundongan",
+    "PUNDONGAN": "Pundongan",
+    "PUROK SAGINGAN": "Sagingan",
+    "SAGINGAN": "Sagingan",
+    "SAINT PAUL 1": "Saint Paul 1",
+    "ST. PAUL 1": "Saint Paul 1",
+    "ST PAUL 1": "Saint Paul 1",
+    "SAINT PAUL 2": "Saint Paul 2",
+    "ST. PAUL 2": "Saint Paul 2",
+    "ST PAUL 2": "Saint Paul 2",
+    "CREEK SIDE": "Creek Side",
+
+    // Ibona
+    "ABUNGAN": "Abungan",
+    "PUROK ABUNGAN": "Abungan",
+    "CAMILING": "Camiling",
+    "PUROK CAMILING": "Camiling",
+    "RIVERSIDE": "Riverside",
+
+    // Matawe
+    "PUROK 6B": "Purok 6B",
+    "PUROK 6-B": "Purok 6B",
+    "PUROK 6A": "Purok 6A",
+    "HIGHWAY": "Highway",
+
+    // Paltic
+    "ALMACIGA": "Almaciga",
+    "PUROK ALMACIGA": "Almaciga",
+    "IPIL-IPIL": "Ipil-Ipil",
+    "IPIL IPIL": "Ipil-Ipil",
+    "IPIP IPIL": "Ipil-Ipil",
+    "PUROK IPIL-IPIL": "Ipil-Ipil",
+    "PUROK IPIL IPIL": "Ipil-Ipil",
+    "KAMAGONG": "Kamagong",
+    "PUROK KAMAGONG": "Kamagong",
+    "MAHOGANY": "Mahogany",
+    "MAHAGONY": "Mahogany",
+    "PUROK MAHOGANY": "Mahogany",
+    "PUROK MAHAGONY": "Mahogany",
+    "MULAWIN": "Mulawin",
+    "PUROK MULAWIN": "Mulawin",
+    "NARRA": "Narra",
+    "PUROK NARRA": "Narra",
+    "YAKAL 1": "Yakal 1",
+    "PUROK YAKAL 1": "Yakal 1",
+    "YAKAL 2": "Yakal 2",
+    "YAKAL2": "Yakal 2",
+    "PUROK YAKAL 2": "Yakal 2",
+    "YAKAL": "Yakal 1",
+    "ABIS 1": "Abis 1",
+    "FISH PORT": "Fish Port",
+
+    // Poblacion / General
+    "MARKET SITE": "Market Site",
+    "PUROK MARKET SITE": "Market Site",
+    "BRGY SITE": "Brgy Site",
+    "UPPER": "Upper",
+  };
+
+  if (aliasMap[upper]) return aliasMap[upper];
+
+  // Try matching against canonical list of the barangay
+  if (bKey) {
+    const stdBrgy = getStandardBarangayName(bKey);
+    const sitios = CANONICAL_SITIOS_BY_BARANGAY[stdBrgy] || [];
+    const cleanRaw = normalizeSitioString(s);
+    for (const canon of sitios) {
+      if (normalizeSitioString(canon) === cleanRaw) {
+        return canon;
+      }
+    }
+  }
+
+  // Fallback title-case
+  return s
+    .replace(/^SITIO\s+/i, "")
+    .replace(/^SO[\.,\s]+\s*/i, "")
+    .toLowerCase()
+    .split(" ")
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+    .join(" ");
 }
 
 /**

@@ -39,7 +39,13 @@ import {
   AlignCenter,
   Move,
 } from "lucide-react";
-import { formatDate, normalizeBarangayName } from "@/lib/utils";
+import { formatDate } from "@/lib/utils";
+import {
+  normalizeBarangayName,
+  normalizeSitioName,
+  getStandardBarangayName,
+  CANONICAL_SITIOS_BY_BARANGAY,
+} from "@/lib/dingalan-groupings";
 import { TableAssignmentModal } from "@/components/tables/TableAssignmentModal";
 import { ETupadCard } from "@/components/stubs/ETupadCard";
 import { Format1Stub } from "@/components/stubs/Format1Stub";
@@ -302,17 +308,27 @@ function StubsContent() {
     );
   }, [beneficiaries]);
 
-  // Collect unique Puroks / Sitios
+  // Collect unique Puroks / Sitios dynamically (Canonical & Normalized)
   const uniqueSitios = useMemo(() => {
     const list = beneficiaries
-      .filter(
-        (pb) =>
-          selectedBarangay === "ALL" ||
-          normalizeBarangayName(pb.beneficiary?.barangay).toLowerCase() ===
-            normalizeBarangayName(selectedBarangay).toLowerCase()
-      )
-      .map((pb) => pb.beneficiary?.sitio)
-      .filter(Boolean);
+      .filter((pb) => {
+        if (selectedBarangay === "ALL") return true;
+        return (
+          normalizeBarangayName(pb.beneficiary?.barangay) ===
+          normalizeBarangayName(selectedBarangay)
+        );
+      })
+      .map((pb) => normalizeSitioName(pb.beneficiary?.sitio, pb.beneficiary?.barangay))
+      .filter((s) => Boolean(s) && s !== "None" && s !== "N/A" && s !== "Centro");
+
+    if (selectedBarangay !== "ALL") {
+      const stdBrgy = getStandardBarangayName(selectedBarangay);
+      const canon = CANONICAL_SITIOS_BY_BARANGAY[stdBrgy] || [];
+      for (const c of canon) {
+        list.push(c);
+      }
+    }
+
     return Array.from(new Set(list)).sort((a: any, b: any) =>
       a.localeCompare(b, undefined, { numeric: true })
     );
@@ -322,11 +338,13 @@ function StubsContent() {
   const filteredBeneficiaries = useMemo(() => {
     return beneficiaries
       .filter((pb) => {
+        const bBrgy = normalizeBarangayName(pb.beneficiary?.barangay);
+        const bSitio = normalizeSitioName(pb.beneficiary?.sitio, pb.beneficiary?.barangay);
+
         const matchesBrgy =
           selectedBarangay === "ALL" ||
-          normalizeBarangayName(pb.beneficiary?.barangay).toLowerCase() ===
-            normalizeBarangayName(selectedBarangay).toLowerCase();
-        const matchesSitio = selectedSitio === "ALL" || pb.beneficiary?.sitio === selectedSitio;
+          bBrgy === normalizeBarangayName(selectedBarangay);
+        const matchesSitio = selectedSitio === "ALL" || bSitio === selectedSitio;
         const matchesTable = filterTable === "ALL" || pb.tableNumber === filterTable;
 
         const num = parseInt(pb.designatedNumber, 10);
@@ -341,8 +359,8 @@ function StubsContent() {
       .sort((a, b) => {
         let comp = 0;
         if (sortField === "SITIO") {
-          const sitioA = (a.beneficiary?.sitio || "").trim();
-          const sitioB = (b.beneficiary?.sitio || "").trim();
+          const sitioA = normalizeSitioName(a.beneficiary?.sitio, a.beneficiary?.barangay);
+          const sitioB = normalizeSitioName(b.beneficiary?.sitio, b.beneficiary?.barangay);
           comp = sitioA.localeCompare(sitioB, undefined, { numeric: true });
           if (comp === 0) {
             const numA = parseInt(a.designatedNumber, 10);
@@ -352,10 +370,12 @@ function StubsContent() {
         } else if (sortField === "NAME") {
           comp = (a.beneficiary?.fullName || "").localeCompare(b.beneficiary?.fullName || "");
         } else if (sortField === "BARANGAY") {
-          comp = (a.beneficiary?.barangay || "").localeCompare(b.beneficiary?.barangay || "");
+          const brgyA = normalizeBarangayName(a.beneficiary?.barangay);
+          const brgyB = normalizeBarangayName(b.beneficiary?.barangay);
+          comp = brgyA.localeCompare(brgyB, undefined, { numeric: true });
           if (comp === 0) {
-            const sitioA = (a.beneficiary?.sitio || "").trim();
-            const sitioB = (b.beneficiary?.sitio || "").trim();
+            const sitioA = normalizeSitioName(a.beneficiary?.sitio, a.beneficiary?.barangay);
+            const sitioB = normalizeSitioName(b.beneficiary?.sitio, b.beneficiary?.barangay);
             comp = sitioA.localeCompare(sitioB, undefined, { numeric: true });
           }
         } else if (sortField === "TABLE") {
@@ -1533,8 +1553,8 @@ function StubsContent() {
                     qrDataUrl={qrImg}
                     token={activeQr?.publicToken}
                     fullName={pb.beneficiary?.fullName || ""}
-                    barangay={pb.beneficiary?.barangay || ""}
-                    sitio={pb.beneficiary?.sitio || "Centro"}
+                    barangay={normalizeBarangayName(pb.beneficiary?.barangay) || ""}
+                    sitio={normalizeSitioName(pb.beneficiary?.sitio, pb.beneficiary?.barangay) || "Centro"}
                     sex={pb.beneficiary?.sex || "BENEFICIARY"}
                     tableNumber={pb.tableNumber || "Table 1"}
                     programName={currentProgram?.programName}
@@ -1574,7 +1594,9 @@ function StubsContent() {
                   </p>
                   <div className="flex justify-between text-[9px] text-slate-600">
                     <span>{pb.tableNumber || "Table 1"}</span>
-                    <span>{pb.beneficiary?.barangay} - {pb.beneficiary?.sitio || "Centro"}</span>
+                    <span>
+                      {normalizeBarangayName(pb.beneficiary?.barangay)} - {normalizeSitioName(pb.beneficiary?.sitio, pb.beneficiary?.barangay) || "Centro"}
+                    </span>
                   </div>
                   <p className="text-[7px] font-mono text-slate-400 truncate">
                     {activeQr?.publicToken}

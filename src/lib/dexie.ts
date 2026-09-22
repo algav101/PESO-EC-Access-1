@@ -5,6 +5,10 @@ import {
   determineAttendanceSlot,
   ATTENDANCE_SLOT_LABELS,
 } from "@/lib/utils";
+import {
+  normalizeBarangayName,
+  normalizeSitioName,
+} from "@/lib/dingalan-groupings";
 
 export interface CachedProgram {
   id: string;
@@ -834,6 +838,9 @@ export async function initializeUserOfflineCache(user?: {
 
           const hasOrientation = pb.orientationAttendance && pb.orientationAttendance.length > 0;
 
+          const normBrgy = normalizeBarangayName(pb.beneficiary?.barangay);
+          const normSitio = normalizeSitioName(pb.beneficiary?.sitio, normBrgy);
+
           await offlineDb.cachedBeneficiaries.put({
             id: pb.id,
             programId: prog.id,
@@ -842,8 +849,8 @@ export async function initializeUserOfflineCache(user?: {
             fullName: pb.beneficiary?.fullName || "",
             birthday: pb.beneficiary?.birthday || "",
             birthdayPin,
-            barangay: pb.beneficiary?.barangay || "",
-            sitio: pb.beneficiary?.sitio || "",
+            barangay: normBrgy,
+            sitio: normSitio,
             tableNumber: pb.tableNumber || "",
             qrToken: activeQr?.publicToken || "",
             status: pb.participationStatus || "ACTIVE",
@@ -1004,6 +1011,9 @@ export async function forceMasterSyncWithServer(user?: {
 
           const hasOrientation = pb.orientationAttendance && pb.orientationAttendance.length > 0;
 
+          const normBrgy = normalizeBarangayName(pb.beneficiary?.barangay);
+          const normSitio = normalizeSitioName(pb.beneficiary?.sitio, normBrgy);
+
           await offlineDb.cachedBeneficiaries.put({
             id: pb.id,
             programId: prog.id,
@@ -1012,8 +1022,8 @@ export async function forceMasterSyncWithServer(user?: {
             fullName: pb.beneficiary?.fullName || "",
             birthday: pb.beneficiary?.birthday || "",
             birthdayPin,
-            barangay: pb.beneficiary?.barangay || "",
-            sitio: pb.beneficiary?.sitio || "",
+            barangay: normBrgy,
+            sitio: normSitio,
             tableNumber: pb.tableNumber || "",
             qrToken: activeQr?.publicToken || "",
             status: pb.participationStatus || "ACTIVE",

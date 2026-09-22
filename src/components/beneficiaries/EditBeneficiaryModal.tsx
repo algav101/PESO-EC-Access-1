@@ -17,19 +17,14 @@ import {
   Clock,
 } from "lucide-react";
 
-const DINGALAN_BARANGAYS = [
-  "Aplaya",
-  "Butas na Bato",
-  "Caragsacan",
-  "Davildavilan",
-  "Dikapanikian",
-  "Ibona",
-  "Matawe",
-  "Paltic",
-  "Poblacion",
-  "Tanawan",
-  "Umiray",
-];
+import {
+  CANONICAL_BARANGAYS,
+  CANONICAL_SITIOS_BY_BARANGAY,
+  normalizeBarangayName,
+  normalizeSitioName,
+} from "@/lib/dingalan-groupings";
+
+const DINGALAN_BARANGAYS = CANONICAL_BARANGAYS;
 
 const PARTICIPATION_STATUSES = [
   { value: "ACTIVE", label: "ACTIVE", color: "bg-emerald-50 text-emerald-700 border-emerald-200" },
@@ -157,6 +152,9 @@ export function EditBeneficiaryModal({
         throw new Error("Birthday is required (YYYY-MM-DD).");
       }
 
+      const normBrgy = normalizeBarangayName(barangay);
+      const normSitio = normalizeSitioName(sitio, normBrgy);
+
       let res: Response;
       if (progId && targetPb) {
         // Update via Program Beneficiary endpoint
@@ -176,8 +174,8 @@ export function EditBeneficiaryModal({
             fullName,
             birthday,
             sex,
-            barangay,
-            sitio,
+            barangay: normBrgy,
+            sitio: normSitio,
             contactNumber,
             civilStatus,
             occupation,
@@ -199,8 +197,8 @@ export function EditBeneficiaryModal({
             fullName,
             birthday,
             sex,
-            barangay,
-            sitio,
+            barangay: normBrgy,
+            sitio: normSitio,
             contactNumber,
             civilStatus,
             occupation,
@@ -598,11 +596,17 @@ export function EditBeneficiaryModal({
                 </label>
                 <input
                   type="text"
+                  list="canonical-sitio-options"
                   value={sitio}
                   onChange={(e) => setSitio(e.target.value)}
-                  placeholder="e.g. Sitio Mulawin, Purok Tanigue"
-                  className="w-full text-xs font-medium px-3 py-2 bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-gov-blue focus:outline-none uppercase"
+                  placeholder="e.g. Mulawin, Lapu-Lapu, Purok 1"
+                  className="w-full text-xs font-medium px-3 py-2 bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-gov-blue focus:outline-none"
                 />
+                <datalist id="canonical-sitio-options">
+                  {(CANONICAL_SITIOS_BY_BARANGAY[barangay] || []).map((s) => (
+                    <option key={s} value={s} />
+                  ))}
+                </datalist>
               </div>
             </div>
           </div>

@@ -21,6 +21,11 @@ import {
   Filter,
 } from "lucide-react";
 
+import {
+  normalizeBarangayName,
+  normalizeSitioName,
+} from "@/lib/dingalan-groupings";
+
 interface BeneficiarySummaryDropdownProps {
   beneficiaries: any[];
   programTitle?: string;
@@ -98,8 +103,8 @@ export function BeneficiarySummaryDropdown({
 
     beneficiaries.forEach((pb) => {
       const b = pb.beneficiary || {};
-      const brgyName = (b.barangay || "Unspecified").trim();
-      const purokName = (b.sitio || "Centro / General").trim();
+      const brgyName = normalizeBarangayName(b.barangay) || "Unspecified";
+      const purokName = normalizeSitioName(b.sitio, b.barangay) || "Centro / General";
       const sex = (b.sex || "").toUpperCase();
       const isMale = sex.startsWith("M");
       const isFemale = sex.startsWith("F");
