@@ -193,6 +193,10 @@ function StubDistributionContent() {
       const bene = await findBeneficiaryOffline(token, selectedProgramId);
       if (!bene) throw new Error(`QR Stub or Beneficiary "${token}" not found in offline database cache.`);
 
+      if (bene.stubDistributed) {
+        throw new Error(`ALREADY DISTRIBUTED: Stub for #${bene.designatedNumber} (${bene.fullName}) was already issued and confirmed.`);
+      }
+
       setScannedData({
         qrId: bene.qrToken || "offline_qr",
         programBeneficiaryId: bene.id,

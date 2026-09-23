@@ -78,10 +78,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     checkAuth();
   }, [pathname]);
 
-  const login = (u: AuthUser) => {
+  const login = (u: AuthUser, token?: string) => {
     setUser(u);
     if (typeof window !== "undefined") {
       localStorage.setItem("peso_cached_user", JSON.stringify(u));
+      if (token) {
+        localStorage.setItem("peso_jwt_token", token);
+      }
     }
   };
 
@@ -92,6 +95,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setUser(null);
     if (typeof window !== "undefined") {
       localStorage.removeItem("peso_cached_user");
+      localStorage.removeItem("peso_jwt_token");
     }
     router.push("/login");
   };

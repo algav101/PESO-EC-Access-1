@@ -334,7 +334,7 @@ export default function LoginPage() {
         throw new Error(data.error || "Authentication failed");
       }
 
-      login(data.user);
+      login(data.user, data.token);
       const targetUrl =
         data.user?.role === "TUPAD_COORDINATOR" || data.user?.role === "TUPAD_ASSISTING_DOCUMENTOR"
           ? "/field"

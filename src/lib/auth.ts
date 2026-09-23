@@ -35,11 +35,34 @@ export function verifyToken(token: string): AuthUser | null {
   }
 }
 
-export async function getCurrentUser(): Promise<AuthUser | null> {
-  const cookieStore = cookies();
-  const token = cookieStore.get(COOKIE_NAME)?.value;
-  if (!token) return null;
-  return verifyToken(token);
+export async function getCurrentUser(request?: Request): Promise<AuthUser | null> {
+  // 1. Check Cookie first
+  try {
+    const cookieStore = cookies();
+    const token = cookieStore.get(COOKIE_NAME)?.value;
+    if (token) {
+      const user = verifyToken(token);
+      if (user) return user;
+    }
+  } catch (e) {
+    // Cookie store may fail outside request contexts
+  }
+
+  // 2. Fallback to Authorization Bearer token header (for mobile apps, PWA, or cross-device sync)
+  if (request) {
+    try {
+      const authHeader = request.headers.get("authorization") || request.headers.get("Authorization");
+      if (authHeader && authHeader.toLowerCase().startsWith("bearer ")) {
+        const token = authHeader.slice(7).trim();
+        if (token) {
+          const user = verifyToken(token);
+          if (user) return user;
+        }
+      }
+    } catch (e) {}
+  }
+
+  return null;
 }
 
 /**

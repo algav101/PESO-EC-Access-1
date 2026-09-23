@@ -8,7 +8,7 @@ import { normalizeBarangayName } from "@/lib/utils";
 
 export async function GET(request: Request) {
   try {
-    const user = await getCurrentUser();
+    const user = await getCurrentUser(request);
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
     const { searchParams } = new URL(request.url);
@@ -100,7 +100,7 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
-    const user = await getCurrentUser();
+    const user = await getCurrentUser(request);
     if (!user || !hasPermission(user.role, "photo.upload")) {
       return NextResponse.json({ error: "Forbidden: insufficient permissions" }, { status: 403 });
     }
@@ -124,7 +124,7 @@ export async function POST(request: Request) {
     } = body;
 
     const rawBarangay =
-      (user.role === "TUPAD_COORDINATOR" || user.role === "TUPAD_ASSISTING_DOCUMENTOR") && user.assignedBarangay
+      (!isAdminUser(user) && user.assignedBarangay)
         ? user.assignedBarangay
         : barangay;
 

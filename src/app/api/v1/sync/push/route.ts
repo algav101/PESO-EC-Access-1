@@ -9,7 +9,7 @@ import { addDays, format, parseISO } from "date-fns";
 
 export async function POST(request: Request) {
   try {
-    const user = await getCurrentUser();
+    const user = await getCurrentUser(request);
     if (user?.id) {
       prisma.user.update({
         where: { id: user.id },
@@ -299,7 +299,7 @@ export async function POST(request: Request) {
           }
 
           const actualPin = formatBirthdayPin(pb.beneficiary.birthday);
-          const enteredPin = birthdayPin?.trim();
+          const enteredPin = birthdayPin ? String(birthdayPin).trim().replace(/[\/\.]/g, "-") : "";
           if (actualPin && enteredPin && actualPin !== enteredPin) {
             conflicts.push(clientTransactionId);
             errors[clientTransactionId] = `Birthday PIN mismatch: expected format ${actualPin}`;

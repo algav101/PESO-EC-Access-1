@@ -41,6 +41,7 @@ export interface CachedBeneficiary {
   qrToken?: string;
   status: string;
   orientationStatus?: "PRESENT" | "ABSENT";
+  stubDistributed?: boolean;
 }
 
 export interface CachedWorkDay {
@@ -120,6 +121,22 @@ export class TupadOfflineDatabase extends Dexie {
 }
 
 export const offlineDb = new TupadOfflineDatabase();
+
+/**
+ * Resolves standard authorization headers from localStorage to prevent 401 Unauthorized during sync
+ */
+export function getClientAuthHeaders(): Record<string, string> {
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+  };
+  if (typeof window !== "undefined") {
+    const token = localStorage.getItem("peso_jwt_token");
+    if (token) {
+      headers["Authorization"] = `Bearer ${token}`;
+    }
+  }
+  return headers;
+}
 
 /**
  * Clean & extract token string from raw URLs, JSON, or parameters
@@ -300,13 +317,15 @@ export async function recordOfflineAttendance(params: {
     (r) => r.workDayId === resolvedWorkDayId || r.attendanceDate === attendanceDate
   );
 
+  const scannerInfo = existingRecord?.scannedByName ? ` (by ${existingRecord.scannedByName})` : "";
+
   // Anti-double-scan checks on installed unit
   if (targetSlot === "MORNING_IN" && existingRecord?.morningTimeIn) {
     const loggedTime = format(new Date(existingRecord.morningTimeIn), "hh:mm a");
     return {
       isDuplicate: true,
       slotRecorded: slotLabels[targetSlot],
-      message: `ALREADY SCANNED: Morning Time-In (AM IN) for #${bene.designatedNumber} (${bene.fullName}) was already recorded on this unit today at ${loggedTime}. Double scanning is blocked.`,
+      message: `ALREADY SCANNED: Morning Time-In (AM IN) for #${bene.designatedNumber} (${bene.fullName}) was already recorded today at ${loggedTime}${scannerInfo}. Double scanning is blocked.`,
       data: {
         designatedNumber: bene.designatedNumber,
         fullName: bene.fullName,
@@ -326,7 +345,7 @@ export async function recordOfflineAttendance(params: {
     return {
       isDuplicate: true,
       slotRecorded: slotLabels[targetSlot],
-      message: `ALREADY SCANNED: Morning Time-Out (AM OUT) for #${bene.designatedNumber} (${bene.fullName}) was already recorded on this unit today at ${loggedTime}. Double scanning is blocked.`,
+      message: `ALREADY SCANNED: Morning Time-Out (AM OUT) for #${bene.designatedNumber} (${bene.fullName}) was already recorded today at ${loggedTime}${scannerInfo}. Double scanning is blocked.`,
       data: {
         designatedNumber: bene.designatedNumber,
         fullName: bene.fullName,
@@ -346,7 +365,7 @@ export async function recordOfflineAttendance(params: {
     return {
       isDuplicate: true,
       slotRecorded: slotLabels[targetSlot],
-      message: `ALREADY SCANNED: Afternoon Time-In (PM IN) for #${bene.designatedNumber} (${bene.fullName}) was already recorded on this unit today at ${loggedTime}. Double scanning is blocked.`,
+      message: `ALREADY SCANNED: Afternoon Time-In (PM IN) for #${bene.designatedNumber} (${bene.fullName}) was already recorded today at ${loggedTime}${scannerInfo}. Double scanning is blocked.`,
       data: {
         designatedNumber: bene.designatedNumber,
         fullName: bene.fullName,
@@ -366,7 +385,7 @@ export async function recordOfflineAttendance(params: {
     return {
       isDuplicate: true,
       slotRecorded: slotLabels[targetSlot],
-      message: `ALREADY SCANNED: Afternoon Time-Out (PM OUT) for #${bene.designatedNumber} (${bene.fullName}) was already recorded on this unit today at ${loggedTime}. Double scanning is blocked.`,
+      message: `ALREADY SCANNED: Afternoon Time-Out (PM OUT) for #${bene.designatedNumber} (${bene.fullName}) was already recorded today at ${loggedTime}${scannerInfo}. Double scanning is blocked.`,
       data: {
         designatedNumber: bene.designatedNumber,
         fullName: bene.fullName,
@@ -650,8 +669,9 @@ export async function pushSyncQueue() {
     try {
       const res = await fetch("/api/v1/sync/push", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: getClientAuthHeaders(),
         body: JSON.stringify({ transactions: chunk }),
+        signal: typeof AbortSignal !== "undefined" && AbortSignal.timeout ? AbortSignal.timeout(30000) : undefined,
       });
 
       if (!res.ok) {
@@ -683,6 +703,19 @@ export async function pushSyncQueue() {
           if (item.id) {
             await offlineDb.offlineQueue.delete(item.id);
           }
+          // Mark local attendance record as synced
+          if (item.entityType === "ATTENDANCE" && item.payload) {
+            const { programId, workDayId, programBeneficiaryId } = item.payload;
+            if (programId && workDayId && programBeneficiaryId) {
+              const existingRec = await offlineDb.offlineAttendanceRecords
+                .where("[programId+workDayId+programBeneficiaryId]")
+                .equals([programId, workDayId, programBeneficiaryId])
+                .first();
+              if (existingRec && existingRec.id) {
+                await offlineDb.offlineAttendanceRecords.update(existingRec.id, { isSynced: true });
+              }
+            }
+          }
         } else if (result.conflicts?.includes(txId)) {
           aggregateResult.conflicts.push(txId);
           const err = errors[txId] || "Conflict detected on server";
@@ -708,14 +741,17 @@ export async function pushSyncQueue() {
       }
     } catch (chunkErr: any) {
       console.error("Chunk sync push error:", chunkErr);
+      const errMsg = chunkErr.name === "TimeoutError"
+        ? "Network timed out. Connection is slow, please retry."
+        : (chunkErr.message || "Network or connection error");
       for (const item of chunk) {
         aggregateResult.failed.push(item.clientTransactionId);
-        aggregateResult.errors[item.clientTransactionId] = chunkErr.message || "Network or connection error";
+        aggregateResult.errors[item.clientTransactionId] = errMsg;
         if (item.id) {
           await offlineDb.offlineQueue.update(item.id, {
             status: "FAILED",
             retryCount: (item.retryCount || 0) + 1,
-            lastError: chunkErr.message || "Network or connection error",
+            lastError: errMsg,
           });
         }
       }
@@ -759,7 +795,10 @@ export async function initializeUserOfflineCache(user?: {
   if (typeof window === "undefined") return;
 
   try {
-    const progRes = await fetch("/api/v1/programs");
+    const progRes = await fetch("/api/v1/programs", {
+      headers: getClientAuthHeaders(),
+      signal: typeof AbortSignal !== "undefined" && AbortSignal.timeout ? AbortSignal.timeout(20000) : undefined,
+    });
     if (!progRes.ok) return;
     const { programs } = await progRes.json();
     if (!programs || programs.length === 0) return;
@@ -795,7 +834,9 @@ export async function initializeUserOfflineCache(user?: {
 
       // 3. Cache Work Program Items & Areas
       try {
-        const wpRes = await fetch(`/api/v1/programs/${prog.id}/work-program`);
+        const wpRes = await fetch(`/api/v1/programs/${prog.id}/work-program`, {
+          headers: getClientAuthHeaders(),
+        });
         if (wpRes.ok) {
           const wpData = await wpRes.json();
           const workPrograms = wpData.workPrograms || [];
@@ -825,7 +866,10 @@ export async function initializeUserOfflineCache(user?: {
         beneUrl += `?barangay=${encodeURIComponent(normalizeBarangayName(user.assignedBarangay))}`;
       }
 
-      const beneRes = await fetch(beneUrl);
+      const beneRes = await fetch(beneUrl, {
+        headers: getClientAuthHeaders(),
+        signal: typeof AbortSignal !== "undefined" && AbortSignal.timeout ? AbortSignal.timeout(25000) : undefined,
+      });
       if (beneRes.ok) {
         const { beneficiaries } = await beneRes.json();
         const beneListToPut: CachedBeneficiary[] = [];
@@ -842,6 +886,7 @@ export async function initializeUserOfflineCache(user?: {
           }
 
           const hasOrientation = pb.orientationAttendance && pb.orientationAttendance.length > 0;
+          const isStubDistributed = Boolean(pb.stubDistributions && pb.stubDistributions.length > 0);
           const normBrgy = normalizeBarangayName(pb.beneficiary?.barangay);
           const normSitio = normalizeSitioName(pb.beneficiary?.sitio, normBrgy);
 
@@ -859,6 +904,7 @@ export async function initializeUserOfflineCache(user?: {
             qrToken: activeQr?.publicToken || "",
             status: pb.participationStatus || "ACTIVE",
             orientationStatus: hasOrientation ? "PRESENT" : "ABSENT",
+            stubDistributed: isStubDistributed,
           });
 
           for (const rec of pb.attendanceRecords || []) {
@@ -944,17 +990,19 @@ export async function forceMasterSyncWithServer(user?: {
     await pushSyncQueue();
 
     // 2. Fetch authoritative programs and workdays
-    const progRes = await fetch("/api/v1/programs");
+    const progRes = await fetch("/api/v1/programs", {
+      headers: getClientAuthHeaders(),
+      signal: typeof AbortSignal !== "undefined" && AbortSignal.timeout ? AbortSignal.timeout(20000) : undefined,
+    });
     if (!progRes.ok) throw new Error("Could not connect to PESO Admin server to retrieve programs.");
     const { programs } = await progRes.json();
     if (!programs || programs.length === 0) throw new Error("No active programs found on PESO Admin server.");
 
-    // 3. Clear local Dexie caches for programs, workdays, beneficiaries, and attendance records
+    // 3. Clear server mirror caches (do NOT wipe unsynced local offline attendance scans!)
     await offlineDb.cachedPrograms.clear();
     await offlineDb.cachedWorkDays.clear();
     await offlineDb.cachedWorkProgramItems.clear();
     await offlineDb.cachedBeneficiaries.clear();
-    await offlineDb.offlineAttendanceRecords.clear();
 
     let totalBeneficiariesCount = 0;
     let totalAttendanceRecordsCount = 0;
@@ -991,7 +1039,9 @@ export async function forceMasterSyncWithServer(user?: {
 
       // Put Work Program Items in bulk
       try {
-        const wpRes = await fetch(`/api/v1/programs/${prog.id}/work-program`);
+        const wpRes = await fetch(`/api/v1/programs/${prog.id}/work-program`, {
+          headers: getClientAuthHeaders(),
+        });
         if (wpRes.ok) {
           const wpData = await wpRes.json();
           const itemsList: CachedWorkProgramItem[] = [];
@@ -1022,7 +1072,10 @@ export async function forceMasterSyncWithServer(user?: {
         beneUrl += `?barangay=${encodeURIComponent(normalizeBarangayName(user.assignedBarangay))}`;
       }
 
-      const beneRes = await fetch(beneUrl);
+      const beneRes = await fetch(beneUrl, {
+        headers: getClientAuthHeaders(),
+        signal: typeof AbortSignal !== "undefined" && AbortSignal.timeout ? AbortSignal.timeout(30000) : undefined,
+      });
       if (beneRes.ok) {
         const { beneficiaries } = await beneRes.json();
         totalBeneficiariesCount += (beneficiaries || []).length;
@@ -1041,6 +1094,7 @@ export async function forceMasterSyncWithServer(user?: {
           }
 
           const hasOrientation = pb.orientationAttendance && pb.orientationAttendance.length > 0;
+          const isStubDistributed = Boolean(pb.stubDistributions && pb.stubDistributions.length > 0);
           const normBrgy = normalizeBarangayName(pb.beneficiary?.barangay);
           const normSitio = normalizeSitioName(pb.beneficiary?.sitio, normBrgy);
 
@@ -1058,6 +1112,7 @@ export async function forceMasterSyncWithServer(user?: {
             qrToken: activeQr?.publicToken || "",
             status: pb.participationStatus || "ACTIVE",
             orientationStatus: hasOrientation ? "PRESENT" : "ABSENT",
+            stubDistributed: isStubDistributed,
           });
 
           // Store authoritative server attendance records (including records scanned by other users in the same barangay)
