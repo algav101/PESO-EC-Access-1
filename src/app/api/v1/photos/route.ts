@@ -182,7 +182,7 @@ export async function POST(request: Request) {
         latitude: latitude ? Number(latitude) : 15.3941,
         longitude: longitude ? Number(longitude) : 121.3965,
         capturedAt: capturedAt ? new Date(capturedAt) : new Date(),
-        uploadedById: user.id,
+        uploadedById: (isAdminUser(user) && body.uploadedById) ? body.uploadedById : user.id,
         status: isAdminUser(user) ? "APPROVED" : "FOR_REVIEW",
         approvedById: isAdminUser(user) ? user.id : null,
         approvedAt: isAdminUser(user) ? new Date() : null,
@@ -194,7 +194,15 @@ export async function POST(request: Request) {
       action: "PHOTO_UPLOADED",
       entityType: "ACCOMPLISHMENT_PHOTO",
       entityId: photo.id,
-      metadata: { barangay: actualBarangay, latitude, longitude, specificActivity, workDayNumber: workDayNumber || null },
+      metadata: {
+        barangay: actualBarangay,
+        latitude,
+        longitude,
+        specificActivity,
+        workDayNumber: workDayNumber || null,
+        uploadedById: photo.uploadedById,
+        documentedByName: body.documentedByName || null,
+      },
     });
 
     return NextResponse.json({ success: true, photo }, { status: 201 });

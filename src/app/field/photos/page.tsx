@@ -28,6 +28,10 @@ import {
   FileArchive,
   FolderDown,
   Loader2,
+  User,
+  UserCheck,
+  ImageIcon,
+  Upload,
 } from "lucide-react";
 import JSZip from "jszip";
 import { StatusBadge } from "@/components/common/StatusBadge";
@@ -81,8 +85,16 @@ export default function PhotosPage() {
   const [gpsCoords, setGpsCoords] = useState<{ lat: number; lng: number }>({ lat: 15.3941, lng: 121.3965 });
   const [gpsStatus, setGpsStatus] = useState<string>("Locating GPS...");
 
-  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  // Camera vs Phone Gallery / Computer File Upload refs
+  const cameraInputRef = useRef<HTMLInputElement | null>(null);
+  const galleryInputRef = useRef<HTMLInputElement | null>(null);
   const rawImageElementRef = useRef<HTMLImageElement | null>(null);
+
+  // Respective User Attribution state
+  const [uploadDocumentedBy, setUploadDocumentedBy] = useState<string>("");
+  const [selectedUploaderUserId, setSelectedUploaderUserId] = useState<string>("");
+  const [usersList, setUsersList] = useState<any[]>([]);
+  const [isDragOver, setIsDragOver] = useState(false);
   const [workPrograms, setWorkPrograms] = useState<any[]>([]);
 
   // Helper to extract or detect stage (BEFORE, DURING, AFTER) from photo object
@@ -101,8 +113,24 @@ export default function PhotosPage() {
   }, []);
 
   useEffect(() => {
-    if ((user?.role === "TUPAD_COORDINATOR" || user?.role === "TUPAD_ASSISTING_DOCUMENTOR") && user.assignedBarangay) {
-      setUploadBarangay(normalizeBarangayName(user.assignedBarangay));
+    if (user) {
+      if (user.fullName && !uploadDocumentedBy) {
+        setUploadDocumentedBy(user.fullName);
+        setSelectedUploaderUserId(user.id);
+      }
+      if ((user.role === "TUPAD_COORDINATOR" || user.role === "TUPAD_ASSISTING_DOCUMENTOR") && user.assignedBarangay) {
+        setUploadBarangay(normalizeBarangayName(user.assignedBarangay));
+      }
+      if (isAdminUser(user) || can("user.read")) {
+        fetch("/api/v1/users")
+          .then((res) => (res.ok ? res.json() : null))
+          .then((data) => {
+            if (data && data.users) {
+              setUsersList(data.users);
+            }
+          })
+          .catch(() => {});
+      }
     }
   }, [user]);
 
@@ -304,18 +332,44 @@ export default function PhotosPage() {
     setPhotos([...offlineQueuedPhotos, ...serverPhotos]);
   };
 
-  // Trigger system unit camera directly
+  // Trigger system unit camera directly (forces native device camera)
   const triggerSystemCamera = () => {
-    if (fileInputRef.current) {
-      fileInputRef.current.value = "";
-      fileInputRef.current.click();
+    if (cameraInputRef.current) {
+      cameraInputRef.current.value = "";
+      cameraInputRef.current.click();
     }
+  };
+
+  // Trigger file upload from phone gallery or computer files
+  const triggerGalleryUpload = () => {
+    if (galleryInputRef.current) {
+      galleryInputRef.current.value = "";
+      galleryInputRef.current.click();
+    }
+  };
+
+  // Process image file selected from Camera or Gallery/Files
+  const handleProcessFile = (file: File) => {
+    if (!file || !file.type.startsWith("image/")) {
+      alert("Please select a valid image file (JPG, PNG, WebP).");
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const img = new Image();
+      img.onload = () => {
+        processAndBurnGeotag(img);
+      };
+      img.src = event.target?.result as string;
+    };
+    reader.readAsDataURL(file);
   };
 
   // Burn Geotag Data Directly into Image Canvas with optimized dimensions
   const processAndBurnGeotag = (
     sourceElement: HTMLImageElement,
-    stageOverride?: "BEFORE" | "DURING" | "AFTER"
+    stageOverride?: "BEFORE" | "DURING" | "AFTER",
+    documenterOverride?: string
   ) => {
     rawImageElementRef.current = sourceElement;
     const canvas = document.createElement("canvas");
@@ -474,10 +528,11 @@ export default function PhotosPage() {
       ctx.fillStyle = "#E2E8F0";
       ctx.fillText(`GPS: ${gpsCoords.lat.toFixed(5)}°N, ${gpsCoords.lng.toFixed(5)}°E  •  PST: ${formattedDate}`, padding + Math.round(width * 0.28), bottomY + lineSpacing * 3);
 
-      // Line 4: Coordinator Sign
+      // Line 4: Coordinator / Documenter Sign
+      const activeDocName = (documenterOverride !== undefined ? documenterOverride : uploadDocumentedBy) || user?.fullName || "Field Coordinator";
       ctx.fillStyle = "#CBD5E1";
       ctx.font = `italic ${smallFontSize - 1}px sans-serif`;
-      ctx.fillText(`Documented by: ${user?.fullName || "Field Coordinator"} • PESO-Dingalan TUPAD EC Management`, padding, bottomY + lineSpacing * 3.9);
+      ctx.fillText(`Documented by: ${activeDocName.trim()} • PESO-Dingalan TUPAD EC Management`, padding, bottomY + lineSpacing * 3.9);
 
       const dataUrl = canvas.toDataURL("image/jpeg", 0.78);
       setCapturedImagePreview(dataUrl);
@@ -503,27 +558,26 @@ export default function PhotosPage() {
     }
   };
 
-  // Handle native mobile file input capture
+  // Documenter change handler to update state and live preview
+  const handleDocumenterChange = (newDocName: string, userId?: string) => {
+    setUploadDocumentedBy(newDocName);
+    if (userId !== undefined) setSelectedUploaderUserId(userId);
+    if (rawImageElementRef.current) {
+      processAndBurnGeotag(rawImageElementRef.current, uploadPhotoStage, newDocName);
+    }
+  };
+
+  // Handle native file input change from Camera or Gallery
   const handleNativeFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file) return;
-
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const img = new Image();
-      img.onload = () => {
-        processAndBurnGeotag(img);
-      };
-      img.src = event.target?.result as string;
-    };
-    reader.readAsDataURL(file);
+    if (file) handleProcessFile(file);
   };
 
   // Submit Geotagged Photo
   const handleSavePhoto = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!capturedImagePreview) {
-      alert("Please capture or snap a photo first!");
+      alert("Please capture or select a photo first!");
       return;
     }
 
@@ -551,6 +605,8 @@ export default function PhotosPage() {
       latitude: gpsCoords.lat,
       longitude: gpsCoords.lng,
       capturedAt: new Date().toISOString(),
+      uploadedById: selectedUploaderUserId || user?.id,
+      documentedByName: uploadDocumentedBy || user?.fullName,
     };
 
     try {
@@ -893,7 +949,7 @@ export default function PhotosPage() {
               className="px-4 py-2 bg-gov-blue hover:bg-gov-dark text-white font-bold text-xs rounded-xl shadow-md flex items-center space-x-2 transition"
             >
               <Camera className="w-4 h-4 text-gov-goldLight" />
-              <span>Take Accomplishment Photo</span>
+              <span>Add / Snap Accomplishment Photo</span>
             </button>
           )}
         </div>
@@ -1159,6 +1215,14 @@ export default function PhotosPage() {
                   </span>
                 </div>
 
+                {/* Respective Documenter / Uploader User Badge */}
+                <div className="text-[10px] text-slate-600 bg-slate-50 px-2 py-1 rounded-md border border-slate-100 flex items-center space-x-1.5 truncate">
+                  <User className="w-3 h-3 text-slate-400 flex-shrink-0" />
+                  <span className="truncate">
+                    Documented by: <strong className="text-slate-800">{photo.uploadedBy?.fullName || "Field Coordinator"}</strong>
+                  </span>
+                </div>
+
                 {/* Action Row: Quick Download & Status Approvals */}
                 <div className="flex items-center justify-between pt-2 border-t border-slate-100 gap-2">
                   <button
@@ -1361,15 +1425,16 @@ export default function PhotosPage() {
             {/* Fixed Modal Header */}
             <div className="flex items-center justify-between px-4 py-3 sm:px-5 sm:py-3.5 border-b bg-slate-50 flex-shrink-0">
               <div className="flex items-center space-x-2">
-                <div className="p-1.5 bg-gov-blue/10 text-gov-blue rounded-lg">
+                <div className="p-1.5 bg-gov-blue/10 text-gov-blue rounded-lg flex items-center space-x-1">
                   <Camera className="w-4 h-4" />
+                  <Upload className="w-3.5 h-3.5 text-emerald-600" />
                 </div>
                 <div>
                   <h3 className="text-xs sm:text-sm font-black text-slate-900 uppercase tracking-wider">
-                    Take Geotagged Accomplishment Photo
+                    Accomplishment Photo & Geotagging
                   </h3>
                   <p className="text-[10px] text-slate-500 font-medium">
-                    System unit camera with automatic geotag & timestamp
+                    Upload from phone gallery, computer files, or snap live camera with automatic geotag burn-in
                   </p>
                 </div>
               </div>
@@ -1536,25 +1601,97 @@ export default function PhotosPage() {
                     className="w-full px-2.5 py-1.5 sm:py-2 text-xs border rounded-lg focus:border-gov-blue"
                   />
                 </div>
+                {/* Step 3: Respective User Attribution */}
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-700 uppercase mb-1 flex items-center justify-between">
+                    <span className="flex items-center space-x-1.5">
+                      <User className="w-3.5 h-3.5 text-gov-blue" />
+                      <span>Documented / Uploaded By (User) *</span>
+                    </span>
+                    <span className="text-[10px] text-slate-500 font-normal">Burned in Geotag Sign</span>
+                  </label>
+
+                  {isAdminUser(user) || can("user.read") ? (
+                    <div className="space-y-1.5">
+                      <select
+                        value={selectedUploaderUserId}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setSelectedUploaderUserId(val);
+                          const matchedUser = usersList.find((u) => u.id === val);
+                          if (matchedUser) {
+                            handleDocumenterChange(matchedUser.fullName, matchedUser.id);
+                          }
+                        }}
+                        className="w-full px-2.5 py-1.5 sm:py-2 text-xs border rounded-lg bg-slate-50 font-bold focus:border-gov-blue"
+                      >
+                        <option value={user?.id || ""}>
+                          👤 Current Account ({user?.fullName || "PESO Officer"})
+                        </option>
+                        {usersList
+                          .filter((u) => u.id !== user?.id)
+                          .map((u) => (
+                            <option key={u.id} value={u.id}>
+                              👤 {u.fullName} {u.assignedBarangay ? `(Brgy. ${u.assignedBarangay})` : `(${u.role.replace(/_/g, " ")})`}
+                            </option>
+                          ))}
+                        <option value="CUSTOM">✏️ Custom Documentor Name...</option>
+                      </select>
+
+                      <input
+                        type="text"
+                        placeholder="Enter full name of field coordinator / documentor"
+                        value={uploadDocumentedBy}
+                        onChange={(e) => handleDocumenterChange(e.target.value)}
+                        className="w-full px-2.5 py-1.5 text-xs border border-blue-200 rounded-lg bg-white font-medium focus:border-gov-blue placeholder:text-slate-400"
+                      />
+                    </div>
+                  ) : (
+                    <div className="flex items-center space-x-2 px-3 py-2 bg-slate-100 rounded-lg border border-slate-200 text-xs text-slate-800">
+                      <UserCheck className="w-4 h-4 text-emerald-600 flex-shrink-0" />
+                      <div className="flex-1 truncate">
+                        <strong className="text-slate-900">{uploadDocumentedBy || user?.fullName}</strong>
+                        <span className="text-slate-500 ml-1">
+                          ({(user?.role || "").replace(/_/g, " ")}{user?.assignedBarangay ? ` • Brgy. ${user.assignedBarangay}` : ""})
+                        </span>
+                      </div>
+                    </div>
+                  )}
+                </div>
               </div>
 
-              {/* Step 2: System Camera Capture & Geotag Preview */}
+              {/* Step 4: System Camera OR Gallery / Computer File Upload */}
               <div className="pt-2 border-t space-y-2">
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-bold text-slate-800 uppercase flex items-center space-x-1.5">
                     <Camera className="w-3.5 h-3.5 text-gov-blue" />
-                    <span>Unit Camera Geotag</span>
+                    <span>Accomplishment Photo & Geotag</span>
                   </span>
                   <span className="text-[10px] font-mono text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
                     {gpsStatus}
                   </span>
                 </div>
 
-                {/* Viewfinder / Action Box */}
+                {/* Viewfinder / Dropzone Box */}
                 <div
-                  onClick={!capturedImagePreview ? triggerSystemCamera : undefined}
-                  className={`relative aspect-[16/9] max-h-[220px] sm:max-h-[250px] w-full bg-slate-950 rounded-xl overflow-hidden border-2 border-slate-800 shadow-inner flex flex-col items-center justify-center transition ${
-                    !capturedImagePreview ? "cursor-pointer hover:border-gov-blue/60 group" : ""
+                  onDragOver={(e) => {
+                    e.preventDefault();
+                    setIsDragOver(true);
+                  }}
+                  onDragLeave={(e) => {
+                    e.preventDefault();
+                    setIsDragOver(false);
+                  }}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    setIsDragOver(false);
+                    const droppedFile = e.dataTransfer.files?.[0];
+                    if (droppedFile) handleProcessFile(droppedFile);
+                  }}
+                  className={`relative aspect-[16/9] max-h-[220px] sm:max-h-[250px] w-full bg-slate-950 rounded-xl overflow-hidden border-2 shadow-inner flex flex-col items-center justify-center transition ${
+                    isDragOver
+                      ? "border-gov-gold bg-slate-900 ring-2 ring-gov-gold/50"
+                      : "border-slate-800"
                   }`}
                 >
                   {capturedImagePreview ? (
@@ -1570,40 +1707,62 @@ export default function PhotosPage() {
                       </div>
                     </div>
                   ) : (
-                    <div className="p-4 sm:p-5 text-center space-y-2">
-                      <div className="w-11 h-11 rounded-full bg-gov-blue/20 text-gov-goldLight border border-gov-blue/30 flex items-center justify-center mx-auto group-hover:scale-110 transition duration-300 shadow-md">
-                        <Camera className="w-5 h-5 text-gov-goldLight" />
+                    <div className="p-4 sm:p-5 text-center space-y-3 max-w-sm">
+                      <div className="w-10 h-10 rounded-full bg-gov-blue/20 text-gov-goldLight border border-gov-blue/30 flex items-center justify-center mx-auto shadow-md">
+                        <UploadCloud className="w-5 h-5 text-gov-goldLight" />
                       </div>
                       <div className="space-y-0.5">
                         <p className="text-xs sm:text-sm font-bold text-slate-100">
-                          Take Accomplishment Photo
+                          Add Accomplishment Photo
                         </p>
-                        <p className="text-[10px] sm:text-[11px] text-slate-400">
-                          Tap to open your device camera with automatic GPS burn-in
+                        <p className="text-[10px] text-slate-400">
+                          Upload from Gallery/Files or snap live Camera with automatic geotagging template
                         </p>
                       </div>
 
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          triggerSystemCamera();
-                        }}
-                        className="px-4 py-2 bg-gradient-to-r from-gov-blue to-gov-dark hover:from-blue-700 hover:to-slate-900 text-white text-xs font-black rounded-xl shadow-lg border border-blue-400/30 flex items-center space-x-2 mx-auto transition active:scale-95"
-                      >
-                        <Camera className="w-3.5 h-3.5 text-gov-goldLight" />
-                        <span>Open Unit Camera</span>
-                      </button>
+                      {/* Dual Action Buttons: Camera vs Gallery / Computer Files */}
+                      <div className="grid grid-cols-2 gap-2 pt-1">
+                        <button
+                          type="button"
+                          onClick={triggerSystemCamera}
+                          className="px-2.5 py-2 bg-gradient-to-r from-gov-blue to-gov-dark hover:from-blue-700 hover:to-slate-900 text-white text-[11px] font-black rounded-xl shadow-lg border border-blue-400/30 flex items-center justify-center space-x-1.5 transition active:scale-95 cursor-pointer"
+                        >
+                          <Camera className="w-3.5 h-3.5 text-gov-goldLight flex-shrink-0" />
+                          <span>Take Camera</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={triggerGalleryUpload}
+                          className="px-2.5 py-2 bg-gradient-to-r from-emerald-600 to-teal-700 hover:from-emerald-500 hover:to-teal-600 text-white text-[11px] font-black rounded-xl shadow-lg border border-emerald-400/30 flex items-center justify-center space-x-1.5 transition active:scale-95 cursor-pointer"
+                        >
+                          <Upload className="w-3.5 h-3.5 text-emerald-200 flex-shrink-0" />
+                          <span>Gallery / Files</span>
+                        </button>
+                      </div>
+
+                      <p className="text-[9px] text-slate-500 font-mono">
+                        Drag & drop photo here or choose from your phone / computer
+                      </p>
                     </div>
                   )}
                 </div>
 
-                {/* Hidden Native File Input with capture="environment" for unit camera */}
+                {/* Native Camera input (forces camera on mobile) */}
                 <input
-                  ref={fileInputRef}
+                  ref={cameraInputRef}
                   type="file"
                   accept="image/*"
                   capture="environment"
+                  onChange={handleNativeFileChange}
+                  className="hidden"
+                />
+
+                {/* Phone Gallery / Computer File input (opens gallery / file picker) */}
+                <input
+                  ref={galleryInputRef}
+                  type="file"
+                  accept="image/*"
                   onChange={handleNativeFileChange}
                   className="hidden"
                 />
@@ -1614,14 +1773,27 @@ export default function PhotosPage() {
             <div className="p-3 sm:p-4 border-t bg-slate-50 flex items-center justify-between gap-2 flex-shrink-0">
               {capturedImagePreview ? (
                 <>
-                  <button
-                    type="button"
-                    onClick={triggerSystemCamera}
-                    className="py-2 px-3 sm:px-3.5 bg-slate-200 hover:bg-slate-300 text-slate-800 rounded-xl font-bold text-xs flex items-center space-x-1.5 transition"
-                  >
-                    <RefreshCw className="w-3.5 h-3.5" />
-                    <span>Retake Photo</span>
-                  </button>
+                  <div className="flex items-center space-x-1.5">
+                    <button
+                      type="button"
+                      onClick={triggerSystemCamera}
+                      className="py-2 px-2.5 sm:px-3 bg-slate-200 hover:bg-slate-300 text-slate-800 rounded-xl font-bold text-xs flex items-center space-x-1.5 transition"
+                      title="Retake photo using device camera"
+                    >
+                      <Camera className="w-3.5 h-3.5" />
+                      <span>Camera</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={triggerGalleryUpload}
+                      className="py-2 px-2.5 sm:px-3 bg-slate-200 hover:bg-slate-300 text-slate-800 rounded-xl font-bold text-xs flex items-center space-x-1.5 transition"
+                      title="Select another photo from phone gallery or computer files"
+                    >
+                      <Upload className="w-3.5 h-3.5" />
+                      <span>Gallery</span>
+                    </button>
+                  </div>
 
                   <button
                     type="submit"
@@ -1636,7 +1808,7 @@ export default function PhotosPage() {
               ) : (
                 <div className="flex w-full justify-between items-center">
                   <span className="text-[11px] text-slate-500 font-medium">
-                    Tap the camera box or button to snap photo
+                    Tap Take Camera or Gallery / Files above to add photo
                   </span>
                   <button
                     type="button"
