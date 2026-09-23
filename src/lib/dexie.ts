@@ -81,6 +81,8 @@ export interface OfflineAttendanceRecord {
   status: string;
   scannedAt: string;
   isSynced?: boolean;
+  scannedById?: string;
+  scannedByName?: string;
 }
 
 export interface OfflineTransaction {
@@ -817,10 +819,10 @@ export async function initializeUserOfflineCache(user?: {
         console.warn("Work program caching notice:", err);
       }
 
-      // 4. Fetch & Cache Beneficiaries (scoped if coordinator / assisting documentor, or full roster)
+      // 4. Fetch & Cache Beneficiaries (scoped if user has assigned barangay, or full roster for super admin)
       let beneUrl = `/api/v1/programs/${prog.id}/beneficiaries`;
-      if ((user?.role === "TUPAD_COORDINATOR" || user?.role === "TUPAD_ASSISTING_DOCUMENTOR") && user.assignedBarangay) {
-        beneUrl += `?barangay=${encodeURIComponent(user.assignedBarangay)}`;
+      if (user?.assignedBarangay) {
+        beneUrl += `?barangay=${encodeURIComponent(normalizeBarangayName(user.assignedBarangay))}`;
       }
 
       const beneRes = await fetch(beneUrl);
@@ -872,6 +874,9 @@ export async function initializeUserOfflineCache(user?: {
               afternoonTimeOut: rec.afternoonTimeOut,
               status: rec.status || "PRESENT",
               scannedAt: rec.morningTimeIn || new Date().toISOString(),
+              scannedById: rec.scannedById,
+              scannedByName: rec.scannedBy?.fullName,
+              isSynced: true,
             });
           }
         }
@@ -897,6 +902,9 @@ export async function initializeUserOfflineCache(user?: {
                   afternoonTimeIn: rec.afternoonTimeIn || existing.afternoonTimeIn,
                   afternoonTimeOut: rec.afternoonTimeOut || existing.afternoonTimeOut,
                   status: rec.status || existing.status,
+                  isSynced: true,
+                  scannedById: rec.scannedById || existing.scannedById,
+                  scannedByName: rec.scannedByName || existing.scannedByName,
                 });
               } else {
                 await offlineDb.offlineAttendanceRecords.add(rec);
@@ -1008,10 +1016,10 @@ export async function forceMasterSyncWithServer(user?: {
         }
       } catch (err) {}
 
-      // Put Authoritative Beneficiaries & Attendance Records
+      // Put Authoritative Beneficiaries & Attendance Records (scoped strictly to user's assigned barangay or full for admin)
       let beneUrl = `/api/v1/programs/${prog.id}/beneficiaries`;
-      if ((user?.role === "TUPAD_COORDINATOR" || user?.role === "TUPAD_ASSISTING_DOCUMENTOR") && user.assignedBarangay) {
-        beneUrl += `?barangay=${encodeURIComponent(user.assignedBarangay)}`;
+      if (user?.assignedBarangay) {
+        beneUrl += `?barangay=${encodeURIComponent(normalizeBarangayName(user.assignedBarangay))}`;
       }
 
       const beneRes = await fetch(beneUrl);
@@ -1052,7 +1060,7 @@ export async function forceMasterSyncWithServer(user?: {
             orientationStatus: hasOrientation ? "PRESENT" : "ABSENT",
           });
 
-          // Store authoritative server attendance records
+          // Store authoritative server attendance records (including records scanned by other users in the same barangay)
           for (const rec of pb.attendanceRecords || []) {
             totalAttendanceRecordsCount++;
             attList.push({
@@ -1067,6 +1075,8 @@ export async function forceMasterSyncWithServer(user?: {
               afternoonTimeOut: rec.afternoonTimeOut,
               status: rec.status || "PRESENT",
               scannedAt: rec.morningTimeIn || new Date().toISOString(),
+              scannedById: rec.scannedById,
+              scannedByName: rec.scannedBy?.fullName,
               isSynced: true,
             });
           }
@@ -1076,15 +1086,30 @@ export async function forceMasterSyncWithServer(user?: {
           await offlineDb.cachedBeneficiaries.bulkPut(beneList);
         }
         if (attList.length > 0) {
-          await offlineDb.offlineAttendanceRecords.bulkAdd(attList);
+          await offlineDb.transaction("rw", offlineDb.offlineAttendanceRecords, async () => {
+            for (const rec of attList) {
+              const existing = await offlineDb.offlineAttendanceRecords
+                .where("[programId+workDayId+programBeneficiaryId]")
+                .equals([rec.programId, rec.workDayId, rec.programBeneficiaryId])
+                .first();
+
+              if (existing && existing.id) {
+                await offlineDb.offlineAttendanceRecords.update(existing.id, {
+                  ...rec,
+                  scannedByName: rec.scannedByName || existing.scannedByName,
+                });
+              } else {
+                await offlineDb.offlineAttendanceRecords.add(rec);
+              }
+            }
+          });
         }
       }
     }
 
-    const scopeStr =
-      (user?.role === "TUPAD_COORDINATOR" || user?.role === "TUPAD_ASSISTING_DOCUMENTOR") && user.assignedBarangay
-        ? `Barangay ${user.assignedBarangay}`
-        : "Municipality-wide (All 11 Barangays)";
+    const scopeStr = user?.assignedBarangay
+      ? `Barangay ${normalizeBarangayName(user.assignedBarangay)}`
+      : "Municipality-wide (All 11 Barangays)";
 
     localStorage.setItem("tupad_last_offline_sync", new Date().toISOString());
     localStorage.setItem("tupad_offline_scope", scopeStr);

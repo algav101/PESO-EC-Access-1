@@ -19,13 +19,13 @@ export async function GET(request: Request) {
     const whereClause: any = {};
     if (programId) whereClause.programId = programId;
 
-    // Enforce coordinator / assisting documentor barangay scope
-    if ((user.role === "TUPAD_COORDINATOR" || user.role === "TUPAD_ASSISTING_DOCUMENTOR") && user.assignedBarangay) {
-      const canonicalBrgy = normalizeBarangayName(user.assignedBarangay);
-      whereClause.barangay = { contains: canonicalBrgy, mode: "insensitive" };
-    } else if (barangay && barangay !== "ALL") {
-      const canonicalBrgy = normalizeBarangayName(barangay);
-      whereClause.barangay = { contains: canonicalBrgy, mode: "insensitive" };
+    // Strict Barangay-level isolation:
+    const userBrgy = user.assignedBarangay ? normalizeBarangayName(user.assignedBarangay) : null;
+    const queryBrgy = barangay && barangay !== "ALL" ? normalizeBarangayName(barangay) : null;
+    const effectiveBrgy = (!isAdminUser(user) && userBrgy) ? userBrgy : queryBrgy;
+
+    if (effectiveBrgy) {
+      whereClause.barangay = { contains: effectiveBrgy, mode: "insensitive" };
     }
 
     // DOLE coordinator sees only approved photos

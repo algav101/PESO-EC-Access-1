@@ -26,11 +26,16 @@ export async function GET(request: Request, { params }: { params: { id: string }
       whereClause.participationStatus = { not: "REPLACED" };
     }
 
-    // Enforce coordinator / assisting documentor barangay-level isolation
-    if ((user.role === "TUPAD_COORDINATOR" || user.role === "TUPAD_ASSISTING_DOCUMENTOR") && user.assignedBarangay) {
-      whereClause.beneficiary = { barangay: user.assignedBarangay };
-    } else if (barangay) {
-      whereClause.beneficiary = { barangay };
+    // Strict Barangay-level isolation:
+    // Any user with an assigned barangay (who is not Domain Master / PESO Admin) is strictly restricted to their barangay.
+    const userBrgy = user.assignedBarangay ? normalizeBarangayName(user.assignedBarangay) : null;
+    const queryBrgy = barangay && barangay !== "ALL" ? normalizeBarangayName(barangay) : null;
+    const effectiveBrgy = (!isAdminUser(user) && userBrgy) ? userBrgy : queryBrgy;
+
+    if (effectiveBrgy) {
+      whereClause.beneficiary = {
+        barangay: { equals: effectiveBrgy, mode: "insensitive" },
+      };
     }
 
     if (query) {
@@ -86,7 +91,18 @@ export async function GET(request: Request, { params }: { params: { id: string }
           select: { id: true, status: true, scannedAt: true },
         },
         attendanceRecords: {
-          select: { id: true, workDayId: true, morningTimeIn: true, morningTimeOut: true, afternoonTimeIn: true, afternoonTimeOut: true, status: true },
+          select: {
+            id: true,
+            workDayId: true,
+            attendanceDate: true,
+            morningTimeIn: true,
+            morningTimeOut: true,
+            afternoonTimeIn: true,
+            afternoonTimeOut: true,
+            status: true,
+            scannedById: true,
+            scannedBy: { select: { fullName: true } },
+          },
         },
         payouts: {
           select: { id: true, status: true, payoutDate: true, verifiedAt: true, remarks: true },

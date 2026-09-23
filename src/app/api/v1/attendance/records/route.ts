@@ -4,6 +4,7 @@ import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getCurrentUser, isAdminUser, hasPermission } from "@/lib/auth";
 import { logAudit } from "@/lib/audit";
+import { normalizeBarangayName } from "@/lib/utils";
 
 export async function GET(request: Request) {
   try {
@@ -23,7 +24,19 @@ export async function GET(request: Request) {
     const whereClause: any = { programId };
     if (workDayId) whereClause.workDayId = workDayId;
     if (programBeneficiaryId) whereClause.programBeneficiaryId = programBeneficiaryId;
-    if (barangay) whereClause.programBeneficiary = { beneficiary: { barangay } };
+
+    // Strict Barangay-level isolation:
+    const userBrgy = user.assignedBarangay ? normalizeBarangayName(user.assignedBarangay) : null;
+    const queryBrgy = barangay && barangay !== "ALL" ? normalizeBarangayName(barangay) : null;
+    const effectiveBrgy = (!isAdminUser(user) && userBrgy) ? userBrgy : queryBrgy;
+
+    if (effectiveBrgy) {
+      whereClause.programBeneficiary = {
+        beneficiary: {
+          barangay: { equals: effectiveBrgy, mode: "insensitive" },
+        },
+      };
+    }
 
     const records = await prisma.attendanceRecord.findMany({
       where: whereClause,
