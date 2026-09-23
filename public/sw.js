@@ -1,34 +1,20 @@
 // PESO Dingalan - TUPAD Management System Service Worker
 // Version: 1.0.2
 
-const CACHE_NAME = "peso-tupad-cache-v2";
+const CACHE_NAME = "peso-tupad-cache-v3";
 const OFFLINE_URL = "/offline.html";
 
 const PRECACHE_ASSETS = [
-  "/",
-  "/dashboard",
-  "/login",
-  "/field/attendance",
-  "/field/stub-distribution",
-  "/field/orientation",
-  "/field/photos",
-  "/field/payout",
-  "/sync",
-  "/beneficiaries",
-  "/programs",
   "/offline.html",
   "/manifest.json",
-  "/peso-logo.png",
-  "/peso-logo-base.png",
-  "/etupad-base.png",
-  "/format1-stub-base.png",
+  "/images/peso-ec-access-emblem.gif",
 ];
 
-// Install Event: Pre-cache core app shell & offline assets
+// Install Event: Pre-cache core app shell & offline fallback assets
 self.addEventListener("install", (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME).then(async (cache) => {
-      console.log("[SW] Pre-caching offline shell and assets...");
+      console.log("[SW] Pre-caching lightweight offline shell assets...");
       for (const url of PRECACHE_ASSETS) {
         try {
           const response = await fetch(url, { cache: "no-cache" });

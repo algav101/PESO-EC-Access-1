@@ -128,13 +128,17 @@ export function OfflineProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  // Initial user cache bootstrap when user logs in
+  // Initial user cache bootstrap when user logs in (deferred to not block mobile UI hydration)
   useEffect(() => {
-    if (user && isOnline) {
+    if (!user || !isOnline) return;
+
+    const timer = setTimeout(() => {
       initializeUserOfflineCache(user).then(() => {
         refreshPending();
-      });
-    }
+      }).catch(() => {});
+    }, 1500);
+
+    return () => clearTimeout(timer);
   }, [user, isOnline, refreshPending]);
 
   // Online / Offline & Polling Heartbeat
@@ -161,9 +165,9 @@ export function OfflineProvider({ children }: { children: React.ReactNode }) {
     window.addEventListener("tupad-attendance-updated", handleAttendanceUpdate);
     window.addEventListener("tupad-offline-synced", handleAttendanceUpdate);
 
-    // Periodic heartbeat (every 10s) to test real connectivity and auto-sync
+    // Periodic heartbeat (every 45s, paused when tab is inactive) to preserve mobile battery & network
     const heartbeatInterval = setInterval(async () => {
-      if (typeof navigator === "undefined") return;
+      if (typeof navigator === "undefined" || (typeof document !== "undefined" && document.hidden)) return;
 
       try {
         const pingRes = await fetch("/api/v1/health", { method: "GET", cache: "no-store" });
@@ -185,7 +189,7 @@ export function OfflineProvider({ children }: { children: React.ReactNode }) {
       } catch (err) {
         setIsOnline(false);
       }
-    }, 10000);
+    }, 45000);
 
     refreshPending();
 

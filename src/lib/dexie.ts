@@ -826,6 +826,9 @@ export async function initializeUserOfflineCache(user?: {
       const beneRes = await fetch(beneUrl);
       if (beneRes.ok) {
         const { beneficiaries } = await beneRes.json();
+        const beneListToPut: CachedBeneficiary[] = [];
+        const attListToProcess: OfflineAttendanceRecord[] = [];
+
         for (const pb of beneficiaries || []) {
           const activeQr = pb.qrCodes?.find((q: any) => q.status === "ACTIVE") || pb.qrCodes?.[0];
           let birthdayPin = pb.beneficiary?.birthday || "";
@@ -837,11 +840,10 @@ export async function initializeUserOfflineCache(user?: {
           }
 
           const hasOrientation = pb.orientationAttendance && pb.orientationAttendance.length > 0;
-
           const normBrgy = normalizeBarangayName(pb.beneficiary?.barangay);
           const normSitio = normalizeSitioName(pb.beneficiary?.sitio, normBrgy);
 
-          await offlineDb.cachedBeneficiaries.put({
+          beneListToPut.push({
             id: pb.id,
             programId: prog.id,
             beneficiaryId: pb.beneficiaryId,
@@ -857,37 +859,50 @@ export async function initializeUserOfflineCache(user?: {
             orientationStatus: hasOrientation ? "PRESENT" : "ABSENT",
           });
 
-          // Cache any server attendance records locally
           for (const rec of pb.attendanceRecords || []) {
-            const existing = await offlineDb.offlineAttendanceRecords
-              .where("[programId+workDayId+programBeneficiaryId]")
-              .equals([prog.id, rec.workDayId, pb.id])
-              .first();
-
-            if (existing && existing.id) {
-              await offlineDb.offlineAttendanceRecords.update(existing.id, {
-                morningTimeIn: rec.morningTimeIn || existing.morningTimeIn,
-                morningTimeOut: rec.morningTimeOut || existing.morningTimeOut,
-                afternoonTimeIn: rec.afternoonTimeIn || existing.afternoonTimeIn,
-                afternoonTimeOut: rec.afternoonTimeOut || existing.afternoonTimeOut,
-                status: rec.status || existing.status,
-              });
-            } else {
-              await offlineDb.offlineAttendanceRecords.add({
-                programId: prog.id,
-                workDayId: rec.workDayId,
-                programBeneficiaryId: pb.id,
-                designatedNumber: pb.designatedNumber,
-                attendanceDate: rec.attendanceDate || "",
-                morningTimeIn: rec.morningTimeIn,
-                morningTimeOut: rec.morningTimeOut,
-                afternoonTimeIn: rec.afternoonTimeIn,
-                afternoonTimeOut: rec.afternoonTimeOut,
-                status: rec.status || "PRESENT",
-                scannedAt: rec.morningTimeIn || new Date().toISOString(),
-              });
-            }
+            attListToProcess.push({
+              programId: prog.id,
+              workDayId: rec.workDayId,
+              programBeneficiaryId: pb.id,
+              designatedNumber: pb.designatedNumber,
+              attendanceDate: rec.attendanceDate || "",
+              morningTimeIn: rec.morningTimeIn,
+              morningTimeOut: rec.morningTimeOut,
+              afternoonTimeIn: rec.afternoonTimeIn,
+              afternoonTimeOut: rec.afternoonTimeOut,
+              status: rec.status || "PRESENT",
+              scannedAt: rec.morningTimeIn || new Date().toISOString(),
+            });
           }
+        }
+
+        // Fast atomic bulk storage for beneficiaries
+        if (beneListToPut.length > 0) {
+          await offlineDb.cachedBeneficiaries.bulkPut(beneListToPut);
+        }
+
+        // Fast batch transaction for attendance records
+        if (attListToProcess.length > 0) {
+          await offlineDb.transaction("rw", offlineDb.offlineAttendanceRecords, async () => {
+            for (const rec of attListToProcess) {
+              const existing = await offlineDb.offlineAttendanceRecords
+                .where("[programId+workDayId+programBeneficiaryId]")
+                .equals([rec.programId, rec.workDayId, rec.programBeneficiaryId])
+                .first();
+
+              if (existing && existing.id) {
+                await offlineDb.offlineAttendanceRecords.update(existing.id, {
+                  morningTimeIn: rec.morningTimeIn || existing.morningTimeIn,
+                  morningTimeOut: rec.morningTimeOut || existing.morningTimeOut,
+                  afternoonTimeIn: rec.afternoonTimeIn || existing.afternoonTimeIn,
+                  afternoonTimeOut: rec.afternoonTimeOut || existing.afternoonTimeOut,
+                  status: rec.status || existing.status,
+                });
+              } else {
+                await offlineDb.offlineAttendanceRecords.add(rec);
+              }
+            }
+          });
         }
       }
     }
@@ -954,25 +969,27 @@ export async function forceMasterSyncWithServer(user?: {
         payoutDate: prog.payoutDate,
       });
 
-      // Put Work Days
-      for (const wd of prog.workDays || []) {
-        await offlineDb.cachedWorkDays.put({
-          id: wd.id,
-          programId: prog.id,
-          dayNumber: wd.dayNumber,
-          workDate: wd.workDate,
-          status: wd.status,
-        });
+      // Put Work Days in bulk
+      const workDaysList = (prog.workDays || []).map((wd: any) => ({
+        id: wd.id,
+        programId: prog.id,
+        dayNumber: wd.dayNumber,
+        workDate: wd.workDate,
+        status: wd.status,
+      }));
+      if (workDaysList.length > 0) {
+        await offlineDb.cachedWorkDays.bulkPut(workDaysList);
       }
 
-      // Put Work Program Items
+      // Put Work Program Items in bulk
       try {
         const wpRes = await fetch(`/api/v1/programs/${prog.id}/work-program`);
         if (wpRes.ok) {
           const wpData = await wpRes.json();
+          const itemsList: CachedWorkProgramItem[] = [];
           for (const wp of wpData.workPrograms || []) {
             for (const it of wp.items || []) {
-              await offlineDb.cachedWorkProgramItems.put({
+              itemsList.push({
                 id: it.id,
                 programId: prog.id,
                 barangay: wp.barangay,
@@ -984,6 +1001,9 @@ export async function forceMasterSyncWithServer(user?: {
                 femaleCount: it.femaleCount,
               });
             }
+          }
+          if (itemsList.length > 0) {
+            await offlineDb.cachedWorkProgramItems.bulkPut(itemsList);
           }
         }
       } catch (err) {}
@@ -999,6 +1019,9 @@ export async function forceMasterSyncWithServer(user?: {
         const { beneficiaries } = await beneRes.json();
         totalBeneficiariesCount += (beneficiaries || []).length;
 
+        const beneList: CachedBeneficiary[] = [];
+        const attList: OfflineAttendanceRecord[] = [];
+
         for (const pb of beneficiaries || []) {
           const activeQr = pb.qrCodes?.find((q: any) => q.status === "ACTIVE") || pb.qrCodes?.[0];
           let birthdayPin = pb.beneficiary?.birthday || "";
@@ -1010,11 +1033,10 @@ export async function forceMasterSyncWithServer(user?: {
           }
 
           const hasOrientation = pb.orientationAttendance && pb.orientationAttendance.length > 0;
-
           const normBrgy = normalizeBarangayName(pb.beneficiary?.barangay);
           const normSitio = normalizeSitioName(pb.beneficiary?.sitio, normBrgy);
 
-          await offlineDb.cachedBeneficiaries.put({
+          beneList.push({
             id: pb.id,
             programId: prog.id,
             beneficiaryId: pb.beneficiaryId,
@@ -1033,7 +1055,7 @@ export async function forceMasterSyncWithServer(user?: {
           // Store authoritative server attendance records
           for (const rec of pb.attendanceRecords || []) {
             totalAttendanceRecordsCount++;
-            await offlineDb.offlineAttendanceRecords.add({
+            attList.push({
               programId: prog.id,
               workDayId: rec.workDayId,
               programBeneficiaryId: pb.id,
@@ -1048,6 +1070,13 @@ export async function forceMasterSyncWithServer(user?: {
               isSynced: true,
             });
           }
+        }
+
+        if (beneList.length > 0) {
+          await offlineDb.cachedBeneficiaries.bulkPut(beneList);
+        }
+        if (attList.length > 0) {
+          await offlineDb.offlineAttendanceRecords.bulkAdd(attList);
         }
       }
     }
