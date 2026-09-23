@@ -348,6 +348,26 @@ export default function PhotosPage() {
     }
   };
 
+  // Open modal pre-focused for Gallery / Computer file picker
+  const openWithGallery = () => {
+    setIsUploadOpen(true);
+    setCapturedImagePreview(null);
+    rawImageElementRef.current = null;
+    setTimeout(() => {
+      triggerGalleryUpload();
+    }, 150);
+  };
+
+  // Open modal pre-focused for Camera snap
+  const openWithCamera = () => {
+    setIsUploadOpen(true);
+    setCapturedImagePreview(null);
+    rawImageElementRef.current = null;
+    setTimeout(() => {
+      triggerSystemCamera();
+    }, 150);
+  };
+
   // Process image file selected from Camera or Gallery/Files
   const handleProcessFile = (file: File) => {
     if (!file || !file.type.startsWith("image/")) {
@@ -940,17 +960,27 @@ export default function PhotosPage() {
           )}
 
           {!isDole && can("photo.upload") && (
-            <button
-              onClick={() => {
-                setIsUploadOpen(true);
-                setCapturedImagePreview(null);
-                rawImageElementRef.current = null;
-              }}
-              className="px-4 py-2 bg-gov-blue hover:bg-gov-dark text-white font-bold text-xs rounded-xl shadow-md flex items-center space-x-2 transition"
-            >
-              <Camera className="w-4 h-4 text-gov-goldLight" />
-              <span>Add / Snap Accomplishment Photo</span>
-            </button>
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={openWithGallery}
+                className="px-3.5 py-2 bg-gradient-to-r from-emerald-600 to-teal-700 hover:from-emerald-500 hover:to-teal-600 text-white font-extrabold text-xs rounded-xl shadow-md flex items-center space-x-1.5 transition active:scale-95 cursor-pointer border border-emerald-400/30"
+                title="Upload photos from computer files or phone gallery"
+              >
+                <Upload className="w-4 h-4 text-emerald-200" />
+                <span>Upload from Computer / Files</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={openWithCamera}
+                className="px-3.5 py-2 bg-gov-blue hover:bg-gov-dark text-white font-extrabold text-xs rounded-xl shadow-md flex items-center space-x-1.5 transition active:scale-95 cursor-pointer"
+                title="Snap photo directly using device camera"
+              >
+                <Camera className="w-4 h-4 text-gov-goldLight" />
+                <span>Snap Live Camera</span>
+              </button>
+            </div>
           )}
         </div>
       </div>
