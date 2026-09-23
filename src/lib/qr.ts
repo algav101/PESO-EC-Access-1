@@ -36,6 +36,8 @@ export function formatBeneficiaryQrPayload(token: string, baseUrl?: string): str
     baseUrl ||
     (typeof window !== "undefined" && window.location?.origin ? window.location.origin : "") ||
     process.env.NEXT_PUBLIC_APP_URL ||
+    (process.env.NEXT_PUBLIC_VERCEL_URL ? `https://${process.env.NEXT_PUBLIC_VERCEL_URL}` : "") ||
+    (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "") ||
     "https://peso-ec-access-1.onrender.com";
 
   return `${origin}/my-assignment?token=${encodeURIComponent(token)}`;
