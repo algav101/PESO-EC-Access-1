@@ -81,6 +81,9 @@ model Program {
   payouts             Payout[]
   restrictions        BeneficiaryRestriction[]
   tupadWorkPrograms   TupadWorkProgram[]
+
+  @@index([createdById])
+  @@index([status])
 }
 
 model ProgramBarangay {
@@ -178,6 +181,8 @@ model Dependent {
   relationship  String?
   createdAt     DateTime    @default(now())
   restrictions  BeneficiaryRestriction[]
+
+  @@index([beneficiaryId])
 }
 
 model BeneficiaryDocument {
@@ -192,6 +197,9 @@ model BeneficiaryDocument {
   uploadedById       String?
   verificationStatus String      @default("PENDING")
   uploadedAt         DateTime    @default(now())
+
+  @@index([beneficiaryId])
+  @@index([uploadedById])
 }
 
 model QrCode {
@@ -210,6 +218,9 @@ model QrCode {
 
   printLogs            QrPrintLog[]
   stubDistributions    StubDistribution[]
+
+  @@index([programId])
+  @@index([programBeneficiaryId])
 }
 
 model QrPrintBatch {
@@ -230,6 +241,9 @@ model QrPrintBatch {
   createdAt       DateTime     @default(now())
 
   printLogs       QrPrintLog[]
+
+  @@index([programId])
+  @@index([printedById])
 }
 
 model QrPrintLog {
@@ -243,6 +257,10 @@ model QrPrintLog {
   printedById  String?
   printedBy    User?         @relation(fields: [printedById], references: [id])
   printedAt    DateTime      @default(now())
+
+  @@index([qrId])
+  @@index([printBatchId])
+  @@index([printedById])
 }
 
 model TableAssignmentRule {
@@ -255,6 +273,8 @@ model TableAssignmentRule {
   slotGroup   String?
   priority    Int      @default(0)
   createdAt   DateTime @default(now())
+
+  @@index([programId])
 }
 
 model StubDistribution {
@@ -276,6 +296,8 @@ model StubDistribution {
   @@index([programBeneficiaryId, status])
   @@index([status])
   @@index([distributedAt])
+  @@index([qrId])
+  @@index([distributedById])
 }
 
 model OrientationAttendance {
@@ -294,6 +316,7 @@ model OrientationAttendance {
   @@unique([programId, programBeneficiaryId])
   @@index([programId, status])
   @@index([programBeneficiaryId])
+  @@index([scannedById])
 }
 
 model BeneficiaryReplacement {
@@ -312,6 +335,12 @@ model BeneficiaryReplacement {
   initiatedAt                     DateTime           @default(now())
   approvedAt                      DateTime?
   status                          String             @default("PENDING") // PENDING, APPROVED, REJECTED
+
+  @@index([programId])
+  @@index([originalProgramBeneficiaryId])
+  @@index([replacementProgramBeneficiaryId])
+  @@index([initiatedById])
+  @@index([approvedById])
 }
 
 model WorkDay {
@@ -328,6 +357,7 @@ model WorkDay {
 
   @@unique([programId, dayNumber])
   @@unique([programId, workDate])
+  @@index([programId])
 }
 
 model AttendanceRecord {
@@ -360,6 +390,9 @@ model AttendanceRecord {
   @@index([programId, attendanceDate])
   @@index([attendanceDate, status])
   @@index([programBeneficiaryId])
+  @@index([workDayId])
+  @@index([scannedById])
+  @@index([workProgramItemId])
 }
 
 model AccomplishmentPhoto {
@@ -393,6 +426,10 @@ model AccomplishmentPhoto {
   @@index([programId, status])
   @@index([uploadedAt])
   @@index([barangay])
+  @@index([workDayId])
+  @@index([workProgramItemId])
+  @@index([uploadedById])
+  @@index([approvedById])
 }
 
 model PhotoConfiguration {
@@ -427,6 +464,8 @@ model Payout {
   @@unique([programId, programBeneficiaryId])
   @@index([programId, status])
   @@index([status])
+  @@index([programBeneficiaryId])
+  @@index([verifiedById])
 }
 
 model BeneficiaryRestriction {
@@ -452,6 +491,8 @@ model BeneficiaryRestriction {
 
   @@index([status])
   @@index([beneficiaryId])
+  @@index([dependentId])
+  @@index([sourceProgramId])
   @@index([payoutDate])
   @@index([createdAt])
 }
@@ -496,6 +537,7 @@ model TupadWorkProgram {
   items            TupadWorkProgramItem[]
 
   @@unique([programId, barangay])
+  @@index([programId])
 }
 
 model TupadWorkProgramItem {
@@ -516,6 +558,8 @@ model TupadWorkProgramItem {
 
   attendanceRecords   AttendanceRecord[]
   accomplishmentPhotos AccomplishmentPhoto[]
+
+  @@index([workProgramId])
 }
 
 model TupadApplicationRoster {

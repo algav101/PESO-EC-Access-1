@@ -33,11 +33,41 @@ export async function POST(request: Request) {
       );
     }
 
-    const cleanUsername = username.trim().toLowerCase();
+    // Normalize username: strip leading @ signs and trim whitespace
+    const cleanUsername = username.trim().replace(/^@+/, "").toLowerCase();
 
+    const usernameAliases: Record<string, string> = {
+      coormatawe: "matawecoor",
+      coor_matawe: "matawecoor",
+      coordinator_matawe: "matawecoor",
+      coor_bnb: "enabnb",
+      coor_butas_na_bato: "enabnb",
+      peso_staff: "pesostaff",
+    };
+    const targetUsername = usernameAliases[cleanUsername] || cleanUsername;
+
+    // 1. Exact match
     let user = await prisma.user.findUnique({
-      where: { username: cleanUsername },
+      where: { username: targetUsername },
     });
+
+    // 2. Flexible matching for variations (e.g. "peso staff" vs "pesostaff" vs "peso_staff")
+    if (!user) {
+      const spaceVariant = targetUsername.replace(/[_-]+/g, " ").trim();
+      const underscoreVariant = targetUsername.replace(/[\s-]+/g, "_").trim();
+      const noSpaceVariant = targetUsername.replace(/[\s_-]+/g, "").trim();
+
+      user = await prisma.user.findFirst({
+        where: {
+          OR: [
+            { username: { equals: targetUsername, mode: "insensitive" } },
+            { username: { equals: spaceVariant, mode: "insensitive" } },
+            { username: { equals: underscoreVariant, mode: "insensitive" } },
+            { username: { equals: noSpaceVariant, mode: "insensitive" } },
+          ],
+        },
+      });
+    }
 
     // Auto-seed default/preset accounts if missing
     if (!user) {
@@ -53,6 +83,7 @@ export async function POST(request: Request) {
         coordinator: { fullName: "Dingalan TUPAD Field Coordinator", role: "TUPAD_COORDINATOR", brgy: null, pass: "coord123" },
         documentor: { fullName: "Dingalan TUPAD Assisting Documentor", role: "TUPAD_ASSISTING_DOCUMENTOR", brgy: null, pass: "doc123" },
         dole: { fullName: "DOLE Aurora Field Officer", role: "DOLE_COORDINATOR", brgy: null, pass: "dole123" },
+        enabnb: { fullName: "Ehna (Brgy. Butas na Bato)", role: "TUPAD_COORDINATOR", brgy: "Butas na Bato", pass: "BUTAS_NA_BATO123" },
         peso_paltic_doc: { fullName: "MARIA (Brgy. Paltic Documentor)", role: "TUPAD_ASSISTING_DOCUMENTOR", brgy: "Paltic", pass: "PALTIC123" },
         peso_umiray_doc: { fullName: "JUAN (Brgy. Umiray Documentor)", role: "TUPAD_ASSISTING_DOCUMENTOR", brgy: "Umiray", pass: "UMIRAY123" },
         peso_aplaya_doc: { fullName: "LIZA (Brgy. Aplaya Documentor)", role: "TUPAD_ASSISTING_DOCUMENTOR", brgy: "Aplaya", pass: "APLAYA123" },
@@ -63,7 +94,7 @@ export async function POST(request: Request) {
         peso_paltic: { fullName: "RAMONITA", role: "TUPAD_COORDINATOR", brgy: "Paltic", pass: "PALTIC123" },
       };
 
-      const preset = presetDefaults[cleanUsername];
+      const preset = presetDefaults[cleanUsername] || presetDefaults[cleanUsername.replace(/[\s_-]+/g, "")];
       if (preset) {
         const hashed = await bcrypt.hash(preset.pass, 10);
         user = await prisma.user.create({

@@ -84,8 +84,7 @@ const DEFAULT_ROLE_GROUPS = [
       { label: "MAY (Brgy. Matawe)", name: "May", username: "peso_matawe1", role: "Tupad Coordinator", barangay: "Matawe" },
       { label: "ANNALYN (Brgy. Matawe)", name: "Annalyn", username: "peso_matawe_2", role: "Tupad Coordinator", barangay: "Matawe" },
       { label: "YOLLY (Brgy. Matawe)", name: "Yolly", username: "matawecoor", role: "Tupad Coordinator", barangay: "Matawe" },
-      { label: "TUPAD COORDINATOR (Brgy. Matawe)", name: "Coordinator Matawe", username: "coormatawe", role: "Tupad Coordinator", barangay: "Matawe" },
-      { label: "ENA (Brgy. Butas na Bato)", name: "Ena", username: "peso_bnb", role: "Tupad Coordinator", barangay: "Butas na Bato" },
+      { label: "EHNA (Brgy. Butas na Bato)", name: "Ehna", username: "enabnb", role: "Tupad Coordinator", barangay: "Butas na Bato" },
       { label: "JONA (Brgy. Aplaya)", name: "Jona", username: "peso_aplaya2", role: "Tupad Coordinator", barangay: "Aplaya" },
       { label: "MAYLYN (Brgy. Aplaya)", name: "Maylyn", username: "aplaya1", role: "Tupad Coordinator", barangay: "Aplaya" },
       { label: "MOLLY (Brgy. Poblacion)", name: "Molly", username: "peso_poblacion_1", role: "Tupad Coordinator", barangay: "Poblacion" },
@@ -257,14 +256,15 @@ export default function LoginPage() {
   }, []);
 
   const getPresetPassword = (uname: string, brgy?: string): string => {
-    const u = (uname || "").toLowerCase();
+    const u = (uname || "").toLowerCase().trim().replace(/^@+/, "");
     const b = (brgy || "").toLowerCase();
     if (u === "admin" || u.startsWith("peso_admin") || u === "peso_head" || u === "peso_manager") return "admin123";
     if (u === "coordinator") return "coord123";
     if (u === "documentor") return "doc123";
     if (u === "dole") return "dole123";
     if (u === "staff") return "staff123";
-    if (u === "pesostaff" || u === "mcdo" || u === "ikoy") return "Dingalan123!";
+    if (u === "pesostaff" || u === "mcdo" || u === "ikoy" || u === "peso staff") return "Dingalan123!";
+    if (u === "enabnb") return "BUTAS_NA_BATO123";
     if (u.includes("umiray") || u.includes("pinamaypayan") || u.includes("singawan") || b.includes("umiray")) return "UMIRAY123";
     if (u.includes("ibona") || b.includes("ibona")) return "IBONA123";
     if (u.includes("matawe") || b.includes("matawe")) return "MATAWE123";

@@ -35,10 +35,21 @@ export default async function LandingPage() {
 
   try {
     programBeneficiaries = await prisma.programBeneficiary.findMany({
-      include: {
-        beneficiary: true,
+      select: {
+        id: true,
+        beneficiary: {
+          select: {
+            barangay: true,
+            sitio: true,
+            sex: true,
+            age: true,
+            isSenior: true,
+            isPwd: true,
+            isIp: true,
+            is4Ps: true,
+          },
+        },
       },
-      orderBy: { designatedNumber: "asc" },
     });
   } catch (error) {
     console.error("Landing page demographics beneficiaries query fallback:", error);
