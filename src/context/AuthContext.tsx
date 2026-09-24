@@ -7,7 +7,7 @@ import { AuthUser, hasPermission } from "@/lib/permissions";
 interface AuthContextType {
   user: AuthUser | null;
   loading: boolean;
-  login: (u: AuthUser) => void;
+  login: (u: AuthUser, token?: string) => void;
   logout: () => Promise<void>;
   can: (permission: string) => boolean;
 }

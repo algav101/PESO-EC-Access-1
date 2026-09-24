@@ -1,6 +1,12 @@
 import * as XLSX from "xlsx";
 import prisma from "@/lib/prisma";
-import { classifyBeneficiaryGroup } from "@/lib/dingalan-groupings";
+import {
+  classifyBeneficiaryGroup,
+  normalizeBarangayName,
+  normalizeSitioName,
+  CANONICAL_BARANGAYS,
+  CANONICAL_SITIOS_BY_BARANGAY,
+} from "@/lib/dingalan-groupings";
 
 export const FINAL_BENEFICIARIES_CSV_TEMPLATE = `No.,FORMULA FULL NAME,"FORMULA LAST NAME, FIRST NAME",Name of Beneficiary,,,,Birthdate,,,,Address (Beneficiary),,,,,Type of ID,ID No.,Contact No.,E-payment/,Type of Beneficiary,Occupation,Sex,Civil Status,Age,Average monthly income,DEPENDENT FULL NAME FORMULA,"DEPENDENT LAST NAME, FIRST NAME FORMULA ",Dependent (Name of Beneficiary of the Micro-insurance Holder),,,,RELATIONSHIP OF DEPENDEMT,AGE (18 ABOVE) OF DEPENDENT,Interested in wage employment or self-employment?,Skills Training Needed,"PWD
 (Please Indicate)","4P's
@@ -99,7 +105,7 @@ const MONTH_NAME_MAP: Record<string, string> = {
   dec: "12", december: "12"
 };
 
-export { normalizeSitioName, normalizeBarangayName, CANONICAL_BARANGAYS, CANONICAL_SITIOS_BY_BARANGAY } from "@/lib/dingalan-groupings";
+export { normalizeSitioName, normalizeBarangayName, CANONICAL_BARANGAYS, CANONICAL_SITIOS_BY_BARANGAY };
 
 export async function parseBeneficiaryExcelBuffer(
   buffer: Buffer,

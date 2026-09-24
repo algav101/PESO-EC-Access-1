@@ -2,7 +2,7 @@ export const dynamic = "force-dynamic";
 
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
-import { getCurrentUser, hasPermission } from "@/lib/auth";
+import { getCurrentUser, hasPermission, isAdminUser } from "@/lib/auth";
 import { logAudit } from "@/lib/audit";
 import {
   DINGALAN_BARANGAY_GROUPINGS,

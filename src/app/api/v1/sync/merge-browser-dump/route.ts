@@ -60,7 +60,7 @@ export async function POST(request: Request) {
         const progId = record.programId || activeProgram.id;
         
         // Find matching ProgramBeneficiary
-        let pb = activeProgram.programBeneficiaries.find(
+        let pb: any = activeProgram.programBeneficiaries.find(
           p => p.id === record.programBeneficiaryId ||
                (record.designatedNumber && String(p.designatedNumber) === String(record.designatedNumber)) ||
                (record.beneficiaryId && p.beneficiaryId === record.beneficiaryId)

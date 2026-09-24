@@ -7,6 +7,7 @@ import { logAudit } from "@/lib/audit";
 import { generateBeneficiaryToken } from "@/lib/qr";
 import { assignBeneficiaryWorkArea, WorkProgramItemAllocation } from "@/lib/work-assignment";
 import { format } from "date-fns";
+import { normalizeBarangayName } from "@/lib/dingalan-groupings";
 
 export async function GET(request: Request, { params }: { params: { id: string } }) {
   try {

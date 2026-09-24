@@ -286,7 +286,7 @@ function BeneficiariesMasterlistContent() {
     const isRestricted =
       (user?.role === "TUPAD_COORDINATOR" || user?.role === "TUPAD_ASSISTING_DOCUMENTOR") &&
       !!user.assignedBarangay;
-    const available = isRestricted ? [user.assignedBarangay] : CANONICAL_BARANGAYS;
+    const available: readonly string[] = isRestricted && user?.assignedBarangay ? [user.assignedBarangay] : CANONICAL_BARANGAYS;
     return available.map((b) => {
       const stdB = normalizeBarangayName(b);
       const count = beneficiaries.filter(

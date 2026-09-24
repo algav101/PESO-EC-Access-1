@@ -70,8 +70,8 @@ export function OfflineProvider({ children }: { children: React.ReactNode }) {
       const now = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
       setLastSyncTime(now);
 
-      if (res.accepted && res.accepted > 0) {
-        setSyncNotice(`Auto-synced ${res.accepted} offline record(s) to server successfully at ${now}.`);
+      if (res.accepted && res.accepted.length > 0) {
+        setSyncNotice(`Auto-synced ${res.accepted.length} offline record(s) to server successfully at ${now}.`);
         setTimeout(() => setSyncNotice(null), 7000);
       }
       return res;
