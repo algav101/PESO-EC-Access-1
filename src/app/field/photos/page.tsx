@@ -1057,11 +1057,11 @@ export default function PhotosPage() {
   const isAdmin = isAdminUser(user);
 
   // Filter activities for active upload modal Barangay + Day
-  const activeWp = workPrograms.find(
-    (w) => normalizeBarangayName(w.barangay).toUpperCase() === normalizeBarangayName(uploadBarangay).toUpperCase()
+  const activeWp = (workPrograms || []).find(
+    (w) => normalizeBarangayName(w?.barangay).toUpperCase() === normalizeBarangayName(uploadBarangay).toUpperCase()
   );
   const availableActivitiesForModal = (activeWp?.items || []).filter(
-    (it: any) => it.dayNumber === uploadWorkDayNumber
+    (it: any) => it?.dayNumber === uploadWorkDayNumber
   );
 
   // Compile comprehensive list of distinct activities from Work Programs and Photos
@@ -1070,12 +1070,14 @@ export default function PhotosPage() {
     const seenActivities = new Set<string>();
 
     // 1. From Scheduled Work Program Items
-    workPrograms.forEach((wp) => {
+    (workPrograms || []).forEach((wp) => {
+      if (!wp) return;
       const wpBrgy = normalizeBarangayName(wp.barangay || "");
       if (selectedBarangayFilter !== "ALL" && wpBrgy.toUpperCase() !== selectedBarangayFilter.toUpperCase()) {
         return;
       }
       (wp.items || []).forEach((item: any) => {
+        if (!item) return;
         const actName = (item.specificActivities || "").trim();
         if (!actName) return;
         const normKey = actName.toLowerCase();
@@ -1091,9 +1093,10 @@ export default function PhotosPage() {
     });
 
     // 2. From actual uploaded photos in the gallery
-    photos.forEach((photo) => {
+    (photos || []).forEach((photo) => {
+      if (!photo) return;
       const rawAct = photo.specificActivity || photo.workProgramItem?.specificActivities || "";
-      const cleanAct = rawAct.replace(/^\[(BEFORE|DURING|AFTER)\]\s*/i, "").trim();
+      const cleanAct = typeof rawAct === "string" ? rawAct.replace(/^\[(BEFORE|DURING|AFTER)\]\s*/i, "").trim() : "";
       if (!cleanAct) return;
       const normKey = cleanAct.toLowerCase();
       if (!seenActivities.has(normKey)) {
@@ -1111,57 +1114,93 @@ export default function PhotosPage() {
       if (a.dayNumber && b.dayNumber && a.dayNumber !== b.dayNumber) {
         return a.dayNumber - b.dayNumber;
       }
-      return a.label.localeCompare(b.label);
+      return (a.label || "").localeCompare(b.label || "");
     });
   }, [workPrograms, photos, selectedBarangayFilter]);
 
   // Filter displayed photos by selected barangay, stage, work day, activity, and search query
-  const displayedPhotos = photos.filter((photo) => {
-    if (isAdmin && selectedBarangayFilter !== "ALL") {
-      if (normalizeBarangayName(photo.barangay).toUpperCase() !== selectedBarangayFilter.toUpperCase()) {
-        return false;
+  const displayedPhotos = useMemo(() => {
+    return photos.filter((photo) => {
+      if (isAdmin && selectedBarangayFilter !== "ALL") {
+        if (normalizeBarangayName(photo.barangay).toUpperCase() !== selectedBarangayFilter.toUpperCase()) {
+          return false;
+        }
       }
+      if (selectedStageFilter !== "ALL") {
+        const stage = getPhotoStage(photo);
+        if (stage !== selectedStageFilter) return false;
+      }
+      if (selectedDayFilter !== "ALL") {
+        const photoDay = photo.workDay?.dayNumber || photo.workProgramItem?.dayNumber;
+        if (String(photoDay) !== String(selectedDayFilter)) return false;
+      }
+      if (selectedActivityFilter !== "ALL") {
+        const cleanPhotoAct = (photo.specificActivity || "")
+          .replace(/^\[(BEFORE|DURING|AFTER)\]\s*/i, "")
+          .trim()
+          .toLowerCase();
+        const wpItemAct = (photo.workProgramItem?.specificActivities || "").trim().toLowerCase();
+        const targetAct = selectedActivityFilter.toLowerCase();
+        const matchesActivity =
+          cleanPhotoAct.includes(targetAct) ||
+          wpItemAct.includes(targetAct) ||
+          targetAct.includes(cleanPhotoAct);
+        if (!matchesActivity) return false;
+      }
+      if (activitySearchQuery.trim()) {
+        const q = activitySearchQuery.trim().toLowerCase();
+        const act = (photo.specificActivity || "").toLowerCase();
+        const area = (photo.workArea || photo.sitio || "").toLowerCase();
+        const wpAct = (photo.workProgramItem?.specificActivities || "").toLowerCase();
+        const wpArea = (photo.workProgramItem?.area || "").toLowerCase();
+        const brgy = (photo.barangay || "").toLowerCase();
+        const doc = (photo.uploadedBy?.fullName || "").toLowerCase();
+        const matches =
+          act.includes(q) ||
+          area.includes(q) ||
+          wpAct.includes(q) ||
+          wpArea.includes(q) ||
+          brgy.includes(q) ||
+          doc.includes(q);
+        if (!matches) return false;
+      }
+      return true;
+    });
+  }, [photos, isAdmin, selectedBarangayFilter, selectedStageFilter, selectedDayFilter, selectedActivityFilter, activitySearchQuery]);
+
+  // Reset page when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [selectedProgramId, selectedBarangayFilter, selectedStageFilter, selectedDayFilter, selectedActivityFilter, activitySearchQuery]);
+
+  // Sliced / Paginated photos for ultra-fast DOM rendering and smooth scrolling
+  const totalFilteredPhotos = displayedPhotos.length;
+  const totalPages = pageSize === -1 ? 1 : Math.max(1, Math.ceil(totalFilteredPhotos / pageSize));
+  const safeCurrentPage = Math.min(currentPage, totalPages);
+
+  const paginatedPhotos = useMemo(() => {
+    if (pageSize === -1) return displayedPhotos;
+    const startIndex = (safeCurrentPage - 1) * pageSize;
+    return displayedPhotos.slice(startIndex, startIndex + pageSize);
+  }, [displayedPhotos, safeCurrentPage, pageSize]);
+
+  const toggleSelectAll = () => {
+    if (displayedPhotos.length > 0 && selectedPhotoIds.length >= displayedPhotos.length) {
+      setSelectedPhotoIds([]);
+    } else {
+      setSelectedPhotoIds(displayedPhotos.map((p) => p.id));
     }
-    if (selectedStageFilter !== "ALL") {
-      const stage = getPhotoStage(photo);
-      if (stage !== selectedStageFilter) return false;
+  };
+
+  const toggleSelectPage = () => {
+    const pageIds = paginatedPhotos.map((p) => p.id);
+    const allPageSelected = pageIds.length > 0 && pageIds.every((id) => selectedPhotoIds.includes(id));
+    if (allPageSelected) {
+      setSelectedPhotoIds((prev) => prev.filter((id) => !pageIds.includes(id)));
+    } else {
+      setSelectedPhotoIds((prev) => Array.from(new Set([...prev, ...pageIds])));
     }
-    if (selectedDayFilter !== "ALL") {
-      const photoDay = photo.workDay?.dayNumber || photo.workProgramItem?.dayNumber;
-      if (String(photoDay) !== String(selectedDayFilter)) return false;
-    }
-    if (selectedActivityFilter !== "ALL") {
-      const cleanPhotoAct = (photo.specificActivity || "")
-        .replace(/^\[(BEFORE|DURING|AFTER)\]\s*/i, "")
-        .trim()
-        .toLowerCase();
-      const wpItemAct = (photo.workProgramItem?.specificActivities || "").trim().toLowerCase();
-      const targetAct = selectedActivityFilter.toLowerCase();
-      const matchesActivity =
-        cleanPhotoAct.includes(targetAct) ||
-        wpItemAct.includes(targetAct) ||
-        targetAct.includes(cleanPhotoAct);
-      if (!matchesActivity) return false;
-    }
-    if (activitySearchQuery.trim()) {
-      const q = activitySearchQuery.trim().toLowerCase();
-      const act = (photo.specificActivity || "").toLowerCase();
-      const area = (photo.workArea || photo.sitio || "").toLowerCase();
-      const wpAct = (photo.workProgramItem?.specificActivities || "").toLowerCase();
-      const wpArea = (photo.workProgramItem?.area || "").toLowerCase();
-      const brgy = (photo.barangay || "").toLowerCase();
-      const doc = (photo.uploadedBy?.fullName || "").toLowerCase();
-      const matches =
-        act.includes(q) ||
-        area.includes(q) ||
-        wpAct.includes(q) ||
-        wpArea.includes(q) ||
-        brgy.includes(q) ||
-        doc.includes(q);
-      if (!matches) return false;
-    }
-    return true;
-  });
+  };
 
   const pendingOfflineCount = photos.filter((p) => p.status === "PENDING_SYNC" || p.isOfflineQueue).length;
 
@@ -1373,23 +1412,36 @@ export default function PhotosPage() {
           {/* Selection & Gallery Metrics bar */}
           <div className="flex flex-wrap items-center gap-2.5 text-xs">
             {displayedPhotos.length > 0 && (
-              <button
-                type="button"
-                onClick={toggleSelectAll}
-                className="px-2.5 py-1 bg-gov-blue/10 hover:bg-gov-blue/20 text-gov-blue font-bold rounded-lg transition flex items-center space-x-1 cursor-pointer"
-              >
-                {selectedPhotoIds.length === displayedPhotos.length ? (
-                  <>
-                    <CheckSquare className="w-3.5 h-3.5" />
-                    <span>Deselect All</span>
-                  </>
-                ) : (
-                  <>
-                    <Square className="w-3.5 h-3.5" />
-                    <span>Select All ({displayedPhotos.length})</span>
-                  </>
+              <>
+                {totalPages > 1 && (
+                  <button
+                    type="button"
+                    onClick={toggleSelectPage}
+                    className="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-lg transition flex items-center space-x-1 cursor-pointer border border-slate-200"
+                    title={`Select all ${paginatedPhotos.length} photos on the current page`}
+                  >
+                    <CheckSquare className="w-3.5 h-3.5 text-slate-600" />
+                    <span>Select Page ({paginatedPhotos.length})</span>
+                  </button>
                 )}
-              </button>
+                <button
+                  type="button"
+                  onClick={toggleSelectAll}
+                  className="px-2.5 py-1 bg-gov-blue/10 hover:bg-gov-blue/20 text-gov-blue font-bold rounded-lg transition flex items-center space-x-1 cursor-pointer"
+                >
+                  {selectedPhotoIds.length >= displayedPhotos.length && displayedPhotos.length > 0 ? (
+                    <>
+                      <CheckSquare className="w-3.5 h-3.5" />
+                      <span>Deselect All</span>
+                    </>
+                  ) : (
+                    <>
+                      <Square className="w-3.5 h-3.5" />
+                      <span>Select All ({displayedPhotos.length})</span>
+                    </>
+                  )}
+                </button>
+              </>
             )}
 
             {selectedPhotoIds.length > 0 && (
@@ -1404,10 +1456,20 @@ export default function PhotosPage() {
               </button>
             )}
 
-            <span className="px-2.5 py-1 bg-slate-100 text-slate-700 font-semibold rounded-lg">
-              Total Photos: <strong>{displayedPhotos.length}</strong>
-              {photos.length !== displayedPhotos.length && (
-                <span className="text-slate-500 font-normal"> (filtered from {photos.length})</span>
+            <span className="px-2.5 py-1 bg-slate-100 text-slate-700 font-semibold rounded-lg flex items-center space-x-1.5">
+              <span>Total Photos:</span>
+              {photosLoading && photos.length === 0 ? (
+                <span className="inline-flex items-center text-gov-blue font-bold">
+                  <Loader2 className="w-3 h-3 animate-spin mr-1" />
+                  Loading...
+                </span>
+              ) : (
+                <>
+                  <strong>{displayedPhotos.length}</strong>
+                  {photos.length !== displayedPhotos.length && (
+                    <span className="text-slate-500 font-normal"> (filtered from {photos.length})</span>
+                  )}
+                </>
               )}
             </span>
             {selectedPhotoIds.length > 0 && (
@@ -1534,213 +1596,319 @@ export default function PhotosPage() {
         </div>
       )}
 
-      {/* Photo Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-        {displayedPhotos.map((photo) => {
-          const photoStage = getPhotoStage(photo);
-          const photoSrc = photo.isOfflineQueue
-            ? photo.fileKey
-            : (photo.imageUrl || `/api/v1/photos/${photo.id}/image`);
-          const isSelected = selectedPhotoIds.includes(photo.id);
-
-          return (
-            <div
-              key={photo.id}
-              className={`gov-card overflow-hidden shadow-sm group hover:shadow-md transition flex flex-col justify-between border ${
-                isSelected
-                  ? "ring-2 ring-gov-blue border-gov-blue bg-blue-50/20"
-                  : "border-slate-200"
-              }`}
-            >
-              {/* Image Box */}
-              <div
-                className="relative aspect-video bg-slate-900 overflow-hidden cursor-pointer"
-                onClick={() => setViewingPhoto(photo)}
-              >
-                {/* Stage Badge & Select Checkbox */}
-                <div
-                  className="absolute top-2 left-2 z-20 flex items-center space-x-1.5"
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  <button
-                    type="button"
-                    onClick={() => toggleSelectPhoto(photo.id)}
-                    className={`p-1.5 rounded-lg transition backdrop-blur-md shadow-md flex items-center justify-center ${
-                      isSelected
-                        ? "bg-gov-blue text-white ring-2 ring-blue-300"
-                        : "bg-black/60 text-slate-200 hover:bg-black/80 hover:text-white"
-                    }`}
-                    title={isSelected ? "Deselect photo" : "Select photo for download"}
-                  >
-                    {isSelected ? (
-                      <CheckSquare className="w-4 h-4 text-gov-goldLight" />
-                    ) : (
-                      <Square className="w-4 h-4" />
-                    )}
-                  </button>
-
-                  <span
-                    className={`text-[9px] font-black uppercase px-2 py-0.5 rounded-md shadow-md tracking-wider flex items-center space-x-1 ${
-                      photoStage === "BEFORE"
-                        ? "bg-amber-500 text-slate-950 font-black ring-1 ring-amber-300"
-                        : photoStage === "AFTER"
-                        ? "bg-emerald-600 text-white font-black ring-1 ring-emerald-400"
-                        : "bg-blue-600 text-white font-black ring-1 ring-blue-400"
-                    }`}
-                  >
-                    <span>{photoStage === "BEFORE" ? "🟡" : photoStage === "AFTER" ? "🟢" : "🔵"}</span>
-                    <span>{photoStage}</span>
-                  </span>
+      {/* Photo Grid & Skeletons */}
+      {photosLoading && photos.length === 0 ? (
+        <div className="space-y-4">
+          <div className="p-4 bg-blue-50/70 border border-blue-200/80 rounded-2xl flex items-center justify-center space-x-3 text-xs font-bold text-gov-blue">
+            <Loader2 className="w-4 h-4 animate-spin text-gov-blue" />
+            <span>Fast-loading accomplishment photos from database...</span>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+            {[1, 2, 3, 4, 5, 6].map((i) => (
+              <div key={i} className="gov-card overflow-hidden border border-slate-200/80 animate-pulse flex flex-col justify-between">
+                <div className="aspect-video bg-slate-200 flex items-center justify-center">
+                  <Camera className="w-8 h-8 text-slate-300 animate-pulse" />
                 </div>
-
-                {/* Status Badge Overlay */}
-                <div className="absolute top-2 right-2 z-20">
-                  <StatusBadge status={photo.status} />
-                </div>
-
-                {/* Real Geotagged Photo or Placeholder */}
-                {photoSrc ? (
-                  <img
-                    src={photoSrc}
-                    alt={photo.specificActivity || "Accomplishment Photo"}
-                    loading="lazy"
-                    className="w-full h-full object-cover group-hover:scale-105 transition duration-500"
-                  />
-                ) : (
-                  <div className="w-full h-full flex flex-col items-center justify-center text-slate-400 bg-gradient-to-br from-slate-800 to-slate-950 p-4 text-center">
-                    <Camera className="w-8 h-8 text-slate-500 mb-1 opacity-70" />
-                    <span className="text-[10px] font-mono text-slate-300 font-semibold line-clamp-1">
-                      {photo.specificActivity || "Field Work Documentation"}
-                    </span>
-                    <span className="text-[9px] text-slate-400 font-mono mt-0.5">
-                      📍 {photo.workArea || photo.sitio || photo.barangay}
-                    </span>
+                <div className="p-4 space-y-3">
+                  <div className="flex justify-between items-center">
+                    <div className="h-3 bg-slate-200 rounded w-1/2"></div>
+                    <div className="h-3 bg-slate-200 rounded w-1/4"></div>
                   </div>
-                )}
-
-                {/* View Overlay on Hover */}
-                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition flex items-center justify-center space-x-2 text-white text-xs font-bold pointer-events-none">
-                  <Eye className="w-5 h-5" />
-                  <span>View Full Photo</span>
+                  <div className="h-4 bg-slate-200 rounded w-4/5"></div>
+                  <div className="h-3 bg-slate-100 rounded w-1/3"></div>
+                  <div className="h-8 bg-slate-100 rounded-xl"></div>
                 </div>
               </div>
-
-              {/* Card Footer / Details */}
-              <div className="p-4 space-y-2 text-xs">
-                <div className="flex justify-between items-center text-slate-600 text-[11px]">
-                  <span className="font-bold text-gov-blue">
-                    Work Day {photo.workDay?.dayNumber || 1} • Barangay {photo.barangay}
-                  </span>
-                  <span className="text-[10px] text-slate-400">
-                    {formatDate(photo.capturedAt || photo.uploadedAt, "MM/dd/yy hh:mm a")}
-                  </span>
-                </div>
-
-                {photo.specificActivity && (
-                  <p className="text-[11px] text-slate-800 font-semibold line-clamp-2">
-                    {photo.specificActivity}
-                  </p>
-                )}
-
-                <div className="text-[10px] text-slate-500 flex items-center justify-between pt-1">
-                  <span>📍 {photo.workArea || photo.sitio || "Assigned Area"}</span>
-                  <span className="font-mono text-slate-400">
-                    {photo.latitude ? `${photo.latitude.toFixed(4)}°N, ${photo.longitude.toFixed(4)}°E` : ""}
-                  </span>
-                </div>
-
-                {/* Respective Documenter / Uploader User Badge */}
-                <div className="text-[10px] text-slate-600 bg-slate-50 px-2 py-1 rounded-md border border-slate-100 flex items-center space-x-1.5 truncate">
-                  <User className="w-3 h-3 text-slate-400 flex-shrink-0" />
-                  <span className="truncate">
-                    Documented by: <strong className="text-slate-800">{photo.uploadedBy?.fullName || "Field Coordinator"}</strong>
-                  </span>
-                </div>
-
-                {/* Documentation Phase Correction Row (Accessible to all user accounts) */}
-                <div className="pt-2 pb-0.5 border-t border-slate-100 flex items-center justify-between gap-1.5 bg-slate-50/70 -mx-1 px-2.5 py-1.5 rounded-xl border border-slate-200/60">
-                  <div className="flex items-center space-x-1 text-[10px] font-black uppercase text-slate-500 tracking-wider">
-                    <Layers className="w-3 h-3 text-slate-400" />
-                    <span>Phase:</span>
-                  </div>
-                  <div className="flex items-center space-x-1">
-                    {(["BEFORE", "DURING", "AFTER"] as const).map((stage) => {
-                      const isActive = photoStage === stage;
-                      const isUpdating = updatingPhotoId === photo.id;
-                      return (
-                        <button
-                          key={stage}
-                          type="button"
-                          disabled={isUpdating}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            if (!isActive) handleUpdatePhotoPhase(photo, stage);
-                          }}
-                          className={`px-2 py-1 text-[10px] font-black rounded-lg transition-all flex items-center space-x-1 cursor-pointer disabled:opacity-50 ${
-                            isActive
-                              ? stage === "BEFORE"
-                                ? "bg-amber-500 text-slate-950 shadow-xs ring-1 ring-amber-400 font-black"
-                                : stage === "AFTER"
-                                ? "bg-emerald-600 text-white shadow-xs ring-1 ring-emerald-400 font-black"
-                                : "bg-blue-600 text-white shadow-xs ring-1 ring-blue-400 font-black"
-                              : "bg-white text-slate-600 hover:bg-slate-100 hover:text-slate-900 border border-slate-200"
-                          }`}
-                          title={`Click to correct phase to ${stage}`}
-                        >
-                          {isUpdating && isActive ? (
-                            <Loader2 className="w-2.5 h-2.5 animate-spin" />
-                          ) : (
-                            <span>{stage === "BEFORE" ? "🟡" : stage === "AFTER" ? "🟢" : "🔵"}</span>
-                          )}
-                          <span>{stage}</span>
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-
-                {/* Action Row: Quick Download & Status Approvals */}
-                <div className="flex items-center justify-between pt-2 border-t border-slate-100 gap-2">
-                  <button
-                    type="button"
-                    onClick={(e) => handleSingleDownload(photo, e)}
-                    className="px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 hover:text-slate-900 font-bold text-[11px] rounded-lg transition flex items-center space-x-1"
-                    title="Download this single photo"
-                  >
-                    <Download className="w-3.5 h-3.5 text-slate-600" />
-                    <span>Download</span>
-                  </button>
-
-                  {/* Approval Buttons for PESO ADMIN */}
-                  {!isDole && can("photo.approve") && photo.status === "FOR_REVIEW" && (
-                    <div className="flex space-x-1.5 flex-1 justify-end">
-                      <button
-                        onClick={() => handleStatusChange(photo.id, "APPROVED")}
-                        className="flex-1 py-1.5 bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-[11px] rounded-lg shadow transition flex items-center justify-center space-x-1"
-                      >
-                        <CheckCircle2 className="w-3 h-3" />
-                        <span>Approve</span>
-                      </button>
-                      <button
-                        onClick={() => handleStatusChange(photo.id, "REJECTED")}
-                        className="flex-1 py-1.5 bg-rose-700 hover:bg-rose-800 text-white font-bold text-[11px] rounded-lg shadow transition flex items-center justify-center space-x-1"
-                      >
-                        <XCircle className="w-3 h-3" />
-                        <span>Reject</span>
-                      </button>
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-          );
-        })}
-      </div>
-
-      {displayedPhotos.length === 0 && (
+            ))}
+          </div>
+        </div>
+      ) : displayedPhotos.length === 0 ? (
         <div className="gov-card p-12 text-center text-xs text-slate-400">
           No accomplishment photos found for this selection.
         </div>
+      ) : (
+        <>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+            {paginatedPhotos.map((photo) => {
+              const photoStage = getPhotoStage(photo);
+              const photoSrc = photo.isOfflineQueue
+                ? photo.fileKey
+                : (photo.imageUrl || `/api/v1/photos/${photo.id}/image`);
+              const isSelected = selectedPhotoIds.includes(photo.id);
+
+              return (
+                <div
+                  key={photo.id}
+                  className={`gov-card overflow-hidden shadow-sm group hover:shadow-md transition flex flex-col justify-between border ${
+                    isSelected
+                      ? "ring-2 ring-gov-blue border-gov-blue bg-blue-50/20"
+                      : "border-slate-200"
+                  }`}
+                >
+                  {/* Image Box */}
+                  <div
+                    className="relative aspect-video bg-slate-900 overflow-hidden cursor-pointer"
+                    onClick={() => setViewingPhoto(photo)}
+                  >
+                    {/* Stage Badge & Select Checkbox */}
+                    <div
+                      className="absolute top-2 left-2 z-20 flex items-center space-x-1.5"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <button
+                        type="button"
+                        onClick={() => toggleSelectPhoto(photo.id)}
+                        className={`p-1.5 rounded-lg transition backdrop-blur-md shadow-md flex items-center justify-center ${
+                          isSelected
+                            ? "bg-gov-blue text-white ring-2 ring-blue-300"
+                            : "bg-black/60 text-slate-200 hover:bg-black/80 hover:text-white"
+                        }`}
+                        title={isSelected ? "Deselect photo" : "Select photo for download"}
+                      >
+                        {isSelected ? (
+                          <CheckSquare className="w-4 h-4 text-gov-goldLight" />
+                        ) : (
+                          <Square className="w-4 h-4" />
+                        )}
+                      </button>
+
+                      <span
+                        className={`text-[9px] font-black uppercase px-2 py-0.5 rounded-md shadow-md tracking-wider flex items-center space-x-1 ${
+                          photoStage === "BEFORE"
+                            ? "bg-amber-500 text-slate-950 font-black ring-1 ring-amber-300"
+                            : photoStage === "AFTER"
+                            ? "bg-emerald-600 text-white font-black ring-1 ring-emerald-400"
+                            : "bg-blue-600 text-white font-black ring-1 ring-blue-400"
+                        }`}
+                      >
+                        <span>{photoStage === "BEFORE" ? "🟡" : photoStage === "AFTER" ? "🟢" : "🔵"}</span>
+                        <span>{photoStage}</span>
+                      </span>
+                    </div>
+
+                    {/* Status Badge Overlay */}
+                    <div className="absolute top-2 right-2 z-20">
+                      <StatusBadge status={photo.status} />
+                    </div>
+
+                    {/* Real Geotagged Photo or Placeholder */}
+                    {photoSrc ? (
+                      <img
+                        src={photoSrc}
+                        alt={photo.specificActivity || "Accomplishment Photo"}
+                        loading="lazy"
+                        decoding="async"
+                        className="w-full h-full object-cover group-hover:scale-105 transition duration-500"
+                      />
+                    ) : (
+                      <div className="w-full h-full flex flex-col items-center justify-center text-slate-400 bg-gradient-to-br from-slate-800 to-slate-950 p-4 text-center">
+                        <Camera className="w-8 h-8 text-slate-500 mb-1 opacity-70" />
+                        <span className="text-[10px] font-mono text-slate-300 font-semibold line-clamp-1">
+                          {photo.specificActivity || "Field Work Documentation"}
+                        </span>
+                        <span className="text-[9px] text-slate-400 font-mono mt-0.5">
+                          📍 {photo.workArea || photo.sitio || photo.barangay}
+                        </span>
+                      </div>
+                    )}
+
+                    {/* View Overlay on Hover */}
+                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition flex items-center justify-center space-x-2 text-white text-xs font-bold pointer-events-none">
+                      <Eye className="w-5 h-5" />
+                      <span>View Full Photo</span>
+                    </div>
+                  </div>
+
+                  {/* Card Footer / Details */}
+                  <div className="p-4 space-y-2 text-xs">
+                    <div className="flex justify-between items-center text-slate-600 text-[11px]">
+                      <span className="font-bold text-gov-blue">
+                        Work Day {photo.workDay?.dayNumber || 1} • Barangay {photo.barangay}
+                      </span>
+                      <span className="text-[10px] text-slate-400">
+                        {formatDate(photo.capturedAt || photo.uploadedAt, "MM/dd/yy hh:mm a")}
+                      </span>
+                    </div>
+
+                    {photo.specificActivity && (
+                      <p className="text-[11px] text-slate-800 font-semibold line-clamp-2">
+                        {photo.specificActivity}
+                      </p>
+                    )}
+
+                    <div className="text-[10px] text-slate-500 flex items-center justify-between pt-1">
+                      <span>📍 {photo.workArea || photo.sitio || "Assigned Area"}</span>
+                      <span className="font-mono text-slate-400">
+                        {photo.latitude && photo.longitude && !isNaN(Number(photo.latitude)) && !isNaN(Number(photo.longitude))
+                          ? `${Number(photo.latitude).toFixed(4)}°N, ${Number(photo.longitude).toFixed(4)}°E`
+                          : ""}
+                      </span>
+                    </div>
+
+                    {/* Respective Documenter / Uploader User Badge */}
+                    <div className="text-[10px] text-slate-600 bg-slate-50 px-2 py-1 rounded-md border border-slate-100 flex items-center space-x-1.5 truncate">
+                      <User className="w-3 h-3 text-slate-400 flex-shrink-0" />
+                      <span className="truncate">
+                        Documented by: <strong className="text-slate-800">{photo.uploadedBy?.fullName || "Field Coordinator"}</strong>
+                      </span>
+                    </div>
+
+                    {/* Documentation Phase Correction Row (Accessible to all user accounts) */}
+                    <div className="pt-2 pb-0.5 border-t border-slate-100 flex items-center justify-between gap-1.5 bg-slate-50/70 -mx-1 px-2.5 py-1.5 rounded-xl border border-slate-200/60">
+                      <div className="flex items-center space-x-1 text-[10px] font-black uppercase text-slate-500 tracking-wider">
+                        <Layers className="w-3 h-3 text-slate-400" />
+                        <span>Phase:</span>
+                      </div>
+                      <div className="flex items-center space-x-1">
+                        {(["BEFORE", "DURING", "AFTER"] as const).map((stage) => {
+                          const isActive = photoStage === stage;
+                          const isUpdating = updatingPhotoId === photo.id;
+                          return (
+                            <button
+                              key={stage}
+                              type="button"
+                              disabled={isUpdating}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                if (!isActive) handleUpdatePhotoPhase(photo, stage);
+                              }}
+                              className={`px-2 py-1 text-[10px] font-black rounded-lg transition-all flex items-center space-x-1 cursor-pointer disabled:opacity-50 ${
+                                isActive
+                                  ? stage === "BEFORE"
+                                    ? "bg-amber-500 text-slate-950 shadow-xs ring-1 ring-amber-400 font-black"
+                                    : stage === "AFTER"
+                                    ? "bg-emerald-600 text-white shadow-xs ring-1 ring-emerald-400 font-black"
+                                    : "bg-blue-600 text-white shadow-xs ring-1 ring-blue-400 font-black"
+                                  : "bg-white text-slate-600 hover:bg-slate-100 hover:text-slate-900 border border-slate-200"
+                              }`}
+                              title={`Click to correct phase to ${stage}`}
+                            >
+                              {isUpdating && isActive ? (
+                                <Loader2 className="w-2.5 h-2.5 animate-spin" />
+                              ) : (
+                                <span>{stage === "BEFORE" ? "🟡" : stage === "AFTER" ? "🟢" : "🔵"}</span>
+                              )}
+                              <span>{stage}</span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    {/* Action Row: Quick Download & Status Approvals */}
+                    <div className="flex items-center justify-between pt-2 border-t border-slate-100 gap-2">
+                      <button
+                        type="button"
+                        onClick={(e) => handleSingleDownload(photo, e)}
+                        className="px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 hover:text-slate-900 font-bold text-[11px] rounded-lg transition flex items-center space-x-1"
+                        title="Download this single photo"
+                      >
+                        <Download className="w-3.5 h-3.5 text-slate-600" />
+                        <span>Download</span>
+                      </button>
+
+                      {/* Approval Buttons for PESO ADMIN */}
+                      {!isDole && can("photo.approve") && photo.status === "FOR_REVIEW" && (
+                        <div className="flex space-x-1.5 flex-1 justify-end">
+                          <button
+                            onClick={() => handleStatusChange(photo.id, "APPROVED")}
+                            className="flex-1 py-1.5 bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-[11px] rounded-lg shadow transition flex items-center justify-center space-x-1"
+                          >
+                            <CheckCircle2 className="w-3 h-3" />
+                            <span>Approve</span>
+                          </button>
+                          <button
+                            onClick={() => handleStatusChange(photo.id, "REJECTED")}
+                            className="flex-1 py-1.5 bg-rose-700 hover:bg-rose-800 text-white font-bold text-[11px] rounded-lg shadow transition flex items-center justify-center space-x-1"
+                          >
+                            <XCircle className="w-3 h-3" />
+                            <span>Reject</span>
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Pagination Navigation Bar */}
+          {totalPages > 1 && (
+            <div className="mt-8 flex flex-col sm:flex-row items-center justify-between gap-4 p-4 bg-white rounded-2xl border border-slate-200 shadow-xs">
+              <div className="flex flex-wrap items-center gap-2 text-xs text-slate-600 font-semibold">
+                <span>Showing</span>
+                <span className="font-bold text-slate-900">
+                  {(safeCurrentPage - 1) * pageSize + 1} - {Math.min(safeCurrentPage * pageSize, totalFilteredPhotos)}
+                </span>
+                <span>of</span>
+                <span className="font-bold text-slate-900">{totalFilteredPhotos}</span>
+                <span>photos</span>
+                <span className="text-slate-300">|</span>
+                <span className="text-slate-500">Page size:</span>
+                <select
+                  value={pageSize}
+                  onChange={(e) => {
+                    const val = Number(e.target.value);
+                    setPageSize(val);
+                    setCurrentPage(1);
+                  }}
+                  className="px-2 py-1 text-xs border border-slate-200 rounded-lg bg-slate-50 font-bold text-slate-800 focus:outline-none focus:ring-1 focus:ring-gov-blue cursor-pointer"
+                >
+                  <option value={12}>12 / page</option>
+                  <option value={24}>24 / page (Fast)</option>
+                  <option value={48}>48 / page</option>
+                  <option value={96}>96 / page</option>
+                  <option value={-1}>Show All ({totalFilteredPhotos})</option>
+                </select>
+              </div>
+
+              <div className="flex items-center space-x-1.5">
+                <button
+                  type="button"
+                  onClick={() => setCurrentPage(1)}
+                  disabled={safeCurrentPage === 1}
+                  className="p-1.5 rounded-lg border border-slate-200 hover:bg-slate-100 disabled:opacity-30 disabled:pointer-events-none transition text-slate-700"
+                  title="First Page"
+                >
+                  <ChevronsLeft className="w-4 h-4" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                  disabled={safeCurrentPage === 1}
+                  className="px-3 py-1.5 text-xs font-bold rounded-lg border border-slate-200 hover:bg-slate-100 disabled:opacity-30 disabled:pointer-events-none transition text-slate-700 flex items-center space-x-1"
+                >
+                  <ChevronLeft className="w-3.5 h-3.5" />
+                  <span>Prev</span>
+                </button>
+
+                <div className="px-3 py-1 text-xs font-extrabold text-gov-blue bg-blue-50 border border-blue-200 rounded-lg">
+                  {safeCurrentPage} / {totalPages}
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                  disabled={safeCurrentPage === totalPages}
+                  className="px-3 py-1.5 text-xs font-bold rounded-lg border border-slate-200 hover:bg-slate-100 disabled:opacity-30 disabled:pointer-events-none transition text-slate-700 flex items-center space-x-1"
+                >
+                  <span>Next</span>
+                  <ChevronRight className="w-3.5 h-3.5" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setCurrentPage(totalPages)}
+                  disabled={safeCurrentPage === totalPages}
+                  className="p-1.5 rounded-lg border border-slate-200 hover:bg-slate-100 disabled:opacity-30 disabled:pointer-events-none transition text-slate-700"
+                  title="Last Page"
+                >
+                  <ChevronsRight className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+          )}
+        </>
       )}
 
       {/* Floating Batch Action Dock when photos are selected */}
