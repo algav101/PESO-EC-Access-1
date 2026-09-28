@@ -28,6 +28,19 @@ export async function GET(request: Request, { params }: { params: { id: string }
       return new NextResponse("Photo not found", { status: 404 });
     }
 
+    const clientEtag = request.headers.get("if-none-match");
+    const etag = `"${photo.id}"`;
+
+    if (!isDownload && clientEtag && clientEtag === etag) {
+      return new NextResponse(null, {
+        status: 304,
+        headers: {
+          "ETag": etag,
+          "Cache-Control": "public, max-age=31536000, immutable",
+        },
+      });
+    }
+
     // 1. If stored as Base64 Data URL (e.g. data:image/jpeg;base64,...)
     if (photo.fileKey.startsWith("data:")) {
       const match = photo.fileKey.match(/^data:([^;]+);base64,(.+)$/);
@@ -39,7 +52,8 @@ export async function GET(request: Request, { params }: { params: { id: string }
         const headers: Record<string, string> = {
           "Content-Type": mimeType,
           "Content-Length": buffer.length.toString(),
-          "Cache-Control": "public, max-age=86400, stale-while-revalidate=604800, immutable",
+          "ETag": etag,
+          "Cache-Control": "public, max-age=31536000, immutable",
         };
 
         if (isDownload) {

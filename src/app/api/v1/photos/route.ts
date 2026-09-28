@@ -57,13 +57,6 @@ export async function GET(request: Request) {
         approvedAt: true,
         rejectionReason: true,
         fileKey: includeData, // Only load full multi-MB base64 data if explicitly requested
-        program: {
-          select: {
-            id: true,
-            programCode: true,
-            programName: true,
-          },
-        },
         workDay: {
           select: {
             id: true,
@@ -80,7 +73,6 @@ export async function GET(request: Request) {
           },
         },
         uploadedBy: { select: { fullName: true } },
-        approvedBy: { select: { fullName: true } },
       },
       orderBy: { uploadedAt: "desc" },
     });
@@ -91,7 +83,10 @@ export async function GET(request: Request) {
       hasImage: true,
     }));
 
-    return NextResponse.json({ photos, total: photos.length });
+    return NextResponse.json(
+      { photos, total: photos.length },
+      { headers: { "Cache-Control": "private, max-age=20, stale-while-revalidate=60" } }
+    );
   } catch (error: any) {
     console.error("GET photos error:", error);
     return NextResponse.json({ error: error.message }, { status: 500 });
