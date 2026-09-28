@@ -21,7 +21,7 @@ export const PERMISSIONS = {
     "orientation.scan", "orientation.read", "orientation.correct",
     "replacement.create", "replacement.read", "replacement.approve",
     "attendance.scan", "attendance.read", "attendance.correct", "attendance.export",
-    "photo.upload", "photo.read", "photo.approve", "photo.reject", "photo.configure",
+    "photo.upload", "photo.read", "photo.update", "photo.approve", "photo.reject", "photo.configure",
     "payout.scan", "payout.read", "payout.correct",
     "restriction.read", "restriction.create", "restriction.override",
     "eligibility.check",
@@ -44,7 +44,7 @@ export const PERMISSIONS = {
     "orientation.scan", "orientation.read", "orientation.correct",
     "replacement.create", "replacement.read", "replacement.approve",
     "attendance.scan", "attendance.read", "attendance.correct", "attendance.export",
-    "photo.upload", "photo.read", "photo.approve", "photo.reject", "photo.configure",
+    "photo.upload", "photo.read", "photo.update", "photo.approve", "photo.reject", "photo.configure",
     "payout.scan", "payout.read", "payout.correct",
     "restriction.read", "restriction.create", "restriction.override",
     "eligibility.check",
@@ -67,7 +67,7 @@ export const PERMISSIONS = {
     "orientation.scan", "orientation.read", "orientation.correct",
     "replacement.create", "replacement.read", "replacement.approve",
     "attendance.scan", "attendance.read", "attendance.correct", "attendance.export",
-    "photo.upload", "photo.read", "photo.approve",
+    "photo.upload", "photo.read", "photo.update", "photo.approve",
     "payout.scan", "payout.read", "payout.correct",
     "eligibility.check",
     "report.generate", "report.export", "report.read",
@@ -88,6 +88,7 @@ export const PERMISSIONS = {
     "attendance.scan",
     "photo.upload",
     "photo.read",
+    "photo.update",
     "payout.scan",
     "eligibility.check",
     "sync.read"
@@ -100,6 +101,7 @@ export const PERMISSIONS = {
     "attendance.scan",
     "photo.upload",
     "photo.read",
+    "photo.update",
     "sync.read"
   ],
   DOLE_COORDINATOR: [

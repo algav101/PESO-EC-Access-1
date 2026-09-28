@@ -214,18 +214,122 @@ export async function POST(request: Request) {
 
 export async function PATCH(request: Request) {
   try {
-    const user = await getCurrentUser();
-    if (!user || !hasPermission(user.role, "photo.approve")) {
-      return NextResponse.json({ error: "Forbidden: insufficient permissions" }, { status: 403 });
+    const user = await getCurrentUser(request);
+    if (!user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const { id, status, rejectionReason, isExported } = await request.json();
+    const body = await request.json();
+    const { id, ids, status, rejectionReason, isExported, photoStage, specificActivity } = body;
 
+    // Check permissions
+    if (status) {
+      if (!hasPermission(user.role, "photo.approve") && !isAdminUser(user)) {
+        return NextResponse.json({ error: "Forbidden: insufficient permissions to review photos" }, { status: 403 });
+      }
+    }
+
+    const canUpdatePhoto =
+      isAdminUser(user) ||
+      hasPermission(user.role, "photo.update") ||
+      hasPermission(user.role, "photo.upload") ||
+      hasPermission(user.role, "photo.read");
+
+    if (!canUpdatePhoto && !status) {
+      return NextResponse.json({ error: "Forbidden: insufficient permissions to update photos" }, { status: 403 });
+    }
+
+    const formatWithStage = (
+      currentText: string | null | undefined,
+      targetStage: string,
+      overrideText?: string | null
+    ) => {
+      const textToUse = overrideText !== undefined && overrideText !== null ? overrideText : (currentText || "Emergency Employment Field Work");
+      const base = textToUse
+        .replace(/^\[(BEFORE|DURING|AFTER)\]\s*/i, "")
+        .replace(/^(BEFORE|DURING|AFTER)[:\-]\s*/i, "")
+        .trim();
+      return `[${targetStage.toUpperCase()}] ${base || "Emergency Employment Field Work"}`;
+    };
+
+    // 1. Batch Phase / Status Update
+    if (ids && Array.isArray(ids) && ids.length > 0) {
+      const targetStage = photoStage ? photoStage.toUpperCase() : null;
+      if (targetStage && !["BEFORE", "DURING", "AFTER"].includes(targetStage)) {
+        return NextResponse.json({ error: "Invalid photoStage. Must be BEFORE, DURING, or AFTER" }, { status: 400 });
+      }
+
+      const existingPhotos = await prisma.accomplishmentPhoto.findMany({
+        where: { id: { in: ids } },
+        select: { id: true, specificActivity: true, barangay: true, uploadedById: true },
+      });
+
+      if (existingPhotos.length === 0) {
+        return NextResponse.json({ error: "No matching photos found" }, { status: 404 });
+      }
+
+      const updateOps = existingPhotos.map((p) => {
+        const updateData: any = {};
+        if (targetStage) {
+          updateData.specificActivity = formatWithStage(p.specificActivity, targetStage);
+        }
+        if (status) {
+          updateData.status = status;
+          updateData.rejectionReason = status === "REJECTED" ? rejectionReason : null;
+          updateData.approvedById = status === "APPROVED" ? user.id : null;
+          updateData.approvedAt = status === "APPROVED" ? new Date() : null;
+        }
+        return prisma.accomplishmentPhoto.update({
+          where: { id: p.id },
+          data: updateData,
+        });
+      });
+
+      await prisma.$transaction(updateOps);
+
+      await logAudit({
+        userId: user.id,
+        action: targetStage ? "PHOTO_BATCH_PHASE_CORRECTED" : "PHOTO_BATCH_UPDATED",
+        entityType: "ACCOMPLISHMENT_PHOTO",
+        metadata: {
+          count: existingPhotos.length,
+          newPhase: targetStage,
+          status,
+          ids,
+          updatedBy: user.fullName || user.username,
+        },
+      });
+
+      return NextResponse.json({
+        success: true,
+        count: existingPhotos.length,
+        photoStage: targetStage,
+      });
+    }
+
+    // 2. Single Photo Update
     if (!id) {
-      return NextResponse.json({ error: "Valid photo ID is required" }, { status: 400 });
+      return NextResponse.json({ error: "Valid photo ID or IDs array is required" }, { status: 400 });
+    }
+
+    const existingPhoto = await prisma.accomplishmentPhoto.findUnique({
+      where: { id },
+    });
+    if (!existingPhoto) {
+      return NextResponse.json({ error: "Photo not found" }, { status: 404 });
     }
 
     const updateData: any = {};
+    if (photoStage) {
+      const normStage = photoStage.toUpperCase();
+      if (!["BEFORE", "DURING", "AFTER"].includes(normStage)) {
+        return NextResponse.json({ error: "Invalid photoStage. Must be BEFORE, DURING, or AFTER" }, { status: 400 });
+      }
+      updateData.specificActivity = formatWithStage(existingPhoto.specificActivity, normStage, specificActivity);
+    } else if (specificActivity !== undefined) {
+      updateData.specificActivity = specificActivity;
+    }
+
     if (status) {
       if (!["APPROVED", "REJECTED", "FOR_REVIEW"].includes(status)) {
         return NextResponse.json({ error: "Invalid status" }, { status: 400 });
@@ -235,6 +339,7 @@ export async function PATCH(request: Request) {
       updateData.approvedById = status === "APPROVED" ? user.id : null;
       updateData.approvedAt = status === "APPROVED" ? new Date() : null;
     }
+
     if (isExported !== undefined) {
       updateData.isExported = Boolean(isExported);
     }
@@ -246,13 +351,28 @@ export async function PATCH(request: Request) {
 
     await logAudit({
       userId: user.id,
-      action: status === "APPROVED" ? "PHOTO_APPROVED" : "PHOTO_UPDATED",
+      action: photoStage ? "PHOTO_PHASE_CORRECTED" : status === "APPROVED" ? "PHOTO_APPROVED" : "PHOTO_UPDATED",
       entityType: "ACCOMPLISHMENT_PHOTO",
       entityId: photo.id,
-      metadata: { status, rejectionReason, isExported },
+      metadata: {
+        photoId: photo.id,
+        newPhase: photoStage ? photoStage.toUpperCase() : undefined,
+        previousActivity: existingPhoto.specificActivity,
+        newActivity: updateData.specificActivity,
+        status,
+        updatedBy: user.fullName || user.username,
+      },
     });
 
-    return NextResponse.json({ success: true, photo });
+    return NextResponse.json({
+      success: true,
+      photo: {
+        ...photo,
+        imageUrl: `/api/v1/photos/${photo.id}/image`,
+        hasImage: true,
+        photoStage: photoStage ? photoStage.toUpperCase() : undefined,
+      },
+    });
   } catch (error: any) {
     console.error("PATCH photos error:", error);
     return NextResponse.json({ error: error.message }, { status: 500 });

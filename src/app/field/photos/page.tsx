@@ -32,6 +32,7 @@ import {
   UserCheck,
   ImageIcon,
   Upload,
+  Layers,
 } from "lucide-react";
 import JSZip from "jszip";
 import { StatusBadge } from "@/components/common/StatusBadge";
@@ -62,9 +63,20 @@ export default function PhotosPage() {
     percent: 0,
   });
 
-  // Photo viewer modal
   const [viewingPhoto, setViewingPhoto] = useState<any | null>(null);
   const [qrGeneratorOpen, setQrGeneratorOpen] = useState(false);
+
+  // Phase correction state for already uploaded photos across all user accounts
+  const [updatingPhotoId, setUpdatingPhotoId] = useState<string | null>(null);
+  const [batchUpdatingPhase, setBatchUpdatingPhase] = useState<boolean>(false);
+  const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
+
+  const showToast = (message: string, type: "success" | "error" = "success") => {
+    setToast({ message, type });
+    setTimeout(() => {
+      setToast((curr) => (curr?.message === message ? null : curr));
+    }, 3500);
+  };
 
   // Stage filter for photo gallery
   const [selectedStageFilter, setSelectedStageFilter] = useState<string>("ALL");
@@ -693,6 +705,167 @@ export default function PhotosPage() {
     }
   };
 
+  // Correct documentation phase of an already-uploaded photo (accessible to all operational user accounts)
+  const handleUpdatePhotoPhase = async (photo: any, newStage: "BEFORE" | "DURING" | "AFTER") => {
+    setUpdatingPhotoId(photo.id);
+    const cleanActivity = (photo.specificActivity || "Emergency Employment Field Work")
+      .replace(/^\[(BEFORE|DURING|AFTER)\]\s*/i, "")
+      .replace(/^(BEFORE|DURING|AFTER)[:\-]\s*/i, "")
+      .trim();
+    const formattedActivity = `[${newStage}] ${cleanActivity || "Emergency Employment Field Work"}`;
+
+    // Optimistically update local gallery state
+    const previousPhotos = [...photos];
+    setPhotos((prev) =>
+      prev.map((p) =>
+        p.id === photo.id
+          ? { ...p, specificActivity: formattedActivity, photoStage: newStage }
+          : p
+      )
+    );
+
+    // If modal is open viewing this photo, update modal state too
+    if (viewingPhoto && viewingPhoto.id === photo.id) {
+      setViewingPhoto((prev: any) => ({
+        ...prev,
+        specificActivity: formattedActivity,
+        photoStage: newStage,
+      }));
+    }
+
+    try {
+      if (photo.isOfflineQueue) {
+        // Offline IndexedDB record update
+        const queuedItems = await offlineDb.offlineQueue
+          .where("entityType")
+          .equals("PHOTO")
+          .toArray();
+        const matched = queuedItems.find(
+          (q) => `offline-${q.id || q.clientTransactionId}` === photo.id || q.clientTransactionId === photo.clientTransactionId
+        );
+        if (matched && matched.id) {
+          matched.payload = {
+            ...matched.payload,
+            specificActivity: formattedActivity,
+            photoStage: newStage,
+          };
+          await offlineDb.offlineQueue.put(matched);
+        }
+        showToast(`Documentation phase changed to ${newStage} in offline cache`, "success");
+      } else {
+        const res = await fetch("/api/v1/photos", {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            id: photo.id,
+            photoStage: newStage,
+          }),
+        });
+
+        if (!res.ok) {
+          const errData = await res.json().catch(() => ({}));
+          throw new Error(errData.error || "Failed to update photo phase");
+        }
+        showToast(`Documentation phase corrected to ${newStage}!`, "success");
+      }
+    } catch (err: any) {
+      console.error("Phase update failed:", err);
+      // Revert local state
+      setPhotos(previousPhotos);
+      if (viewingPhoto && viewingPhoto.id === photo.id) {
+        setViewingPhoto(photo);
+      }
+      showToast(err.message || "Failed to update documentation phase", "error");
+    } finally {
+      setUpdatingPhotoId(null);
+    }
+  };
+
+  // Batch correct phase for all selected photos
+  const handleBatchUpdatePhase = async (newStage: "BEFORE" | "DURING" | "AFTER") => {
+    if (selectedPhotoIds.length === 0) {
+      alert("Please select at least one photo first.");
+      return;
+    }
+
+    const confirmMsg = `Correct documentation phase of ${selectedPhotoIds.length} selected photo(s) to [${newStage}]?`;
+    if (!window.confirm(confirmMsg)) return;
+
+    setBatchUpdatingPhase(true);
+    const targetPhotos = photos.filter((p) => selectedPhotoIds.includes(p.id));
+    const offlinePhotos = targetPhotos.filter((p) => p.isOfflineQueue);
+    const onlinePhotos = targetPhotos.filter((p) => !p.isOfflineQueue);
+
+    const previousPhotos = [...photos];
+    setPhotos((prev) =>
+      prev.map((p) => {
+        if (selectedPhotoIds.includes(p.id)) {
+          const cleanAct = (p.specificActivity || "Emergency Employment Field Work")
+            .replace(/^\[(BEFORE|DURING|AFTER)\]\s*/i, "")
+            .replace(/^(BEFORE|DURING|AFTER)[:\-]\s*/i, "")
+            .trim();
+          return {
+            ...p,
+            specificActivity: `[${newStage}] ${cleanAct || "Emergency Employment Field Work"}`,
+            photoStage: newStage,
+          };
+        }
+        return p;
+      })
+    );
+
+    try {
+      if (offlinePhotos.length > 0) {
+        const queuedItems = await offlineDb.offlineQueue
+          .where("entityType")
+          .equals("PHOTO")
+          .toArray();
+
+        for (const op of offlinePhotos) {
+          const matched = queuedItems.find(
+            (q) => `offline-${q.id || q.clientTransactionId}` === op.id || q.clientTransactionId === op.clientTransactionId
+          );
+          if (matched && matched.id) {
+            const cleanAct = (matched.payload?.specificActivity || "Emergency Employment Field Work")
+              .replace(/^\[(BEFORE|DURING|AFTER)\]\s*/i, "")
+              .replace(/^(BEFORE|DURING|AFTER)[:\-]\s*/i, "")
+              .trim();
+            matched.payload = {
+              ...matched.payload,
+              specificActivity: `[${newStage}] ${cleanAct}`,
+              photoStage: newStage,
+            };
+            await offlineDb.offlineQueue.put(matched);
+          }
+        }
+      }
+
+      if (onlinePhotos.length > 0) {
+        const res = await fetch("/api/v1/photos", {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            ids: onlinePhotos.map((p) => p.id),
+            photoStage: newStage,
+          }),
+        });
+
+        if (!res.ok) {
+          const errData = await res.json().catch(() => ({}));
+          throw new Error(errData.error || "Failed to update batch phase");
+        }
+      }
+
+      showToast(`Successfully updated phase for ${selectedPhotoIds.length} photo(s) to ${newStage}!`, "success");
+    } catch (err: any) {
+      console.error("Batch phase update failed:", err);
+      setPhotos(previousPhotos);
+      showToast(err.message || "Failed to update batch phase", "error");
+    } finally {
+      setBatchUpdatingPhase(false);
+    }
+  };
+
   const handlePurgePhotos = async () => {
     setPurging(true);
     try {
@@ -886,7 +1059,25 @@ export default function PhotosPage() {
   const pendingOfflineCount = photos.filter((p) => p.status === "PENDING_SYNC" || p.isOfflineQueue).length;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 relative">
+      {/* Toast Alert Notification */}
+      {toast && (
+        <div
+          className={`fixed top-5 right-5 z-50 px-4 py-3 rounded-2xl shadow-2xl border flex items-center space-x-2.5 text-xs font-bold transition-all duration-300 animate-fadeIn ${
+            toast.type === "success"
+              ? "bg-slate-900 text-emerald-300 border-emerald-500/50 shadow-emerald-950/40"
+              : "bg-slate-900 text-rose-300 border-rose-500/50 shadow-rose-950/40"
+          }`}
+        >
+          {toast.type === "success" ? (
+            <CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0" />
+          ) : (
+            <AlertCircle className="w-4 h-4 text-rose-400 flex-shrink-0" />
+          )}
+          <span>{toast.message}</span>
+        </div>
+      )}
+
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
@@ -1253,6 +1444,48 @@ export default function PhotosPage() {
                   </span>
                 </div>
 
+                {/* Documentation Phase Correction Row (Accessible to all user accounts) */}
+                <div className="pt-2 pb-0.5 border-t border-slate-100 flex items-center justify-between gap-1.5 bg-slate-50/70 -mx-1 px-2.5 py-1.5 rounded-xl border border-slate-200/60">
+                  <div className="flex items-center space-x-1 text-[10px] font-black uppercase text-slate-500 tracking-wider">
+                    <Layers className="w-3 h-3 text-slate-400" />
+                    <span>Phase:</span>
+                  </div>
+                  <div className="flex items-center space-x-1">
+                    {(["BEFORE", "DURING", "AFTER"] as const).map((stage) => {
+                      const isActive = photoStage === stage;
+                      const isUpdating = updatingPhotoId === photo.id;
+                      return (
+                        <button
+                          key={stage}
+                          type="button"
+                          disabled={isUpdating}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (!isActive) handleUpdatePhotoPhase(photo, stage);
+                          }}
+                          className={`px-2 py-1 text-[10px] font-black rounded-lg transition-all flex items-center space-x-1 cursor-pointer disabled:opacity-50 ${
+                            isActive
+                              ? stage === "BEFORE"
+                                ? "bg-amber-500 text-slate-950 shadow-xs ring-1 ring-amber-400 font-black"
+                                : stage === "AFTER"
+                                ? "bg-emerald-600 text-white shadow-xs ring-1 ring-emerald-400 font-black"
+                                : "bg-blue-600 text-white shadow-xs ring-1 ring-blue-400 font-black"
+                              : "bg-white text-slate-600 hover:bg-slate-100 hover:text-slate-900 border border-slate-200"
+                          }`}
+                          title={`Click to correct phase to ${stage}`}
+                        >
+                          {isUpdating && isActive ? (
+                            <Loader2 className="w-2.5 h-2.5 animate-spin" />
+                          ) : (
+                            <span>{stage === "BEFORE" ? "🟡" : stage === "AFTER" ? "🟢" : "🔵"}</span>
+                          )}
+                          <span>{stage}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
                 {/* Action Row: Quick Download & Status Approvals */}
                 <div className="flex items-center justify-between pt-2 border-t border-slate-100 gap-2">
                   <button
@@ -1327,6 +1560,46 @@ export default function PhotosPage() {
               </>
             )}
           </button>
+
+          <div className="h-4 w-px bg-slate-700 hidden sm:block" />
+
+          {/* Batch Correct Phase Button Group (Accessible to all user accounts) */}
+          <div className="flex items-center space-x-1 bg-slate-800/90 px-2 py-1 rounded-xl border border-slate-700">
+            <span className="text-[10px] font-bold text-slate-300 hidden md:inline flex items-center space-x-1 mr-1">
+              <Layers className="w-3 h-3 text-gov-goldLight" />
+              <span>Set Phase:</span>
+            </span>
+            <button
+              type="button"
+              disabled={batchUpdatingPhase}
+              onClick={() => handleBatchUpdatePhase("BEFORE")}
+              className="px-2.5 py-1 bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-[10px] rounded-lg shadow transition flex items-center space-x-1 disabled:opacity-50 whitespace-nowrap cursor-pointer"
+              title={`Change ${selectedPhotoIds.length} photo(s) to BEFORE`}
+            >
+              <span>🟡 Before</span>
+            </button>
+            <button
+              type="button"
+              disabled={batchUpdatingPhase}
+              onClick={() => handleBatchUpdatePhase("DURING")}
+              className="px-2.5 py-1 bg-blue-600 hover:bg-blue-500 text-white font-black text-[10px] rounded-lg shadow transition flex items-center space-x-1 disabled:opacity-50 whitespace-nowrap cursor-pointer"
+              title={`Change ${selectedPhotoIds.length} photo(s) to DURING`}
+            >
+              <span>🔵 During</span>
+            </button>
+            <button
+              type="button"
+              disabled={batchUpdatingPhase}
+              onClick={() => handleBatchUpdatePhase("AFTER")}
+              className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-500 text-white font-black text-[10px] rounded-lg shadow transition flex items-center space-x-1 disabled:opacity-50 whitespace-nowrap cursor-pointer"
+              title={`Change ${selectedPhotoIds.length} photo(s) to AFTER`}
+            >
+              <span>🟢 After</span>
+            </button>
+            {batchUpdatingPhase && (
+              <Loader2 className="w-3 h-3 animate-spin text-gov-goldLight ml-1" />
+            )}
+          </div>
 
           <button
             type="button"
@@ -1431,14 +1704,56 @@ export default function PhotosPage() {
               />
             </div>
 
-            <div className="p-4 bg-slate-950 border-t border-slate-800 text-xs text-slate-300 flex items-center justify-between">
-              <p className="max-w-md truncate">
-                <strong>Activity:</strong> {viewingPhoto.specificActivity || "General Field Work"}
-              </p>
+            <div className="p-4 bg-slate-950 border-t border-slate-800 text-xs text-slate-300 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="space-y-1.5 flex-1 min-w-0">
+                <p className="truncate">
+                  <strong className="text-white">Activity:</strong> {viewingPhoto.specificActivity || "General Field Work"}
+                </p>
+
+                {/* Direct Phase Switcher inside Modal */}
+                <div className="flex items-center space-x-2 pt-0.5">
+                  <span className="text-[11px] font-black uppercase text-slate-400 tracking-wider flex items-center space-x-1">
+                    <Layers className="w-3 h-3 text-slate-400" />
+                    <span>Correct Phase:</span>
+                  </span>
+                  <div className="flex items-center space-x-1">
+                    {(["BEFORE", "DURING", "AFTER"] as const).map((stage) => {
+                      const isActive = getPhotoStage(viewingPhoto) === stage;
+                      const isUpdating = updatingPhotoId === viewingPhoto.id;
+                      return (
+                        <button
+                          key={stage}
+                          type="button"
+                          disabled={isUpdating}
+                          onClick={() => handleUpdatePhotoPhase(viewingPhoto, stage)}
+                          className={`px-2.5 py-1 text-[10px] font-black rounded-lg transition-all flex items-center space-x-1 cursor-pointer disabled:opacity-50 ${
+                            isActive
+                              ? stage === "BEFORE"
+                                ? "bg-amber-500 text-slate-950 shadow-sm ring-1 ring-amber-300"
+                                : stage === "AFTER"
+                                ? "bg-emerald-600 text-white shadow-sm ring-1 ring-emerald-300"
+                                : "bg-blue-600 text-white shadow-sm ring-1 ring-blue-300"
+                              : "bg-slate-800 text-slate-300 hover:bg-slate-700 hover:text-white border border-slate-700"
+                          }`}
+                          title={`Switch documentation phase to ${stage}`}
+                        >
+                          {isUpdating && isActive ? (
+                            <Loader2 className="w-2.5 h-2.5 animate-spin" />
+                          ) : (
+                            <span>{stage === "BEFORE" ? "🟡" : stage === "AFTER" ? "🟢" : "🔵"}</span>
+                          )}
+                          <span>{stage}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+
               <button
                 type="button"
                 onClick={() => handleSingleDownload(viewingPhoto)}
-                className="px-3.5 py-1.5 bg-gov-blue hover:bg-gov-dark text-white rounded-lg font-bold flex items-center space-x-1.5 shadow cursor-pointer"
+                className="px-3.5 py-2 bg-gov-blue hover:bg-gov-dark text-white rounded-xl font-bold flex items-center justify-center space-x-1.5 shadow transition cursor-pointer flex-shrink-0"
               >
                 <Download className="w-3.5 h-3.5" />
                 <span>Download Geotagged Image</span>
