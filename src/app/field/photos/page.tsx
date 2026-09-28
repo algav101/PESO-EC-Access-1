@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState, useRef, useCallback } from "react";
+import React, { useEffect, useState, useRef, useCallback, useMemo } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { isAdminUser } from "@/lib/permissions";
 import {
@@ -33,6 +33,7 @@ import {
   ImageIcon,
   Upload,
   Layers,
+  Tag,
 } from "lucide-react";
 import JSZip from "jszip";
 import { StatusBadge } from "@/components/common/StatusBadge";
@@ -80,6 +81,11 @@ export default function PhotosPage() {
 
   // Stage filter for photo gallery
   const [selectedStageFilter, setSelectedStageFilter] = useState<string>("ALL");
+
+  // Work Program & Scheduled Activity filters
+  const [selectedActivityFilter, setSelectedActivityFilter] = useState<string>("ALL");
+  const [activitySearchQuery, setActivitySearchQuery] = useState<string>("");
+  const [selectedDayFilter, setSelectedDayFilter] = useState<string>("ALL");
 
   // Camera & Capture Modal state
   const [isUploadOpen, setIsUploadOpen] = useState(false);
@@ -1042,7 +1048,58 @@ export default function PhotosPage() {
     (it: any) => it.dayNumber === uploadWorkDayNumber
   );
 
-  // Filter displayed photos by selected barangay and stage
+  // Compile comprehensive list of distinct activities from Work Programs and Photos
+  const activityFilterOptions = useMemo(() => {
+    const list: { label: string; value: string; dayNumber?: number }[] = [];
+    const seenActivities = new Set<string>();
+
+    // 1. From Scheduled Work Program Items
+    workPrograms.forEach((wp) => {
+      const wpBrgy = normalizeBarangayName(wp.barangay || "");
+      if (selectedBarangayFilter !== "ALL" && wpBrgy.toUpperCase() !== selectedBarangayFilter.toUpperCase()) {
+        return;
+      }
+      (wp.items || []).forEach((item: any) => {
+        const actName = (item.specificActivities || "").trim();
+        if (!actName) return;
+        const normKey = actName.toLowerCase();
+        if (!seenActivities.has(normKey)) {
+          seenActivities.add(normKey);
+          list.push({
+            label: `Day ${item.dayNumber}: ${actName}${item.area ? ` [${item.area}]` : ""}`,
+            value: normKey,
+            dayNumber: item.dayNumber,
+          });
+        }
+      });
+    });
+
+    // 2. From actual uploaded photos in the gallery
+    photos.forEach((photo) => {
+      const rawAct = photo.specificActivity || photo.workProgramItem?.specificActivities || "";
+      const cleanAct = rawAct.replace(/^\[(BEFORE|DURING|AFTER)\]\s*/i, "").trim();
+      if (!cleanAct) return;
+      const normKey = cleanAct.toLowerCase();
+      if (!seenActivities.has(normKey)) {
+        seenActivities.add(normKey);
+        const dayNum = photo.workDay?.dayNumber || photo.workProgramItem?.dayNumber;
+        list.push({
+          label: dayNum ? `Day ${dayNum}: ${cleanAct}` : cleanAct,
+          value: normKey,
+          dayNumber: dayNum,
+        });
+      }
+    });
+
+    return list.sort((a, b) => {
+      if (a.dayNumber && b.dayNumber && a.dayNumber !== b.dayNumber) {
+        return a.dayNumber - b.dayNumber;
+      }
+      return a.label.localeCompare(b.label);
+    });
+  }, [workPrograms, photos, selectedBarangayFilter]);
+
+  // Filter displayed photos by selected barangay, stage, work day, activity, and search query
   const displayedPhotos = photos.filter((photo) => {
     if (isAdmin && selectedBarangayFilter !== "ALL") {
       if (normalizeBarangayName(photo.barangay).toUpperCase() !== selectedBarangayFilter.toUpperCase()) {
@@ -1052,6 +1109,40 @@ export default function PhotosPage() {
     if (selectedStageFilter !== "ALL") {
       const stage = getPhotoStage(photo);
       if (stage !== selectedStageFilter) return false;
+    }
+    if (selectedDayFilter !== "ALL") {
+      const photoDay = photo.workDay?.dayNumber || photo.workProgramItem?.dayNumber;
+      if (String(photoDay) !== String(selectedDayFilter)) return false;
+    }
+    if (selectedActivityFilter !== "ALL") {
+      const cleanPhotoAct = (photo.specificActivity || "")
+        .replace(/^\[(BEFORE|DURING|AFTER)\]\s*/i, "")
+        .trim()
+        .toLowerCase();
+      const wpItemAct = (photo.workProgramItem?.specificActivities || "").trim().toLowerCase();
+      const targetAct = selectedActivityFilter.toLowerCase();
+      const matchesActivity =
+        cleanPhotoAct.includes(targetAct) ||
+        wpItemAct.includes(targetAct) ||
+        targetAct.includes(cleanPhotoAct);
+      if (!matchesActivity) return false;
+    }
+    if (activitySearchQuery.trim()) {
+      const q = activitySearchQuery.trim().toLowerCase();
+      const act = (photo.specificActivity || "").toLowerCase();
+      const area = (photo.workArea || photo.sitio || "").toLowerCase();
+      const wpAct = (photo.workProgramItem?.specificActivities || "").toLowerCase();
+      const wpArea = (photo.workProgramItem?.area || "").toLowerCase();
+      const brgy = (photo.barangay || "").toLowerCase();
+      const doc = (photo.uploadedBy?.fullName || "").toLowerCase();
+      const matches =
+        act.includes(q) ||
+        area.includes(q) ||
+        wpAct.includes(q) ||
+        wpArea.includes(q) ||
+        brgy.includes(q) ||
+        doc.includes(q);
+      if (!matches) return false;
     }
     return true;
   });
@@ -1177,104 +1268,210 @@ export default function PhotosPage() {
       </div>
 
       {/* Program Selector & Filter Controls */}
-      <div className="gov-card p-4 flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div className="flex flex-wrap items-center gap-3">
-          <div className="flex items-center space-x-2">
-            <label className="text-xs font-bold text-slate-700 uppercase">Program:</label>
-            <select
-              value={selectedProgramId}
-              onChange={(e) => setSelectedProgramId(e.target.value)}
-              className="px-3 py-1.5 text-xs font-bold border rounded-lg bg-slate-50 min-w-[240px]"
-            >
-              {programs.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.programCode} - {p.programName}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {/* Admin Barangay Filter */}
-          {isAdmin && (
+      <div className="gov-card p-4 space-y-3.5 shadow-xs">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+          <div className="flex flex-wrap items-center gap-3">
+            {/* Program Filter */}
             <div className="flex items-center space-x-2">
-              <label className="text-xs font-bold text-slate-700 uppercase flex items-center space-x-1">
-                <Filter className="w-3.5 h-3.5 text-slate-400" />
-                <span>Barangay:</span>
-              </label>
+              <label className="text-xs font-bold text-slate-700 uppercase">Program:</label>
               <select
-                value={selectedBarangayFilter}
-                onChange={(e) => setSelectedBarangayFilter(e.target.value)}
-                className="px-2.5 py-1.5 text-xs font-bold border rounded-lg bg-slate-50"
+                value={selectedProgramId}
+                onChange={(e) => {
+                  setSelectedProgramId(e.target.value);
+                  setSelectedActivityFilter("ALL");
+                  setSelectedDayFilter("ALL");
+                }}
+                className="px-3 py-1.5 text-xs font-bold border rounded-lg bg-slate-50 min-w-[220px]"
               >
-                <option value="ALL">All 11 Barangays</option>
-                {DINGALAN_BARANGAYS.map((b) => (
-                  <option key={b} value={b}>
-                    {b}
+                {programs.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.programCode} - {p.programName}
                   </option>
                 ))}
               </select>
             </div>
-          )}
 
-          {/* Documentation Phase / Stage Filter */}
-          <div className="flex items-center space-x-2">
-            <label className="text-xs font-bold text-slate-700 uppercase flex items-center space-x-1">
-              <span>Phase:</span>
-            </label>
-            <select
-              value={selectedStageFilter}
-              onChange={(e) => setSelectedStageFilter(e.target.value)}
-              className="px-2.5 py-1.5 text-xs font-bold border rounded-lg bg-slate-50 font-semibold"
-            >
-              <option value="ALL">All Phases</option>
-              <option value="BEFORE">🟡 Before Work</option>
-              <option value="DURING">🔵 During Work</option>
-              <option value="AFTER">🟢 After Work</option>
-            </select>
+            {/* Admin Barangay Filter */}
+            {isAdmin && (
+              <div className="flex items-center space-x-2">
+                <label className="text-xs font-bold text-slate-700 uppercase flex items-center space-x-1">
+                  <Filter className="w-3.5 h-3.5 text-slate-400" />
+                  <span>Barangay:</span>
+                </label>
+                <select
+                  value={selectedBarangayFilter}
+                  onChange={(e) => {
+                    setSelectedBarangayFilter(e.target.value);
+                    setSelectedActivityFilter("ALL");
+                  }}
+                  className="px-2.5 py-1.5 text-xs font-bold border rounded-lg bg-slate-50"
+                >
+                  <option value="ALL">All 11 Barangays</option>
+                  {DINGALAN_BARANGAYS.map((b) => (
+                    <option key={b} value={b}>
+                      {b}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            {/* Work Day Filter */}
+            <div className="flex items-center space-x-2">
+              <label className="text-xs font-bold text-slate-700 uppercase flex items-center space-x-1">
+                <Calendar className="w-3.5 h-3.5 text-slate-400" />
+                <span>Day:</span>
+              </label>
+              <select
+                value={selectedDayFilter}
+                onChange={(e) => setSelectedDayFilter(e.target.value)}
+                className="px-2.5 py-1.5 text-xs font-bold border rounded-lg bg-slate-50"
+              >
+                <option value="ALL">All 10 Days</option>
+                {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((d) => (
+                  <option key={d} value={String(d)}>
+                    Day {d}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Documentation Phase / Stage Filter */}
+            <div className="flex items-center space-x-2">
+              <label className="text-xs font-bold text-slate-700 uppercase flex items-center space-x-1">
+                <span>Phase:</span>
+              </label>
+              <select
+                value={selectedStageFilter}
+                onChange={(e) => setSelectedStageFilter(e.target.value)}
+                className="px-2.5 py-1.5 text-xs font-bold border rounded-lg bg-slate-50 font-semibold"
+              >
+                <option value="ALL">All Phases</option>
+                <option value="BEFORE">🟡 Before Work</option>
+                <option value="DURING">🔵 During Work</option>
+                <option value="AFTER">🟢 After Work</option>
+              </select>
+            </div>
+          </div>
+
+          {/* Selection & Gallery Metrics bar */}
+          <div className="flex flex-wrap items-center gap-2.5 text-xs">
+            {displayedPhotos.length > 0 && (
+              <button
+                type="button"
+                onClick={toggleSelectAll}
+                className="px-2.5 py-1 bg-gov-blue/10 hover:bg-gov-blue/20 text-gov-blue font-bold rounded-lg transition flex items-center space-x-1 cursor-pointer"
+              >
+                {selectedPhotoIds.length === displayedPhotos.length ? (
+                  <>
+                    <CheckSquare className="w-3.5 h-3.5" />
+                    <span>Deselect All</span>
+                  </>
+                ) : (
+                  <>
+                    <Square className="w-3.5 h-3.5" />
+                    <span>Select All ({displayedPhotos.length})</span>
+                  </>
+                )}
+              </button>
+            )}
+
+            {selectedPhotoIds.length > 0 && (
+              <button
+                type="button"
+                onClick={() => downloadPhotosAsZip(selectedPhotoIds)}
+                disabled={isDownloadingZip}
+                className="px-2.5 py-1 bg-emerald-100 hover:bg-emerald-200 text-emerald-900 font-extrabold rounded-lg border border-emerald-300 transition flex items-center space-x-1 disabled:opacity-50 cursor-pointer"
+              >
+                <FileArchive className="w-3.5 h-3.5 text-emerald-700" />
+                <span>Download Selected ({selectedPhotoIds.length})</span>
+              </button>
+            )}
+
+            <span className="px-2.5 py-1 bg-slate-100 text-slate-700 font-semibold rounded-lg">
+              Total Photos: <strong>{displayedPhotos.length}</strong>
+              {photos.length !== displayedPhotos.length && (
+                <span className="text-slate-500 font-normal"> (filtered from {photos.length})</span>
+              )}
+            </span>
+            {selectedPhotoIds.length > 0 && (
+              <span className="px-2.5 py-1 bg-rose-50 text-rose-700 font-bold border border-rose-200 rounded-lg">
+                {selectedPhotoIds.length} Selected
+              </span>
+            )}
           </div>
         </div>
 
-        {/* Selection & Gallery Metrics bar */}
-        <div className="flex flex-wrap items-center gap-2.5 text-xs">
-          {displayedPhotos.length > 0 && (
-            <button
-              type="button"
-              onClick={toggleSelectAll}
-              className="px-2.5 py-1 bg-gov-blue/10 hover:bg-gov-blue/20 text-gov-blue font-bold rounded-lg transition flex items-center space-x-1"
-            >
-              {selectedPhotoIds.length === displayedPhotos.length ? (
-                <>
-                  <CheckSquare className="w-3.5 h-3.5" />
-                  <span>Deselect All</span>
-                </>
-              ) : (
-                <>
-                  <Square className="w-3.5 h-3.5" />
-                  <span>Select All ({displayedPhotos.length})</span>
-                </>
+        {/* Second Filter Row: Dedicated Work Program & Activity Selection + Keyword Search */}
+        <div className="pt-2.5 border-t border-slate-100 flex flex-col md:flex-row md:items-center justify-between gap-3 bg-slate-50/70 p-2.5 rounded-xl border border-slate-200/60">
+          <div className="flex flex-1 flex-col sm:flex-row sm:items-center gap-3">
+            {/* Work Program / Activity Select */}
+            <div className="flex items-center space-x-2 flex-1 min-w-[280px]">
+              <label className="text-xs font-bold text-slate-700 uppercase flex items-center space-x-1.5 flex-shrink-0">
+                <Tag className="w-3.5 h-3.5 text-gov-blue" />
+                <span>Work Program Activity:</span>
+              </label>
+              <select
+                value={selectedActivityFilter}
+                onChange={(e) => setSelectedActivityFilter(e.target.value)}
+                className="w-full px-3 py-1.5 text-xs font-bold border border-slate-300 rounded-lg bg-white text-slate-800 shadow-2xs focus:ring-2 focus:ring-gov-blue focus:outline-none"
+              >
+                <option value="ALL">
+                  All Scheduled Activities & Tasks {activityFilterOptions.length > 0 ? `(${activityFilterOptions.length} available)` : ""}
+                </option>
+                {activityFilterOptions.map((opt, idx) => (
+                  <option key={`${opt.value}-${idx}`} value={opt.value}>
+                    {opt.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Keyword / Text Search Input */}
+            <div className="relative min-w-[240px]">
+              <input
+                type="text"
+                placeholder="Search activity, purok, or location..."
+                value={activitySearchQuery}
+                onChange={(e) => setActivitySearchQuery(e.target.value)}
+                className="w-full pl-8 pr-8 py-1.5 text-xs border border-slate-300 rounded-lg bg-white text-slate-800 placeholder-slate-400 focus:ring-2 focus:ring-gov-blue focus:outline-none"
+              />
+              <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none text-xs">
+                🔍
+              </span>
+              {activitySearchQuery && (
+                <button
+                  type="button"
+                  onClick={() => setActivitySearchQuery("")}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
               )}
-            </button>
-          )}
+            </div>
+          </div>
 
-          {selectedPhotoIds.length > 0 && (
+          {/* Reset Filters button if any filter is active */}
+          {(selectedStageFilter !== "ALL" ||
+            selectedActivityFilter !== "ALL" ||
+            selectedDayFilter !== "ALL" ||
+            activitySearchQuery.trim() !== "" ||
+            (isAdmin && selectedBarangayFilter !== "ALL")) && (
             <button
               type="button"
-              onClick={() => downloadPhotosAsZip(selectedPhotoIds)}
-              disabled={isDownloadingZip}
-              className="px-2.5 py-1 bg-emerald-100 hover:bg-emerald-200 text-emerald-900 font-extrabold rounded-lg border border-emerald-300 transition flex items-center space-x-1 disabled:opacity-50"
+              onClick={() => {
+                setSelectedStageFilter("ALL");
+                setSelectedActivityFilter("ALL");
+                setSelectedDayFilter("ALL");
+                setActivitySearchQuery("");
+                if (isAdmin) setSelectedBarangayFilter("ALL");
+              }}
+              className="px-3 py-1.5 text-xs font-bold text-slate-600 hover:text-rose-700 bg-white hover:bg-rose-50 border border-slate-200 hover:border-rose-200 rounded-lg transition flex items-center space-x-1.5 flex-shrink-0 cursor-pointer shadow-2xs"
+              title="Reset all filters to default"
             >
-              <FileArchive className="w-3.5 h-3.5 text-emerald-700" />
-              <span>Download Selected ({selectedPhotoIds.length})</span>
+              <RefreshCw className="w-3 h-3 text-slate-500" />
+              <span>Reset Filters</span>
             </button>
-          )}
-
-          <span className="px-2.5 py-1 bg-slate-100 text-slate-700 font-semibold rounded-lg">
-            Total Photos: <strong>{displayedPhotos.length}</strong>
-          </span>
-          {selectedPhotoIds.length > 0 && (
-            <span className="px-2.5 py-1 bg-rose-50 text-rose-700 font-bold border border-rose-200 rounded-lg">
-              {selectedPhotoIds.length} Selected
-            </span>
           )}
         </div>
       </div>
