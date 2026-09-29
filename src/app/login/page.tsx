@@ -255,15 +255,39 @@ export default function LoginPage() {
     fetchLivePresets();
   }, []);
 
-  const getPresetPassword = (uname: string, brgy?: string): string => {
+  // Security Policy: Auto-filling of username and password is ONLY permitted for field coordinator & assisting documentor.
+  // For PESO Operations Staff, DOLE Coordinator, Domain Master, and PESO Admin, auto-filling is strictly disabled.
+  const isAutoFillRole = (roleId?: string | null): boolean => {
+    if (!roleId) return false;
+    return roleId === "TUPAD_COORDINATOR" || roleId === "TUPAD_ASSISTING_DOCUMENTOR";
+  };
+
+  const getPresetPassword = (uname: string, brgy?: string, roleId?: string): string => {
+    // Strictly disallow password auto-fill for administrative, DOLE, and operations staff roles
+    if (roleId && !isAutoFillRole(roleId)) {
+      return "";
+    }
+
     const u = (uname || "").toLowerCase().trim().replace(/^@+/, "");
     const b = (brgy || "").toLowerCase();
-    if (u === "admin" || u.startsWith("peso_admin") || u === "peso_head" || u === "peso_manager") return "admin123";
+
+    // Prevent any password lookup for non-field roles
+    if (
+      u === "admin" ||
+      u.startsWith("peso_admin") ||
+      u === "peso_head" ||
+      u === "peso_manager" ||
+      u === "pesostaff" ||
+      u === "mcdo" ||
+      u === "ikoy" ||
+      u === "staff" ||
+      u.startsWith("dole")
+    ) {
+      return "";
+    }
+
     if (u === "coordinator") return "coord123";
     if (u === "documentor") return "doc123";
-    if (u === "dole") return "dole123";
-    if (u === "staff") return "staff123";
-    if (u === "pesostaff" || u === "mcdo" || u === "ikoy" || u === "peso staff") return "Dingalan123!";
     if (u === "enabnb") return "BUTAS_NA_BATO123";
     if (u.includes("umiray") || u.includes("pinamaypayan") || u.includes("singawan") || b.includes("umiray")) return "UMIRAY123";
     if (u.includes("ibona") || b.includes("ibona")) return "IBONA123";
@@ -276,7 +300,6 @@ export default function LoginPage() {
     if (u.includes("tanawan") || b.includes("tanawan")) return "TANAWAN123";
     if (u.includes("dika") || b.includes("dikapanikian")) return "DIKAPANIKIAN123";
     if (u.includes("paltic") || b.includes("paltic")) return "PALTIC123";
-    if (u.includes("dolefoaurora")) return "ALL BARANGAY123";
     if (brgy && brgy !== "Municipality-wide" && !brgy.includes("All Barangays")) {
       return `${brgy.trim().toUpperCase()}123`;
     }
@@ -287,17 +310,22 @@ export default function LoginPage() {
   const handleRoleChange = (roleId: string) => {
     setSelectedRole(roleId);
     setSelectedAccountUsername("");
-    if (!roleId) {
-      setUsername("");
-      setPassword("");
+    setUsername("");
+    setPassword("");
+
+    if (!roleId) return;
+
+    // Auto-filling username & password is ONLY permitted for Field Coordinator and Assisting Documentor
+    if (!isAutoFillRole(roleId)) {
       return;
     }
+
     const roleObj = presetRoles.find((r) => r.id === roleId);
     if (roleObj && roleObj.accounts.length === 1) {
       const uname = roleObj.accounts[0].username;
       setSelectedAccountUsername(uname);
       setUsername(uname);
-      const defPass = getPresetPassword(uname, roleObj.accounts[0].barangay);
+      const defPass = getPresetPassword(uname, roleObj.accounts[0].barangay, roleId);
       if (defPass) setPassword(defPass);
     }
   };
@@ -305,10 +333,18 @@ export default function LoginPage() {
   // When specific account is picked from dropdown
   const handleAccountSelect = (uname: string) => {
     setSelectedAccountUsername(uname);
+
+    // Auto-filling username & password is ONLY permitted for Field Coordinator and Assisting Documentor
+    if (!isAutoFillRole(selectedRole)) {
+      setUsername("");
+      setPassword("");
+      return;
+    }
+
     setUsername(uname);
     const roleObj = presetRoles.find((r) => r.id === selectedRole);
     const acc = roleObj?.accounts.find((a) => a.username === uname);
-    const defPass = getPresetPassword(uname, acc?.barangay);
+    const defPass = getPresetPassword(uname, acc?.barangay, selectedRole);
     if (defPass) setPassword(defPass);
   };
 
@@ -418,42 +454,63 @@ export default function LoginPage() {
           )}
 
           {/* Form */}
-          <form onSubmit={handleSubmit} className="mt-6 space-y-4">
+          <form onSubmit={handleSubmit} autoComplete="off" className="mt-6 space-y-4">
             {/* 1. Quick Role Selection Dropdown */}
             <div className="space-y-1">
               <label className="block text-[11px] font-bold text-slate-700 uppercase tracking-wider flex items-center justify-between">
                 <span>1. Select User Role</span>
                 <span className="text-[10px] text-gov-blue font-normal flex items-center space-x-0.5">
                   <Sparkles className="w-3 h-3 text-gov-gold" />
-                  <span>Quick Account Finder</span>
+                  <span>Role Navigator</span>
                 </span>
               </label>
               <select
                 value={selectedRole}
                 onChange={(e) => handleRoleChange(e.target.value)}
-                className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg focus:outline-none focus:border-gov-blue focus:ring-1 focus:ring-gov-blue bg-slate-50 font-medium text-slate-800"
+                className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg focus:outline-none focus:border-gov-blue focus:ring-1 focus:ring-gov-blue bg-slate-50 font-medium text-slate-800 cursor-pointer"
               >
                 <option value="">-- Choose Role / Manual Typing --</option>
-                {presetRoles.map((role) => (
-                  <option key={role.id} value={role.id}>
-                    {role.label} ({role.accounts.length} {role.accounts.length === 1 ? "user" : "users"})
-                  </option>
-                ))}
+                {presetRoles.map((role) => {
+                  const isField = isAutoFillRole(role.id);
+                  return (
+                    <option key={role.id} value={role.id}>
+                      {role.label} {isField ? `(⚡ Auto-Fill Enabled • ${role.accounts.length} field users)` : `(🔒 Manual Login Required)`}
+                    </option>
+                  );
+                })}
               </select>
             </div>
 
-            {/* 2. Account Picker for Selected Role */}
-            {selectedRole && currentRoleObj && currentRoleObj.accounts.length > 0 && (
+            {/* Security Notice for Non-Field Roles (Admin, Staff, DOLE, Domain Master) */}
+            {selectedRole && !isAutoFillRole(selectedRole) && (
+              <div className="p-3 bg-amber-50/90 border border-amber-200/90 rounded-xl flex items-start space-x-2.5 text-xs text-amber-950 animate-in fade-in duration-200 shadow-2xs">
+                <Shield className="w-4 h-4 text-amber-600 flex-shrink-0 mt-0.5" />
+                <div className="space-y-0.5">
+                  <p className="font-extrabold text-[11px] text-amber-950 uppercase tracking-wide">
+                    🔒 Security Policy: Manual Login Required
+                  </p>
+                  <p className="text-[11px] text-amber-900 leading-relaxed">
+                    Auto-filling of username and password is <strong>disabled</strong> for PESO Operations Staff, DOLE Coordinator, Domain Master, and PESO Admin. Please enter your credentials manually below.
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {/* 2. Account Picker (Strictly for TUPAD Field Coordinator & Assisting Documentor only) */}
+            {selectedRole && isAutoFillRole(selectedRole) && currentRoleObj && currentRoleObj.accounts.length > 0 && (
               <div className="space-y-1 animate-in fade-in duration-200">
                 <label className="block text-[11px] font-bold text-slate-700 uppercase tracking-wider flex items-center justify-between">
-                  <span>2. Pick Specific Account ({currentRoleObj.accounts.length} available)</span>
+                  <span>2. Pick Specific Field Account ({currentRoleObj.accounts.length} available)</span>
+                  <span className="text-[10px] text-emerald-600 font-bold bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
+                    ⚡ Auto-fills Credentials
+                  </span>
                 </label>
                 <select
                   value={selectedAccountUsername}
                   onChange={(e) => handleAccountSelect(e.target.value)}
-                  className="w-full px-3 py-2 text-xs border border-blue-300 rounded-lg focus:outline-none focus:border-gov-blue focus:ring-1 focus:ring-gov-blue bg-blue-50/50 font-semibold text-gov-blue"
+                  className="w-full px-3 py-2 text-xs border border-blue-300 rounded-lg focus:outline-none focus:border-gov-blue focus:ring-1 focus:ring-gov-blue bg-blue-50/50 font-semibold text-gov-blue cursor-pointer"
                 >
-                  <option value="">-- Select Specific User ({currentRoleObj.label}) --</option>
+                  <option value="">-- Select Specific Field User ({currentRoleObj.label}) --</option>
                   {currentRoleObj.accounts.map((acc) => (
                     <option key={acc.username} value={acc.username}>
                       {acc.label} ({acc.username})
@@ -463,8 +520,8 @@ export default function LoginPage() {
               </div>
             )}
 
-            {/* Account Info Pill */}
-            {currentAccount && (
+            {/* Account Info Pill (Only for Field Roles) */}
+            {isAutoFillRole(selectedRole) && currentAccount && (
               <div className="p-2.5 bg-slate-50 border border-slate-200 rounded-lg flex items-center justify-between text-xs animate-in fade-in">
                 <div className="flex items-center space-x-1.5 text-slate-700">
                   <MapPin className="w-3.5 h-3.5 text-gov-gold" />
@@ -481,17 +538,25 @@ export default function LoginPage() {
             <div>
               <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1 flex items-center justify-between">
                 <span>Username</span>
-                {currentAccount && (
+                {isAutoFillRole(selectedRole) && currentAccount ? (
                   <span className="text-[10px] text-emerald-600 font-semibold flex items-center space-x-1">
                     <UserCheck className="w-3 h-3" />
-                    <span>Selected: {currentAccount.name}</span>
+                    <span>Auto-filled: {currentAccount.name}</span>
                   </span>
-                )}
+                ) : selectedRole && !isAutoFillRole(selectedRole) ? (
+                  <span className="text-[10px] text-amber-700 font-semibold flex items-center space-x-1">
+                    <Lock className="w-3 h-3 text-amber-600" />
+                    <span>Manual Entry Required</span>
+                  </span>
+                ) : null}
               </label>
               <div className="relative">
                 <User className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
                 <input
                   type="text"
+                  name="username"
+                  id="username"
+                  autoComplete="off"
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
                   placeholder="e.g. admin or peso_umiray1"
@@ -529,6 +594,9 @@ export default function LoginPage() {
                 <Lock className="w-4 h-4 text-slate-400 absolute left-3 top-3 pointer-events-none" />
                 <input
                   type={showPassword ? "text" : "password"}
+                  name="password"
+                  id="password"
+                  autoComplete="new-password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="••••••••"
