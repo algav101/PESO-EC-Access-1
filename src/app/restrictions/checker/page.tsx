@@ -273,11 +273,8 @@ export default function EligibilityCheckerPage() {
         <div className="space-y-1">
           <h1 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight flex items-center space-x-2">
             <Search className="w-6 h-6 text-gov-blue" />
-            <span>TUPAD 320-Day & Appointive Eligibility Checker</span>
+            <span>Alamin kung ikaw ba ay kwalipikado nang maging aplikante ng TUPAD</span>
           </h1>
-          <p className="text-xs text-slate-500">
-            Real-time validation against the 320-day payout interval rule & Barangay Appointive Personnel registry
-          </p>
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
@@ -336,9 +333,6 @@ export default function EligibilityCheckerPage() {
           <span className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center space-x-1.5">
             <User className="w-4 h-4 text-gov-blue" />
             <span>Beneficiary Inquiring Information</span>
-          </span>
-          <span className="text-[10px] text-gov-blue font-bold bg-blue-50 border border-blue-200 px-2 py-0.5 rounded">
-            320-Day Lockout Verification
           </span>
         </div>
 
@@ -462,7 +456,7 @@ export default function EligibilityCheckerPage() {
               ) : (
                 <>
                   <ShieldCheck className="w-4 h-4 text-gov-goldLight" />
-                  <span>Verify Eligibility Status</span>
+                  <span>Alamin at Magpatuloy</span>
                 </>
               )}
             </button>
@@ -498,15 +492,15 @@ export default function EligibilityCheckerPage() {
 
               <div>
                 <span
-                  className={`text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full ${
+                  className={`inline-block font-extrabold rounded-lg ${
                     result.disqualified
-                      ? "bg-rose-100 text-rose-800 border border-rose-300"
-                      : "bg-emerald-100 text-emerald-800 border border-emerald-300"
+                      ? "text-sm sm:text-base text-rose-800 bg-rose-100 border border-rose-300 px-3 py-1.5"
+                      : "text-xs font-black uppercase tracking-wider text-emerald-800 bg-emerald-100 border border-emerald-300 px-2.5 py-1 rounded-full"
                   }`}
                 >
-                  {result.disqualified ? "✕ DISQUALIFIED / NOT ELIGIBLE" : "✓ ELIGIBLE FOR ENROLLMENT"}
+                  {result.disqualified ? "Paumanhin ngunit hindi ka pa Kwalipikado dahil sa sumusunod na Dahilan:" : "✓ ELIGIBLE FOR ENROLLMENT"}
                 </span>
-                <h2 className="text-lg font-black text-slate-900 mt-0.5">{result.name}</h2>
+                <h2 className="text-lg font-black text-slate-900 mt-1">{result.name}</h2>
               </div>
             </div>
 
@@ -567,16 +561,16 @@ export default function EligibilityCheckerPage() {
                 : "bg-emerald-50/80 border-emerald-200 text-emerald-950"
             }`}
           >
-            <div className="flex items-center space-x-2 font-black uppercase text-[11px] tracking-wide">
+            <div className="flex items-center space-x-2 font-black text-xs sm:text-sm tracking-wide">
               {result.disqualified ? (
                 <>
                   <AlertTriangle className="w-4 h-4 text-rose-700 flex-shrink-0" />
-                  <span className="text-rose-800">Disqualification Findings & DOLE Statutory Rule:</span>
+                  <span className="text-rose-800 font-extrabold">Narito ang dahilan base sa DOLE TUPAD Guidelines:</span>
                 </>
               ) : (
                 <>
                   <ShieldCheck className="w-4 h-4 text-emerald-700 flex-shrink-0" />
-                  <span className="text-emerald-800">Eligibility Clearance:</span>
+                  <span className="text-emerald-800 uppercase text-[11px]">Eligibility Clearance:</span>
                 </>
               )}
             </div>
