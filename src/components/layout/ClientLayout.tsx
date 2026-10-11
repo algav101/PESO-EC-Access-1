@@ -10,10 +10,42 @@ export function ClientLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
 
+  const [isRedirecting, setIsRedirecting] = useState(false);
+
   // Automatically close mobile sidebar on navigation
   useEffect(() => {
     setMobileSidebarOpen(false);
   }, [pathname]);
+
+  // Ensure shared links to any sub-address always direct to the landing page first
+  useEffect(() => {
+    if (pathname === "/") {
+      try {
+        sessionStorage.setItem("peso_entered_via_landing", "1");
+        document.cookie = "peso_landing_visited=1; path=/; SameSite=Lax";
+      } catch (e) {}
+      return;
+    }
+
+    try {
+      const enteredViaLanding = sessionStorage.getItem("peso_entered_via_landing");
+      if (!enteredViaLanding) {
+        setIsRedirecting(true);
+        window.location.replace("/");
+      }
+    } catch (e) {}
+  }, [pathname]);
+
+  if (isRedirecting) {
+    return (
+      <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-4">
+        <div className="flex flex-col items-center space-y-3">
+          <div className="w-9 h-9 border-4 border-gov-blue border-t-transparent rounded-full animate-spin" />
+          <span className="text-xs font-bold text-slate-600">Nagre-redirect sa Landing Page...</span>
+        </div>
+      </div>
+    );
+  }
 
   const isAuthPage = pathname === "/login" || pathname === "/";
 
