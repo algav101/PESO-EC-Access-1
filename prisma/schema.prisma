@@ -622,3 +622,191 @@ model PublicInquiryMessage {
   @@index([createdAt])
 }
 
+
+// ============================================================================
+// MODULE 5: MIGRANTS' CORNER (OFW & SEAFARER HELPDESK)
+// ============================================================================
+
+model MigrantCaseReport {
+  id                    String               @id @default(uuid())
+  trackingCode          String               @unique
+  workerCategory        String               @default("LAND_BASED") // LAND_BASED, SEA_BASED
+  caseCategory          String               @default("CONTRACT_VIOLATION_UNPAID_WAGES")
+  urgencyLevel          String               @default("HIGH") // NORMAL, HIGH, CRITICAL_SOS
+  ofwLastName           String
+  ofwFirstName          String
+  ofwMiddleName         String?
+  ofwSuffix             String?
+  ofwFullName           String
+  ofwBirthday           String?
+  ofwSex                String?
+  ofwCivilStatus        String?
+  ofwContactAbroad      String
+  passportNumber        String?
+  sirbNumber            String?              // Seafarer's Identification & Record Book (Seaman's Book)
+  owwaStatus            String               @default("ACTIVE") // ACTIVE, INACTIVE, NON_MEMBER, UNDOCUMENTED
+  countryOrVessel       String               // Host Country or Vessel Name & Flag
+  jobPosition           String
+  foreignEmployer       String?
+  localAgency           String?              // DMW Licensed Recruitment / Manning Agency
+  isFiledByFamily       Boolean              @default(false)
+  reporterName          String
+  reporterRelationship  String               @default("SELF")
+  reporterBarangay      String?
+  reporterContact       String
+  caseSummary           String               // Detailed Salaysay / Narrative
+  submittedRequirements String?              // JSON string of OWWA/DMW documentary requirements & attachments
+  status                String               @default("OPEN") // OPEN, UNDER_INVESTIGATION, ENDORSED_TO_DMW_OWWA, RESOLVED, CLOSED
+  endorsedAgency        String?              // e.g. DMW RO-III, OWWA RWO-III, MWO/Embassy, MARINA/NLRC
+  adminRemarks          String?
+  createdAt             DateTime             @default(now())
+  updatedAt             DateTime             @updatedAt
+
+  messages              MigrantCaseMessage[]
+
+  @@index([trackingCode])
+  @@index([status])
+  @@index([workerCategory])
+  @@index([urgencyLevel])
+  @@index([createdAt])
+}
+
+model MigrantCaseMessage {
+  id             String            @id @default(uuid())
+  caseId         String
+  caseReport     MigrantCaseReport @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  senderType     String            @default("REPORTER") // REPORTER, PESO_STAFF, DMW_OWWA_DESK
+  senderName     String
+  message        String
+  attachmentName String?
+  attachmentUrl  String?
+  createdAt      DateTime          @default(now())
+
+  @@index([caseId])
+  @@index([createdAt])
+}
+
+model BalikPinasApplication {
+  id                       String   @id @default(uuid())
+  controlNo                String   @unique
+  programComponent         String   @default("EBPBH") // EBPBH (Enhanced Balik Pinay Balik Hanapbuhay), ELDAP (Expanded Livelihood Dev Assistance)
+  dateFiled                String
+  scheduledBy              String?
+  photoDataUrl             String?  // 2x2 ID Picture (base64 data URL)
+
+  // I. DATOS TUNGKOL SA OFW (ELPOR Form A)
+  lastName                 String
+  firstName                String
+  middleName               String?
+  suffix                   String?
+  fullName                 String
+  houseNumber              String?
+  street                   String?
+  barangay                 String
+  municipality             String   @default("Dingalan")
+  province                 String   @default("Aurora")
+  birthdate                String
+  age                      Int?
+  sex                      String   @default("FEMALE") // MALE, FEMALE
+  civilStatus              String   @default("MARRIED") // SINGLE, MARRIED, SEPARATED, WIDOWED
+  otherDataJson            String?  // JSON: { isPwd, isSenior, isSoloParent, isIp, isLgbtqia }
+  cellphone1               String
+  cellphone2               String?
+  emailOrFb                String?
+  workerCategory           String   @default("LAND_BASED") // SEA_BASED, LAND_BASED
+
+  // II. DATOS TUNGKOL SA OFW EMPLOYMENT (ELPOR Form A & A2)
+  jobsiteCountry           String
+  jobPosition              String
+  latestDepartureDate      String?
+  latestContractDuration   String?
+  latestArrivalDate        String?
+  passportNumber           String?
+
+  // III. DATOS TUNGKOL SA NEGOSYO (ELPOR Form A)
+  proposedBusinessType     String
+  businessLocation         String
+  hasExistingBusiness      Boolean  @default(false)
+  existingBusinessDetails  String?
+
+  // IV. MGA PAGSASANAY SA NEGOSYO (ELPOR Form A)
+  trainingKind             String?
+  trainingVenue            String?
+  trainingIssuedBy         String?
+  trainingDate             String?
+
+  // ELPOR FORM A2: OFW STATEMENT FORM
+  reasonForReturn          String
+  briefStatement           String
+
+  // ELPOR FORM B1: LISTAHAN NG PANIMULANG KAGAMITAN AT PRODUKTO
+  suppliesAndEquipmentJson String?  // JSON array of PRODUKTO & KAGAMITAN items
+  totalProposedAmount      Float    @default(20000)
+
+  // ELPOR FORM B: BUSINESS MODEL CANVAS
+  businessCanvasJson       String?  // JSON object of 1. Business Idea, 2. Marketing, 3. Operations, 4. Finance
+
+  // ELPOR FORM C (COMMITMENT) & KASULATAN & DOCUMENTS CHECKLIST
+  documentsChecklistJson   String?  // JSON checklist of Form A, A2, B, B1, C, Passport, Arrival Proof, Training Cert
+  agreedToCommitment       Boolean  @default(true)
+  agreedToKasulatan        Boolean  @default(true)
+
+  // STAFF / DMW RO III EVALUATION
+  status                   String   @default("SUBMITTED") // SUBMITTED, UNDER_EVALUATION, ENDORSED_TO_DMW_RO3, APPROVED, RELEASED, DISAPPROVED
+  withPreviousAvailment    Boolean  @default(false)
+  previousProgram          String?
+  amountOfAssistance       Float?   @default(20000)
+  evaluatedBy              String?
+  adminRemarks             String?
+  createdAt                DateTime @default(now())
+  updatedAt                DateTime @updatedAt
+
+  @@index([controlNo])
+  @@index([status])
+  @@index([barangay])
+  @@index([programComponent])
+  @@index([createdAt])
+}
+
+model OfwFamilyCircleMember {
+  id                    String   @id @default(uuid())
+  memberCode            String   @unique
+  photoDataUrl          String?  // Uploaded photo of OFW or Family Circle Member
+
+  // Left Column of OFW Information Sheet
+  ofwLastName           String
+  ofwFirstName          String
+  ofwMiddleName         String?
+  ofwSuffix             String?
+  ofwFullName           String
+  ofwSex                String   @default("FEMALE")
+  ofwBirthdate          String
+  ofwContactInfo        String
+  abroadResidencyStatus String   @default("CONTRACTUAL") // PERMANENTE, PETITIONER, UNDOCUMENTED
+
+  // Right Column of OFW Information Sheet
+  occupationAbroad      String
+  monthlyIncome         String?
+  countryOfWork         String
+  agencyName            String?
+  employmentStatus      String   @default("CONTRACTUAL") // PERMANENTE, CONTRACTUAL, UNDOCUMENTED
+  contractDuration      String?
+
+  // Bottom Section: Detalye ng pamilya na sa Dingalan naninirahan
+  dingalanBarangay      String
+  dingalanPurokSitio    String?
+  familyContactInfo     String
+  familyMembersJson     String   // JSON array of { fullName, relationship, birthdate, sex, education, skills }
+  representativeName    String   // Pangalan at Lagda ng Kinatawan ng OFW
+
+  membershipStatus      String   @default("ACTIVE") // ACTIVE, VERIFIED, RETURNING_OFW, ARCHIVED
+  remarks               String?
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  @@index([memberCode])
+  @@index([ofwFullName])
+  @@index([dingalanBarangay])
+  @@index([membershipStatus])
+  @@index([createdAt])
+}

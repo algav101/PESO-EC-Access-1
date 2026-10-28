@@ -68,8 +68,11 @@ export function Sidebar({ isMobile = false, onClose }: SidebarProps) {
     pathname.startsWith("/replacements") ||
     pathname.startsWith("/restrictions");
 
+  const isMigrantsRoute = pathname.startsWith("/migrants");
+
   // State for toggling dropdown menus
-  const [tupadDropdownOpen, setTupadDropdownOpen] = useState<boolean>(true);
+  const [tupadDropdownOpen, setTupadDropdownOpen] = useState<boolean>(!isMigrantsRoute);
+  const [migrantsDropdownOpen, setMigrantsDropdownOpen] = useState<boolean>(isMigrantsRoute || true);
   const [openDummyModules, setOpenDummyModules] = useState<Record<string, boolean>>({});
   const [selectedDevModule, setSelectedDevModule] = useState<{
     moduleName: string;
@@ -164,18 +167,6 @@ export function Sidebar({ isMobile = false, onClose }: SidebarProps) {
             { title: "GIP Government Internship Roster", desc: "Government Internship Program placement, attendance, and evaluation." },
             { title: "DILEEP Livelihood Grant Tracking", desc: "DOLE Integrated Livelihood and Emergency Employment Program beneficiaries." },
             { title: "Youth Career Guidance & Profiling", desc: "High school and college labor market counseling modules." },
-          ],
-        },
-        {
-          id: "migrants-corner",
-          name: "5 - Migrants' Corner (OFW Helpdesk)",
-          icon: HeartHandshake,
-          status: "under development",
-          description: "Dedicated assistance hub for Dingaleño Overseas Filipino Workers (OFWs), seafarers, and their families.",
-          subItems: [
-            { title: "OFW & Seafarer Case Assistance", desc: "Welfare case intake, grievance tracking, and DMW coordination." },
-            { title: "Balik Pinas Balik Hanapbuhay Portal", desc: "Reintegration assistance and livelihood startup capital for returning OFWs." },
-            { title: "OFW Family Circle Registry", desc: "Community support groups and financial literacy program schedules." },
           ],
         },
         {
@@ -396,6 +387,80 @@ export function Sidebar({ isMobile = false, onClose }: SidebarProps) {
                 </div>
               )}
             </div>
+
+            {/* MODULE 5: MIGRANTS' CORNER (OFW HELPDESK) - OPERATIONAL */}
+            {!isCoordinator && (
+              <div className="rounded-xl border border-slate-800 bg-slate-950/40 overflow-hidden mb-2.5 transition-all shadow-sm">
+                <button
+                  type="button"
+                  onClick={() => setMigrantsDropdownOpen((prev) => !prev)}
+                  className={`w-full flex items-center justify-between px-3 py-2.5 text-left transition ${
+                    migrantsDropdownOpen
+                      ? "bg-slate-800/90 text-white border-b border-slate-800"
+                      : isMigrantsRoute
+                      ? "bg-gov-blue/20 text-blue-200 hover:bg-slate-800/60"
+                      : "text-slate-300 hover:bg-slate-800/60"
+                  }`}
+                  aria-expanded={migrantsDropdownOpen}
+                >
+                  <div className="flex items-center space-x-2.5 min-w-0 pr-2">
+                    <div className="w-6 h-6 rounded-lg bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 flex items-center justify-center flex-shrink-0 font-black text-[11px]">
+                      5
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-xs font-black truncate text-white leading-tight">
+                        5 - Migrants&apos; Corner (OFW Helpdesk)
+                      </p>
+                      <span className="inline-block text-[9px] font-bold text-emerald-400 bg-emerald-950/60 border border-emerald-800/50 px-1.5 py-0.2 rounded mt-0.5">
+                        Operational
+                      </span>
+                    </div>
+                  </div>
+                  <div className="flex items-center flex-shrink-0 pl-1 text-slate-400">
+                    {migrantsDropdownOpen ? (
+                      <ChevronDown className="w-4 h-4 text-emerald-400 transition-transform duration-200" />
+                    ) : (
+                      <ChevronRight className="w-4 h-4 transition-transform duration-200" />
+                    )}
+                  </div>
+                </button>
+
+                {migrantsDropdownOpen && (
+                  <div className="p-2 space-y-1 bg-slate-950/30 animate-fadeIn">
+                    {[
+                      { label: "Migrants' Corner Hub", href: "/migrants", icon: HeartHandshake },
+                      { label: "OFW & Seafarer Case Assistance", href: "/migrants/case-assistance", icon: ShieldAlert },
+                      { label: "Balik Pinas! Balik Hanapbuhay!", href: "/migrants/balik-pinas", icon: Briefcase },
+                      { label: "OFW Family Circle Registry", href: "/migrants/family-circle", icon: Users },
+                    ].map((item) => {
+                      const Icon = item.icon;
+                      const isActive = pathname === item.href;
+                      return (
+                        <a
+                          key={item.href}
+                          href={item.href}
+                          onClick={() => {
+                            if (isMobile && onClose) onClose();
+                          }}
+                          className={`flex items-center space-x-2.5 px-2.5 py-2 rounded-lg text-xs font-semibold transition ${
+                            isActive
+                              ? "bg-gov-blue text-white shadow-sm font-bold border border-blue-400/40"
+                              : "text-slate-300 hover:text-white hover:bg-slate-800/80 active:bg-slate-800"
+                          }`}
+                        >
+                          <Icon
+                            className={`w-3.5 h-3.5 flex-shrink-0 ${
+                              isActive ? "text-gov-goldLight" : "text-slate-400"
+                            }`}
+                          />
+                          <span className="truncate">{item.label}</span>
+                        </a>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* MODULES 2-6: DUMMY DROPDOWN BUTTONS (UNDER DEVELOPMENT - HIDDEN FOR COORDINATORS) */}
             {dummyModules.length > 0 && (

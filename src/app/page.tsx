@@ -7,6 +7,7 @@ import { PublicInquiryMessageForm } from "@/components/public/PublicInquiryMessa
 import { PublicWorkAssignmentLookupCard } from "@/components/public/PublicWorkAssignmentLookupCard";
 import { PesoOrganizationalChart } from "@/components/public/PesoOrganizationalChart";
 import { OngoingTupadDemographicsSection } from "@/components/public/OngoingTupadDemographicsSection";
+import { MigrantsCornerLandingSection } from "@/components/public/MigrantsCornerLandingSection";
 import {
   ShieldCheck,
   MapPin,
@@ -231,6 +232,22 @@ export default async function LandingPage() {
                     gamit ang iyong Laminated QR ID
                   </span>
                 </li>
+                <li className="flex items-start gap-2 bg-blue-50/80 p-2.5 rounded-lg border border-blue-200 hover:border-blue-400 transition-colors sm:col-span-2">
+                  <span className="text-blue-700 font-bold">✔</span>
+                  <span>
+                    <a href="/migrants/family-circle" className="hover:underline font-extrabold text-blue-950">
+                      Migrants&apos; Corner: OFW Family Circle Registration (OFW Info Sheet)
+                    </a>
+                    ,{" "}
+                    <a href="/migrants/case-assistance" className="hover:underline font-bold text-rose-800">
+                      OWWA/DMW Case Assistance
+                    </a>{" "}
+                    at{" "}
+                    <a href="/migrants/balik-pinas" className="hover:underline font-bold text-emerald-900">
+                      Balik Pinas! Balik Hanapbuhay! (ELPOR Portal)
+                    </a>
+                  </span>
+                </li>
                 <li className="flex items-start gap-2 bg-slate-50 p-2.5 rounded-lg border border-slate-100 hover:border-slate-300 transition-colors sm:col-span-2">
                   <span className="text-purple-700 font-bold">✔</span>
                   <span>
@@ -321,6 +338,9 @@ export default async function LandingPage() {
           <PublicInquiryMessageForm />
         </div>
       </section>
+
+      {/* 7B. Module 5: Migrants' Corner (OFW & Seafarer Helpdesk, Balik Pinas ELPOR, & OFW Family Circle Registry) */}
+      <MigrantsCornerLandingSection />
 
       {/* 8. Demographics of Ongoing TUPAD Program (Replicating Masterlist Summary Tabulation & Features) */}
       <OngoingTupadDemographicsSection beneficiaries={programBeneficiaries} />

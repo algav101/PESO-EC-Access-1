@@ -91,7 +91,10 @@ export function LandingNavDrawer() {
         { title: "DAMA E-Trabaho Job Matching", href: "#", icon: Globe, status: "Under Dev", isExternal: false },
         { title: "Technical Skills Accreditation", href: "#", icon: FileText, status: "Future Dev", isExternal: false },
         { title: "SPES, GIP, DILEEP, Career Guidance", href: "#", icon: Briefcase, status: "Future Dev", isExternal: false },
-        { title: "Migrants' Corner (OFW Helpdesk)", href: "#", icon: Globe, status: "Future Dev", isExternal: false },
+        { title: "5 - Migrants' Corner (OFW & Seafarer Helpdesk)", href: "/migrants", icon: Globe, highlight: true, badge: "Active", isExternal: false },
+        { title: "OFW Family Circle Registration (OFW Info Sheet)", href: "/migrants/family-circle", icon: Users, highlight: true, badge: "New", isExternal: false },
+        { title: "OFW & Seafarer Case Assistance (OWWA / DMW)", href: "/migrants/case-assistance", icon: MessageSquare, badge: "Active", isExternal: false },
+        { title: "Balik Pinas! Balik Hanapbuhay! (DMW ELPOR)", href: "/migrants/balik-pinas", icon: Briefcase, badge: "Active", isExternal: false },
       ],
     },
     {

@@ -28,6 +28,7 @@ export const PERMISSIONS = {
     "report.generate", "report.template.create", "report.template.update", "report.export", "report.read",
     "application.read", "application.update", "application.download", "application.export", "application.import",
     "inquiry.read", "inquiry.update",
+    "migrants.read", "migrants.manage",
     "user.create", "user.read", "user.update", "user.disable", "user.delete",
     "settings.read", "settings.update",
     "audit.read",
@@ -51,6 +52,7 @@ export const PERMISSIONS = {
     "report.generate", "report.template.create", "report.template.update", "report.export", "report.read",
     "application.read", "application.update", "application.download", "application.export", "application.import",
     "inquiry.read", "inquiry.update",
+    "migrants.read", "migrants.manage",
     "user.create", "user.read", "user.update", "user.disable", "user.delete",
     "settings.read", "settings.update",
     "audit.read",
@@ -73,6 +75,7 @@ export const PERMISSIONS = {
     "report.generate", "report.export", "report.read",
     "application.read", "application.update", "application.download", "application.export",
     "inquiry.read", "inquiry.update",
+    "migrants.read", "migrants.manage",
     "restriction.read",
     "sync.read"
   ],

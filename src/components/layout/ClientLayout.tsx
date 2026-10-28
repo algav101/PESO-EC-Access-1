@@ -23,7 +23,8 @@ export function ClientLayout({ children }: { children: React.ReactNode }) {
     if (
       pathname === "/" ||
       pathname.startsWith("/my-assignment") ||
-      pathname.startsWith("/qr/")
+      pathname.startsWith("/qr/") ||
+      pathname.startsWith("/migrants")
     ) {
       try {
         sessionStorage.setItem("peso_entered_via_landing", "1");

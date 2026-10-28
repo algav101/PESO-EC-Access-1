@@ -593,6 +593,93 @@ async function runTests() {
     await prisma.program.delete({ where: { id: testBatchProg.id } });
     assert(true, "Batch designated QR test suite resources cleaned up");
 
+    // TEST 14: Module 5 - Migrants' Corner (OFW Case Assistance, Balik Pinas ELPOR & Family Circle)
+    console.log("\n[TEST 14] Module 5 - Migrants' Corner (Case Assistance, Balik Pinas ELPOR & Family Circle)");
+    const testCaseCode = `CASE-2026-TST${Date.now().toString().slice(-3)}`;
+    const createdCase = await prisma.migrantCaseReport.create({
+      data: {
+        trackingCode: testCaseCode,
+        workerCategory: "SEA_BASED",
+        caseCategory: "SEA_BASED_MARITIME_DISPUTE",
+        urgencyLevel: "CRITICAL_SOS",
+        ofwLastName: "MENDOZA",
+        ofwFirstName: "CARLO",
+        ofwFullName: "MENDOZA, CARLO",
+        ofwContactAbroad: "+639170001111",
+        passportNumber: "P1234567A",
+        sirbNumber: "SIRB-998877",
+        owwaStatus: "ACTIVE",
+        countryOrVessel: "M/V DINGALAN STAR",
+        jobPosition: "ABLE SEAMAN",
+        reporterName: "MENDOZA, CARLO",
+        reporterContact: "09170001111",
+        caseSummary: "Test maritime wage and medical assistance report",
+        messages: {
+          create: [
+            {
+              senderType: "REPORTER",
+              senderName: "MENDOZA, CARLO",
+              message: "Initial case message",
+            },
+          ],
+        },
+      },
+      include: { messages: true },
+    });
+    assert(createdCase.trackingCode === testCaseCode, "OFW/Seafarer case report created with tracking code");
+    assert(createdCase.messages.length === 1, "Two-way case messaging thread initialized");
+
+    const testElporNo = `ELPOR-2026-TST${Date.now().toString().slice(-3)}`;
+    const createdElpor = await prisma.balikPinasApplication.create({
+      data: {
+        controlNo: testElporNo,
+        programComponent: "EBPBH",
+        dateFiled: "2026-10-28",
+        lastName: "VILLANUEVA",
+        firstName: "MARITES",
+        fullName: "VILLANUEVA, MARITES",
+        barangay: "Paltic",
+        birthdate: "1989-05-19",
+        cellphone1: "09173349921",
+        jobsiteCountry: "KUWAIT",
+        jobPosition: "DOMESTIC WORKER",
+        proposedBusinessType: "SARI-SARI STORE AT BIGASAN",
+        businessLocation: "Paltic, Dingalan, Aurora",
+        reasonForReturn: "Finished Contract",
+        briefStatement: "Reintegration livelihood application",
+        totalProposedAmount: 20000,
+      },
+    });
+    assert(createdElpor.controlNo === testElporNo, "Balik Pinas / DMW ELPOR application saved with Control No.");
+
+    const testOfcCode = `OFC-DGL-2026-T${Date.now().toString().slice(-3)}`;
+    const createdOfc = await prisma.ofwFamilyCircleMember.create({
+      data: {
+        memberCode: testOfcCode,
+        ofwLastName: "DELA CRUZ",
+        ofwFirstName: "MARIA ELENA",
+        ofwFullName: "DELA CRUZ, MARIA ELENA",
+        ofwSex: "FEMALE",
+        ofwBirthdate: "1989-08-15",
+        ofwContactInfo: "+971501234567",
+        abroadResidencyStatus: "PERMANENTE",
+        occupationAbroad: "STAFF NURSE",
+        countryOfWork: "UAE",
+        employmentStatus: "CONTRACTUAL",
+        dingalanBarangay: "Paltic",
+        familyContactInfo: "09175558899",
+        familyMembersJson: JSON.stringify([{ fullName: "ROBERTO DELA CRUZ", relationship: "SPOUSE" }]),
+        representativeName: "ROBERTO DELA CRUZ",
+      },
+    });
+    assert(createdOfc.memberCode === testOfcCode, "OFW Family Circle Information Sheet registered in database");
+
+    // Clean up Module 5 test records
+    await prisma.migrantCaseReport.delete({ where: { id: createdCase.id } });
+    await prisma.balikPinasApplication.delete({ where: { id: createdElpor.id } });
+    await prisma.ofwFamilyCircleMember.delete({ where: { id: createdOfc.id } });
+    assert(true, "Module 5 Migrants' Corner test records cleaned up");
+
     console.log("\n==================================================================");
     console.log(`TEST SUMMARY: ${passed} PASSED, ${failed} FAILED`);
     console.log("==================================================================");

@@ -21,11 +21,12 @@ export function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
-  // 2. Landing Page & Direct QR Assignment Lookups: Set visitor session cookie
+  // 2. Landing Page & Direct QR Assignment Lookups & Public Migrants' Corner: Set visitor session cookie
   if (
     pathname === "/" ||
     pathname.startsWith("/my-assignment") ||
-    pathname.startsWith("/qr/")
+    pathname.startsWith("/qr/") ||
+    pathname.startsWith("/migrants")
   ) {
     const response = NextResponse.next();
     response.cookies.set("peso_landing_visited", "1", {
@@ -47,7 +48,8 @@ export function middleware(request: NextRequest) {
   const isPublicSubRoute =
     pathname === "/login" ||
     pathname.startsWith("/apply") ||
-    pathname.startsWith("/restrictions/checker");
+    pathname.startsWith("/restrictions/checker") ||
+    pathname.startsWith("/migrants");
 
   const hasAuthCookie = Boolean(request.cookies.get("tupad_auth_token")?.value);
 
