@@ -4,6 +4,7 @@ import {
   getPhilippineTime,
   determineAttendanceSlot,
   ATTENDANCE_SLOT_LABELS,
+  extractCleanQrToken as canonicalExtractCleanQrToken,
 } from "@/lib/utils";
 import {
   normalizeBarangayName,
@@ -142,50 +143,7 @@ export function getClientAuthHeaders(): Record<string, string> {
  * Clean & extract token string from raw URLs, JSON, or parameters
  */
 export function extractCleanQrToken(raw: string): string {
-  if (!raw) return "";
-  let trimmed = String(raw).trim();
-
-  // If JSON object string
-  if (trimmed.startsWith("{") && trimmed.endsWith("}")) {
-    try {
-      const parsed = JSON.parse(trimmed);
-      return (parsed.token || parsed.qrToken || parsed.designatedNumber || trimmed).trim();
-    } catch {}
-  }
-
-  // If URL string or query string (e.g., https://... or /... or ?token=...)
-  if (
-    trimmed.startsWith("http://") ||
-    trimmed.startsWith("https://") ||
-    trimmed.startsWith("/") ||
-    trimmed.includes("?") ||
-    trimmed.includes("=")
-  ) {
-    try {
-      const fullUrl = trimmed.startsWith("http")
-        ? trimmed
-        : `http://localhost${trimmed.startsWith("/") ? "" : "/"}${trimmed}`;
-      const url = new URL(fullUrl);
-      const paramToken =
-        url.searchParams.get("token") ||
-        url.searchParams.get("qrToken") ||
-        url.searchParams.get("q") ||
-        url.searchParams.get("slot");
-      if (paramToken) return paramToken.trim();
-
-      const lastSeg = url.pathname.split("/").filter(Boolean).pop();
-      if (
-        lastSeg &&
-        !["my-assignment", "scan", "attendance", "orientation", "payout", "stub-distribution"].includes(
-          lastSeg.toLowerCase()
-        )
-      ) {
-        return lastSeg.trim();
-      }
-    } catch {}
-  }
-
-  return trimmed;
+  return canonicalExtractCleanQrToken(raw);
 }
 
 /**
@@ -222,10 +180,10 @@ export async function findBeneficiaryOffline(
     const parsedNum = isNum ? parseInt(clean, 10) : null;
 
     match = all.find((b) => {
-      // Exact or substring QR token
+      // Exact or safe substring QR token (min 6 chars, non-numeric to prevent slot 1 vs 10 collisions)
       if (b.qrToken) {
         const bQrUpper = b.qrToken.toUpperCase();
-        if (bQrUpper === upperClean || bQrUpper.includes(upperClean) || upperClean.includes(bQrUpper)) {
+        if (bQrUpper === upperClean || (!isNum && upperClean.length >= 6 && bQrUpper.includes(upperClean))) {
           return true;
         }
       }

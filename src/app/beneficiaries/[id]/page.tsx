@@ -1,6 +1,6 @@
 import React from "react";
 import prisma from "@/lib/prisma";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import {
   User,
   MapPin,
@@ -29,8 +29,11 @@ export const dynamic = "force-dynamic";
 
 export default async function BeneficiaryProfilePage({ params }: { params: { id: string } }) {
   const currentUser = await getCurrentUser();
+  if (!currentUser) {
+    redirect("/login");
+  }
   const isAdmin = isAdminUser(currentUser);
-  const canEdit = isAdmin || hasPermission(currentUser?.role || "", "beneficiary.update");
+  const canEdit = isAdmin || hasPermission(currentUser.role || "", "beneficiary.update");
 
   const rawBeneficiary = await prisma.beneficiary.findUnique({
     where: { id: params.id },

@@ -463,6 +463,110 @@ export async function generateAccomplishmentExcel(programId: string): Promise<Bu
   return Buffer.from(buffer);
 }
 
+/**
+ * Generates an official Orientation & Stub Distribution Excel Report
+ */
+export async function generateOrientationExcel(programId: string): Promise<Buffer> {
+  const program = await prisma.program.findUnique({
+    where: { id: programId },
+    include: {
+      programBeneficiaries: {
+        where: { participationStatus: { not: "REPLACED" } },
+        include: {
+          beneficiary: true,
+          orientationAttendance: true,
+          stubDistributions: true,
+        },
+        orderBy: { designatedNumber: "asc" },
+      },
+    },
+  });
+
+  if (!program) throw new Error("Program not found");
+
+  const workbook = new ExcelJS.Workbook();
+  const ws = workbook.addWorksheet("Orientation & Stubs");
+
+  ws.mergeCells("A1:H1");
+  ws.getCell("A1").value = `${program.programName} - ORIENTATION & STUB DISTRIBUTION REPORT`;
+  ws.getCell("A1").font = { bold: true, size: 12 };
+
+  const headers = ["#", "DESIGNATED NO.", "FULL NAME", "BARANGAY", "TABLE NO.", "STUB STATUS", "ORIENTATION STATUS", "SCANNED AT"];
+  const headerRow = ws.getRow(3);
+  headers.forEach((h, i) => {
+    headerRow.getCell(i + 1).value = h;
+  });
+  headerRow.font = { bold: true };
+
+  program.programBeneficiaries.forEach((pb, idx) => {
+    const r = ws.getRow(idx + 4);
+    const stub = pb.stubDistributions?.[0];
+    const orient = pb.orientationAttendance?.[0];
+    r.getCell(1).value = idx + 1;
+    r.getCell(2).value = pb.designatedNumber;
+    r.getCell(3).value = pb.beneficiary.fullName;
+    r.getCell(4).value = pb.beneficiary.barangay || "Dingalan";
+    r.getCell(5).value = pb.tableNumber || "-";
+    r.getCell(6).value = stub?.status || "PENDING";
+    r.getCell(7).value = orient?.status || "ABSENT";
+    r.getCell(8).value = orient?.scannedAt ? format(new Date(orient.scannedAt), "yyyy-MM-dd hh:mm a") : "-";
+  });
+
+  const buffer = await workbook.xlsx.writeBuffer();
+  return Buffer.from(buffer);
+}
+
+/**
+ * Generates an official Payout Verification Excel Report
+ */
+export async function generatePayoutExcel(programId: string): Promise<Buffer> {
+  const program = await prisma.program.findUnique({
+    where: { id: programId },
+    include: {
+      programBeneficiaries: {
+        where: { participationStatus: { not: "REPLACED" } },
+        include: {
+          beneficiary: true,
+          payouts: { include: { verifiedBy: { select: { fullName: true } } } },
+        },
+        orderBy: { designatedNumber: "asc" },
+      },
+    },
+  });
+
+  if (!program) throw new Error("Program not found");
+
+  const workbook = new ExcelJS.Workbook();
+  const ws = workbook.addWorksheet("Payout Verification");
+
+  ws.mergeCells("A1:H1");
+  ws.getCell("A1").value = `${program.programName} - PAYOUT VERIFICATION REPORT`;
+  ws.getCell("A1").font = { bold: true, size: 12 };
+
+  const headers = ["#", "DESIGNATED NO.", "FULL NAME", "BARANGAY", "PAYOUT STATUS", "PAYOUT DATE", "VERIFIED BY", "REMARKS"];
+  const headerRow = ws.getRow(3);
+  headers.forEach((h, i) => {
+    headerRow.getCell(i + 1).value = h;
+  });
+  headerRow.font = { bold: true };
+
+  program.programBeneficiaries.forEach((pb, idx) => {
+    const r = ws.getRow(idx + 4);
+    const payout = pb.payouts?.[0];
+    r.getCell(1).value = idx + 1;
+    r.getCell(2).value = pb.designatedNumber;
+    r.getCell(3).value = pb.beneficiary.fullName;
+    r.getCell(4).value = pb.beneficiary.barangay || "Dingalan";
+    r.getCell(5).value = payout?.status || "PENDING";
+    r.getCell(6).value = payout?.payoutDate || "-";
+    r.getCell(7).value = payout?.verifiedBy?.fullName || "-";
+    r.getCell(8).value = payout?.remarks || "";
+  });
+
+  const buffer = await workbook.xlsx.writeBuffer();
+  return Buffer.from(buffer);
+}
+
 
 function getColLetter(colIndex: number): string {
   let temp = "";

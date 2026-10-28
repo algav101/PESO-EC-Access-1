@@ -580,6 +580,7 @@ export async function parseBeneficiaryExcelBuffer(
         select: {
           restrictionEnd: true,
           reason: true,
+          isAppointivePersonnel: true,
           beneficiary: {
             select: {
               fullName: true,
@@ -612,9 +613,17 @@ export async function parseBeneficiaryExcelBuffer(
 
     for (const r of activeRestrictions) {
       if (r.beneficiary?.fullName) {
-        if (!r.restrictionEnd || r.restrictionEnd >= todayStr) {
-          const key = `${r.beneficiary.fullName.trim().toUpperCase()}_${r.beneficiary.birthday}`;
-          restrictionMap.set(key, { end: r.restrictionEnd || "Active Restriction", reason: r.reason || "365-day payout restriction" });
+        if (!r.restrictionEnd || r.restrictionEnd >= todayStr || r.isAppointivePersonnel) {
+          const cleanName = r.beneficiary.fullName.trim().toUpperCase();
+          const bday = (r.beneficiary.birthday || "").trim();
+          const entry = {
+            end: r.restrictionEnd || (r.isAppointivePersonnel ? "Permanent (Appointive)" : "Active Restriction"),
+            reason: r.reason || "365-day payout restriction",
+          };
+          restrictionMap.set(`${cleanName}_${bday}`, entry);
+          if (!bday || r.isAppointivePersonnel) {
+            restrictionMap.set(cleanName, entry);
+          }
         }
       }
     }
@@ -680,8 +689,10 @@ export async function parseBeneficiaryExcelBuffer(
       validationError = "Duplicate beneficiary row in file";
       duplicateCount++;
     } else {
-      // Check 365-Day restriction from targeted map
-      const restriction = restrictionMap.get(`${item.fullName}_${item.birthday}`);
+      // Check 365-Day / Appointive restriction from targeted map
+      const restriction =
+        restrictionMap.get(`${item.fullName}_${item.birthday}`) ||
+        restrictionMap.get(item.fullName);
       if (restriction) {
         status = "RESTRICTED";
         validationError = `Restricted until ${restriction.end}: ${restriction.reason}`;

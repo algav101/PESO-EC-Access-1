@@ -12,27 +12,32 @@ export async function POST(request: Request) {
       middleName,
       extensionName,
       birthday, // MM-DD-YYYY or YYYY-MM-DD
+      applicationCode,
     } = body;
 
-    if (!lastName || !firstName) {
+    const cleanAppCode = applicationCode ? String(applicationCode).trim().toUpperCase() : "";
+
+    if (!cleanAppCode && (!lastName || !firstName)) {
       return NextResponse.json(
-        { error: "Mangyaring ilagay ang inyong Last Name at First Name." },
+        { error: "Mangyaring ilagay ang inyong Last Name at First Name (o Application Code)." },
         { status: 400 }
       );
     }
 
-    const cleanLast = String(lastName).trim().toUpperCase();
-    const cleanFirst = String(firstName).trim().toUpperCase();
+    const cleanLast = lastName ? String(lastName).trim().toUpperCase() : "";
+    const cleanFirst = firstName ? String(firstName).trim().toUpperCase() : "";
     const cleanMiddle = middleName ? String(middleName).trim().toUpperCase() : "";
     const cleanExt = extensionName ? String(extensionName).trim().toUpperCase() : "";
     const cleanBday = birthday ? String(birthday).trim() : "";
 
-    // 1. Query TupadApplicationRoster
+    // 1. Query TupadApplicationRoster (by applicationCode in remarks or by Last + First name)
     const applicants = await prisma.tupadApplicationRoster.findMany({
-      where: {
-        lastName: { equals: cleanLast, mode: "insensitive" },
-        firstName: { equals: cleanFirst, mode: "insensitive" },
-      },
+      where: cleanAppCode
+        ? { remarks: { contains: cleanAppCode, mode: "insensitive" } }
+        : {
+            lastName: { equals: cleanLast, mode: "insensitive" },
+            firstName: { equals: cleanFirst, mode: "insensitive" },
+          },
     });
 
     // Match middle name and extension if candidates found

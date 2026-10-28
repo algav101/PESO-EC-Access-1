@@ -17,9 +17,14 @@ export function ClientLayout({ children }: { children: React.ReactNode }) {
     setMobileSidebarOpen(false);
   }, [pathname]);
 
-  // Ensure shared links to any sub-address always direct to the landing page first
+  // Ensure shared links to unauthenticated sub-addresses acknowledge landing cookie
+  // without kicking authenticated staff or new-tab navigations back to /
   useEffect(() => {
-    if (pathname === "/") {
+    if (
+      pathname === "/" ||
+      pathname.startsWith("/my-assignment") ||
+      pathname.startsWith("/qr/")
+    ) {
       try {
         sessionStorage.setItem("peso_entered_via_landing", "1");
         document.cookie = "peso_landing_visited=1; path=/; SameSite=Lax";
@@ -29,6 +34,16 @@ export function ClientLayout({ children }: { children: React.ReactNode }) {
 
     try {
       const enteredViaLanding = sessionStorage.getItem("peso_entered_via_landing");
+      const hasLandingCookie = document.cookie.includes("peso_landing_visited=1");
+      const hasCachedAuth = Boolean(
+        localStorage.getItem("peso_cached_user") || localStorage.getItem("peso_jwt_token")
+      );
+
+      if (hasLandingCookie || hasCachedAuth) {
+        sessionStorage.setItem("peso_entered_via_landing", "1");
+        return;
+      }
+
       if (!enteredViaLanding) {
         setIsRedirecting(true);
         window.location.replace("/");

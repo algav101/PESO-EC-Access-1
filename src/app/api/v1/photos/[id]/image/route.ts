@@ -2,9 +2,15 @@ export const dynamic = "force-dynamic";
 
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
+import { getCurrentUser } from "@/lib/auth";
 
 export async function GET(request: Request, { params }: { params: { id: string } }) {
   try {
+    const user = await getCurrentUser(request);
+    if (!user) {
+      return new NextResponse("Unauthorized", { status: 401 });
+    }
+
     const photoId = params.id;
     if (!photoId) {
       return new NextResponse("Missing photo ID", { status: 400 });

@@ -163,7 +163,10 @@ export async function POST(request: Request) {
     });
 
     let record: any;
-    const applicationCode = generateAppCode();
+    const existingRefMatch = existing?.remarks?.match(/\[REF:\s*(APP-[A-Z0-9-]+)\]/i);
+    const applicationCode = existingRefMatch ? existingRefMatch[1] : generateAppCode();
+    const cleanRemarksWithoutRef = finalRemarks.replace(/\[REF:\s*APP-[A-Z0-9-]+\]\s*\|\s*/gi, "").trim();
+    finalRemarks = `[REF: ${applicationCode}] | ${cleanRemarksWithoutRef}`;
 
     if (existing) {
       record = await prisma.tupadApplicationRoster.update({

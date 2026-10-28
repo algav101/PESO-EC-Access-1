@@ -63,14 +63,6 @@ export async function POST(request: Request) {
           { status: 400 }
         );
       }
-    } else if (captchaExpected !== undefined && captchaAnswer !== undefined) {
-      // Legacy fallback
-      if (String(captchaAnswer).trim() !== String(captchaExpected).trim()) {
-        return NextResponse.json(
-          { error: "Maling CAPTCHA Security Code. Pakisubukan muli upang mapatunayang hindi ka robot." },
-          { status: 400 }
-        );
-      }
     } else {
       return NextResponse.json(
         { error: "Kinakailangan ang pagsagot sa CAPTCHA Security Check." },

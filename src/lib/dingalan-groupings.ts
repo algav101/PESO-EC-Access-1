@@ -303,18 +303,16 @@ export function getBarangayKey(rawBarangay?: string | null): string {
   return clean;
 }
 
+import { normalizeBarangayName as canonicalNormalizeBarangayName } from "@/lib/utils";
+
 /**
  * Returns clean standard title-cased barangay name
  */
 export function getStandardBarangayName(rawBarangay?: string | null): string {
-  const key = getBarangayKey(rawBarangay);
-  const cfg = DINGALAN_BARANGAY_GROUPINGS[key];
-  return cfg ? cfg.barangay : (rawBarangay || "").trim();
+  return canonicalNormalizeBarangayName(rawBarangay);
 }
 
-export function normalizeBarangayName(input?: string | null): string {
-  return getStandardBarangayName(input);
-}
+export const normalizeBarangayName = canonicalNormalizeBarangayName;
 
 /**
  * Normalizes Purok/Sitio strings for reliable matching against uploaded names

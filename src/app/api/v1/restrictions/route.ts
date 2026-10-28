@@ -43,6 +43,9 @@ export async function GET(request: Request) {
 
     // Masked suggestions for public eligibility lookup dropdown
     if (isSuggestions && query) {
+      if (!user && query.length < 3) {
+        return NextResponse.json({ suggestions: [] });
+      }
       const qUpper = query.toUpperCase();
 
       const restrictions = await prisma.beneficiaryRestriction.findMany({
@@ -51,7 +54,7 @@ export async function GET(request: Request) {
             { beneficiary: { fullName: { contains: qUpper, mode: "insensitive" } } },
             { beneficiary: { lastName: { contains: qUpper, mode: "insensitive" } } },
             { beneficiary: { firstName: { contains: qUpper, mode: "insensitive" } } },
-            { adlNo: { contains: qUpper, mode: "insensitive" } },
+            ...(user ? [{ adlNo: { contains: qUpper, mode: "insensitive" as const } }] : []),
           ],
         },
         include: {
@@ -68,7 +71,7 @@ export async function GET(request: Request) {
           id: r.id,
           fullName: isAuthStaff ? (b?.fullName || "") : maskFullName(b?.fullName || ""),
           firstName: b?.firstName || "",
-          middleName: b?.middleName || "",
+          middleName: isAuthStaff ? (b?.middleName || "") : (b?.middleName ? b.middleName[0] + "." : ""),
           lastName: b?.lastName || "",
           extensionName: b?.extensionName || "",
           adlNo: isAuthStaff ? (r.adlNo || "") : (r.adlNo ? `${r.adlNo.slice(0, 4)}****` : "Historical"),
@@ -137,14 +140,15 @@ export async function POST(request: Request) {
         const middlePart = mName ? ` ${mName}` : "";
         const extPart = extName ? ` ${extName}` : "";
         combinedTargetName = `${lName}, ${fName}${middlePart}${extPart}`;
-      } else if (fName) {
-        combinedTargetName = fName;
       }
     }
 
-    if (!combinedTargetName && !lName && !fName) {
+    const hasBothNames = Boolean(lName && fName);
+    const hasMultiWordFullName = combinedTargetName.split(/[\s,]+/).filter(Boolean).length >= 2;
+
+    if (!hasBothNames && !hasMultiWordFullName) {
       return NextResponse.json(
-        { error: "Please provide at least a First Name or Last Name to evaluate eligibility." },
+        { error: "Please provide both First Name and Last Name to accurately evaluate eligibility." },
         { status: 400 }
       );
     }

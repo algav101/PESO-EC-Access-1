@@ -63,8 +63,9 @@ export async function POST(request: Request) {
       pb = qr.programBeneficiary;
     }
 
-    // Strategy 2: Search by Case-Insensitive substring of publicToken
-    if (!pb) {
+    // Strategy 2: Search by Case-Insensitive substring of publicToken (non-numeric tokens >= 6 chars)
+    const isNumericSlot = /^\d+$/.test(cleanToken);
+    if (!pb && !isNumericSlot && cleanToken.length >= 6) {
       qr = await prisma.qrCode.findFirst({
         where: {
           publicToken: { contains: cleanToken, mode: "insensitive" },
@@ -88,7 +89,6 @@ export async function POST(request: Request) {
     }
 
     // Strategy 3: Numeric slot match (e.g. "1", "22", "81", "92")
-    const isNumericSlot = /^\d+$/.test(cleanToken);
     if (!pb && isNumericSlot) {
       const slotNum = String(parseInt(cleanToken, 10));
       const whereClause: any = { designatedNumber: slotNum, participationStatus: "ACTIVE" };

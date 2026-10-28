@@ -2,15 +2,19 @@ export const dynamic = "force-dynamic";
 
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
-import { getCurrentUser, isAdminUser } from "@/lib/auth";
+import { getCurrentUser, isAdminUser, hasPermission } from "@/lib/auth";
 import { logAudit } from "@/lib/audit";
 import { formatBirthdayPin, normalizeBarangayName } from "@/lib/utils";
+import { generateBeneficiaryToken } from "@/lib/qr";
 import { addDays, format, parseISO } from "date-fns";
 
 export async function POST(request: Request) {
   try {
     const user = await getCurrentUser(request);
-    if (user?.id) {
+    if (!user) {
+      return NextResponse.json({ error: "Unauthorized: valid authentication required to push offline transactions" }, { status: 401 });
+    }
+    if (user.id) {
       prisma.user.update({
         where: { id: user.id },
         data: { lastLoginAt: new Date() },
@@ -50,6 +54,19 @@ export async function POST(request: Request) {
       }
 
       try {
+        const requiredPermissionMap: Record<string, string> = {
+          ATTENDANCE: "attendance.scan",
+          ORIENTATION: "orientation.scan",
+          STUB_DISTRIBUTION: "stub.distribution.scan",
+          PAYOUT: "payout.scan",
+          PHOTO: "photo.upload",
+          REPLACEMENT: "replacement.create",
+        };
+        const reqPerm = requiredPermissionMap[entityType];
+        if (reqPerm && !hasPermission(user.role, reqPerm)) {
+          throw new Error(`Forbidden: role ${user.role} lacks ${reqPerm} permission`);
+        }
+
         if (entityType === "ATTENDANCE") {
           const {
             programId,
@@ -317,13 +334,13 @@ export async function POST(request: Request) {
             resolvedQrId = activeQr.id;
           }
           if (!resolvedQrId) {
-            const token = `TUPAD-${pb.programId.slice(0, 4).toUpperCase()}-${pb.designatedNumber || Date.now()}`;
+            const qrData = generateBeneficiaryToken(pb.programId, String(pb.designatedNumber || Date.now()));
             const newQr = await prisma.qrCode.create({
               data: {
                 programId: pb.programId,
                 programBeneficiaryId: pb.id,
-                publicToken: token,
-                tokenHash: Buffer.from(token).toString("base64"),
+                publicToken: qrData.publicToken,
+                tokenHash: qrData.tokenHash,
                 status: "ACTIVE",
               },
             });
@@ -619,28 +636,29 @@ export async function POST(request: Request) {
               });
 
               // 4. Generate new QR code
-              const token = `TUPAD-${originalPb.programId.slice(0, 4).toUpperCase()}-${originalPb.designatedNumber}-${Date.now().toString(36).toUpperCase()}`;
+              const qrData = generateBeneficiaryToken(originalPb.programId, String(originalPb.designatedNumber));
               await dbTx.qrCode.create({
                 data: {
                   programId: originalPb.programId,
                   programBeneficiaryId: newPb.id,
-                  publicToken: token,
-                  tokenHash: Buffer.from(token).toString("base64"),
+                  publicToken: qrData.publicToken,
+                  tokenHash: qrData.tokenHash,
                   status: "ACTIVE",
                 },
               });
 
               // 5. Record Replacement
+              const canApprove = isAdminUser(user) || hasPermission(user.role, "replacement.approve");
               await dbTx.beneficiaryReplacement.create({
                 data: {
                   programId: originalPb.programId,
                   originalProgramBeneficiaryId: originalPb.id,
                   replacementProgramBeneficiaryId: newPb.id,
                   reason: reason || "Field replacement during offline operations",
-                  status: "APPROVED",
-                  initiatedById: user?.id,
-                  approvedById: user?.id,
-                  approvedAt: new Date(),
+                  status: canApprove ? "APPROVED" : "PENDING",
+                  initiatedById: user.id,
+                  approvedById: canApprove ? user.id : null,
+                  approvedAt: canApprove ? new Date() : null,
                 },
               });
             });

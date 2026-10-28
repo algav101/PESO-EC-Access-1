@@ -36,7 +36,6 @@ export async function POST(request: Request) {
         "SAMPLE BENEFICIARY",
         "DUMMY",
         "TEST USER",
-        "DELA CRUZ, JUAN SANTOS",
       ];
 
       const testBeneficiaries = await prisma.beneficiary.findMany({
@@ -94,8 +93,34 @@ export async function POST(request: Request) {
           beneficiary: {
             select: { id: true, fullName: true, birthday: true },
           },
+          _count: {
+            select: {
+              attendanceRecords: true,
+              orientationAttendance: true,
+              stubDistributions: true,
+              payouts: true,
+            },
+          },
         },
-        orderBy: [{ joinedAt: "desc" }],
+        orderBy: [{ joinedAt: "asc" }],
+      });
+
+      // Sort candidates so records with actual historical scans/payouts come FIRST and are preserved
+      pbs.sort((a, b) => {
+        const scoreA =
+          (a._count?.payouts || 0) * 100 +
+          (a._count?.attendanceRecords || 0) * 10 +
+          (a._count?.orientationAttendance || 0) * 5 +
+          (a._count?.stubDistributions || 0) * 5 +
+          (a.participationStatus === "ACTIVE" ? 1 : 0);
+        const scoreB =
+          (b._count?.payouts || 0) * 100 +
+          (b._count?.attendanceRecords || 0) * 10 +
+          (b._count?.orientationAttendance || 0) * 5 +
+          (b._count?.stubDistributions || 0) * 5 +
+          (b.participationStatus === "ACTIVE" ? 1 : 0);
+        if (scoreB !== scoreA) return scoreB - scoreA;
+        return new Date(a.joinedAt).getTime() - new Date(b.joinedAt).getTime();
       });
 
       const seenDesig = new Map<string, string>();
@@ -103,8 +128,11 @@ export async function POST(request: Request) {
       const pbIdsToDelete: string[] = [];
 
       for (const pb of pbs) {
+        if (pb.participationStatus === "REPLACED") continue;
         const desig = String(pb.designatedNumber || "").trim();
         const name = pb.beneficiary?.fullName?.trim().toUpperCase() || "";
+        const bday = pb.beneficiary?.birthday?.trim() || "";
+        const beneKey = name ? `${name}_${bday}` : "";
 
         let isDuplicate = false;
 
@@ -112,7 +140,7 @@ export async function POST(request: Request) {
           isDuplicate = true;
         }
 
-        if (name && seenBene.has(name)) {
+        if (beneKey && seenBene.has(beneKey)) {
           isDuplicate = true;
         }
 
@@ -120,7 +148,7 @@ export async function POST(request: Request) {
           pbIdsToDelete.push(pb.id);
         } else {
           if (desig) seenDesig.set(desig, pb.id);
-          if (name) seenBene.set(name, pb.id);
+          if (beneKey) seenBene.set(beneKey, pb.id);
         }
       }
 

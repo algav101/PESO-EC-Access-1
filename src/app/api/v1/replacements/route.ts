@@ -272,3 +272,82 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }
+
+export async function PATCH(request: Request) {
+  try {
+    const user = await getCurrentUser(request);
+    if (!user || !hasPermission(user.role, "replacement.approve")) {
+      return NextResponse.json({ error: "Forbidden: insufficient permissions to approve or reject replacements" }, { status: 403 });
+    }
+
+    const { id, replacementId, status } = await request.json();
+    const targetId = id || replacementId;
+
+    if (!targetId || !["APPROVED", "REJECTED"].includes(status)) {
+      return NextResponse.json({ error: "Replacement ID and valid status (APPROVED or REJECTED) are required" }, { status: 400 });
+    }
+
+    const existing = await prisma.beneficiaryReplacement.findUnique({
+      where: { id: targetId },
+      include: {
+        originalProgramBeneficiary: true,
+        replacementProgramBeneficiary: true,
+      },
+    });
+
+    if (!existing) {
+      return NextResponse.json({ error: "Replacement record not found" }, { status: 404 });
+    }
+
+    const updated = await prisma.$transaction(async (tx) => {
+      if (status === "REJECTED") {
+        // Restore original beneficiary to ACTIVE
+        await tx.programBeneficiary.update({
+          where: { id: existing.originalProgramBeneficiaryId },
+          data: { participationStatus: "ACTIVE" },
+        });
+
+        // Mark replacement beneficiary as WITHDRAWN and transfer QR code back to original
+        if (existing.replacementProgramBeneficiaryId) {
+          await tx.programBeneficiary.update({
+            where: { id: existing.replacementProgramBeneficiaryId },
+            data: { participationStatus: "WITHDRAWN" },
+          });
+          await tx.qrCode.updateMany({
+            where: { programBeneficiaryId: existing.replacementProgramBeneficiaryId },
+            data: {
+              programBeneficiaryId: existing.originalProgramBeneficiaryId,
+              status: "ACTIVE",
+            },
+          });
+        }
+      }
+
+      return tx.beneficiaryReplacement.update({
+        where: { id: targetId },
+        data: {
+          status,
+          approvedById: user.id,
+          approvedAt: new Date(),
+        },
+        include: {
+          originalProgramBeneficiary: { include: { beneficiary: true } },
+          replacementProgramBeneficiary: { include: { beneficiary: true, qrCodes: true } },
+        },
+      });
+    });
+
+    await logAudit({
+      userId: user.id,
+      action: status === "APPROVED" ? "REPLACEMENT_APPROVED" : "REPLACEMENT_REJECTED",
+      entityType: "BENEFICIARY_REPLACEMENT",
+      entityId: updated.id,
+      metadata: { status },
+    });
+
+    return NextResponse.json({ success: true, replacement: updated });
+  } catch (error: any) {
+    console.error("Replacement PATCH error:", error);
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+}

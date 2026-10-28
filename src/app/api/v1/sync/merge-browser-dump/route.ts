@@ -8,21 +8,12 @@ import { normalizeBarangayName } from "@/lib/utils";
 
 export async function POST(request: Request) {
   try {
-    const user = await getCurrentUser();
-    // Allow admin or authenticated field staff
+    const user = await getCurrentUser(request);
     if (!user) {
-      // If called from browser script without cookie, try finding default admin
-      const adminFallback = await prisma.user.findFirst({
-        where: { role: { in: ["DOMAIN_MASTER", "PESO_ADMIN"] } }
-      });
-      if (!adminFallback) {
-        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-      }
+      return NextResponse.json({ error: "Unauthorized: valid staff authentication required" }, { status: 401 });
     }
 
-    const adminUser = user || await prisma.user.findFirst({
-      where: { role: { in: ["DOMAIN_MASTER", "PESO_ADMIN"] } }
-    });
+    const adminUser = user;
 
     const body = await request.json();
     const dump = body.data || body;

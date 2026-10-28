@@ -48,19 +48,19 @@ export function normalizeBarangayName(raw?: string | null): string {
   if (!raw) return "Paltic";
   const cleaned = raw.trim().toLowerCase().replace(/\s+/g, " ");
 
-  if (cleaned === "aplaya") return "Aplaya";
-  if (cleaned === "butas na bato" || cleaned === "butasnabato" || cleaned === "butas-na-bato") return "Butas na Bato";
-  if (cleaned === "caragsacan" || cleaned === "karagsakan" || cleaned === "caragsakan") return "Caragsacan";
-  if (cleaned === "davildavilan" || cleaned === "dabildavilan" || cleaned === "dabil-dabilan" || cleaned === "davil-davilan") return "Davildavilan";
-  if (cleaned === "dikapanikian" || cleaned === "dikapanikyan") return "Dikapanikian";
-  if (cleaned === "ibona") return "Ibona";
-  if (cleaned === "matawe") return "Matawe";
-  if (cleaned === "paltic") return "Paltic";
-  if (cleaned === "poblacion") return "Poblacion";
-  if (cleaned === "tanawan") return "Tanawan";
-  if (cleaned === "umiray") return "Umiray";
+  if (cleaned === "aplaya" || cleaned.includes("aplaya")) return "Aplaya";
+  if (cleaned === "butas na bato" || cleaned === "butasnabato" || cleaned === "butas-na-bato" || cleaned === "bnb" || cleaned.includes("butas")) return "Butas na Bato";
+  if (cleaned === "caragsacan" || cleaned === "karagsakan" || cleaned === "caragsakan" || cleaned.includes("caragsacan")) return "Caragsacan";
+  if (cleaned === "davildavilan" || cleaned === "dabildavilan" || cleaned === "dabil-dabilan" || cleaned === "davil-davilan" || cleaned.includes("davildavilan")) return "Davildavilan";
+  if (cleaned === "dikapanikian" || cleaned === "dikapanikyan" || cleaned === "dika" || cleaned.includes("dikapanikian") || cleaned.includes("dika")) return "Dikapanikian";
+  if (cleaned === "ibona" || cleaned.includes("ibona")) return "Ibona";
+  if (cleaned === "matawe" || cleaned.includes("matawe")) return "Matawe";
+  if (cleaned === "paltic" || cleaned.includes("paltic")) return "Paltic";
+  if (cleaned === "poblacion" || cleaned.includes("poblacion")) return "Poblacion";
+  if (cleaned === "tanawan" || cleaned.includes("tanawan")) return "Tanawan";
+  if (cleaned === "umiray" || cleaned.includes("umiray")) return "Umiray";
 
-  // Check substring match
+  // Check exact match
   for (const b of DINGALAN_BARANGAYS) {
     if (b.toLowerCase() === cleaned) return b;
   }
@@ -71,6 +71,56 @@ export function normalizeBarangayName(raw?: string | null): string {
     .split(/\s+/)
     .map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
     .join(" ");
+}
+
+/**
+ * Clean & extract QR token string from raw URLs, JSON payloads, or query parameters.
+ */
+export function extractCleanQrToken(raw: string): string {
+  if (!raw) return "";
+  const trimmed = String(raw).trim();
+
+  // 1. If JSON object string
+  if (trimmed.startsWith("{") && trimmed.endsWith("}")) {
+    try {
+      const parsed = JSON.parse(trimmed);
+      return String(parsed.token || parsed.qrToken || parsed.designatedNumber || trimmed).trim();
+    } catch {}
+  }
+
+  // 2. If URL string or query string (e.g., https://... or /... or ?token=...)
+  if (
+    trimmed.startsWith("http://") ||
+    trimmed.startsWith("https://") ||
+    trimmed.startsWith("/") ||
+    trimmed.includes("?") ||
+    trimmed.includes("=")
+  ) {
+    try {
+      const fullUrl = trimmed.startsWith("http")
+        ? trimmed
+        : `http://localhost${trimmed.startsWith("/") ? "" : "/"}${trimmed}`;
+      const url = new URL(fullUrl);
+      const paramToken =
+        url.searchParams.get("token") ||
+        url.searchParams.get("qrToken") ||
+        url.searchParams.get("q") ||
+        url.searchParams.get("slot");
+      if (paramToken) return paramToken.trim();
+
+      const lastSeg = url.pathname.split("/").filter(Boolean).pop();
+      if (
+        lastSeg &&
+        !["my-assignment", "scan", "attendance", "orientation", "payout", "stub-distribution"].includes(
+          lastSeg.toLowerCase()
+        )
+      ) {
+        return lastSeg.trim();
+      }
+    } catch {}
+  }
+
+  return trimmed;
 }
 
 /**

@@ -73,8 +73,9 @@ export async function POST(request: Request) {
       pb = qr.programBeneficiary;
     }
 
-    // Strategy 2: Case-insensitive substring
-    if (!pb) {
+    // Strategy 2: Case-insensitive substring (only for non-numeric tokens of length >= 6)
+    const isNumericSlot = /^\d+$/.test(cleanToken);
+    if (!pb && !isNumericSlot && cleanToken.length >= 6) {
       qr = await prisma.qrCode.findFirst({
         where: { publicToken: { contains: cleanToken, mode: "insensitive" } },
         include: {
@@ -89,7 +90,6 @@ export async function POST(request: Request) {
     }
 
     // Strategy 3: Numeric slot
-    const isNumericSlot = /^\d+$/.test(cleanToken);
     if (!pb && isNumericSlot) {
       const slotNum = String(parseInt(cleanToken, 10));
       const whereClause: any = { designatedNumber: slotNum, participationStatus: "ACTIVE" };
@@ -265,20 +265,39 @@ export async function POST(request: Request) {
         const restrictionStartStr = format(startD, "yyyy-MM-dd");
         const restrictionEndStr = format(endD, "yyyy-MM-dd");
 
-        restriction = await tx.beneficiaryRestriction.create({
-          data: {
+        const existingRestriction = await tx.beneficiaryRestriction.findFirst({
+          where: {
             beneficiaryId: pb.beneficiaryId,
             sourceProgramId: program.id,
-            payoutDate: effectivePayoutDate,
-            restrictionStart: restrictionStartStr,
-            restrictionEnd: restrictionEndStr,
-            adlNo: program.programCode,
-            barangay: normalizeBarangayName(pb.beneficiary.barangay),
-            municipality: "Dingalan",
-            reason: `365-day statutory TUPAD payout restriction (${program.programName})`,
-            status: "ACTIVE",
           },
         });
+
+        if (existingRestriction) {
+          restriction = await tx.beneficiaryRestriction.update({
+            where: { id: existingRestriction.id },
+            data: {
+              payoutDate: effectivePayoutDate,
+              restrictionStart: restrictionStartStr,
+              restrictionEnd: restrictionEndStr,
+              status: "ACTIVE",
+            },
+          });
+        } else {
+          restriction = await tx.beneficiaryRestriction.create({
+            data: {
+              beneficiaryId: pb.beneficiaryId,
+              sourceProgramId: program.id,
+              payoutDate: effectivePayoutDate,
+              restrictionStart: restrictionStartStr,
+              restrictionEnd: restrictionEndStr,
+              adlNo: program.programCode,
+              barangay: normalizeBarangayName(pb.beneficiary.barangay),
+              municipality: "Dingalan",
+              reason: `365-day statutory TUPAD payout restriction (${program.programName})`,
+              status: "ACTIVE",
+            },
+          });
+        }
       }
 
       return { payout, restriction };

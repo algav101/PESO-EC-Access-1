@@ -21,8 +21,12 @@ export function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
-  // 2. Landing Page: Set visitor session cookie to acknowledge entry via landing page
-  if (pathname === "/") {
+  // 2. Landing Page & Direct QR Assignment Lookups: Set visitor session cookie
+  if (
+    pathname === "/" ||
+    pathname.startsWith("/my-assignment") ||
+    pathname.startsWith("/qr/")
+  ) {
     const response = NextResponse.next();
     response.cookies.set("peso_landing_visited", "1", {
       path: "/",
@@ -40,6 +44,27 @@ export function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
+  const isPublicSubRoute =
+    pathname === "/login" ||
+    pathname.startsWith("/apply") ||
+    pathname.startsWith("/restrictions/checker");
+
+  const hasAuthCookie = Boolean(request.cookies.get("tupad_auth_token")?.value);
+
+  // Protect staff-only routes when no authentication token cookie is present
+  if (!isPublicSubRoute && !hasAuthCookie) {
+    const url = request.nextUrl.clone();
+    url.pathname = "/login";
+    url.search = "";
+    const redirectResponse = NextResponse.redirect(url);
+    redirectResponse.cookies.set("peso_landing_visited", "1", {
+      path: "/",
+      sameSite: "lax",
+      httpOnly: false,
+    });
+    return redirectResponse;
+  }
+
   const referer = request.headers.get("referer");
   const host = request.headers.get("host");
 
@@ -47,16 +72,14 @@ export function middleware(request: NextRequest) {
   const isExternalReferer = Boolean(referer && host && !referer.includes(host));
   const hasLandingCookie = request.cookies.has("peso_landing_visited");
 
-  // If accessed via a shared external link (e.g., Facebook, Messenger, Viber, etc.)
-  // OR accessed directly without internal referrer and without active landing page session:
-  // Always redirect directly to the landing page (/)
-  if (isExternalReferer || (!isInternalReferer && !hasLandingCookie)) {
+  // If an unauthenticated visitor accesses a public sub-route via an external link
+  // OR without an active landing page session: redirect to landing page (/)
+  if (!hasAuthCookie && (isExternalReferer || (!isInternalReferer && !hasLandingCookie))) {
     const url = request.nextUrl.clone();
     url.pathname = "/";
     url.search = "";
 
     const redirectResponse = NextResponse.redirect(url);
-    // Mark landing page as visited for subsequent in-session clicks
     redirectResponse.cookies.set("peso_landing_visited", "1", {
       path: "/",
       sameSite: "lax",

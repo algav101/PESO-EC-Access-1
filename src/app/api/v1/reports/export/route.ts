@@ -1,6 +1,12 @@
 import { NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth";
-import { generateAttendanceExcel, generateAccomplishmentExcel, generateWorkProgramExcel } from "@/lib/excel-exporter";
+import {
+  generateAttendanceExcel,
+  generateAccomplishmentExcel,
+  generateWorkProgramExcel,
+  generateOrientationExcel,
+  generatePayoutExcel,
+} from "@/lib/excel-exporter";
 import prisma from "@/lib/prisma";
 
 export const dynamic = "force-dynamic";
@@ -40,6 +46,22 @@ export async function GET(request: Request) {
         headers: {
           "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
           "Content-Disposition": `attachment; filename="TUPAD_10Day_Work_Program_Dingalan_${programId.slice(0, 6)}.xlsx"`,
+        },
+      });
+    } else if (reportType === "ORIENTATION") {
+      const buffer = await generateOrientationExcel(programId);
+      return new Response(new Uint8Array(buffer), {
+        headers: {
+          "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+          "Content-Disposition": `attachment; filename="TUPAD_Orientation_Stubs_Dingalan_${programId.slice(0, 6)}.xlsx"`,
+        },
+      });
+    } else if (reportType === "PAYOUT") {
+      const buffer = await generatePayoutExcel(programId);
+      return new Response(new Uint8Array(buffer), {
+        headers: {
+          "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+          "Content-Disposition": `attachment; filename="TUPAD_Payout_Verification_Dingalan_${programId.slice(0, 6)}.xlsx"`,
         },
       });
     } else {

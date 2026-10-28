@@ -92,8 +92,9 @@ export async function POST(request: Request) {
       pb = qr.programBeneficiary;
     }
 
-    // Strategy 2: Case-insensitive substring
-    if (!pb) {
+    // Strategy 2: Case-insensitive substring (only for non-numeric tokens of length >= 6)
+    const isNumericSlot = /^\d+$/.test(cleanToken);
+    if (!pb && !isNumericSlot && cleanToken.length >= 6) {
       qr = await prisma.qrCode.findFirst({
         where: { publicToken: { contains: cleanToken, mode: "insensitive" } },
         include: {
@@ -108,7 +109,6 @@ export async function POST(request: Request) {
     }
 
     // Strategy 3: Numeric designated slot
-    const isNumericSlot = /^\d+$/.test(cleanToken);
     if (!pb && isNumericSlot) {
       const slotNum = String(parseInt(cleanToken, 10));
       const whereClause: any = { designatedNumber: slotNum, participationStatus: "ACTIVE" };
@@ -479,45 +479,46 @@ export async function POST(request: Request) {
       }
     }
 
-    // Record or update attendance
+    // Record or update attendance atomically via upsert to prevent P2002 race conditions
     const slotRecorded = slotLabels[targetSlot];
 
-    if (!record) {
-      record = await prisma.attendanceRecord.create({
-        data: {
+    const updateData: any = {};
+    if (resolvedItemId && !record?.workProgramItemId) updateData.workProgramItemId = resolvedItemId;
+    if (resolvedArea && !record?.workArea) updateData.workArea = resolvedArea;
+    if (resolvedActivity && !record?.activityName) updateData.activityName = resolvedActivity;
+
+    if (targetSlot === "MORNING_IN") updateData.morningTimeIn = now;
+    else if (targetSlot === "MORNING_OUT") updateData.morningTimeOut = now;
+    else if (targetSlot === "AFTERNOON_IN") updateData.afternoonTimeIn = now;
+    else if (targetSlot === "AFTERNOON_OUT") updateData.afternoonTimeOut = now;
+
+    record = await prisma.attendanceRecord.upsert({
+      where: {
+        programId_workDayId_programBeneficiaryId: {
           programId: program.id,
           workDayId: workDay.id,
           programBeneficiaryId: pb.id,
-          attendanceDate: workDay.workDate,
-          morningTimeIn: targetSlot === "MORNING_IN" ? now : null,
-          morningTimeOut: targetSlot === "MORNING_OUT" ? now : null,
-          afternoonTimeIn: targetSlot === "AFTERNOON_IN" ? now : null,
-          afternoonTimeOut: targetSlot === "AFTERNOON_OUT" ? now : null,
-          status: "PRESENT",
-          source: "QR_SCAN",
-          scannedById: user.id,
-          deviceId: deviceId || "BROWSER",
-          workProgramItemId: resolvedItemId,
-          workArea: resolvedArea,
-          activityName: resolvedActivity,
         },
-      });
-    } else {
-      const updateData: any = {};
-      if (resolvedItemId && !record.workProgramItemId) updateData.workProgramItemId = resolvedItemId;
-      if (resolvedArea && !record.workArea) updateData.workArea = resolvedArea;
-      if (resolvedActivity && !record.activityName) updateData.activityName = resolvedActivity;
-
-      if (targetSlot === "MORNING_IN") updateData.morningTimeIn = now;
-      else if (targetSlot === "MORNING_OUT") updateData.morningTimeOut = now;
-      else if (targetSlot === "AFTERNOON_IN") updateData.afternoonTimeIn = now;
-      else if (targetSlot === "AFTERNOON_OUT") updateData.afternoonTimeOut = now;
-
-      record = await prisma.attendanceRecord.update({
-        where: { id: record.id },
-        data: updateData,
-      });
-    }
+      },
+      update: updateData,
+      create: {
+        programId: program.id,
+        workDayId: workDay.id,
+        programBeneficiaryId: pb.id,
+        attendanceDate: workDay.workDate,
+        morningTimeIn: targetSlot === "MORNING_IN" ? now : null,
+        morningTimeOut: targetSlot === "MORNING_OUT" ? now : null,
+        afternoonTimeIn: targetSlot === "AFTERNOON_IN" ? now : null,
+        afternoonTimeOut: targetSlot === "AFTERNOON_OUT" ? now : null,
+        status: "PRESENT",
+        source: "QR_SCAN",
+        scannedById: user.id,
+        deviceId: deviceId || "BROWSER",
+        workProgramItemId: resolvedItemId,
+        workArea: resolvedArea,
+        activityName: resolvedActivity,
+      },
+    });
 
     await logAudit({
       userId: user.id,
