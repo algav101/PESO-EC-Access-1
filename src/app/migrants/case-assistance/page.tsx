@@ -24,7 +24,7 @@ import {
   Trash2,
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
-import { isAdminUser, hasPermission } from "@/lib/permissions";
+import { isAdminUser, hasPermission, isPesoPersonnel } from "@/lib/permissions";
 
 const DINGALAN_BARANGAYS = [
   "Aplaya",
@@ -139,7 +139,7 @@ const OWWA_DMW_REQUIREMENTS: RequirementItem[] = [
 export default function OfwSeafarerCaseAssistancePage() {
   const { user } = useAuth();
   const isStaff = Boolean(
-    user && (isAdminUser(user) || hasPermission(user.role, "migrants.read") || hasPermission(user.role, "migrants.manage"))
+    user && (isPesoPersonnel(user) || isAdminUser(user) || hasPermission(user.role, "migrants.read") || hasPermission(user.role, "migrants.manage"))
   );
 
   const [activeTab, setActiveTab] = useState<"file" | "messenger" | "staff">("file");

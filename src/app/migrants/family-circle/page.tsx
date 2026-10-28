@@ -25,7 +25,7 @@ import {
   Download,
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
-import { isAdminUser, hasPermission } from "@/lib/permissions";
+import { isAdminUser, hasPermission, isPesoPersonnel } from "@/lib/permissions";
 
 interface FamilyMemberRow {
   fullName: string;
@@ -62,7 +62,7 @@ const EMPTY_FAMILY_ROWS: FamilyMemberRow[] = Array.from({ length: 8 }, () => ({
 export default function OfwFamilyCirclePage() {
   const { user } = useAuth();
   const isStaff = Boolean(
-    user && (isAdminUser(user) || hasPermission(user.role, "migrants.read") || hasPermission(user.role, "migrants.manage"))
+    user && (isPesoPersonnel(user) || isAdminUser(user) || hasPermission(user.role, "migrants.read") || hasPermission(user.role, "migrants.manage"))
   );
 
   const [activeTab, setActiveTab] = useState<"register" | "lookup" | "inventory">("register");
@@ -497,17 +497,19 @@ export default function OfwFamilyCirclePage() {
                     className="w-16 h-16 sm:w-20 sm:h-20 object-contain rounded-full border border-slate-200 shadow-xs"
                   />
                   {/* 3. OFW Family Circle Federation Dingalan Emblem */}
-                  <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-gradient-to-br from-sky-500 via-emerald-500 to-blue-800 p-1 shadow-md flex items-center justify-center border-2 border-emerald-300">
-                    <div className="w-full h-full rounded-full bg-white flex flex-col items-center justify-center text-center p-1">
-                      <Globe className="w-6 h-6 sm:w-7 sm:h-7 text-emerald-600" />
-                      <span className="text-[7px] sm:text-[8px] font-black uppercase leading-none text-blue-950 tracking-tighter mt-0.5">
-                        OFW FAMILY CIRCLE
-                      </span>
-                      <span className="text-[6px] sm:text-[7px] font-extrabold text-emerald-700 leading-none">
-                        DINGALAN
-                      </span>
-                    </div>
-                  </div>
+                  <a
+                    href="https://imgbb.com/"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="shrink-0 transition-transform hover:scale-105"
+                    title="OFW Family Circle Federation Dingalan"
+                  >
+                    <img
+                      src="https://i.ibb.co/pjJmZRNT/dingalan-1.png"
+                      alt="OFW Family Circle Federation Dingalan"
+                      className="w-16 h-16 sm:w-20 sm:h-20 object-contain rounded-full border border-slate-200 shadow-xs"
+                    />
+                  </a>
                 </div>
               </div>
 
@@ -1102,17 +1104,19 @@ export default function OfwFamilyCirclePage() {
                     alt="Dingalan Seal"
                     className="w-16 h-16 object-contain"
                   />
-                  <div className="w-16 h-16 rounded-full bg-gradient-to-br from-sky-500 via-emerald-500 to-blue-800 p-1 flex items-center justify-center border border-slate-400">
-                    <div className="w-full h-full rounded-full bg-white flex flex-col items-center justify-center text-center p-1">
-                      <Globe className="w-6 h-6 text-emerald-600" />
-                      <span className="text-[6.5px] font-black uppercase leading-none text-blue-950">
-                        OFW FAMILY CIRCLE
-                      </span>
-                      <span className="text-[6px] font-extrabold text-emerald-700 leading-none">
-                        DINGALAN
-                      </span>
-                    </div>
-                  </div>
+                  <a
+                    href="https://imgbb.com/"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="shrink-0"
+                    title="OFW Family Circle Federation Dingalan"
+                  >
+                    <img
+                      src="https://i.ibb.co/pjJmZRNT/dingalan-1.png"
+                      alt="OFW Family Circle Federation Dingalan"
+                      className="w-16 h-16 object-contain"
+                    />
+                  </a>
                 </div>
 
                 {/* Uploaded Member Photo on Right Corner if present */}

@@ -2,12 +2,14 @@
 
 import React, { useState, useEffect } from "react";
 import { usePathname } from "next/navigation";
+import { useAuth } from "@/context/AuthContext";
 import { Navbar } from "./Navbar";
 import { Sidebar } from "./Sidebar";
 import { BottomNav } from "./BottomNav";
 
 export function ClientLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const { user } = useAuth();
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
 
   const [isRedirecting, setIsRedirecting] = useState(false);
@@ -70,6 +72,27 @@ export function ClientLayout({ children }: { children: React.ReactNode }) {
       <div className="min-h-screen flex flex-col">
         <Navbar />
         <main className="flex-1">{children}</main>
+      </div>
+    );
+  }
+
+  // Migrants' Corner Hub (/migrants*) and unauthenticated public sub-routes
+  // must stay in the standalone Landing Page Portal layout and NEVER open the Dashboard Sidebar/BottomNav
+  const isStandaloneLandingPortal =
+    pathname.startsWith("/migrants") ||
+    (!user &&
+      (pathname.startsWith("/apply") ||
+        pathname.startsWith("/restrictions/checker") ||
+        pathname.startsWith("/my-assignment") ||
+        pathname.startsWith("/qr/")));
+
+  if (isStandaloneLandingPortal) {
+    return (
+      <div className="min-h-screen flex flex-col bg-slate-50">
+        <Navbar />
+        <main className="flex-1 p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto w-full">
+          {children}
+        </main>
       </div>
     );
   }

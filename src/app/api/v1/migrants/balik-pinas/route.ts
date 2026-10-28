@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth";
-import { hasPermission, isAdminUser } from "@/lib/permissions";
+import { hasPermission, isAdminUser, isPesoPersonnel } from "@/lib/permissions";
 
 function generateElporControlNo(): string {
   const year = new Date().getFullYear();
@@ -36,7 +36,7 @@ export async function GET(request: NextRequest) {
 
     // 2. Staff List & Dashboard Summary
     const user = await getCurrentUser(request);
-    if (!user || (!isAdminUser(user) && !hasPermission(user.role, "migrants.read"))) {
+    if (!user || (!isPesoPersonnel(user) && !isAdminUser(user) && !hasPermission(user.role, "migrants.read"))) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 

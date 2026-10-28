@@ -428,7 +428,6 @@ export function Sidebar({ isMobile = false, onClose }: SidebarProps) {
                 {migrantsDropdownOpen && (
                   <div className="p-2 space-y-1 bg-slate-950/30 animate-fadeIn">
                     {[
-                      { label: "Migrants' Corner Hub", href: "/migrants", icon: HeartHandshake },
                       { label: "OFW & Seafarer Case Assistance", href: "/migrants/case-assistance", icon: ShieldAlert },
                       { label: "Balik Pinas! Balik Hanapbuhay!", href: "/migrants/balik-pinas", icon: Briefcase },
                       { label: "OFW Family Circle Registry", href: "/migrants/family-circle", icon: Users },

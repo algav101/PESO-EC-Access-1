@@ -94,6 +94,7 @@ export const PERMISSIONS = {
     "photo.update",
     "payout.scan",
     "eligibility.check",
+    "migrants.read",
     "sync.read"
   ],
   TUPAD_ASSISTING_DOCUMENTOR: [
@@ -105,6 +106,7 @@ export const PERMISSIONS = {
     "photo.upload",
     "photo.read",
     "photo.update",
+    "migrants.read",
     "sync.read"
   ],
   DOLE_COORDINATOR: [
@@ -120,6 +122,7 @@ export const PERMISSIONS = {
     "payout.read",
     "restriction.read_limited",
     "eligibility.check",
+    "migrants.read",
     "report.generate", "report.export",
     "sync.read"
   ]
@@ -131,6 +134,18 @@ export function isDomainMaster(user?: { role?: string } | null): boolean {
 
 export function isAdminUser(user?: { role?: string } | null): boolean {
   return user?.role === "DOMAIN_MASTER" || user?.role === "PESO_ADMIN";
+}
+
+export function isPesoPersonnel(user?: { role?: string } | null): boolean {
+  if (!user || !user.role) return false;
+  return [
+    "DOMAIN_MASTER",
+    "PESO_ADMIN",
+    "PESO_STAFF",
+    "DOLE_COORDINATOR",
+    "TUPAD_COORDINATOR",
+    "TUPAD_ASSISTING_DOCUMENTOR",
+  ].includes(user.role);
 }
 
 export function isFieldCoordinator(user?: { role?: string } | null): boolean {

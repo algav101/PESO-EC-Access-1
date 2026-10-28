@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 import { useOffline } from "@/context/OfflineContext";
 import { PesoLogo } from "./PesoLogo";
@@ -22,8 +23,12 @@ interface NavbarProps {
 }
 
 export function Navbar({ onToggleSidebar }: NavbarProps) {
+  const pathname = usePathname();
   const { user, logout } = useAuth();
   const { isOnline, pendingCount, isSyncing, syncNow, masterSyncNow } = useOffline();
+
+  const isLandingOrMigrantsPortal =
+    !user || pathname === "/" || pathname === "/login" || pathname.startsWith("/migrants");
 
   return (
     <header className="gov-header-gradient text-white sticky top-0 z-40 shadow-md">
@@ -41,7 +46,16 @@ export function Navbar({ onToggleSidebar }: NavbarProps) {
               </button>
             )}
 
-            <a href={isFieldCoordinator(user) ? "/field" : "/dashboard"} className="flex items-center space-x-3 group">
+            <a
+              href={
+                isLandingOrMigrantsPortal
+                  ? "/"
+                  : isFieldCoordinator(user)
+                  ? "/field"
+                  : "/dashboard"
+              }
+              className="flex items-center space-x-3 group"
+            >
               <PesoLogo className="h-10 w-10" />
               <div className="flex flex-col">
                 <div className="flex items-center space-x-1.5">
