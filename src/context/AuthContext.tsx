@@ -21,19 +21,9 @@ const AuthContext = createContext<AuthContextType>({
 });
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<AuthUser | null>(() => {
-    if (typeof window !== "undefined") {
-      const cached = localStorage.getItem("peso_cached_user");
-      if (cached) {
-        try {
-          return JSON.parse(cached);
-        } catch (e) {
-          return null;
-        }
-      }
-    }
-    return null;
-  });
+  // Server and first client render must agree. Read cached auth only in the
+  // existing offline fallback effect, not during hydration of role-based menus.
+  const [user, setUser] = useState<AuthUser | null>(null);
   const [loading, setLoading] = useState(true);
   const router = useRouter();
   const pathname = usePathname();

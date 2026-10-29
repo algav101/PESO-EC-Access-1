@@ -34,6 +34,8 @@ model User {
   approvedPhotos         AccomplishmentPhoto[]    @relation("PhotoApprover")
   payoutsVerified        Payout[]
   auditLogs              AuditLog[]
+  encodedApplications    TupadApplicationRoster[]   @relation("ApplicationEncoder")
+  applicationDocuments   TupadApplicationDocument[] @relation("ApplicationDocumentUploader")
 }
 
 model Program {
@@ -563,39 +565,91 @@ model TupadWorkProgramItem {
 }
 
 model TupadApplicationRoster {
-  id                    String   @id @default(uuid())
-  batchName             String?  @default("TUPAD Applicant Masterlist")
-  lastName              String
-  firstName             String
-  middleName            String?
-  extensionName         String?
-  fullName              String   // Standard normalized: "LAST, FIRST MIDDLE EXT"
-  birthMonth            String?
-  birthDay              String?
-  birthYear             String?
-  birthday              String?  // Formatted MM-DD-YYYY or YYYY-MM-DD
-  civilStatus           String?
-  streetSitio           String?
-  barangay              String?
-  contactNumber         String?
-  idPresented           String?
-  idNumber              String?
-  is4ps                 String?  // "Y", "N", "YES", "NO"
-  isIp                  String?  // "Y", "N", "YES", "NO"
-  occupation            String?
-  monthlyIncome         String?
-  dependentFullName     String?
-  dependentAge          String?
-  dependentRelationship String?
-  remarks               String?
-  status                String   @default("QUEUED") // QUEUED, INCOMPLETE, APPROVED, DISQUALIFIED
-  uploadedById          String?
-  createdAt             DateTime @default(now())
-  updatedAt             DateTime @updatedAt
+  id                          String    @id @default(uuid())
+  applicationCode             String?   @unique
+  idempotencyKey              String?   @unique
+  batchName                   String?   @default("TUPAD Applicant Masterlist")
+  source                      String    @default("ONLINE") // ONLINE, WALK_IN, IMPORT
+  submissionStatus            String    @default("SUBMITTED") // DRAFT, SUBMITTED
+  email                       String?
+  lastName                    String
+  firstName                   String
+  middleName                  String?
+  extensionName               String?
+  fullName                    String // Standard normalized: "LAST, FIRST MIDDLE EXT"
+  birthMonth                  String?
+  birthDay                    String?
+  birthYear                   String?
+  birthday                    String? // Formatted MM-DD-YYYY or YYYY-MM-DD
+  applicantAge                Int?
+  sex                         String?
+  civilStatus                 String?
+  streetSitio                 String?
+  barangay                    String?
+  contactNumber               String?
+  idPresented                 String?
+  idNumber                    String?
+  typeOfBeneficiary           String?
+  is4ps                       String? // "Y", "N", "YES", "NO"
+  isIp                        String? // "Y", "N", "YES", "NO"
+  disability                  String?
+  occupation                  String?
+  occupations                 Json?
+  occupationOther             String?
+  monthlyIncome               String?
+  monthlyIncomeAmount         Decimal?  @db.Decimal(12, 2)
+  employmentInterest          String?
+  skillsTraining              Json?
+  skillsTrainingOther         String?
+  dependentFullName           String?
+  dependentGivenName          String?
+  dependentMiddleName         String?
+  dependentLastName           String?
+  dependentExtensionName      String?
+  dependentBirthDate          String?
+  dependentAge                String?
+  dependentAgeValue           Int?
+  dependentRelationship       String?
+  medicalReminderAcknowledged Boolean   @default(false)
+  fieldSources                Json?
+  ocrMetadata                 Json?
+  duplicateWarning            Json?
+  remarks                     String?
+  status                      String    @default("QUEUED") // QUEUED, INCOMPLETE, APPROVED, DISQUALIFIED
+  uploadedById                String?
+  encodedById                 String?
+  encodedBy                   User?     @relation("ApplicationEncoder", fields: [encodedById], references: [id], onDelete: SetNull)
+  submittedAt                 DateTime?
+  createdAt                   DateTime  @default(now())
+  updatedAt                   DateTime  @updatedAt
+
+  documents TupadApplicationDocument[]
 
   @@index([fullName])
   @@index([lastName, firstName])
   @@index([barangay])
+  @@index([source, submissionStatus])
+  @@index([encodedById])
+  @@index([submittedAt])
+}
+
+model TupadApplicationDocument {
+  id            String                 @id @default(uuid())
+  applicationId String
+  application   TupadApplicationRoster @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  fieldName     String
+  subject       String // APPLICANT, DEPENDENT, SUPPORTING
+  storageBucket String
+  storageKey    String
+  fileName      String
+  fileSize      Int
+  mimeType      String
+  uploadedById  String?
+  uploadedBy    User?                  @relation("ApplicationDocumentUploader", fields: [uploadedById], references: [id], onDelete: SetNull)
+  createdAt     DateTime               @default(now())
+
+  @@index([applicationId, fieldName])
+  @@index([uploadedById])
 }
 
 model PublicInquiryMessage {

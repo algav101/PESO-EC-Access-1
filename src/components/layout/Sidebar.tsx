@@ -64,6 +64,8 @@ export function Sidebar({ isMobile = false, onClose }: SidebarProps) {
     pathname.startsWith("/beneficiaries") ||
     pathname.startsWith("/stubs") ||
     pathname.startsWith("/apply") ||
+    pathname.startsWith("/applications") ||
+    pathname.startsWith("/admin/applications") ||
     pathname.startsWith("/field") ||
     pathname.startsWith("/replacements") ||
     pathname.startsWith("/restrictions");
@@ -102,6 +104,16 @@ export function Sidebar({ isMobile = false, onClose }: SidebarProps) {
           },
         ]
       : []),
+    {
+      title: "Application Intake",
+      items: [
+        { label: "Walk-in Application", href: "/applications/walk-in", icon: UserPlus, permission: "application.encode" },
+        ...(isAdminUser(user) ? [
+          { label: "Online Applications", href: "/admin/applications/online", icon: Sparkles, permission: "application.read" },
+          { label: "Walk-in Submissions", href: "/admin/applications/walk-in-submissions", icon: FileSpreadsheet, permission: "application.read" },
+        ] : []),
+      ],
+    },
     {
       title: "Field Scanner Hub",
       items: [

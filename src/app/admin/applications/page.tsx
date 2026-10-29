@@ -15,6 +15,7 @@ import {
   MapPin,
   Clock,
   ShieldCheck,
+  UserPlus,
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { isAdminUser } from "@/lib/permissions";
@@ -149,6 +150,13 @@ export default function AdminApplicationsPage() {
 
         <div className="flex items-center space-x-2">
           <a
+            href="/applications/walk-in"
+            className="px-3.5 py-2 bg-gov-blue hover:bg-gov-light text-white font-bold text-xs rounded-xl shadow transition flex items-center space-x-1.5"
+          >
+            <UserPlus className="w-4 h-4 text-gov-goldLight" />
+            <span>Walk-in Encoding</span>
+          </a>
+          <a
             href="/api/v1/applications/template"
             className="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl border border-slate-300 transition flex items-center space-x-1.5"
           >
@@ -169,6 +177,7 @@ export default function AdminApplicationsPage() {
       </div>
 
       {/* Summary KPI Cards */}
+      {isAdmin && <nav aria-label="Application inboxes" className="flex flex-wrap gap-3 rounded-xl border border-blue-200 bg-blue-50 p-4 text-sm font-bold text-gov-blue"><a href="/admin/applications/online" className="hover:underline">Online Applications inbox</a><a href="/admin/applications/walk-in-submissions" className="hover:underline">Walk-in Submissions inbox</a><p className="w-full text-xs font-normal text-slate-600">This roster contains spreadsheet imports only. New applications are kept in their separate admin inboxes.</p></nav>}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <div className="gov-card p-5 bg-white border-l-4 border-l-gov-blue shadow-xs flex items-center justify-between">
           <div>
@@ -295,6 +304,7 @@ export default function AdminApplicationsPage() {
                   <th className="px-4 py-3">ID Presented / No.</th>
                   <th className="px-4 py-3">Dependent</th>
                   <th className="px-4 py-3">Public Status</th>
+                  <th className="px-4 py-3">Documents</th>
                   <th className="px-4 py-3">Remarks</th>
                 </tr>
               </thead>
@@ -341,7 +351,11 @@ export default function AdminApplicationsPage() {
                         )}
                       </td>
                       <td className="px-4 py-3">
-                        {isIncomplete ? (
+                        {a.submissionStatus === "DRAFT" ? (
+                          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-50 text-blue-800 border border-blue-300">
+                            Draft
+                          </span>
+                        ) : isIncomplete ? (
                           <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-800 border border-amber-300">
                             May Kakulangan
                           </span>
@@ -350,6 +364,17 @@ export default function AdminApplicationsPage() {
                             Nakapila (Complete)
                           </span>
                         )}
+                      </td>
+                      <td className="px-4 py-3 min-w-44">
+                        {a.documents?.length ? (
+                          <div className="flex flex-col gap-1">
+                            {a.documents.map((document: any) => (
+                              <a key={document.id} href={`/api/v1/applications/documents/${document.id}`} target="_blank" rel="noreferrer" className="text-[10px] font-bold text-gov-blue hover:underline">
+                                {document.fieldName} — {document.fileName}
+                              </a>
+                            ))}
+                          </div>
+                        ) : <span className="text-[10px] text-slate-400">No documents</span>}
                       </td>
                       <td className="px-4 py-3 text-slate-600 text-[11px] max-w-xs truncate" title={a.remarks || ""}>
                         {a.remarks || "-"}

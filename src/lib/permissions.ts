@@ -26,7 +26,7 @@ export const PERMISSIONS = {
     "restriction.read", "restriction.create", "restriction.override",
     "eligibility.check",
     "report.generate", "report.template.create", "report.template.update", "report.export", "report.read",
-    "application.read", "application.update", "application.download", "application.export", "application.import",
+    "application.create", "application.read", "application.update", "application.download", "application.export", "application.import",
     "inquiry.read", "inquiry.update",
     "migrants.read", "migrants.manage",
     "user.create", "user.read", "user.update", "user.disable", "user.delete",
@@ -50,7 +50,7 @@ export const PERMISSIONS = {
     "restriction.read", "restriction.create", "restriction.override",
     "eligibility.check",
     "report.generate", "report.template.create", "report.template.update", "report.export", "report.read",
-    "application.read", "application.update", "application.download", "application.export", "application.import",
+    "application.create", "application.read", "application.update", "application.download", "application.export", "application.import",
     "inquiry.read", "inquiry.update",
     "migrants.read", "migrants.manage",
     "user.create", "user.read", "user.update", "user.disable", "user.delete",
@@ -59,6 +59,7 @@ export const PERMISSIONS = {
     "sync.read", "sync.resolve"
   ],
   PESO_STAFF: [
+    "application.encode",
     "dashboard.view",
     "field.scan",
     "program.read",
@@ -73,13 +74,14 @@ export const PERMISSIONS = {
     "payout.scan", "payout.read", "payout.correct",
     "eligibility.check",
     "report.generate", "report.export", "report.read",
-    "application.read", "application.update", "application.download", "application.export",
+    "application.create", "application.read", "application.update", "application.download", "application.export",
     "inquiry.read", "inquiry.update",
     "migrants.read", "migrants.manage",
     "restriction.read",
     "sync.read"
   ],
   TUPAD_COORDINATOR: [
+    "application.encode",
     "dashboard.view",
     "field.scan",
     "program.read",
@@ -98,6 +100,7 @@ export const PERMISSIONS = {
     "sync.read"
   ],
   TUPAD_ASSISTING_DOCUMENTOR: [
+    "application.encode",
     "field.scan",
     "program.read",
     "work_program.read",
@@ -110,6 +113,7 @@ export const PERMISSIONS = {
     "sync.read"
   ],
   DOLE_COORDINATOR: [
+    "application.encode",
     "dashboard.view",
     "field.scan",
     "program.read",

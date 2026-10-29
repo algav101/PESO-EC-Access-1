@@ -3,15 +3,22 @@
   "version": "1.0.2",
   "private": true,
   "scripts": {
-    "dev": "next dev -H 0.0.0.0 -p 3000",
-    "build": "npx prisma generate --schema=./prisma/schema.prisma && next build",
-    "postinstall": "npx prisma generate --schema=./prisma/schema.prisma",
+    "dev": "node scripts/prepare-ocr-assets.mjs && next dev -H 0.0.0.0 -p 3000",
+    "build": "node scripts/prepare-ocr-assets.mjs && npx prisma generate --schema=./prisma/schema.prisma && next build",
+    "postinstall": "npx prisma generate --schema=./prisma/schema.prisma && node scripts/prepare-ocr-assets.mjs",
+    "prepare:ocr": "node scripts/prepare-ocr-assets.mjs",
     "start": "next start -H 0.0.0.0",
     "lint": "next lint",
     "prisma:generate": "prisma generate",
     "prisma:push": "prisma db push",
     "prisma:seed": "node prisma/seed.js",
-    "test": "node test/test-suite.mjs"
+    "test": "node test/test-suite.mjs",
+    "test:applications": "node --experimental-strip-types test/test-application-id-autofill.mjs",
+    "test:applications:workflow": "node test/test-application-workflow.mjs",
+    "test:applications:browser": "node test/test-application-inbox-browser.mjs",
+    "test:pwa": "node test/test-service-worker-cache.mjs",
+    "test:ocr": "node --experimental-strip-types test/test-local-id-reader.mjs",
+    "test:ocr:browser": "node test/test-local-ocr-browser.mjs"
   },
   "engines": {
     "node": ">=20.0.0",
@@ -21,6 +28,7 @@
     "@hookform/resolvers": "^3.9.1",
     "@prisma/client": "^5.22.0",
     "@supabase/supabase-js": "^2.116.0",
+    "@tesseract.js-data/eng": "1.0.0",
     "@types/bcryptjs": "^2.4.6",
     "@types/jsonwebtoken": "^9.0.7",
     "@types/jszip": "^3.4.0",
@@ -53,6 +61,7 @@
     "react-hook-form": "^7.53.2",
     "tailwind-merge": "^2.5.4",
     "tailwindcss": "^3.4.15",
+    "tesseract.js": "7.0.0",
     "typescript": "^5.6.3",
     "xlsx": "^0.18.5",
     "zod": "^3.23.8"

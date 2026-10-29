@@ -1,7 +1,8 @@
 // PESO Dingalan - TUPAD Management System Service Worker
 // Version: 1.0.2
 
-const CACHE_NAME = "peso-tupad-cache-v3";
+const CACHE_NAME = "peso-tupad-cache-v4";
+const IS_LOCAL_DEVELOPMENT = ["localhost", "127.0.0.1", "[::1]"].includes(self.location.hostname);
 const OFFLINE_URL = "/offline.html";
 
 const PRECACHE_ASSETS = [
@@ -12,6 +13,10 @@ const PRECACHE_ASSETS = [
 
 // Install Event: Pre-cache core app shell & offline fallback assets
 self.addEventListener("install", (event) => {
+  if (IS_LOCAL_DEVELOPMENT) {
+    self.skipWaiting();
+    return;
+  }
   event.waitUntil(
     caches.open(CACHE_NAME).then(async (cache) => {
       console.log("[SW] Pre-caching lightweight offline shell assets...");
@@ -32,11 +37,23 @@ self.addEventListener("install", (event) => {
 
 // Activate Event: Clear old cache versions and claim clients
 self.addEventListener("activate", (event) => {
+  if (IS_LOCAL_DEVELOPMENT) {
+    // Runs even when stale React bundles stop the page from hydrating.
+    event.waitUntil((async () => {
+      const names = await caches.keys();
+      await Promise.all(names.filter((name) => name.startsWith("peso-tupad-cache-")).map((name) => caches.delete(name)));
+      await self.clients.claim();
+      await self.registration.unregister();
+      const clients = await self.clients.matchAll({ type: "window" });
+      await Promise.all(clients.map((client) => client.navigate(client.url)));
+    })());
+    return;
+  }
   event.waitUntil(
     caches.keys().then((cacheNames) => {
       return Promise.all(
         cacheNames.map((cacheName) => {
-          if (cacheName !== CACHE_NAME) {
+          if (cacheName.startsWith("peso-tupad-cache-") && cacheName !== CACHE_NAME) {
             console.log("[SW] Removing old cache:", cacheName);
             return caches.delete(cacheName);
           }
@@ -48,6 +65,8 @@ self.addEventListener("activate", (event) => {
 
 // Fetch Event: Handle Navigation and Asset Caching
 self.addEventListener("fetch", (event) => {
+  if (IS_LOCAL_DEVELOPMENT) return;
+
   const { request } = event;
   const url = new URL(request.url);
 

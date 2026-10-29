@@ -314,6 +314,14 @@ export function PublicStatusInquiryCard() {
                 </div>
               )}
 
+              {result.found && result.applicant && <div className="space-y-3 rounded-2xl border-2 border-blue-200 bg-blue-50 p-5">
+                <h4 className="text-base font-black text-blue-950">{result.pendingReview ? "Naghihintay ng admin review" : result.isLackingDetails ? "May kailangang kumpletuhin" : "Nakapila ang aplikasyon"}</h4>
+                <p className="text-sm font-semibold text-blue-900">{result.message}</p>
+                <p className="text-xs text-slate-600">{result.applicant.fullName} · Brgy. {result.applicant.barangay}</p>
+                <p className="text-xs text-slate-600">{result.sourceRemarks}</p>
+                {result.isLackingDetails && result.lackingFields?.length > 0 && <ul className="list-inside list-disc text-sm text-amber-900">{result.lackingFields.map((field: string) => <li key={field}>{field}</li>)}</ul>}
+              </div>}
+
               {/* Case 2: FOUND BENEFICIARY */}
               {result.found && result.beneficiary && (
                 <div className="space-y-4">

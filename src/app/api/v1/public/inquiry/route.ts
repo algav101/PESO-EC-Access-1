@@ -32,12 +32,18 @@ export async function POST(request: Request) {
 
     // 1. Query TupadApplicationRoster (by applicationCode in remarks or by Last + First name)
     const applicants = await prisma.tupadApplicationRoster.findMany({
-      where: cleanAppCode
-        ? { remarks: { contains: cleanAppCode, mode: "insensitive" } }
-        : {
-            lastName: { equals: cleanLast, mode: "insensitive" },
-            firstName: { equals: cleanFirst, mode: "insensitive" },
-          },
+      where: {
+        submissionStatus: "SUBMITTED",
+        ...(cleanAppCode
+          ? { OR: [
+              { applicationCode: { equals: cleanAppCode, mode: "insensitive" as const } },
+              { remarks: { contains: cleanAppCode, mode: "insensitive" as const } },
+            ] }
+          : {
+              lastName: { equals: cleanLast, mode: "insensitive" as const },
+              firstName: { equals: cleanFirst, mode: "insensitive" as const },
+            }),
+      },
     });
 
     // Match middle name and extension if candidates found
@@ -154,11 +160,14 @@ export async function POST(request: Request) {
     const remarksText = matchedApplicant.remarks || "";
     const hasLackingRemark = /kulang|lacking|pending|photocopy|valid id|walang contact/i.test(remarksText);
 
-    const isLacking = lackingFields.length > 0 || hasLackingRemark || matchedApplicant.status === "INCOMPLETE";
+    const pendingReview = matchedApplicant.status === "PENDING_REVIEW";
+    const isLacking = !pendingReview && (lackingFields.length > 0 || hasLackingRemark || matchedApplicant.status === "INCOMPLETE");
 
     // Build Response
     let statusMessage = "";
-    if (isLacking) {
+    if (pendingReview) {
+      statusMessage = "Natanggap na ang inyong aplikasyon at naghihintay ng review ng PESO admin. Hindi pa ito approval o pagkakasama sa susunod na batch.";
+    } else if (isLacking) {
       statusMessage = "Magtungo sa Tangapan ng PESO-Dingalan o di kaya ay magmessage sa ating System Message Inquiry Form para sa kalinawan ng kakulangan ng inyong aplikasyon";
     } else {
       statusMessage = "Maedup! Ang inyong aplikasyon ay kasalukuyang nakapila para susunod na batch ng TUPAD Beneficiary";
@@ -201,15 +210,16 @@ export async function POST(request: Request) {
         barangay: matchedApplicant.barangay || "-",
         streetSitio: matchedApplicant.streetSitio ? `Purok / Sitio sa Brgy. ${matchedApplicant.barangay || "Dingalan"}` : "-",
         contactNumber: maskPhoneNumber(matchedApplicant.contactNumber),
-        idPresented: matchedApplicant.idPresented ? `${matchedApplicant.idPresented} (Naberipika)` : "Nakatala",
+        idPresented: matchedApplicant.idPresented ? `${matchedApplicant.idPresented} (Nakatala)` : "Nakatala",
         idNumber: maskIdNumber(matchedApplicant.idNumber),
         dependentFullName: maskDependentName(matchedApplicant.dependentFullName),
         status: matchedApplicant.status,
       },
       isLackingDetails: isLacking,
+      pendingReview,
       lackingFields,
       message: statusMessage,
-      sourceRemarks: isLacking ? "Kulang ang ilang kinakailangang dokumento/detalye. Mangyaring kumpletuhin sa tanggapan." : "Kumpleto ang mga pangunahing detalye sa talaan.",
+      sourceRemarks: pendingReview ? "Para sa admin review pa ang mga detalye at dokumento." : isLacking ? "Kulang ang ilang kinakailangang dokumento/detalye. Mangyaring kumpletuhin sa tanggapan." : "Kumpleto ang mga pangunahing detalye sa talaan.",
       lastAvailment: lastAvailment ? {
         adlNo: lastAvailment.adlNo ? `${lastAvailment.adlNo.slice(0, 4)}****` : "Historical TUPAD",
         payoutDate: lastAvailment.payoutDate || "Recorded",

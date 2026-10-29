@@ -55,7 +55,7 @@ export async function POST(request: Request) {
     }
 
     if (mode === "REPLACE") {
-      await prisma.tupadApplicationRoster.deleteMany({});
+      await prisma.tupadApplicationRoster.deleteMany({ where: { source: "IMPORT" } });
     }
 
     let insertedCount = 0;
@@ -116,6 +116,7 @@ export async function POST(request: Request) {
       // Upsert applicant record
       const existing = await prisma.tupadApplicationRoster.findFirst({
         where: {
+          source: "IMPORT",
           lastName,
           firstName,
           middleName: middleName || undefined,
@@ -127,6 +128,9 @@ export async function POST(request: Request) {
           where: { id: existing.id },
           data: {
             batchName,
+            source: "IMPORT",
+            submissionStatus: "SUBMITTED",
+            submittedAt: new Date(),
             extensionName: extensionName || null,
             fullName: normalizedFullName,
             birthMonth: birthMonth || null,
@@ -156,6 +160,9 @@ export async function POST(request: Request) {
         await prisma.tupadApplicationRoster.create({
           data: {
             batchName,
+            source: "IMPORT",
+            submissionStatus: "SUBMITTED",
+            submittedAt: new Date(),
             lastName,
             firstName,
             middleName: middleName || null,

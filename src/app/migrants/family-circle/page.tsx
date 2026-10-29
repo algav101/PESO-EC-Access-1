@@ -4,7 +4,6 @@ import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import {
   Users,
-  Globe,
   Camera,
   CheckCircle2,
   Printer,
@@ -49,6 +48,8 @@ const DINGALAN_BARANGAYS = [
   "Tanawan",
   "Umiray",
 ];
+
+const OFW_FAMILY_CIRCLE_LOGO = "/images/ofw-family-circle-dingalan.jpg";
 
 const EMPTY_FAMILY_ROWS: FamilyMemberRow[] = Array.from({ length: 8 }, () => ({
   fullName: "",
@@ -497,19 +498,13 @@ export default function OfwFamilyCirclePage() {
                     className="w-16 h-16 sm:w-20 sm:h-20 object-contain rounded-full border border-slate-200 shadow-xs"
                   />
                   {/* 3. OFW Family Circle Federation Dingalan Emblem */}
-                  <a
-                    href="https://imgbb.com/"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="shrink-0 transition-transform hover:scale-105"
-                    title="OFW Family Circle Federation Dingalan"
-                  >
-                    <img
-                      src="https://i.ibb.co/pjJmZRNT/dingalan-1.png"
-                      alt="OFW Family Circle Federation Dingalan"
-                      className="w-16 h-16 sm:w-20 sm:h-20 object-contain rounded-full border border-slate-200 shadow-xs"
-                    />
-                  </a>
+                  <img
+                    src={OFW_FAMILY_CIRCLE_LOGO}
+                    alt="OFW Family Circle Federation Dingalan logo"
+                    width={80}
+                    height={80}
+                    className="w-16 h-16 sm:w-20 sm:h-20 object-contain"
+                  />
                 </div>
               </div>
 
@@ -1104,19 +1099,13 @@ export default function OfwFamilyCirclePage() {
                     alt="Dingalan Seal"
                     className="w-16 h-16 object-contain"
                   />
-                  <a
-                    href="https://imgbb.com/"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="shrink-0"
-                    title="OFW Family Circle Federation Dingalan"
-                  >
-                    <img
-                      src="https://i.ibb.co/pjJmZRNT/dingalan-1.png"
-                      alt="OFW Family Circle Federation Dingalan"
-                      className="w-16 h-16 object-contain"
-                    />
-                  </a>
+                  <img
+                    src={OFW_FAMILY_CIRCLE_LOGO}
+                    alt="OFW Family Circle Federation Dingalan logo"
+                    width={64}
+                    height={64}
+                    className="w-16 h-16 object-contain"
+                  />
                 </div>
 
                 {/* Uploaded Member Photo on Right Corner if present */}
