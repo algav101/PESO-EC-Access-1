@@ -16,6 +16,7 @@ import {
   RefreshCw,
 } from "lucide-react";
 import { StatusBadge } from "@/components/common/StatusBadge";
+import { RosterRestrictionDetails } from "@/components/beneficiaries/RosterRestrictionDetails";
 
 export default function ExcelImportPage() {
   const params = useParams();
@@ -288,7 +289,9 @@ export default function ExcelImportPage() {
                         <StatusBadge status={r.status} />
                       </td>
                       <td className="px-4 py-2.5 text-[11px]">
-                        {r.validationError ? (
+                        {r.status === "RESTRICTED" || r.restrictionDetails?.length ? (
+                          <RosterRestrictionDetails row={r} />
+                        ) : r.validationError ? (
                           <span className="text-rose-700 font-medium">{r.validationError}</span>
                         ) : (
                           <span className="text-emerald-700 font-semibold">Passed Pre-Validation</span>

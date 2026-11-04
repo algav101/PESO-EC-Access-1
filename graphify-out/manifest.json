@@ -1098,9 +1098,9 @@
     "semantic_hash": ""
   },
   "src/app/programs/[id]/import/page.tsx": {
-    "mtime": 1793171874.0422177,
-    "seen": 1793172745.378434,
-    "ast_hash": "c54c4290c3fbb95ea296937eb9d2c035",
+    "mtime": 1793754615.433334,
+    "seen": 1793754808.7552059,
+    "ast_hash": "20df90d70332f5752a440cd104f950ea",
     "semantic_hash": ""
   },
   "src/app/programs/[id]/page.tsx": {
@@ -1218,9 +1218,9 @@
     "semantic_hash": ""
   },
   "src/components/beneficiaries/MasterlistUploadModal.tsx": {
-    "mtime": 1793171874.0507383,
-    "seen": 1793172745.3784437,
-    "ast_hash": "2edbd855a1e83a092c0b69fcc8ac7b1b",
+    "mtime": 1793754615.433334,
+    "seen": 1793754808.7564135,
+    "ast_hash": "fe7c0836b4d501d50fe6f666b083965f",
     "semantic_hash": ""
   },
   "src/components/common/MultiSelectFilter.tsx": {
@@ -1458,9 +1458,9 @@
     "semantic_hash": ""
   },
   "src/lib/excel-importer.ts": {
-    "mtime": 1793171874.066111,
-    "seen": 1793172745.3784645,
-    "ast_hash": "b4cdd04390c1c2a726e5a14969bbb675",
+    "mtime": 1793754615.433334,
+    "seen": 1793754808.7587264,
+    "ast_hash": "025617c90ba16293e7beafc5ba349dbc",
     "semantic_hash": ""
   },
   "src/lib/ocr/application-id-mapper.ts": {
@@ -1911,6 +1911,30 @@
     "mtime": 1793260661.3150523,
     "seen": 1793261000.0453696,
     "ast_hash": "bb692e316671a7445f29655b16d5e0b9",
+    "semantic_hash": ""
+  },
+  "prisma/migrations/20261028000100_application_id_autofill/migration.sql": {
+    "mtime": 1793244895.478898,
+    "seen": 1793754808.7450798,
+    "ast_hash": "b562d53e69d8519a6f59665586db3284",
+    "semantic_hash": ""
+  },
+  "src/components/beneficiaries/RosterRestrictionDetails.tsx": {
+    "mtime": 1793754676.0522392,
+    "seen": 1793754808.756415,
+    "ast_hash": "c4c45481d7de51d1fc81c64449d45e62",
+    "semantic_hash": ""
+  },
+  "test/test-roster-restriction-browser.mjs": {
+    "mtime": 1793754862.9422739,
+    "seen": 1793754890.66186,
+    "ast_hash": "b1a98f1b1ada5b2dd0d99e59fa12c22e",
+    "semantic_hash": ""
+  },
+  "test/test-roster-restriction-preview.mjs": {
+    "mtime": 1793754676.053235,
+    "seen": 1793754808.7609005,
+    "ast_hash": "53cb1f3a03dcef82385984c509da8727",
     "semantic_hash": ""
   }
 }

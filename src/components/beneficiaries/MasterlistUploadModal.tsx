@@ -23,6 +23,7 @@ import {
   UserPlus,
 } from "lucide-react";
 import { ImportPreviewResult, ParsedBeneficiaryRow } from "@/lib/excel-importer";
+import { RosterRestrictionDetails } from "@/components/beneficiaries/RosterRestrictionDetails";
 
 interface MasterlistUploadModalProps {
   isOpen: boolean;
@@ -725,6 +726,7 @@ export function MasterlistUploadModal({
                             <span>{r.status}</span>
                           </span>
                         )}
+                        <RosterRestrictionDetails row={r} />
                       </td>
                     </tr>
                   ))}
@@ -756,8 +758,9 @@ export function MasterlistUploadModal({
               </div>
 
               <div className="space-y-3 text-xs">
+                {targetExemptionRow && targetExemptionRow !== "ALL" && <RosterRestrictionDetails row={targetExemptionRow} />}
                 <p className="text-slate-600">
-                  Granting this exemption overrides the 365-day restriction and authorizes inclusion in the final implementation masterlist. Please select or state the justification:
+                  Granting this exemption overrides the recorded restriction for this import and authorizes inclusion in the final implementation masterlist. Please select or state the justification:
                 </p>
 
                 <div className="space-y-1.5">

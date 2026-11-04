@@ -17,6 +17,14 @@ export const FINAL_BENEFICIARIES_CSV_TEMPLATE = `No.,FORMULA FULL NAME,"FORMULA 
 2,"ATENTAR, OFELIA SARMIENTO","ATENTAR, OFELIA",OFELIA,SARMIENTO,ATENTAR,,1959/11/06,11,6,1959,PUROK TANIGUE,APLAYA,DINGALAN,AURORA,LONE,NATIONAL ID,6348-5468-2693-6042,639977003203,,SENIOR CITIZEN,PIGGERY FARM,F,M,66,,"ATENTAR, NICOLE SARMIENTO","ATENTAR, NICOLE",NICOLE,SARMIENTO,ATENTAR,,DAUGHTER,26,,,,N,N
 3,"AVELLANO, LOVIE TENA","AVELLANO, LOVIE",LOVIE,TENA,AVELLANO,,1979/11/08,11,8,1979,LAPU LAPU,APLAYA,DINGALAN,AURORA,LONE,NATIONAL ID,5684-1903-1870-8153,639852686649,,SELF-EMPLOYED,LABORER,M,M,46,,"AVELLANO, ANNA CHERRIE BALDERAMA","AVELLANO, ANNA CHERRIE",ANNA CHERRIE,BALDERAMA,AVELLANO,,WIFE,48,,,,N,N`;
 
+export interface RosterRestrictionDetail {
+  reason: string;
+  end: string;
+  start?: string;
+  payoutDate?: string;
+  isAppointivePersonnel?: boolean;
+}
+
 export interface ParsedBeneficiaryRow {
   rowNumber: number;
   designatedNumber: string;
@@ -72,6 +80,7 @@ export interface ParsedBeneficiaryRow {
   validationError?: string;
   restrictionEnd?: string;
   restrictionReason?: string;
+  restrictionDetails?: RosterRestrictionDetail[];
   isExempted?: boolean;
   exemptionReason?: string;
 }
@@ -564,7 +573,7 @@ export async function parseBeneficiaryExcelBuffer(
 
   // Step 2: Perform fast targeted DB queries only for candidate names in this file
   const todayStr = new Date().toISOString().split("T")[0];
-  const restrictionMap = new Map<string, { end: string; reason: string }>();
+  const restrictionMap = new Map<string, RosterRestrictionDetail[]>();
   const existingBeneDbMap = new Map<string, any>();
 
   if (candidateNames.size > 0) {
@@ -579,6 +588,8 @@ export async function parseBeneficiaryExcelBuffer(
         },
         select: {
           restrictionEnd: true,
+          restrictionStart: true,
+          payoutDate: true,
           reason: true,
           isAppointivePersonnel: true,
           beneficiary: {
@@ -618,11 +629,15 @@ export async function parseBeneficiaryExcelBuffer(
           const bday = (r.beneficiary.birthday || "").trim();
           const entry = {
             end: r.restrictionEnd || (r.isAppointivePersonnel ? "Permanent (Appointive)" : "Active Restriction"),
-            reason: r.reason || "365-day payout restriction",
+            reason: r.reason?.trim() || (r.isAppointivePersonnel ? "Appointive personnel restriction" : "Active beneficiary restriction"),
+            start: r.restrictionStart || undefined,
+            payoutDate: r.payoutDate || undefined,
+            isAppointivePersonnel: r.isAppointivePersonnel,
           };
-          restrictionMap.set(`${cleanName}_${bday}`, entry);
+          const exactKey = `${cleanName}_${bday}`;
+          restrictionMap.set(exactKey, [...(restrictionMap.get(exactKey) || []), entry]);
           if (!bday || r.isAppointivePersonnel) {
-            restrictionMap.set(cleanName, entry);
+            restrictionMap.set(cleanName, [...(restrictionMap.get(cleanName) || []), entry]);
           }
         }
       }
@@ -690,13 +705,16 @@ export async function parseBeneficiaryExcelBuffer(
       duplicateCount++;
     } else {
       // Check 365-Day / Appointive restriction from targeted map
-      const restriction =
-        restrictionMap.get(`${item.fullName}_${item.birthday}`) ||
-        restrictionMap.get(item.fullName);
-      if (restriction) {
+      // Keep every matched active reason, including name-only/appointive matches.
+      // The same entry may be indexed under both keys; show it only once.
+      const restrictions = [...new Set([
+        ...(restrictionMap.get(`${item.fullName}_${item.birthday}`) || []),
+        ...(restrictionMap.get(item.fullName) || []),
+      ])];
+      if (restrictions.length > 0) {
         status = "RESTRICTED";
-        validationError = `Restricted until ${restriction.end}: ${restriction.reason}`;
-        restrictionEnd = restriction.end;
+        validationError = restrictions.map((restriction) => `Restricted until ${restriction.end}: ${restriction.reason}`).join("; ");
+        restrictionEnd = restrictions[0].end;
         restrictedCount++;
         parsedRows.push({
           ...item,
@@ -708,7 +726,8 @@ export async function parseBeneficiaryExcelBuffer(
           status,
           validationError,
           restrictionEnd,
-          restrictionReason: restriction.reason,
+          restrictionReason: [...new Set(restrictions.map((restriction) => restriction.reason))].join("; "),
+          restrictionDetails: restrictions,
         });
       } else {
         status = "VALID";
