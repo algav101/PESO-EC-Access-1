@@ -27,6 +27,10 @@ const nextConfig = {
   },
   experimental: {
     serverComponentsExternalPackages: ["@prisma/client", "bcryptjs", "exceljs"],
+    outputFileTracingIncludes: {
+      "/api/v1/programs/[id]/reports": ["./public/templates/**/*"],
+      "/api/v1/beneficiaries/template": ["./public/templates/**/*"],
+    },
   },
 };
 

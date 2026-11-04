@@ -48,8 +48,8 @@ export async function POST(request: Request, { params }: { params: { id: string 
     return new Response(new Uint8Array(workbook), { headers: { "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "Content-Disposition": `attachment; filename="${filename}"`, "Cache-Control": "private, no-store" } });
   } catch (error) {
     if (error instanceof ReportInputError) return NextResponse.json({ error: error.message }, { status: 422 });
-    if (error instanceof Error && /^(Cannot overwrite template formula|Only blank template cells|Template cell row not found|The original DTR)/.test(error.message)) return NextResponse.json({ error: error.message }, { status: 422 });
-    console.error("DOLE report generation failed", { name: error instanceof Error ? error.name : "UNKNOWN" });
+    if (error instanceof Error && /^(Cannot overwrite template formula|Only blank template cells|Template cell row not found|The original DTR|DOLE report template file is missing)/.test(error.message)) return NextResponse.json({ error: error.message }, { status: 422 });
+    console.error("DOLE report generation failed", error);
     return NextResponse.json({ error: "Unable to prepare the workbook. Check the selected sheets and report inputs." }, { status: 500 });
   }
 }

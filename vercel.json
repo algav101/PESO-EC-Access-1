@@ -4,7 +4,8 @@
   "buildCommand": "npx prisma generate --schema=./prisma/schema.prisma && next build",
   "functions": {
     "src/app/api/**/*": {
-      "maxDuration": 60
+      "maxDuration": 60,
+      "includeFiles": "public/templates/**"
     }
   }
 }

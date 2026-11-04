@@ -33,7 +33,8 @@ export async function saveImportedReportRows(tx: Prisma.TransactionClient, progr
     const beneficiary = beneficiaryMap.get(key) || beneficiaryMap.get(row.fullName.trim().toUpperCase());
     if (beneficiary && (strategy !== "SKIP" || !source[beneficiary.id])) source[beneficiary.id] = importedReportRow(row);
   }
-  await tx.auditLog.create({ data: { userId, action: "REPORT_MASTERLIST_SOURCE_CAPTURED", entityType: "PROGRAM_REPORT_MASTERLIST", entityId: programId, newData: JSON.stringify({ version: 1, rows: source }), metadata: JSON.stringify({ rowCount: rows.length }) } });
+  const validUser = (tx as any).user?.findUnique ? await (tx as any).user.findUnique({ where: { id: userId }, select: { id: true } }) : { id: userId };
+  await tx.auditLog.create({ data: { userId: validUser ? userId : null, action: "REPORT_MASTERLIST_SOURCE_CAPTURED", entityType: "PROGRAM_REPORT_MASTERLIST", entityId: programId, newData: JSON.stringify({ version: 1, rows: source }), metadata: JSON.stringify({ rowCount: rows.length }) } });
 }
 
 export function validateReportDraft(raw: any, rowIds: Set<string>): DoleReportDraft {

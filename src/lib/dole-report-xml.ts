@@ -100,7 +100,7 @@ function extendRows(xml: string, cfg: typeof DOLE_REPORT_SHEETS[number], count: 
     return copy.replace(new RegExp(`^<row([^>]*?)r="${next}"`), `<row$1r="${next}"`);
   }).join("");
   const endRow = new RegExp(`(<row\\b[^>]*\\br="${cfg.end}"[^>]*(?:/>|>[\\s\\S]*?</row>))`);
-  xml = xml.replace(endRow, "$1" + additions);
+  xml = xml.replace(endRow, (m) => m + additions);
   // Footer merges, sheet dimensions, filter ranges and page breaks move with the extended body.
   xml = xml.replace(/(<(mergeCell|dimension|autoFilter)\b[^>]*\bref=")([^"]+)(")/g, (_, a, tag, ref, b) => a + ref.replace(/([A-Z]+)(\d+)/g, (_: string, c: string, r: string) => c + (Number(r) > cfg.end || tag !== "mergeCell" && Number(r) === cfg.end ? Number(r) + delta : r)) + b);
   return xml;
@@ -118,11 +118,12 @@ function setCells(xml: string, values: Record<string, unknown>, onlyBlank = fals
   });
   // Existing blank rows often omit unpopulated <c> nodes. Insert new cells in column order.
   for (const [ref, value] of pending) {
+    if (value === null || value === undefined || value === "") continue;
     const row = Number(ref.match(/\d+$/)![0]);
     const matcher = new RegExp(`(<row\\b[^>]*?\\br="${row}"[^>]*?)(/>|>[\\s\\S]*?</row>)`);
     const cell = valueCell(` r="${ref}"`, value);
     if (!matcher.test(xml)) throw new Error(`Template cell row not found: ${ref}`);
-    xml = xml.replace(matcher, (whole, open, body) => body === "/>" ? `${open}>${cell}</row>` : `${open}${body.replace("</row>", cell + "</row>")}`);
+    xml = xml.replace(matcher, (whole, open, body) => body === "/>" ? `${open}>${cell}</row>` : `${open}${body.slice(0, -6)}${cell}</row>`);
   }
   // Sort cell nodes by their actual column, without changing their formatting attributes.
   return xml.replace(/<row\b[^>]*>[\s\S]*?<\/row>/g, (row) => {

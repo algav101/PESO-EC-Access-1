@@ -39,6 +39,7 @@ next-env.d.ts
 
 # Exported Excel files
 *.xlsx
+!public/templates/*.xlsx
 
 # Local graph analysis caches and machine-specific settings
 /graphify-out/cache/
