@@ -1176,9 +1176,9 @@
     "semantic_hash": ""
   },
   "src/components/applications/IdUploadPanel.tsx": {
-    "mtime": 1793236120.8736656,
-    "seen": 1793236344.9392867,
-    "ast_hash": "91bd1bfe059de40bc528c63368d9c82d",
+    "mtime": 1793760518.173025,
+    "seen": 1793761017.5506375,
+    "ast_hash": "c6c0af44822eba7bc3c3ce8c2e41e239",
     "semantic_hash": ""
   },
   "src/components/beneficiaries/AdminStubOverrideModal.tsx": {
@@ -1965,6 +1965,36 @@
     "mtime": 1793756379.370088,
     "seen": 1793756495.2585704,
     "ast_hash": "66b84cbe6038dc1dc50875d2d134d3f5",
+    "semantic_hash": ""
+  },
+  "src/components/applications/IdCameraCapture.tsx": {
+    "mtime": 1793761002.9810538,
+    "seen": 1793761017.5506356,
+    "ast_hash": "8317a1b4da40daba1642023e8cb139e7",
+    "semantic_hash": ""
+  },
+  "src/lib/id-camera-guide.ts": {
+    "mtime": 1793760439.2953267,
+    "seen": 1793761017.5535433,
+    "ast_hash": "f5dcf75a7307d0acd900d761b0f77da3",
+    "semantic_hash": ""
+  },
+  "test/test-id-camera-browser.mjs": {
+    "mtime": 1793760801.7955272,
+    "seen": 1793761017.5552187,
+    "ast_hash": "c545178f73a88c17438e6d6473ecadca",
+    "semantic_hash": ""
+  },
+  "test/test-id-camera-guide.mjs": {
+    "mtime": 1793760676.457122,
+    "seen": 1793761017.5552197,
+    "ast_hash": "93592b711467bf78dee22edd939ca709",
+    "semantic_hash": ""
+  },
+  "docs/guided-id-camera.md": {
+    "mtime": 1793760902.7341945,
+    "seen": 1793761017.5568688,
+    "ast_hash": "e3eca3b62921e5f96d9a5a10c502172f",
     "semantic_hash": ""
   }
 }

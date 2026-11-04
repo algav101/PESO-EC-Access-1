@@ -1,10 +1,11 @@
 "use client";
 
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { AlertTriangle, CheckCircle2, FileSearch, UploadCloud } from "lucide-react";
+import { AlertTriangle, Camera, CheckCircle2, FileSearch, UploadCloud } from "lucide-react";
 import { ID_TYPES, isAcceptedApplicationFile, type ApplicationFormValues } from "@/lib/application-schema";
 import { getIdentityProfile } from "@/lib/ocr/identity-profiles";
 import type { OcrConflict, OcrAutofillStatus } from "@/lib/ocr/application-id-mapper";
+import { IdCameraCapture } from "./IdCameraCapture";
 
 export interface OcrResponse {
   configured: boolean;
@@ -49,12 +50,14 @@ export function IdUploadPanel(props: IdUploadPanelProps) {
   const [attempt, setAttempt] = useState(0);
   const [numberFile, setNumberFile] = useState<File>();
   const numberInput = useRef<HTMLInputElement>(null);
+  const fileInputs = useRef<Partial<Record<IdUploadPanelProps["frontField"] | IdUploadPanelProps["backField"], HTMLInputElement | null>>>({});
+  const [cameraField, setCameraField] = useState<IdUploadPanelProps["frontField"] | IdUploadPanelProps["backField"] | "NUMBER" | null>(null);
   const onResultRef = useRef(props.onResult);
   const { frontFile, backFile, subject, idType } = props;
   const profile = getIdentityProfile(idType);
   const selectionRef = useRef(idType);
   selectionRef.current = idType;
-  useEffect(() => { setNumberFile(undefined); }, [idType]);
+  useEffect(() => { setNumberFile(undefined); setCameraField(null); }, [idType]);
 
   useEffect(() => { onResultRef.current = props.onResult; }, [props.onResult]);
 
@@ -102,6 +105,12 @@ export function IdUploadPanel(props: IdUploadPanelProps) {
     props.onFile(field, file);
   };
 
+  const chooseNumber = (file?: File) => {
+    const issue = file ? isAcceptedApplicationFile(file) : null;
+    props.onError("idNumberCloseup", issue || undefined);
+    if (!issue) setNumberFile(file);
+  };
+
   const statusStyle = status === "Autofill Complete"
     ? "bg-emerald-50 text-emerald-700 border-emerald-200"
     : status === "Needs Review"
@@ -127,7 +136,7 @@ export function IdUploadPanel(props: IdUploadPanelProps) {
       <div className="space-y-2 rounded-xl border border-blue-200 bg-white p-3">
         <label className="block space-y-1">
           <span className="text-xs font-black uppercase text-slate-700">1. {subject === "APPLICANT" ? "TYPE OF ID" : "DEPENDENT TYPE OF ID"} *</span>
-          <select aria-label={subject === "APPLICANT" ? "TYPE OF ID" : "DEPENDENT TYPE OF ID"} value={idType} onChange={(event) => props.onIdTypeChange(event.target.value)} className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm font-semibold">
+          <select aria-label={subject === "APPLICANT" ? "TYPE OF ID" : "DEPENDENT TYPE OF ID"} value={idType} onChange={(event) => { setCameraField(null); props.onIdTypeChange(event.target.value); }} className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm font-semibold">
             <option value="">Piliin muna ang ID na gagamitin</option>
             {ID_TYPES.map((type) => <option key={type} value={type}>{type}</option>)}
           </select>
@@ -146,16 +155,18 @@ export function IdUploadPanel(props: IdUploadPanelProps) {
           <div key={field} className="space-y-2">
             <label className="text-xs font-black text-slate-700 uppercase">{label}{props.required ? " *" : ""}</label>
             <FilePreview file={file} />
+            <button type="button" aria-label={`${subject === "DEPENDENT" ? "Dependent: " : ""}Kunan ang ${label.toLowerCase()} gamit ang camera`} onClick={() => setCameraField(field)} className="flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border border-blue-300 bg-gov-blue px-3 py-2 text-xs font-bold text-white hover:bg-gov-light"><Camera className="h-4 w-4" />Camera na may ID guide</button>
             <input
+              ref={(input) => { fileInputs.current[field] = input; }}
               key={`${subject}:${idType}:${field}`}
               type="file"
               aria-label={label}
               accept="image/*,application/pdf"
-              capture="environment"
               onClick={(event) => { event.currentTarget.value = ""; }}
               onChange={(event) => choose(field, event.target.files?.[0])}
               className="block w-full text-xs file:mr-3 file:rounded-lg file:border-0 file:bg-gov-blue file:px-3 file:py-2 file:font-bold file:text-white"
             />
+            <p className="text-[11px] text-slate-500">Camera na may border ayon sa ID, o pumili ng photo/PDF mula sa device.</p>
             {props.errors[field] && <p className="text-xs font-semibold text-rose-600">{props.errors[field]}</p>}
           </div>
         ))}
@@ -163,17 +174,18 @@ export function IdUploadPanel(props: IdUploadPanelProps) {
       {subject === "APPLICANT" && <fieldset disabled={!profile} className="rounded-xl border border-dashed border-blue-200 bg-white p-3 space-y-2 disabled:opacity-50">
         <legend className="px-1 text-xs font-black text-gov-blue">OPTIONAL: CLOSE-UP NG ID NUMBER</legend>
         <p className="text-xs text-slate-600">Kung hindi pa nabasa ang number, kumuha ng malapit na picture ng buong numero kasama ang label nito. Browser OCR lang ito; hindi kasama sa ise-save na supporting documents. Kailangan pa rin ang buong front at back.</p>
-        <input ref={numberInput} key={`number:${idType}`} type="file" aria-label="Close-up ID number" accept="image/*,application/pdf" capture="environment"
+        <button type="button" onClick={() => setCameraField("NUMBER")} className="flex min-h-11 items-center gap-2 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-xs font-bold text-gov-blue"><Camera className="h-4 w-4" />Kunan ang close-up ng ID number</button>
+        <input ref={numberInput} key={`number:${idType}`} type="file" aria-label="Close-up ID number" accept="image/*,application/pdf"
           onClick={(event) => { event.currentTarget.value = ""; }}
-          onChange={(event) => {
-            const file = event.target.files?.[0];
-            const issue = file ? isAcceptedApplicationFile(file) : null;
-            props.onError("idNumberCloseup", issue || undefined);
-            if (!issue) setNumberFile(file);
-          }} className="block w-full text-xs" />
+          onChange={(event) => chooseNumber(event.target.files?.[0])} className="block w-full text-xs" />
         {numberFile && <><FilePreview file={numberFile} /><button type="button" onClick={() => { setNumberFile(undefined); if (numberInput.current) numberInput.current.value = ""; }} className="text-xs font-semibold text-gov-blue">Alisin ang close-up</button></>}
         {props.errors.idNumberCloseup && <p className="text-xs text-rose-600">{props.errors.idNumberCloseup}</p>}
       </fieldset>}
+      {cameraField && profile && <IdCameraCapture key={`${subject}:${idType}:${cameraField}`} idType={idType} closeup={cameraField === "NUMBER"}
+        label={`${subject === "DEPENDENT" ? "Dependent: " : ""}${cameraField === "NUMBER" ? "Close-up ng ID number" : cameraField === props.frontField ? "Front ID Picture" : "Back ID Picture"}`}
+        onCapture={(file) => cameraField === "NUMBER" ? chooseNumber(file) : choose(cameraField, file)}
+        onClose={() => setCameraField(null)}
+        onChooseFile={() => { const input = cameraField === "NUMBER" ? numberInput.current : fileInputs.current[cameraField]; setCameraField(null); input?.click(); }} />}
       <p className="text-[11px] text-slate-500">Ipakita ang buong ID nang malapit, pantay, at walang glare. Sa browser mismo binabasa ang QR at ID details. Pakireview ang lahat ng nabasang fields bago isumite.</p>
     </section>
   );
