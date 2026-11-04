@@ -68,7 +68,7 @@ export function Sidebar({ isMobile = false, onClose }: SidebarProps) {
     pathname.startsWith("/admin/applications") ||
     pathname.startsWith("/field") ||
     pathname.startsWith("/replacements") ||
-    pathname.startsWith("/restrictions");
+    pathname.startsWith("/restrictions") || pathname.startsWith("/reports");
 
   const isMigrantsRoute = pathname.startsWith("/migrants");
 
@@ -97,6 +97,7 @@ export function Sidebar({ isMobile = false, onClose }: SidebarProps) {
             title: "Core Operations",
             items: [
               { label: "Programs & Work Plans", href: "/programs", icon: FolderKanban, permission: "program.read" },
+              ...(["DOMAIN_MASTER", "PESO_ADMIN", "DOLE_COORDINATOR"].includes(user?.role || "") ? [{ label: "Reports", href: "/reports", icon: FileSpreadsheet, permission: "report.generate" }] : []),
               { label: "Beneficiaries Masterlist", href: "/beneficiaries", icon: Users, permission: "beneficiary.read" },
               { label: "QR & Stub Designer", href: "/stubs", icon: Printer, permission: "stub.configure" },
               { label: "Online Application Portal", href: "/apply", icon: Sparkles, permission: "application.read" },

@@ -273,11 +273,11 @@ export function MasterlistUploadModal({
           <div className="flex items-center space-x-2 self-start sm:self-auto">
             <a
               href="/api/v1/beneficiaries/template"
-              download="tupad_final_beneficiaries_template.csv"
+              download="tupad_form4_consolidated_template.xlsx"
               className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-lg border flex items-center space-x-1.5 transition"
             >
               <Download className="w-3.5 h-3.5" />
-              <span>Download Template CSV</span>
+              <span>Download Form 4 consolidated template</span>
             </a>
 
             <button

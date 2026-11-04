@@ -1,6 +1,8 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
+import { DoleReportsPanel } from "@/components/reports/DoleReportsPanel";
+import { canUseDoleReports } from "@/lib/dole-report-config";
 import {
   FileSpreadsheet,
   Download,
@@ -64,7 +66,8 @@ export default function ReportCenterPage() {
         const progs = data.programs || [];
         setPrograms(progs);
         if (progs.length > 0) {
-          setSelectedProgramId(progs[0].id);
+          const requested = new URL(window.location.href).searchParams.get("programId");
+          setSelectedProgramId(progs.some((p: any) => p.id === requested) ? requested! : progs[0].id);
         }
       }
     } catch (e) {
@@ -213,10 +216,10 @@ export default function ReportCenterPage() {
         <div>
           <h1 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight flex items-center space-x-2">
             <FileSpreadsheet className="w-6 h-6 text-gov-blue" />
-            <span>TUPAD Report & Documentation Center</span>
+            <span>Reports</span>
           </h1>
           <p className="text-xs text-slate-500">
-            Generate pixel-accurate workbooks, attendance matrices, work area QR routing, and compliance audits for LGU Dingalan & DOLE
+            Generate DOLE templates from the uploaded masterlist and selected TUPAD work program.
           </p>
         </div>
 
@@ -259,6 +262,8 @@ export default function ReportCenterPage() {
           ))}
         </select>
       </div>
+
+      {selectedProgramId && canUseDoleReports(user) && <DoleReportsPanel key={selectedProgramId} programId={selectedProgramId}/>}
 
       {/* Reports Catalog Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">

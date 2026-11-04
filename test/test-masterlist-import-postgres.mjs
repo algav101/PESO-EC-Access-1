@@ -104,6 +104,16 @@ try {
   assert.equal(await db.beneficiaryRestriction.count({ where: { status: "OVERRIDDEN" } }), 3);
   assert.equal((await db.program.findUnique({ where: { id: program.id } })).beneficiaryCount, 500);
   assert.equal(await db.beneficiary.count({ where: { occupation: "SYNTHETIC UPDATED" } }), 500);
+  const reportSource = await db.auditLog.findFirst({ where: { entityType: "PROGRAM_REPORT_MASTERLIST", entityId: program.id }, orderBy: { createdAt: "desc" } });
+  assert.equal(Object.keys(JSON.parse(reportSource.newData).rows).length, 500, "report source must be captured atomically for the selected program");
+  const reportService = load("src/lib/dole-report-service.ts");
+  const reportData = await reportService.loadDoleReport(program.id);
+  assert.equal(reportData.rows.length, 500);
+  assert.equal(reportData.program.id, program.id);
+  const draft = { meta: { dailyRate: "600" }, rows: {}, cells: {} };
+  await reportService.saveDoleReportDraft(program.id, draft, null, admin.id);
+  assert.equal((await reportService.loadDoleReport(program.id)).meta.dailyRate, "600");
+  await assert.rejects(reportService.saveDoleReportDraft(program.id, draft, null, admin.id), /changed by another user/);
   const retry = await commit.POST(request());
   assert.equal(retry.status, 200);
   assert.equal((await retry.json()).newCount, 0);

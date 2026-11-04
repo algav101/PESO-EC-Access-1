@@ -3,6 +3,7 @@ export const maxDuration = 60;
 
 import { NextResponse } from "next/server";
 import crypto from "crypto";
+import { saveImportedReportRows } from "@/lib/dole-report-data";
 import prisma from "@/lib/prisma";
 import { getCurrentUser, hasPermission } from "@/lib/auth";
 import { generateBeneficiaryToken } from "@/lib/qr";
@@ -372,6 +373,7 @@ export async function POST(request: Request) {
           entityId: targetProgramId,
           metadata: JSON.stringify({ count: importedCount, newCount, updatedCount, skippedCount, exemptedCount, duplicateStrategy }),
       } });
+      await saveImportedReportRows(tx, targetProgramId, validRows, beneMap, user.id, duplicateStrategy);
 
       awaitingCommitConfirmation = true;
       return NextResponse.json({

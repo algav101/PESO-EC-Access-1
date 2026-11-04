@@ -131,6 +131,7 @@ export default function ExcelImportPage() {
       )}
 
       {/* Upload Box */}
+      <p className="text-sm"><a href="/api/v1/beneficiaries/template" className="font-bold text-gov-blue underline">Download Form 4 for consolidated upload template</a>. Fill this sheet, then upload it to this program. Existing CSV/Excel formats remain supported.</p>
       {!preview && (
         <div className="gov-card p-8 border-2 border-dashed border-slate-300 hover:border-gov-blue text-center space-y-4 transition">
           <div className="w-16 h-16 rounded-full bg-blue-50 text-gov-blue flex items-center justify-center mx-auto">

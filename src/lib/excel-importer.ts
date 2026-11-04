@@ -8,14 +8,7 @@ import {
   CANONICAL_SITIOS_BY_BARANGAY,
 } from "@/lib/dingalan-groupings";
 
-export const FINAL_BENEFICIARIES_CSV_TEMPLATE = `No.,FORMULA FULL NAME,"FORMULA LAST NAME, FIRST NAME",Name of Beneficiary,,,,Birthdate,,,,Address (Beneficiary),,,,,Type of ID,ID No.,Contact No.,E-payment/,Type of Beneficiary,Occupation,Sex,Civil Status,Age,Average monthly income,DEPENDENT FULL NAME FORMULA,"DEPENDENT LAST NAME, FIRST NAME FORMULA ",Dependent (Name of Beneficiary of the Micro-insurance Holder),,,,RELATIONSHIP OF DEPENDEMT,AGE (18 ABOVE) OF DEPENDENT,Interested in wage employment or self-employment?,Skills Training Needed,"PWD
-(Please Indicate)","4P's
-(Y/N)","IP's
-(Y/N)"
-,,,First Name,Middle Name,Last Name,Extension Name,(YYYY/MM/DD),,,,Street,Brgy.,City/Municipality,Province,District,,,,Account No. ,,,,,,,,,First Name, Middle Name,Last Name,Extension Name,,,"(Yes/No, if Yes, please specify)",,,,
-1,"ASTORGA, JONEL TALENTO","ASTORGA, JONEL",JONEL,TALENTO,ASTORGA,,2000/11/08,11,8,2000,LAPU LAPU,APLAYA,DINGALAN,AURORA,LONE,NATIONAL ID,2406-3425-7582-9680,639979925136,,SELF-EMPLOYED,LABORER,F,M,25,,"PRONTO, KAILA NICOL","PRONTO, KAILA",KAILA,NICOL,PRONTO,,WIFE,31,,,,N,N
-2,"ATENTAR, OFELIA SARMIENTO","ATENTAR, OFELIA",OFELIA,SARMIENTO,ATENTAR,,1959/11/06,11,6,1959,PUROK TANIGUE,APLAYA,DINGALAN,AURORA,LONE,NATIONAL ID,6348-5468-2693-6042,639977003203,,SENIOR CITIZEN,PIGGERY FARM,F,M,66,,"ATENTAR, NICOLE SARMIENTO","ATENTAR, NICOLE",NICOLE,SARMIENTO,ATENTAR,,DAUGHTER,26,,,,N,N
-3,"AVELLANO, LOVIE TENA","AVELLANO, LOVIE",LOVIE,TENA,AVELLANO,,1979/11/08,11,8,1979,LAPU LAPU,APLAYA,DINGALAN,AURORA,LONE,NATIONAL ID,5684-1903-1870-8153,639852686649,,SELF-EMPLOYED,LABORER,M,M,46,,"AVELLANO, ANNA CHERRIE BALDERAMA","AVELLANO, ANNA CHERRIE",ANNA CHERRIE,BALDERAMA,AVELLANO,,WIFE,48,,,,N,N`;
+// The canonical blank upload workbook is served by /api/v1/beneficiaries/template.
 
 export interface RosterRestrictionDetail {
   reason: string;
@@ -60,6 +53,7 @@ export interface ParsedBeneficiaryRow {
   dependentExtensionName?: string;
   dependentRelationship?: string;
   dependentAge?: number;
+  reportInputs?: Record<string, string>;
   // Grouping fields
   groupName?: string;
   groupLabel?: string;
@@ -86,6 +80,7 @@ export interface ParsedBeneficiaryRow {
 }
 
 export interface ImportPreviewResult {
+  sourceSheetName?: string;
   fileName: string;
   totalRows: number;
   validCount: number;
@@ -136,7 +131,7 @@ export async function parseBeneficiaryExcelBuffer(
     throw new Error("No worksheets found in uploaded file");
   }
 
-  const sheetName = workbook.SheetNames[0];
+  const sheetName = workbook.SheetNames.find((name) => name.trim().toLowerCase() === "form 4 for consolidated") || workbook.SheetNames[0];
   const worksheet = workbook.Sheets[sheetName];
   const rawRows: any[] = XLSX.utils.sheet_to_json(worksheet, { header: 1, defval: "" });
 
@@ -148,7 +143,7 @@ export async function parseBeneficiaryExcelBuffer(
   let headerRowIndex = 0;
   let subHeaderRowIndex = -1;
 
-  for (let i = 0; i < Math.min(10, rawRows.length); i++) {
+  for (let i = 0; i < Math.min(30, rawRows.length); i++) {
     const row = rawRows[i] || [];
     const rowStr = row.map((c: any) => String(c).toLowerCase()).join(" ");
     if (
@@ -184,6 +179,7 @@ export async function parseBeneficiaryExcelBuffer(
   // Build merged header map
   const topHeaders = (rawRows[headerRowIndex] || []).map((h: any) => String(h).trim());
   const subHeaders = subHeaderRowIndex !== -1 ? (rawRows[subHeaderRowIndex] || []).map((h: any) => String(h).trim()) : [];
+  const isConsolidated = topHeaders[0]?.toUpperCase() === "BATCH" && topHeaders[7]?.toLowerCase() === "no." && subHeaders[10]?.toLowerCase() === "first name";
   const mergedHeaders: string[] = [];
 
   const maxCols = Math.max(topHeaders.length, subHeaders.length, 35);
@@ -220,6 +216,8 @@ export async function parseBeneficiaryExcelBuffer(
       if (sub.includes("extension") && colBeneExt === -1) colBeneExt = c;
     }
   }
+
+  if (isConsolidated) { colBeneFirst = 10; colBeneMiddle = 11; colBeneLast = 12; colBeneExt = 13; }
 
   // Birthdate sub-headers (Month, Day, Year, or Single Date Column)
   let colBdayMonth = -1;
@@ -327,6 +325,8 @@ export async function parseBeneficiaryExcelBuffer(
       if (sub.includes("extension") && colDepExt === -1) colDepExt = c;
     }
   }
+
+  if (isConsolidated) { colDepFirst = 35; colDepMiddle = 36; colDepLast = 37; colDepExt = 38; }
 
   const colDepRelationship = findCol("relationship of dependent", "relationship");
   const colDepAge = findCol("age (18 above) of dependent", "age of dependent");
@@ -494,7 +494,9 @@ export async function parseBeneficiaryExcelBuffer(
     const civilStatus = rawCivil === "M" ? "MARRIED" : rawCivil === "S" ? "SINGLE" : rawCivil === "W" ? "WIDOWED" : rawCivil;
 
     const age = colAge !== -1 && row[colAge] ? parseInt(String(row[colAge]).trim(), 10) || undefined : undefined;
-    const monthlyIncome = colMonthlyIncome !== -1 && row[colMonthlyIncome] ? parseFloat(String(row[colMonthlyIncome]).replace(/[^0-9.]/g, "")) || undefined : undefined;
+    const incomeInput = colMonthlyIncome !== -1 ? String(row[colMonthlyIncome] ?? "").trim() : "";
+    const parsedIncome = incomeInput !== "" ? Number(incomeInput.replace(/,/g, "")) : NaN;
+    const monthlyIncome = Number.isFinite(parsedIncome) ? parsedIncome : undefined;
 
     const idType = colIdType !== -1 && row[colIdType] ? String(row[colIdType]).trim() : undefined;
     let idNumber = colIdNo !== -1 && row[colIdNo] ? String(row[colIdNo]).trim() : undefined;
@@ -550,8 +552,8 @@ export async function parseBeneficiaryExcelBuffer(
       idNumber,
       barangay,
       sitio,
-      municipality: "Dingalan",
-      province: "Aurora",
+      municipality: colCity !== -1 && row[colCity] ? String(row[colCity]).trim() : "Dingalan",
+      province: colProvince !== -1 && row[colProvince] ? String(row[colProvince]).trim() : "Aurora",
       contactNumber: contact,
       isSenior: Boolean(isSenior),
       isPwd,
@@ -565,6 +567,9 @@ export async function parseBeneficiaryExcelBuffer(
       dependentExtensionName: depExt,
       dependentRelationship,
       dependentAge,
+      reportInputs: isConsolidated ? Object.fromEntries(Object.entries({
+        batchLabel: row[0], proponentLabel: row[1], orientationDate: row[2], periodOfCoverage: row[3], payoutDate: row[4], salary: row[5], remarks: row[6], district: row[22], bankAccount: row[26], employmentInterest: row[41], pwd: row[43], fourPs: row[44], ip: row[45],
+      }).map(([k, v]) => [k, v instanceof Date ? v.toISOString().slice(0, 10) : String(v ?? "").trim()])) : undefined,
       groupName: groupInfo.groupName,
       groupLabel: groupInfo.groupLabel,
       designatedMainArea: groupInfo.designatedMainArea,
@@ -758,6 +763,7 @@ export async function parseBeneficiaryExcelBuffer(
 
   return {
     fileName,
+    sourceSheetName: sheetName,
     totalRows: parsedRows.length,
     validCount,
     duplicateCount,
