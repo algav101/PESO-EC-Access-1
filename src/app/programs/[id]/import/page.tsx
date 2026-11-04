@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import { StatusBadge } from "@/components/common/StatusBadge";
 import { RosterRestrictionDetails } from "@/components/beneficiaries/RosterRestrictionDetails";
+import { readImportResponse } from "@/lib/import-response";
 
 export default function ExcelImportPage() {
   const params = useParams();
@@ -60,19 +61,7 @@ export default function ExcelImportPage() {
         body: formData,
       });
 
-      const responseText = await res.text();
-      let data: any = {};
-      try {
-        data = responseText ? JSON.parse(responseText) : {};
-      } catch (jsonErr) {
-        throw new Error(
-          `Server returned an invalid response (Status ${res.status}: ${res.statusText || "Error"}). Please ensure the file is a valid Excel spreadsheet (.xlsx / .xls / .csv).`
-        );
-      }
-
-      if (!res.ok) {
-        throw new Error(data.error || `Failed to parse spreadsheet (Status ${res.status})`);
-      }
+      const data = await readImportResponse(res, "preview");
 
       setPreview(data.preview);
     } catch (err: any) {
@@ -101,22 +90,12 @@ export default function ExcelImportPage() {
         body: JSON.stringify({ rows: preview.rows }),
       });
 
-      const responseText = await res.text();
-      let data: any = {};
-      try {
-        data = responseText ? JSON.parse(responseText) : {};
-      } catch (jsonErr) {
-        throw new Error(
-          `Server returned status ${res.status} (${res.statusText || "Error"}).`
-        );
-      }
-
-      if (!res.ok) throw new Error(data.error || "Commit failed");
+      const data = await readImportResponse(res, "commit");
 
       alert(`Successfully imported ${data.importedCount} beneficiaries with QR tokens!`);
       router.push(`/programs/${programId}`);
     } catch (err: any) {
-      setError(err.message || "Failed to commit beneficiaries");
+      setError(err instanceof TypeError ? "The connection was interrupted. The import result is unknown. Check the program roster before retrying; do not repeatedly click Commit." : err.message || "Failed to commit beneficiaries");
     } finally {
       setCommitting(false);
     }

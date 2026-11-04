@@ -24,6 +24,7 @@ import {
 } from "lucide-react";
 import { ImportPreviewResult, ParsedBeneficiaryRow } from "@/lib/excel-importer";
 import { RosterRestrictionDetails } from "@/components/beneficiaries/RosterRestrictionDetails";
+import { readImportResponse } from "@/lib/import-response";
 
 interface MasterlistUploadModalProps {
   isOpen: boolean;
@@ -93,10 +94,10 @@ export function MasterlistUploadModal({
         body: formData,
       });
 
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Failed to parse masterlist file");
+      const data = await readImportResponse(res, "preview");
 
       setPreview(data.preview);
+      if (typeof data.resolvedProgramId === "string" && data.resolvedProgramId !== "temp-program-id") setSelectedProgramId(data.resolvedProgramId);
     } catch (err: any) {
       setError(err.message || "Failed to preview file");
     } finally {
@@ -223,8 +224,7 @@ export function MasterlistUploadModal({
         }),
       });
 
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Failed to commit masterlist");
+      const data = await readImportResponse(res, "commit");
 
       const mergeMsg = data.updatedCount > 0 ? ` (${data.newCount} new, ${data.updatedCount} merged/updated)` : "";
       const exemptMsg = data.exemptedCount > 0 ? ` with ${data.exemptedCount} authorized exemptions` : "";
@@ -235,7 +235,7 @@ export function MasterlistUploadModal({
       onSuccess();
       onClose();
     } catch (err: any) {
-      setError(err.message || "Failed to commit masterlist");
+      setError(err instanceof TypeError ? "The connection was interrupted. The import result is unknown. Check the program roster before retrying; do not repeatedly click Commit." : err.message || "Failed to commit masterlist");
     } finally {
       setCommitting(false);
     }
@@ -282,6 +282,7 @@ export function MasterlistUploadModal({
 
             <button
               onClick={onClose}
+              disabled={committing}
               className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition"
             >
               <X className="w-5 h-5" />
@@ -297,7 +298,8 @@ export function MasterlistUploadModal({
             </label>
             <select
               value={selectedProgramId}
-              onChange={(e) => setSelectedProgramId(e.target.value)}
+              disabled={committing || parsing}
+              onChange={(e) => { setSelectedProgramId(e.target.value); setPreview(null); setError(null); }}
               className="w-full px-3 py-2 text-xs border rounded-xl bg-slate-50 font-bold text-slate-800"
             >
               {programs.map((p) => (
@@ -316,6 +318,7 @@ export function MasterlistUploadModal({
             <div className="flex items-center space-x-2">
               <input
                 type="file"
+                disabled={committing || parsing}
                 accept=".csv, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, application/vnd.ms-excel"
                 onChange={handleFileChange}
                 className="w-full text-xs file:mr-3 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-blue-50 file:text-gov-blue hover:file:bg-blue-100 border rounded-xl"
@@ -412,7 +415,7 @@ export function MasterlistUploadModal({
             <div className="flex items-center space-x-2.5">
               <RefreshCw className="w-4 h-4 text-gov-blue animate-spin" />
               <span>
-                Fast Batch Committing {preview?.validCount} Records — Syncing database profiles, QR tokens, and program rosters...
+                Saving {preview?.validCount} Records — Beneficiaries, dependents, QR codes and program roster changes are saved together. Please keep this window open.
               </span>
             </div>
             <span className="text-[10px] bg-gov-blue text-white px-2 py-0.5 rounded-md font-mono">
