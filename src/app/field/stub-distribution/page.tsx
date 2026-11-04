@@ -1,6 +1,8 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import { ScanRequestError, readScanResponse } from "@/lib/program-qr-slot";
+
+import React, { useState, useEffect, useRef } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import {
@@ -50,6 +52,8 @@ function StubDistributionContent() {
   const [activeTab, setActiveTab] = useState<"scanner" | "monitoring">(initialTab);
   const [programs, setPrograms] = useState<any[]>([]);
   const [selectedProgramId, setSelectedProgramId] = useState<string>("");
+  const programRef = useRef(selectedProgramId);
+  programRef.current = selectedProgramId;
 
   // Scanner States
   const [scannerOpen, setScannerOpen] = useState(false);
@@ -121,6 +125,7 @@ function StubDistributionContent() {
         const res = await fetch(`/api/v1/stub-distribution/monitoring?programId=${progId}`);
         if (res.ok) {
           const data = await res.json();
+          if (programRef.current !== progId) return;
           setMonitoringData(data);
           return;
         }
@@ -137,6 +142,7 @@ function StubDistributionContent() {
         .where("programId")
         .equals(progId)
         .toArray();
+      if (programRef.current !== progId) return;
 
       if (cachedBeneficiaries.length > 0) {
         setMonitoringData({
@@ -164,6 +170,8 @@ function StubDistributionContent() {
   };
 
   // 1. Scan Handler
+  useEffect(() => { setScannedData(null); setSuccessResult(null); setError(null); setBirthdayPin(""); setMonitoringData(null); setScannerOpen(false); }, [selectedProgramId]);
+
   const handleScan = async (token: string) => {
     setScannerOpen(false);
     setLoading(true);
@@ -171,20 +179,21 @@ function StubDistributionContent() {
     setSuccessResult(null);
 
     try {
+      if (!selectedProgramId) throw new ScanRequestError("Pumili muna ng TUPAD program.");
       if (isOnline) {
         try {
           const res = await fetch("/api/v1/stub-distribution/scan", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ qrToken: token }),
+            body: JSON.stringify({ qrToken: token, programId: selectedProgramId }),
           });
 
-          const data = await res.json();
-          if (!res.ok) throw new Error(data.error || "Invalid QR Stub");
+          const data = await readScanResponse(res, "Scan rejected for the selected program.");
 
           setScannedData(data.data);
           return;
         } catch (onlineErr: any) {
+          if (onlineErr instanceof ScanRequestError) throw onlineErr;
           console.warn("Online stub scan failed, switching to local offline engine:", onlineErr);
         }
       }
@@ -198,6 +207,7 @@ function StubDistributionContent() {
       }
 
       setScannedData({
+        programId: bene.programId,
         qrId: bene.qrToken || "offline_qr",
         programBeneficiaryId: bene.id,
         designatedNumber: bene.designatedNumber,
@@ -242,6 +252,7 @@ function StubDistributionContent() {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
+            programId: selectedProgramId,
             qrId: scannedData.qrId,
             programBeneficiaryId: scannedData.programBeneficiaryId,
             birthdayPin: birthdayPin.trim(),
@@ -266,6 +277,7 @@ function StubDistributionContent() {
         }
 
         await queueOfflineTransaction("STUB_DISTRIBUTION", "CREATE", {
+          programId: selectedProgramId,
           qrId: scannedData.qrId,
           programBeneficiaryId: scannedData.programBeneficiaryId,
           birthdayPin: cleanedEntered,
@@ -273,6 +285,7 @@ function StubDistributionContent() {
           longitude: geoLong,
         });
 
+        await offlineDb.cachedBeneficiaries.update(scannedData.programBeneficiaryId, { stubDistributed: true });
         setSuccessResult({
           message: "✓ Verified & Saved Offline (Queued for Sync)",
           data: scannedData,
@@ -435,6 +448,11 @@ function StubDistributionContent() {
 
         {/* Tab & Action Switcher */}
         <div className="flex flex-wrap items-center gap-2 self-start sm:self-auto">
+          <label className="text-xs font-bold" htmlFor="stub-program">TUPAD Program</label>
+          <select id="stub-program" value={selectedProgramId} disabled={loading} onChange={(e) => setSelectedProgramId(e.target.value)} className="gov-input max-w-xs text-xs">
+            <option value="">Pumili ng program</option>
+            {programs.map((p) => <option key={p.id} value={p.id}>{p.programCode} — {p.programName}</option>)}
+          </select>
           <button
             type="button"
             onClick={() => setQrGeneratorOpen(true)}
@@ -656,6 +674,7 @@ function StubDistributionContent() {
               <span className="text-xs font-bold text-slate-700 whitespace-nowrap">Program:</span>
               <select
                 value={selectedProgramId}
+                disabled={loading}
                 onChange={(e) => setSelectedProgramId(e.target.value)}
                 className="px-3 py-2 text-xs font-bold border border-slate-300 rounded-lg bg-slate-50 focus:bg-white focus:outline-none focus:border-gov-blue w-full sm:w-80"
               >
@@ -1046,6 +1065,7 @@ function StubDistributionContent() {
 
       {/* Beneficiary QR Pass Generator & Screenshot Modal */}
       <FieldQrPassGeneratorModal
+        programId={selectedProgramId}
         isOpen={qrGeneratorOpen}
         onClose={() => setQrGeneratorOpen(false)}
       />

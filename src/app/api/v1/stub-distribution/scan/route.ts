@@ -1,3 +1,4 @@
+import { resolveProgramScan, ProgramScanError } from "@/lib/program-scan-resolver";
 export const dynamic = "force-dynamic";
 
 import { NextResponse } from "next/server";
@@ -22,154 +23,12 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "QR Token or Beneficiary number is required" }, { status: 400 });
     }
 
-    // Clean token: check if scanned value is a URL containing token parameter
-    let cleanToken = rawQrToken;
-    try {
-      if (rawQrToken.startsWith("http://") || rawQrToken.startsWith("https://")) {
-        const parsedUrl = new URL(rawQrToken);
-        cleanToken =
-          parsedUrl.searchParams.get("token") ||
-          parsedUrl.searchParams.get("qrToken") ||
-          parsedUrl.pathname.split("/").pop() ||
-          rawQrToken;
-      }
-    } catch {}
-
-    cleanToken = cleanToken.trim();
-
-    let qr = null;
-    let pb: any = null;
-
-    // Strategy 1: Find by exact or uppercase publicToken
-    qr = await prisma.qrCode.findFirst({
-      where: {
-        OR: [{ publicToken: cleanToken }, { publicToken: cleanToken.toUpperCase() }],
-      },
-      include: {
-        programBeneficiary: {
-          include: {
-            beneficiary: true,
-            program: true,
-            stubDistributions: {
-              include: { distributedBy: { select: { fullName: true } } },
-              orderBy: { distributedAt: "desc" },
-            },
-          },
-        },
-      },
+    const resolved = await resolveProgramScan(rawQrToken, programIdParam, {
+      beneficiary: true, program: true, qrCodes: true,
+      stubDistributions: { include: { distributedBy: { select: { fullName: true } } }, orderBy: { distributedAt: "desc" } },
     });
-
-    if (qr && qr.programBeneficiary) {
-      pb = qr.programBeneficiary;
-    }
-
-    // Strategy 2: Search by Case-Insensitive substring of publicToken (non-numeric tokens >= 6 chars)
-    const isNumericSlot = /^\d+$/.test(cleanToken);
-    if (!pb && !isNumericSlot && cleanToken.length >= 6) {
-      qr = await prisma.qrCode.findFirst({
-        where: {
-          publicToken: { contains: cleanToken, mode: "insensitive" },
-        },
-        include: {
-          programBeneficiary: {
-            include: {
-              beneficiary: true,
-              program: true,
-              stubDistributions: {
-                include: { distributedBy: { select: { fullName: true } } },
-                orderBy: { distributedAt: "desc" },
-              },
-            },
-          },
-        },
-      });
-      if (qr && qr.programBeneficiary) {
-        pb = qr.programBeneficiary;
-      }
-    }
-
-    // Strategy 3: Numeric slot match (e.g. "1", "22", "81", "92")
-    if (!pb && isNumericSlot) {
-      const slotNum = String(parseInt(cleanToken, 10));
-      const whereClause: any = { designatedNumber: slotNum, participationStatus: "ACTIVE" };
-      if (programIdParam) whereClause.programId = programIdParam;
-
-      pb = await prisma.programBeneficiary.findFirst({
-        where: whereClause,
-        orderBy: { joinedAt: "desc" },
-        include: {
-          beneficiary: true,
-          program: true,
-          stubDistributions: {
-            include: { distributedBy: { select: { fullName: true } } },
-            orderBy: { distributedAt: "desc" },
-          },
-          qrCodes: true,
-        },
-      });
-
-      if (pb) {
-        qr = pb.qrCodes.find((q: any) => q.status === "ACTIVE") || pb.qrCodes[0] || null;
-      }
-    }
-
-    // Strategy 4: Beneficiary Number or Full Name match
-    if (!pb) {
-      const whereClause: any = {
-        OR: [
-          { beneficiary: { beneficiaryNumber: cleanToken } },
-          { beneficiary: { fullName: { equals: cleanToken, mode: "insensitive" } } },
-        ],
-      };
-      if (programIdParam) whereClause.programId = programIdParam;
-
-      pb = await prisma.programBeneficiary.findFirst({
-        where: whereClause,
-        orderBy: { joinedAt: "desc" },
-        include: {
-          beneficiary: true,
-          program: true,
-          stubDistributions: {
-            include: { distributedBy: { select: { fullName: true } } },
-            orderBy: { distributedAt: "desc" },
-          },
-          qrCodes: true,
-        },
-      });
-
-      if (pb) {
-        qr = pb.qrCodes.find((q: any) => q.status === "ACTIVE") || pb.qrCodes[0] || null;
-      }
-    }
-
-    if (!pb) {
-      return NextResponse.json({ error: "QR Stub not found in registered program roster." }, { status: 404 });
-    }
-
-    // Resolve replacement if beneficiary was replaced
-    if (pb.participationStatus === "REPLACED") {
-      const activeReplacement = await prisma.programBeneficiary.findFirst({
-        where: {
-          programId: pb.programId,
-          designatedNumber: pb.designatedNumber,
-          participationStatus: "ACTIVE",
-        },
-        include: {
-          beneficiary: true,
-          program: true,
-          stubDistributions: {
-            include: { distributedBy: { select: { fullName: true } } },
-            orderBy: { distributedAt: "desc" },
-          },
-          qrCodes: true,
-        },
-      });
-
-      if (activeReplacement) {
-        pb = activeReplacement;
-        qr = pb.qrCodes.find((q: any) => q.status === "ACTIVE") || pb.qrCodes[0] || qr;
-      }
-    }
+    const pb = resolved.pb;
+    let qr = resolved.qr;
 
     // Ensure active QR code record exists
     if (!qr) {
@@ -233,6 +92,7 @@ export async function POST(request: Request) {
       data: {
         qrId: qr.id,
         programBeneficiaryId: pb.id,
+        programId: pb.programId,
         designatedNumber: pb.designatedNumber,
         fullName: pb.beneficiary.fullName,
         barangay: normalizedBrgy,
@@ -247,6 +107,7 @@ export async function POST(request: Request) {
       },
     });
   } catch (error: any) {
+    if (error instanceof ProgramScanError) return NextResponse.json({ error: error.message }, { status: error.status });
     console.error("Stub scan error:", error);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }

@@ -1,3 +1,4 @@
+import { resolveProgramScan, ProgramScanError } from "@/lib/program-scan-resolver";
 export const dynamic = "force-dynamic";
 
 import { NextResponse } from "next/server";
@@ -23,174 +24,11 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "QR Token or Beneficiary number is required" }, { status: 400 });
     }
 
-    // Clean token if URL
-    let cleanToken = rawQrToken;
-    try {
-      if (rawQrToken.startsWith("http://") || rawQrToken.startsWith("https://")) {
-        const parsedUrl = new URL(rawQrToken);
-        cleanToken =
-          parsedUrl.searchParams.get("token") ||
-          parsedUrl.searchParams.get("qrToken") ||
-          parsedUrl.pathname.split("/").pop() ||
-          rawQrToken;
-      }
-    } catch {}
-
-    cleanToken = cleanToken.trim();
-
-    let qr = null;
-    let pb: any = null;
-
-    // Strategy 1: Exact or uppercase publicToken
-    qr = await prisma.qrCode.findFirst({
-      where: {
-        OR: [{ publicToken: cleanToken }, { publicToken: cleanToken.toUpperCase() }],
-      },
-      include: {
-        programBeneficiary: {
-          include: {
-            beneficiary: true,
-            program: true,
-            orientationAttendance: {
-              include: { scannedBy: { select: { fullName: true } } },
-              orderBy: { scannedAt: "desc" },
-            },
-            stubDistributions: {
-              where: { status: "DISTRIBUTED" },
-            },
-          },
-        },
-      },
+    const { pb, qr } = await resolveProgramScan(rawQrToken, programIdParam, {
+      beneficiary: true, program: true, qrCodes: true,
+      orientationAttendance: { where: { programId: programIdParam }, include: { scannedBy: { select: { fullName: true } } }, orderBy: { scannedAt: "desc" } },
+      stubDistributions: { where: { status: "DISTRIBUTED" } },
     });
-
-    if (qr && qr.programBeneficiary) {
-      pb = qr.programBeneficiary;
-    }
-
-    // Strategy 2: Case-insensitive substring
-    if (!pb) {
-      qr = await prisma.qrCode.findFirst({
-        where: { publicToken: { contains: cleanToken, mode: "insensitive" } },
-        include: {
-          programBeneficiary: {
-            include: {
-              beneficiary: true,
-              program: true,
-              orientationAttendance: {
-                include: { scannedBy: { select: { fullName: true } } },
-                orderBy: { scannedAt: "desc" },
-              },
-              stubDistributions: {
-                where: { status: "DISTRIBUTED" },
-              },
-            },
-          },
-        },
-      });
-      if (qr && qr.programBeneficiary) {
-        pb = qr.programBeneficiary;
-      }
-    }
-
-    // Strategy 3: Numeric designated slot number
-    const isNumericSlot = /^\d+$/.test(cleanToken);
-    if (!pb && isNumericSlot) {
-      const slotNum = String(parseInt(cleanToken, 10));
-      const whereClause: any = { designatedNumber: slotNum, participationStatus: "ACTIVE" };
-      if (programIdParam) whereClause.programId = programIdParam;
-
-      pb = await prisma.programBeneficiary.findFirst({
-        where: whereClause,
-        orderBy: { joinedAt: "desc" },
-        include: {
-          beneficiary: true,
-          program: true,
-          orientationAttendance: {
-            include: { scannedBy: { select: { fullName: true } } },
-            orderBy: { scannedAt: "desc" },
-          },
-          stubDistributions: {
-            where: { status: "DISTRIBUTED" },
-          },
-          qrCodes: true,
-        },
-      });
-
-      if (pb) {
-        qr = pb.qrCodes.find((q: any) => q.status === "ACTIVE") || pb.qrCodes[0] || null;
-      }
-    }
-
-    // Strategy 4: Beneficiary number or Full name
-    if (!pb) {
-      const whereClause: any = {
-        OR: [
-          { beneficiary: { beneficiaryNumber: cleanToken } },
-          { beneficiary: { fullName: { equals: cleanToken, mode: "insensitive" } } },
-        ],
-      };
-      if (programIdParam) whereClause.programId = programIdParam;
-
-      pb = await prisma.programBeneficiary.findFirst({
-        where: whereClause,
-        orderBy: { joinedAt: "desc" },
-        include: {
-          beneficiary: true,
-          program: true,
-          orientationAttendance: {
-            include: { scannedBy: { select: { fullName: true } } },
-            orderBy: { scannedAt: "desc" },
-          },
-          stubDistributions: {
-            where: { status: "DISTRIBUTED" },
-          },
-          qrCodes: true,
-        },
-      });
-
-      if (pb) {
-        qr = pb.qrCodes.find((q: any) => q.status === "ACTIVE") || pb.qrCodes[0] || null;
-      }
-    }
-
-    if (!pb) {
-      return NextResponse.json({ error: "QR Code not found in registered program roster." }, { status: 404 });
-    }
-
-    // Handle replacement resolution
-    if (pb.participationStatus === "REPLACED") {
-      const activeReplacement = await prisma.programBeneficiary.findFirst({
-        where: {
-          programId: pb.programId,
-          designatedNumber: pb.designatedNumber,
-          participationStatus: "ACTIVE",
-        },
-        include: {
-          beneficiary: true,
-          program: true,
-          orientationAttendance: {
-            include: { scannedBy: { select: { fullName: true } } },
-            orderBy: { scannedAt: "desc" },
-          },
-          stubDistributions: {
-            where: { status: "DISTRIBUTED" },
-          },
-          qrCodes: true,
-        },
-      });
-
-      if (activeReplacement) {
-        pb = activeReplacement;
-      } else {
-        return NextResponse.json(
-          {
-            error: `CANNOT SCAN: Beneficiary #${pb.designatedNumber} (${pb.beneficiary.fullName}) was replaced and is no longer active in this program.`,
-            stepBlocked: "BENEFICIARY_REPLACED",
-          },
-          { status: 400 }
-        );
-      }
-    }
 
     // =========================================================================
     // STEP SEQUENCE VALIDATION: Step 1 (Stub Distribution) must be completed!
@@ -268,6 +106,7 @@ export async function POST(request: Request) {
       },
     });
   } catch (error: any) {
+    if (error instanceof ProgramScanError) return NextResponse.json({ error: error.message }, { status: error.status });
     console.error("Orientation scan error:", error);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }

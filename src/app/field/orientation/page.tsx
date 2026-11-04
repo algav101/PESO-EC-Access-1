@@ -1,6 +1,8 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import { ScanRequestError, readScanResponse } from "@/lib/program-qr-slot";
+
+import React, { useState, useEffect, useRef } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import {
@@ -53,6 +55,8 @@ function OrientationContent() {
   const [activeTab, setActiveTab] = useState<"scanner" | "monitoring">(initialTab);
   const [programs, setPrograms] = useState<any[]>([]);
   const [selectedProgramId, setSelectedProgramId] = useState<string>("");
+  const programRef = useRef(selectedProgramId);
+  programRef.current = selectedProgramId;
 
   // Scanner States
   const [scannerOpen, setScannerOpen] = useState(false);
@@ -136,6 +140,7 @@ function OrientationContent() {
         const res = await fetch(`/api/v1/orientation/monitoring?programId=${progId}`);
         if (res.ok) {
           const data = await res.json();
+          if (programRef.current !== progId) return;
           setMonitoringData(data);
           setLastRefreshedAt(new Date());
           return;
@@ -153,6 +158,7 @@ function OrientationContent() {
         .where("programId")
         .equals(progId)
         .toArray();
+      if (programRef.current !== progId) return;
 
       if (cachedBeneficiaries.length > 0) {
         const attendedCount = cachedBeneficiaries.filter((b) => b.orientationStatus === "PRESENT").length;
@@ -181,6 +187,8 @@ function OrientationContent() {
     }
   };
 
+  useEffect(() => { setScanResult(null); setError(null); setManualSlot(""); setMonitoringData(null); setScannerOpen(false); }, [selectedProgramId]);
+
   const handleScan = async (tokenOrSlot: string) => {
     setScannerOpen(false);
     setLoading(true);
@@ -188,6 +196,7 @@ function OrientationContent() {
     setScanResult(null);
 
     try {
+      if (!selectedProgramId) throw new ScanRequestError("Pumili muna ng TUPAD program.");
       if (isOnline) {
         try {
           const res = await fetch("/api/v1/orientation/scan", {
@@ -200,8 +209,7 @@ function OrientationContent() {
             }),
           });
 
-          const data = await res.json();
-          if (!res.ok) throw new Error(data.error || "Orientation verification failed");
+          const data = await readScanResponse(res, "Scan rejected for the selected program.");
 
           setScanResult({
             alreadyRecorded: data.alreadyScanned,
@@ -216,6 +224,7 @@ function OrientationContent() {
           }
           return;
         } catch (onlineErr: any) {
+          if (onlineErr instanceof ScanRequestError) throw onlineErr;
           if (
             onlineErr.message &&
             (onlineErr.message.includes("ALREADY SCANNED") ||
@@ -232,6 +241,8 @@ function OrientationContent() {
       const bene = await findBeneficiaryOffline(tokenOrSlot, selectedProgramId);
       if (!bene) throw new Error(`Beneficiary or QR Token "${tokenOrSlot}" not found in offline database.`);
 
+      if (bene.orientationStatus === "PRESENT") throw new Error("ALREADY SCANNED: Orientation was already recorded in this program.");
+
       // Update orientation status in local cache
       await offlineDb.cachedBeneficiaries.update(bene.id, { orientationStatus: "PRESENT" });
 
@@ -242,7 +253,7 @@ function OrientationContent() {
       });
 
       setScanResult({
-        alreadyRecorded: bene.orientationStatus === "PRESENT",
+        alreadyRecorded: false,
         message: "✓ Orientation Attendance Stored to Installed Unit (Queued for Sync)",
         data: {
           designatedNumber: bene.designatedNumber,
@@ -417,6 +428,7 @@ function OrientationContent() {
           </label>
           <select
             value={selectedProgramId}
+            disabled={loading}
             onChange={(e) => setSelectedProgramId(e.target.value)}
             className="text-xs font-bold bg-white border border-slate-300 rounded-xl px-3 py-2 text-slate-800 shadow-xs focus:ring-2 focus:ring-gov-blue focus:border-gov-blue"
           >
@@ -1120,6 +1132,7 @@ function OrientationContent() {
 
       {/* Beneficiary QR Pass Generator & Screenshot Modal */}
       <FieldQrPassGeneratorModal
+        programId={selectedProgramId}
         isOpen={qrGeneratorOpen}
         onClose={() => setQrGeneratorOpen(false)}
       />

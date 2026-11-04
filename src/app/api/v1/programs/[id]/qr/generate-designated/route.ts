@@ -1,9 +1,10 @@
 export const dynamic = "force-dynamic";
+export const maxDuration = 60;
 
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
-import { getCurrentUser } from "@/lib/auth";
-import { logAudit } from "@/lib/audit";
+import { getCurrentUser, hasPermission } from "@/lib/auth";
+import { ensureProgramQrCodes } from "@/lib/program-qr-generation";
 import { generateBeneficiaryToken, formatBeneficiaryQrPayload, generateQrDataUrl } from "@/lib/qr";
 import { assignBeneficiaryWorkArea, WorkProgramItemAllocation } from "@/lib/work-assignment";
 import { format } from "date-fns";
@@ -14,6 +15,7 @@ export async function POST(
 ) {
   try {
     const user = await getCurrentUser();
+    if (!user || !hasPermission(user.role, "qr.generate")) return NextResponse.json({ error: "Forbidden: insufficient permissions" }, { status: 403 });
     const programId = params.id;
 
     let body: any = {};
@@ -47,6 +49,8 @@ export async function POST(
       return NextResponse.json({ error: "Hindi nahanap ang programang ito." }, { status: 404 });
     }
 
+    const stats = await prisma.$transaction((tx) => ensureProgramQrCodes(tx, programId, user.id, { force: forceRegenerate, barangay: filterBarangay }), { maxWait: 5000, timeout: 45000 });
+
     // 2. Fetch Beneficiaries
     const whereClause: any = {
       programId: program.id,
@@ -54,7 +58,7 @@ export async function POST(
     };
 
     if (filterBarangay) {
-      whereClause.beneficiary = { barangay: { contains: filterBarangay, mode: "insensitive" } };
+      whereClause.beneficiary = { barangay: { equals: filterBarangay, mode: "insensitive" } };
     }
 
     const beneficiaries = await prisma.programBeneficiary.findMany({
@@ -74,40 +78,10 @@ export async function POST(
       return String(a.designatedNumber).localeCompare(String(b.designatedNumber), undefined, { numeric: true });
     });
 
-    let newlyGeneratedCount = 0;
-    let existingCount = 0;
-
     const updatedBeneficiaries = await Promise.all(
       beneficiaries.map(async (pb) => {
-        let activeQr = pb.qrCodes.find((q) => q.status === "ACTIVE");
-
-        if (forceRegenerate || !activeQr) {
-          // If force regenerating, mark old active QRs as REPLACED
-          if (forceRegenerate && activeQr) {
-            await prisma.qrCode.updateMany({
-              where: {
-                programBeneficiaryId: pb.id,
-                status: "ACTIVE",
-              },
-              data: { status: "REPLACED" },
-            });
-          }
-
-          const generated = generateBeneficiaryToken(program.id, pb.designatedNumber);
-          activeQr = await prisma.qrCode.create({
-            data: {
-              programId: program.id,
-              programBeneficiaryId: pb.id,
-              publicToken: generated.publicToken,
-              tokenHash: generated.tokenHash,
-              status: "ACTIVE",
-              generatedById: user?.id || null,
-            },
-          });
-          newlyGeneratedCount++;
-        } else {
-          existingCount++;
-        }
+        const activeQr = pb.qrCodes.find((q) => ["ACTIVE", "REPRINTED"].includes(q.status));
+        if (!activeQr) throw new Error("QR not available after batch generation");
 
         // Build scannable direct web URL & QR Image Data URL
         const qrPayloadUrl = formatBeneficiaryQrPayload(activeQr.publicToken, origin);
@@ -216,33 +190,18 @@ export async function POST(
       })
     );
 
-    if (user) {
-      await logAudit({
-        userId: user.id,
-        action: forceRegenerate ? "DESIGNATED_QR_REGENERATED_ALL" : "DESIGNATED_QR_BATCH_GENERATED",
-        entityType: "PROGRAM",
-        entityId: program.id,
-        metadata: {
-          totalCount: beneficiaries.length,
-          newlyGeneratedCount,
-          existingCount,
-          filterBarangay,
-        },
-      });
-    }
-
     return NextResponse.json({
       success: true,
       message: `Matagumpay na naihanda ang Designated Work Area QR Codes para sa ${beneficiaries.length} benepisyaryo.`,
       stats: {
-        totalCount: beneficiaries.length,
-        newlyGeneratedCount,
-        existingCount,
+        ...stats,
+        newlyGeneratedCount: stats.generatedCount,
       },
       beneficiaries: updatedBeneficiaries,
     });
   } catch (error: any) {
-    console.error("Batch designated QR generation error:", error);
+    if (error.message === "QR_GENERATION_BUSY") return NextResponse.json({ error: "May ongoing import/QR generation sa program. Hintaying matapos." }, { status: 409 });
+    console.error("Batch designated QR generation error:", { code: error.code || error.name });
     return NextResponse.json({ error: "Failed to generate designated QR codes: " + error.message }, { status: 500 });
   }
 }

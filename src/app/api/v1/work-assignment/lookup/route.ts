@@ -2,6 +2,7 @@ export const dynamic = "force-dynamic";
 
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
+import { resolveProgramScan, ProgramScanError } from "@/lib/program-scan-resolver";
 import { format } from "date-fns";
 import { assignBeneficiaryWorkArea, WorkProgramItemAllocation } from "@/lib/work-assignment";
 import { getCurrentUser } from "@/lib/auth";
@@ -302,74 +303,17 @@ async function handleLookup(params: any) {
     }
   }
 
-  // 2. Search by exact QR token
-  if (!pb && cleanToken) {
-    qr = await prisma.qrCode.findFirst({
-      where: {
-        OR: [{ publicToken: cleanToken }, { publicToken: cleanToken.toUpperCase() }],
-      },
-      include: {
-        programBeneficiary: {
-          include: pbIncludes,
-        },
-      },
-    });
-
-    if (qr && qr.programBeneficiary) {
-      pb = qr.programBeneficiary;
-    }
-
-    // Substring fallback
-    if (!pb) {
-      qr = await prisma.qrCode.findFirst({
-        where: { publicToken: { contains: cleanToken, mode: "insensitive" } },
-        include: {
-          programBeneficiary: {
-            include: pbIncludes,
-          },
-        },
-      });
-      if (qr && qr.programBeneficiary) {
-        pb = qr.programBeneficiary;
-      }
-    }
-  }
-
-  // 3. Search by designated slot number
-  if (!pb && (designatedNumber || (/^\d+$/.test(cleanToken) && cleanToken.length < 5))) {
-    const slotNum = designatedNumber || String(parseInt(cleanToken, 10));
-    const whereClause: any = { designatedNumber: slotNum, participationStatus: "ACTIVE" };
-    if (programIdParam) whereClause.programId = programIdParam;
-
-    pb = await prisma.programBeneficiary.findFirst({
-      where: whereClause,
-      orderBy: { joinedAt: "desc" },
-      include: pbIncludes,
-    });
-
-    if (pb) {
-      qr = pb.qrCodes.find((q: any) => q.status === "ACTIVE") || pb.qrCodes[0] || null;
-    }
-  }
-
-  // 4. Search by general beneficiary name or token
-  if (!pb && cleanToken && !/^\d+$/.test(cleanToken)) {
-    const whereClause: any = {
-      OR: [
-        { beneficiary: { beneficiaryNumber: cleanToken } },
-        { beneficiary: { fullName: { contains: cleanToken, mode: "insensitive" } } },
-      ],
-    };
-    if (programIdParam) whereClause.programId = programIdParam;
-
-    pb = await prisma.programBeneficiary.findFirst({
-      where: whereClause,
-      orderBy: { joinedAt: "desc" },
-      include: pbIncludes,
-    });
-
-    if (pb) {
-      qr = pb.qrCodes.find((q: any) => q.status === "ACTIVE") || pb.qrCodes[0] || null;
+  // A camera-scanned printed card refers to the same slot in the selected/latest program.
+  if (!pb && (cleanToken || designatedNumber)) {
+    const targetProgramId = programIdParam || (await prisma.program.findFirst({
+      where: { status: { in: ["ACTIVE", "DRAFT"] } }, orderBy: { createdAt: "desc" }, select: { id: true },
+    }))?.id;
+    try {
+      const resolved = await resolveProgramScan(designatedNumber || cleanToken, targetProgramId, pbIncludes);
+      pb = resolved.pb; qr = resolved.qr;
+    } catch (error) {
+      if (error instanceof ProgramScanError) return NextResponse.json({ error: error.message }, { status: error.status });
+      throw error;
     }
   }
 

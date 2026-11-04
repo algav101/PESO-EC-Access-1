@@ -180,18 +180,18 @@ function StubsContent() {
     setPreviewSheetPage(1);
   }, [templateMode]);
 
-  const handleBatchGenerateDesignated = async () => {
+  const handleBatchGenerateDesignated = async (missingOnly = false) => {
     if (!selectedProgramId) return;
     setIsGeneratingDesignated(true);
     setDesignatedGenProgress("Nagsisimulang mag-generate ng designated QR codes...");
     setDesignatedSuccessMsg(null);
 
     try {
-      const res = await fetch(`/api/v1/programs/${selectedProgramId}/qr/generate-designated`, {
+      const res = await fetch(`/api/v1/programs/${selectedProgramId}/qr/${missingOnly ? "generate" : "generate-designated"}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          forceRegenerate: forceRegenerateQrs,
+          forceRegenerate: !missingOnly && forceRegenerateQrs,
           barangay: designatedFilterBrgy !== "ALL" ? designatedFilterBrgy : undefined,
           origin: typeof window !== "undefined" ? window.location.origin : undefined,
         }),
@@ -1131,6 +1131,7 @@ function StubsContent() {
               <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Target Program</label>
               <select
                 value={selectedProgramId}
+                disabled={isGeneratingDesignated}
                 onChange={(e) => setSelectedProgramId(e.target.value)}
                 className="w-full px-3 py-1.5 text-xs border border-slate-300 rounded-lg bg-slate-50 font-bold focus:outline-none focus:border-gov-blue truncate"
               >
@@ -1753,7 +1754,7 @@ function StubsContent() {
       {/* Batch Designated QR Generator Modal */}
       {isDesignatedGenModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-fadeIn">
-          <div className="bg-slate-950 text-white rounded-3xl max-w-lg w-full p-6 space-y-5 shadow-2xl border-2 border-emerald-500/50 relative overflow-hidden">
+          <div className="bg-slate-950 text-white rounded-3xl max-w-lg w-full max-h-[90dvh] overflow-y-auto p-6 space-y-5 shadow-2xl border-2 border-emerald-500/50 relative">
             <div className="flex items-start justify-between border-b border-slate-800 pb-3">
               <div className="flex items-center space-x-2.5">
                 <div className="p-2.5 bg-emerald-500/20 text-emerald-400 rounded-xl border border-emerald-500/30">
@@ -1790,6 +1791,15 @@ function StubsContent() {
                 </div>
               </div>
 
+              <div className="p-3 bg-emerald-950/60 border border-emerald-800 rounded-xl space-y-2">
+                <p className="font-bold text-emerald-200">Walang 522 QR limit</p>
+                <p>Batay sa designated number ng uploaded roster ang QR. Kung #1–#600 ang roster, kasama ang #523–#600. Walang gagawing blank/unassigned slot.</p>
+                <p>Reusable ang lumang printed QR sa parehong slot ng napiling program. Bawat bagong program ay may sariling pending scans; hindi mabubura ang lumang history.</p>
+                <button type="button" disabled={isGeneratingDesignated} onClick={() => handleBatchGenerateDesignated(true)} className="w-full p-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold disabled:opacity-50">
+                  Add missing QR codes (kasama ang #523 pataas)
+                </button>
+              </div>
+
               {/* Barangay Filter Selector */}
               <div>
                 <label className="block text-[11px] font-bold text-slate-300 uppercase mb-1">
@@ -1820,7 +1830,7 @@ function StubsContent() {
                 <div className="space-y-0.5">
                   <span className="font-bold text-white block">Mag-generate ng Bagong Tokens (Force Refresh)</span>
                   <span className="text-[10px] text-slate-400 block">
-                    Kung naka-check, papalitan ang umiiral na QR tokens ng bagong cryptographic tokens at ia-update ang active reference sa database.
+                    Papalitan ang active tokens para sa bagong print. Hindi nito ni-reset ang scan history. Reusable pa rin ang dating printed slot references maliban sa explicitly invalidated QR.
                   </span>
                 </div>
               </label>
@@ -1842,6 +1852,7 @@ function StubsContent() {
                   <span>{designatedGenProgress}</span>
                 </div>
               )}
+              {designatedSuccessMsg && <p role="status" className="p-3 text-emerald-200 bg-emerald-950 rounded-xl">{designatedSuccessMsg}</p>}
             </div>
 
             <div className="flex items-center justify-end space-x-2 pt-2 border-t border-slate-800">

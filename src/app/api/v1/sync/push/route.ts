@@ -2,6 +2,7 @@ export const dynamic = "force-dynamic";
 
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
+import { resolveProgramScan } from "@/lib/program-scan-resolver";
 import { getCurrentUser, isAdminUser, hasPermission } from "@/lib/auth";
 import { logAudit } from "@/lib/audit";
 import { formatBirthdayPin, normalizeBarangayName } from "@/lib/utils";
@@ -66,6 +67,11 @@ export async function POST(request: Request) {
         if (reqPerm && !hasPermission(user.role, reqPerm)) {
           throw new Error(`Forbidden: role ${user.role} lacks ${reqPerm} permission`);
         }
+        // Queued scans retain their original program; never migrate them to a new roster.
+        if (["ATTENDANCE", "ORIENTATION", "STUB_DISTRIBUTION", "PAYOUT"].includes(entityType) && payload?.programBeneficiaryId) {
+          const owner = await prisma.programBeneficiary.findUnique({ where: { id: payload.programBeneficiaryId }, select: { programId: true } });
+          if (owner && payload.programId && owner.programId !== payload.programId) throw new Error("CANNOT SYNC: Beneficiary belongs to a different program.");
+        }
 
         if (entityType === "ATTENDANCE") {
           const {
@@ -103,16 +109,7 @@ export async function POST(request: Request) {
             });
           }
           if (!pb && (payload.qrToken || payload.rawToken)) {
-            const token = String(payload.qrToken || payload.rawToken).trim();
-            const qr = await prisma.qrCode.findFirst({
-              where: {
-                OR: [{ publicToken: token }, { publicToken: token.toUpperCase() }],
-              },
-              include: { programBeneficiary: { include: { program: true } } },
-            });
-            if (qr?.programBeneficiary) {
-              pb = qr.programBeneficiary;
-            }
+            pb = (await resolveProgramScan(String(payload.qrToken || payload.rawToken), programId, { program: true })).pb;
           }
           if (!pb && payload.designatedNumber) {
             const slotNum = String(parseInt(String(payload.designatedNumber), 10));
@@ -132,11 +129,13 @@ export async function POST(request: Request) {
 
           const resolvedProgramId = pb.programId;
           const resolvedBeneficiaryId = pb.id;
+          if (programId && pb.programId !== programId) throw new Error("CANNOT SYNC: Wrong beneficiary program.");
 
           // 2. Resolve WorkDay
           let wd = null;
           if (workDayId && !String(workDayId).startsWith("WD-") && String(workDayId).length > 10) {
             wd = await prisma.workDay.findUnique({ where: { id: workDayId } });
+            if (wd && wd.programId !== resolvedProgramId) throw new Error("CANNOT SYNC: Work day belongs to a different program.");
           }
 
           const parsedDayNum = payload.dayNumber || (String(workDayId).startsWith("WD-") ? parseInt(String(workDayId).replace("WD-", ""), 10) : null);
@@ -182,8 +181,8 @@ export async function POST(request: Request) {
           // 3. Resolve WorkProgramItem
           let resolvedItemId: string | null = null;
           if (workProgramItemId && workProgramItemId !== "AUTO" && String(workProgramItemId).trim() !== "") {
-            const itemExists = await prisma.tupadWorkProgramItem.findUnique({
-              where: { id: workProgramItemId },
+            const itemExists = await prisma.tupadWorkProgramItem.findFirst({
+              where: { id: workProgramItemId, workProgram: { programId: resolvedProgramId } },
             });
             if (itemExists) {
               resolvedItemId = itemExists.id;
@@ -260,6 +259,7 @@ export async function POST(request: Request) {
           if (!pb) {
             throw new Error(`Beneficiary record (${programBeneficiaryId || "unknown"}) not found for orientation.`);
           }
+          if (programId && pb.programId !== programId) throw new Error("CANNOT SYNC: Wrong orientation program.");
 
           let validScannedById: string | null = null;
           const targetUserId = scannedById || user?.id;
@@ -291,7 +291,7 @@ export async function POST(request: Request) {
           });
           accepted.push(clientTransactionId);
         } else if (entityType === "STUB_DISTRIBUTION") {
-          const { qrId, programBeneficiaryId, birthdayPin, latitude, longitude } = payload || {};
+          const { qrId, programId, programBeneficiaryId, birthdayPin, latitude, longitude } = payload || {};
           let pb = null;
           if (programBeneficiaryId) {
             pb = await prisma.programBeneficiary.findUnique({
@@ -314,6 +314,7 @@ export async function POST(request: Request) {
           if (!pb) {
             throw new Error(`Beneficiary record (${programBeneficiaryId || "unknown"}) not found for stub distribution.`);
           }
+          if (programId && pb.programId !== programId) throw new Error("CANNOT SYNC: Wrong stub program.");
 
           const actualPin = formatBirthdayPin(pb.beneficiary.birthday);
           const enteredPin = birthdayPin ? String(birthdayPin).trim().replace(/[\/\.]/g, "-") : "";
@@ -327,7 +328,7 @@ export async function POST(request: Request) {
           let resolvedQrId = qrId;
           if (resolvedQrId) {
             const qrExists = await prisma.qrCode.findUnique({ where: { id: resolvedQrId } });
-            if (!qrExists) resolvedQrId = null;
+            if (!qrExists || qrExists.programBeneficiaryId !== pb.id || qrExists.programId !== pb.programId || qrExists.status === "INVALIDATED") resolvedQrId = null;
           }
           if (!resolvedQrId && pb.qrCodes && pb.qrCodes.length > 0) {
             const activeQr = pb.qrCodes.find((q) => q.status === "ACTIVE") || pb.qrCodes[0];
@@ -411,6 +412,7 @@ export async function POST(request: Request) {
           if (!pb) {
             throw new Error(`Beneficiary record (${programBeneficiaryId || "unknown"}) not found for payout.`);
           }
+          if (programId && pb.programId !== programId) throw new Error("CANNOT SYNC: Wrong payout program.");
 
           const resolvedProgramId = pb.programId;
           const resolvedPbId = pb.id;

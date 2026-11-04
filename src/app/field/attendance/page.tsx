@@ -1,6 +1,8 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import { ScanRequestError, readScanResponse } from "@/lib/program-qr-slot";
+
+import React, { useEffect, useState, useRef } from "react";
 import {
   Clock,
   QrCode,
@@ -43,6 +45,8 @@ export default function DailyAttendancePage() {
 
   const [programs, setPrograms] = useState<any[]>([]);
   const [selectedProgramId, setSelectedProgramId] = useState<string>("");
+  const programRef = useRef(selectedProgramId);
+  programRef.current = selectedProgramId;
   const [workDays, setWorkDays] = useState<any[]>([]);
   const [selectedWorkDayId, setSelectedWorkDayId] = useState<string>("");
   const [shiftMode, setShiftMode] = useState<string>("AUTO");
@@ -142,6 +146,9 @@ export default function DailyAttendancePage() {
 
   useEffect(() => {
     if (selectedProgramId) {
+      setWorkDays([]);
+      setSelectedWorkDayId("");
+      setWorkPrograms([]);
       const prog = programs.find((p) => p.id === selectedProgramId);
       if (prog && prog.workDays && prog.workDays.length > 0) {
         const sortedDays = [...prog.workDays].sort((a, b) => a.dayNumber - b.dayNumber);
@@ -167,6 +174,7 @@ export default function DailyAttendancePage() {
         const res = await fetch(`/api/v1/programs/${progId}`);
         if (res.ok) {
           const data = await res.json();
+          if (programRef.current !== progId) return;
           if (data.program?.workDays?.length > 0) {
             const sortedDays = [...data.program.workDays].sort((a, b) => a.dayNumber - b.dayNumber);
             setWorkDays(sortedDays);
@@ -187,6 +195,7 @@ export default function DailyAttendancePage() {
     // Try offline IndexedDB
     try {
       const cachedDays = await offlineDb.cachedWorkDays.where("programId").equals(progId).toArray();
+      if (programRef.current !== progId) return;
       if (cachedDays && cachedDays.length > 0) {
         const sortedDays = cachedDays.sort((a, b) => a.dayNumber - b.dayNumber);
         setWorkDays(sortedDays);
@@ -247,6 +256,7 @@ export default function DailyAttendancePage() {
         const res = await fetch(`/api/v1/programs/${progId}/work-program`);
         if (res.ok) {
           const data = await res.json();
+          if (programRef.current !== progId) return;
           if (data.workPrograms && data.workPrograms.length > 0) {
             setWorkPrograms(data.workPrograms);
             return;
@@ -260,6 +270,7 @@ export default function DailyAttendancePage() {
     // Offline fallback from Dexie
     try {
       const cachedItems = await offlineDb.cachedWorkProgramItems.where("programId").equals(progId).toArray();
+      if (programRef.current !== progId) return;
       if (cachedItems.length > 0) {
         const grouped: Record<string, any[]> = {};
         cachedItems.forEach((it) => {
@@ -296,6 +307,8 @@ export default function DailyAttendancePage() {
       }))
   );
 
+  useEffect(() => { setScanResult(null); setError(null); setSelectedAreaItemId("AUTO"); setScannerOpen(false); }, [selectedProgramId]);
+
   const handleScan = async (token: string) => {
     setScannerOpen(false);
     setLoading(true);
@@ -303,6 +316,7 @@ export default function DailyAttendancePage() {
     setScanResult(null);
 
     try {
+      if (!selectedProgramId) throw new ScanRequestError("Pumili muna ng TUPAD program.");
       if (isOnline) {
         try {
           const res = await fetch("/api/v1/attendance/scan", {
@@ -310,6 +324,7 @@ export default function DailyAttendancePage() {
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
               qrToken: token,
+              programId: selectedProgramId,
               workDayId: selectedWorkDayId,
               targetDate: selectedWorkDay?.workDate,
               shiftMode,
@@ -319,8 +334,7 @@ export default function DailyAttendancePage() {
             }),
           });
 
-          const data = await res.json();
-          if (!res.ok) throw new Error(data.error || "Attendance scan failed");
+          const data = await readScanResponse(res, "Scan rejected for the selected program.");
 
           setScanResult({
             isDuplicate: data.isDuplicate,
@@ -331,6 +345,7 @@ export default function DailyAttendancePage() {
           });
           return;
         } catch (onlineErr: any) {
+          if (onlineErr instanceof ScanRequestError) throw onlineErr;
           if (
             onlineErr.message &&
             (onlineErr.message.includes("ALREADY SCANNED") ||
@@ -459,6 +474,7 @@ export default function DailyAttendancePage() {
           <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Target Program</label>
           <select
             value={selectedProgramId}
+            disabled={loading}
             onChange={(e) => setSelectedProgramId(e.target.value)}
             className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg bg-slate-50 font-bold text-slate-900 focus:outline-none focus:border-gov-blue"
           >
@@ -859,6 +875,7 @@ export default function DailyAttendancePage() {
 
       {/* Beneficiary QR Pass Generator & Screenshot Modal */}
       <FieldQrPassGeneratorModal
+        programId={selectedProgramId}
         isOpen={qrGeneratorOpen}
         onClose={() => setQrGeneratorOpen(false)}
       />

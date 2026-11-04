@@ -1,6 +1,8 @@
 "use client";
 
-import React, { useState } from "react";
+import { ScanRequestError, readScanResponse } from "@/lib/program-qr-slot";
+
+import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import {
   Banknote,
@@ -24,6 +26,8 @@ import { format } from "date-fns";
 export default function PayoutScannerPage() {
   const { user, can } = useAuth();
   const { isOnline } = useOffline();
+  const [programs, setPrograms] = useState<any[]>([]);
+  const [selectedProgramId, setSelectedProgramId] = useState("");
 
   const [scannerOpen, setScannerOpen] = useState(false);
   const [qrGeneratorOpen, setQrGeneratorOpen] = useState(false);
@@ -34,6 +38,26 @@ export default function PayoutScannerPage() {
   const [remarks, setRemarks] = useState("");
   const [payoutResult, setPayoutResult] = useState<any | null>(null);
 
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      let list: any[] = [];
+      try {
+        if (navigator.onLine) {
+          const response = await fetch("/api/v1/programs");
+          if (response.ok) list = (await response.json()).programs || [];
+        }
+      } catch {}
+      if (!list.length) list = await offlineDb.cachedPrograms.toArray();
+      if (!cancelled) { setPrograms(list); setSelectedProgramId(list[0]?.id || ""); }
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
+  useEffect(() => {
+    setScannedBeneficiary(null); setPayoutResult(null); setError(null); setRemarks(""); setScannerOpen(false);
+  }, [selectedProgramId]);
+
   const handleScan = async (token: string) => {
     setScannerOpen(false);
     setLoading(true);
@@ -41,17 +65,17 @@ export default function PayoutScannerPage() {
     setPayoutResult(null);
 
     try {
+      if (!selectedProgramId) throw new ScanRequestError("Pumili muna ng TUPAD program.");
       if (isOnline) {
         try {
           // Look up beneficiary details and validate sequence + anti-double payout checks
           const res = await fetch("/api/v1/payout/scan", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ qrToken: token, isLookupOnly: true }),
+            body: JSON.stringify({ qrToken: token, programId: selectedProgramId, isLookupOnly: true }),
           });
 
-          const data = await res.json();
-          if (!res.ok) throw new Error(data.error || "Payout scan validation failed");
+          const data = await readScanResponse(res, "Scan rejected for the selected program.");
 
           setScannedBeneficiary({
             ...data.data,
@@ -59,6 +83,7 @@ export default function PayoutScannerPage() {
           });
           return;
         } catch (onlineErr: any) {
+          if (onlineErr instanceof ScanRequestError) throw onlineErr;
           if (
             onlineErr.message &&
             (onlineErr.message.includes("ALREADY") ||
@@ -72,8 +97,9 @@ export default function PayoutScannerPage() {
       }
 
       // Offline lookup with universal token resolution
-      const bene = await findBeneficiaryOffline(token);
+      const bene = await findBeneficiaryOffline(token, selectedProgramId);
       if (!bene) throw new Error(`QR Token or Beneficiary "${token}" not found in offline database cache.`);
+      if (bene.payoutStatus === "PAID") throw new Error("ALREADY PAID: Payout was already recorded in this program.");
 
       setScannedBeneficiary({
         programBeneficiaryId: bene.id,
@@ -105,6 +131,7 @@ export default function PayoutScannerPage() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             qrToken: scannedBeneficiary.qrToken,
+            programId: selectedProgramId,
             status: payoutStatus,
             remarks,
             payoutDate: format(new Date(), "yyyy-MM-dd"),
@@ -128,6 +155,7 @@ export default function PayoutScannerPage() {
           payoutDate: format(new Date(), "yyyy-MM-dd"),
           remarks,
         });
+        if (payoutStatus === "PAID") await offlineDb.cachedBeneficiaries.update(scannedBeneficiary.programBeneficiaryId, { payoutStatus: "PAID" });
 
         setPayoutResult({
           message: `Payout (${payoutStatus}) Recorded & Saved Offline (Queued for Sync)`,
@@ -202,6 +230,14 @@ export default function PayoutScannerPage() {
       </div>
 
       {/* Main Scan Trigger */}
+      <div className="gov-card p-4 space-y-2">
+        <label htmlFor="payout-program" className="block text-xs font-bold">TUPAD Program</label>
+        <select id="payout-program" className="gov-input w-full" value={selectedProgramId} disabled={loading} onChange={(e) => setSelectedProgramId(e.target.value)}>
+          <option value="">Pumili ng program</option>
+          {programs.map((p) => <option key={p.id} value={p.id}>{p.programCode} — {p.programName}</option>)}
+        </select>
+        <p className="text-xs text-slate-500">Reusable ang printed QR ayon sa slot. Sa napiling program lamang ise-save ang payout.</p>
+      </div>
       {!scannedBeneficiary && !payoutResult && (
         <div className="gov-card p-8 text-center space-y-6 shadow-xl border-t-4 border-t-emerald-600">
           <div className="w-24 h-24 rounded-full bg-emerald-50 text-emerald-700 flex items-center justify-center mx-auto border-4 border-emerald-100 shadow-inner">
@@ -364,6 +400,7 @@ export default function PayoutScannerPage() {
 
       {/* Beneficiary QR Pass Generator & Screenshot Modal */}
       <FieldQrPassGeneratorModal
+        programId={selectedProgramId}
         isOpen={qrGeneratorOpen}
         onClose={() => setQrGeneratorOpen(false)}
       />

@@ -46,6 +46,7 @@ const DINGALAN_BARANGAYS = [
 ];
 
 interface FieldQrPassGeneratorCardProps {
+  programId?: string;
   initialSlot?: string;
   initialBarangay?: string;
   onClose?: () => void;
@@ -53,6 +54,7 @@ interface FieldQrPassGeneratorCardProps {
 }
 
 export function FieldQrPassGeneratorCard({
+  programId,
   initialSlot = "",
   initialBarangay = "ALL",
   onClose,
@@ -72,7 +74,7 @@ export function FieldQrPassGeneratorCard({
 
   useEffect(() => {
     fetchQrPasses(initialSlot || "", selectedBarangay);
-  }, []);
+  }, [programId]);
 
   const fetchQrPasses = async (query: string, brgy: string) => {
     setLoading(true);
@@ -80,6 +82,7 @@ export function FieldQrPassGeneratorCard({
     try {
       if (typeof navigator === "undefined" || navigator.onLine) {
         const params = new URLSearchParams();
+        if (programId) params.set("programId", programId);
         if (query && query.trim()) params.set("query", query.trim());
         if (brgy && brgy !== "ALL") params.set("barangay", brgy);
 
@@ -101,6 +104,7 @@ export function FieldQrPassGeneratorCard({
     // Offline QR Pass Fallback from IndexedDB
     try {
       let cached = await offlineDb.cachedBeneficiaries.toArray();
+      if (programId) cached = cached.filter((b) => b.programId === programId);
       if (brgy && brgy !== "ALL") {
         cached = cached.filter((b) => b.barangay?.toUpperCase() === brgy.toUpperCase());
       }
@@ -580,11 +584,13 @@ export function FieldQrPassGeneratorCard({
 
 // Fullscreen or Modal Wrapper
 export function FieldQrPassGeneratorModal({
+  programId,
   isOpen,
   onClose,
   initialSlot = "",
   initialBarangay = "ALL",
 }: {
+  programId?: string;
   isOpen: boolean;
   onClose: () => void;
   initialSlot?: string;
@@ -610,6 +616,7 @@ export function FieldQrPassGeneratorModal({
         </div>
 
         <FieldQrPassGeneratorCard
+          programId={programId}
           initialSlot={initialSlot}
           initialBarangay={initialBarangay}
           onClose={onClose}

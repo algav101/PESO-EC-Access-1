@@ -14,7 +14,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Forbidden: insufficient permissions for stub distribution" }, { status: 403 });
     }
 
-    const { qrId, programBeneficiaryId, birthdayPin, latitude, longitude, deviceId } = await request.json();
+    const { qrId, programId, programBeneficiaryId, birthdayPin, latitude, longitude, deviceId } = await request.json();
 
     if (!programBeneficiaryId || !birthdayPin) {
       return NextResponse.json({ error: "Program beneficiary ID and birthday PIN are required" }, { status: 400 });
@@ -31,6 +31,7 @@ export async function POST(request: Request) {
     if (!pb) {
       return NextResponse.json({ error: "Beneficiary not found" }, { status: 404 });
     }
+    if (programId && pb.programId !== programId) return NextResponse.json({ error: "CANNOT SCAN: Beneficiary belongs to a different program." }, { status: 400 });
 
     // Robust multi-format birthday comparison
     const isMatched = matchesBirthdayPin(pb.beneficiary.birthday, birthdayPin);
@@ -71,7 +72,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const activeQrId = qrId || pb.qrCodes.find((q) => q.status === "ACTIVE")?.id || pb.qrCodes[0]?.id;
+    const activeQrId = pb.qrCodes.find((q) => q.id === qrId && ["ACTIVE", "REPRINTED"].includes(q.status))?.id || pb.qrCodes.find((q) => ["ACTIVE", "REPRINTED"].includes(q.status))?.id;
     if (!activeQrId) {
       return NextResponse.json({ error: "Active QR Code not found for this beneficiary" }, { status: 400 });
     }

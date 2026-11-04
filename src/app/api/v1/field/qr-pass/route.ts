@@ -67,6 +67,7 @@ async function handleQrPassSearch(params: {
     });
   }
 
+  if (params.programId && !program) return NextResponse.json({ error: "Selected program not found." }, { status: 404 });
   if (!program) {
     program = await prisma.program.findFirst({
       where: { status: "ACTIVE" },

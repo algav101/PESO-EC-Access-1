@@ -1,4 +1,5 @@
 import Dexie, { type Table } from "dexie";
+import { normalizeQrSlot, registeredQrSlot } from "@/lib/program-qr-slot";
 import { format } from "date-fns";
 import {
   getPhilippineTime,
@@ -43,6 +44,7 @@ export interface CachedBeneficiary {
   status: string;
   orientationStatus?: "PRESENT" | "ABSENT";
   stubDistributed?: boolean;
+  payoutStatus?: string;
 }
 
 export interface CachedWorkDay {
@@ -107,6 +109,7 @@ export class TupadOfflineDatabase extends Dexie {
   cachedWorkProgramItems!: Table<CachedWorkProgramItem, string>;
   offlineAttendanceRecords!: Table<OfflineAttendanceRecord, number>;
   offlineQueue!: Table<OfflineTransaction, number>;
+  cachedQrSlots!: Table<{ publicToken: string; designatedNumber: string }, string>;
 
   constructor() {
     super("TupadOfflineDB_Dingalan");
@@ -118,10 +121,24 @@ export class TupadOfflineDatabase extends Dexie {
       offlineAttendanceRecords: "++id, [programId+workDayId+programBeneficiaryId], programBeneficiaryId, workDayId, attendanceDate",
       offlineQueue: "++id, clientTransactionId, entityType, status, createdAt",
     });
+    this.version(3).stores({ cachedQrSlots: "publicToken, designatedNumber" });
   }
 }
 
 export const offlineDb = new TupadOfflineDatabase();
+
+async function cacheRegisteredQrSlots() {
+  const response = await fetch("/api/v1/qr/slots", { headers: getClientAuthHeaders() });
+  if (response.status === 403) return; // Non-scanner roles can still cache their permitted data.
+  if (!response.ok) throw new Error("Cannot refresh registered QR slot references.");
+  const { slots } = await response.json();
+  if (!Array.isArray(slots)) throw new Error("Invalid QR slot reference response.");
+  await offlineDb.transaction("rw", offlineDb.cachedQrSlots, async () => {
+    await offlineDb.cachedQrSlots.clear();
+    if (slots.length) await offlineDb.cachedQrSlots.bulkPut(slots);
+    await offlineDb.cachedQrSlots.put({ publicToken: "__SYNCED__", designatedNumber: "" });
+  });
+}
 
 /**
  * Resolves standard authorization headers from localStorage to prevent 401 Unauthorized during sync
@@ -160,54 +177,24 @@ export async function findBeneficiaryOffline(
   const upperClean = clean.toUpperCase();
 
   try {
-    // 1. Direct indexed match on qrToken
-    let match: CachedBeneficiary | null = (await offlineDb.cachedBeneficiaries.where("qrToken").equals(clean).first()) || null;
-    if (!match && clean !== upperClean) {
-      match = (await offlineDb.cachedBeneficiaries.where("qrToken").equals(upperClean).first()) || null;
+    if (!targetProgramId) throw new Error("Pumili muna ng TUPAD program.");
+    const roster = (await offlineDb.cachedBeneficiaries.where("programId").equals(targetProgramId).toArray())
+      .filter((b) => ["ACTIVE", "ENROLLED", "FLAGGED_FOR_REPLACEMENT"].includes(b.status));
+    let slot = normalizeQrSlot(clean);
+    if (!slot) {
+      const reference = await offlineDb.cachedQrSlots.get(upperClean);
+      if (reference) slot = reference.designatedNumber;
+      // Compatibility with an existing cache before the new reference list was downloaded.
+      if (!slot && !(await offlineDb.cachedQrSlots.get("__SYNCED__"))) {
+        const known = (await offlineDb.cachedBeneficiaries.toArray()).find((b) => b.qrToken?.toUpperCase() === upperClean);
+        if (known?.qrToken) slot = registeredQrSlot(known.qrToken, known.designatedNumber);
+      }
     }
-
-    if (match && (!targetProgramId || match.programId === targetProgramId)) {
-      return match;
-    }
-
-    // 2. Fetch records (scoped by program if provided)
-    const all = targetProgramId
-      ? await offlineDb.cachedBeneficiaries.where("programId").equals(targetProgramId).toArray()
-      : await offlineDb.cachedBeneficiaries.toArray();
-
-    // 3. Match by QR substring, or designatedNumber (numeric or text)
-    const isNum = /^\d+$/.test(clean);
-    const parsedNum = isNum ? parseInt(clean, 10) : null;
-
-    match = all.find((b) => {
-      // Exact or safe substring QR token (min 6 chars, non-numeric to prevent slot 1 vs 10 collisions)
-      if (b.qrToken) {
-        const bQrUpper = b.qrToken.toUpperCase();
-        if (bQrUpper === upperClean || (!isNum && upperClean.length >= 6 && bQrUpper.includes(upperClean))) {
-          return true;
-        }
-      }
-
-      // Match designated slot number (e.g., "1" matches "1", "01", "001")
-      if (b.designatedNumber) {
-        if (b.designatedNumber === clean) return true;
-        if (parsedNum !== null && parseInt(b.designatedNumber, 10) === parsedNum) return true;
-      }
-
-      // Match full name
-      if (clean.length >= 3 && b.fullName?.toUpperCase().includes(upperClean)) {
-        return true;
-      }
-
-      // Match ID
-      if (b.id === clean || b.beneficiaryId === clean) {
-        return true;
-      }
-
-      return false;
-    }) || null;
-
-    return match;
+    const matches = roster.filter((b) => slot
+      ? normalizeQrSlot(b.designatedNumber) === slot
+      : b.fullName?.toUpperCase() === upperClean || b.id === clean || b.beneficiaryId === clean);
+    // Never choose an arbitrary person when a slot is duplicated.
+    return matches.length === 1 ? matches[0] : null;
   } catch (err) {
     console.error("Error finding beneficiary offline:", err);
     return null;
@@ -242,6 +229,7 @@ export async function recordOfflineAttendance(params: {
 
   // Resolve work day
   let workDay = workDayId ? await offlineDb.cachedWorkDays.get(workDayId) : null;
+  if (workDay && workDay.programId !== bene.programId) throw new Error("CANNOT SCAN: Work day belongs to a different program.");
   if (!workDay && programId) {
     const progDays = await offlineDb.cachedWorkDays.where("programId").equals(programId).toArray();
     workDay = progDays.find((d) => d.workDate === todayStr) || progDays[0] || null;
@@ -272,7 +260,7 @@ export async function recordOfflineAttendance(params: {
     .toArray();
 
   const existingRecord = records.find(
-    (r) => r.workDayId === resolvedWorkDayId || r.attendanceDate === attendanceDate
+    (r) => r.programId === resolvedProgramId && (r.workDayId === resolvedWorkDayId || r.attendanceDate === attendanceDate)
   );
 
   const scannerInfo = existingRecord?.scannedByName ? ` (by ${existingRecord.scannedByName})` : "";
@@ -760,6 +748,7 @@ export async function initializeUserOfflineCache(user?: {
     if (!progRes.ok) return;
     const { programs } = await progRes.json();
     if (!programs || programs.length === 0) return;
+    await cacheRegisteredQrSlots();
 
     for (const prog of programs) {
       // 1. Cache Program
@@ -843,8 +832,8 @@ export async function initializeUserOfflineCache(user?: {
             }
           }
 
-          const hasOrientation = pb.orientationAttendance && pb.orientationAttendance.length > 0;
-          const isStubDistributed = Boolean(pb.stubDistributions && pb.stubDistributions.length > 0);
+          const hasOrientation = pb.orientationAttendance?.some((r: any) => r.status === "PRESENT");
+          const isStubDistributed = Boolean(pb.stubDistributions?.some((r: any) => r.status === "DISTRIBUTED"));
           const normBrgy = normalizeBarangayName(pb.beneficiary?.barangay);
           const normSitio = normalizeSitioName(pb.beneficiary?.sitio, normBrgy);
 
@@ -863,6 +852,7 @@ export async function initializeUserOfflineCache(user?: {
             status: pb.participationStatus || "ACTIVE",
             orientationStatus: hasOrientation ? "PRESENT" : "ABSENT",
             stubDistributed: isStubDistributed,
+            payoutStatus: pb.payouts?.find((p: any) => p.status === "PAID")?.status || "PENDING",
           });
 
           for (const rec of pb.attendanceRecords || []) {
@@ -955,6 +945,7 @@ export async function forceMasterSyncWithServer(user?: {
     if (!progRes.ok) throw new Error("Could not connect to PESO Admin server to retrieve programs.");
     const { programs } = await progRes.json();
     if (!programs || programs.length === 0) throw new Error("No active programs found on PESO Admin server.");
+    await cacheRegisteredQrSlots();
 
     // 3. Clear server mirror caches (do NOT wipe unsynced local offline attendance scans!)
     await offlineDb.cachedPrograms.clear();
@@ -1051,8 +1042,8 @@ export async function forceMasterSyncWithServer(user?: {
             }
           }
 
-          const hasOrientation = pb.orientationAttendance && pb.orientationAttendance.length > 0;
-          const isStubDistributed = Boolean(pb.stubDistributions && pb.stubDistributions.length > 0);
+          const hasOrientation = pb.orientationAttendance?.some((r: any) => r.status === "PRESENT");
+          const isStubDistributed = Boolean(pb.stubDistributions?.some((r: any) => r.status === "DISTRIBUTED"));
           const normBrgy = normalizeBarangayName(pb.beneficiary?.barangay);
           const normSitio = normalizeSitioName(pb.beneficiary?.sitio, normBrgy);
 
@@ -1071,6 +1062,7 @@ export async function forceMasterSyncWithServer(user?: {
             status: pb.participationStatus || "ACTIVE",
             orientationStatus: hasOrientation ? "PRESENT" : "ABSENT",
             stubDistributed: isStubDistributed,
+            payoutStatus: pb.payouts?.find((p: any) => p.status === "PAID")?.status || "PENDING",
           });
 
           // Store authoritative server attendance records (including records scanned by other users in the same barangay)
