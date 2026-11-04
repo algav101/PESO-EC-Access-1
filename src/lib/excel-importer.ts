@@ -111,6 +111,35 @@ const MONTH_NAME_MAP: Record<string, string> = {
 
 export { normalizeSitioName, normalizeBarangayName, CANONICAL_BARANGAYS, CANONICAL_SITIOS_BY_BARANGAY };
 
+function parseCellDateIso(val: unknown): string {
+  if (val == null || val === "") return "";
+  if (val instanceof Date && !isNaN(val.getTime())) return val.toISOString().slice(0, 10);
+  if (typeof val === "number" && Number.isFinite(val)) {
+    const d = new Date(Math.round((val - 25569) * 86400 * 1000));
+    return !isNaN(d.getTime()) ? d.toISOString().slice(0, 10) : "";
+  }
+  const s = String(val).trim();
+  if (/^\d{4}[\/\-]\d{1,2}[\/\-]\d{1,2}$/.test(s)) {
+    const [y, m, d] = s.split(/[\/\-]/);
+    return `${y}-${m.padStart(2, "0")}-${d.padStart(2, "0")}`;
+  }
+  if (/^\d{1,2}[\/\-]\d{1,2}[\/\-]\d{4}$/.test(s)) {
+    const [p1, p2, y] = s.split(/[\/\-]/);
+    const n1 = parseInt(p1, 10), n2 = parseInt(p2, 10);
+    const m = n1 > 12 ? String(n2).padStart(2, "0") : String(n1).padStart(2, "0");
+    const d = n1 > 12 ? String(n1).padStart(2, "0") : String(n2).padStart(2, "0");
+    return `${y}-${m}-${d}`;
+  }
+  return "";
+}
+
+function cleanStr(val: unknown): string {
+  if (val == null) return "";
+  if (val instanceof Date && !isNaN(val.getTime())) return val.toISOString().slice(0, 10);
+  const s = String(val).trim();
+  return s.startsWith("=") ? "" : s;
+}
+
 export async function parseBeneficiaryExcelBuffer(
   buffer: Buffer,
   fileName: string,
@@ -131,7 +160,53 @@ export async function parseBeneficiaryExcelBuffer(
     throw new Error("No worksheets found in uploaded file");
   }
 
-  const sheetName = workbook.SheetNames.find((name) => name.trim().toLowerCase() === "form 4 for consolidated") || workbook.SheetNames[0];
+  const form4EditSheetName = workbook.SheetNames.find((name) => name.trim().toLowerCase() === "form 4 edit");
+  const consolidatedSheetName = workbook.SheetNames.find((name) => name.trim().toLowerCase() === "form 4 for consolidated");
+
+  // Extract raw rows and workbook metadata from FORM 4 EDIT when present in the workbook.
+  const form4EditByDesig = new Map<string, any[]>();
+  const workbookMeta: Record<string, string> = {};
+  if (form4EditSheetName) {
+    const editSheet = workbook.Sheets[form4EditSheetName];
+    const editRows: any[] = XLSX.utils.sheet_to_json(editSheet, { header: 1, defval: "" });
+    const cellVal = (r: number, c: number) => cleanStr(editRows[r]?.[c]);
+    const cellDate = (r: number, c: number) => parseCellDateIso(editSheet[XLSX.utils.encode_col(c) + (r + 1)]?.v ?? editRows[r]?.[c]);
+    const metaPairs: [string, string][] = [
+      ["natureOfProject", cellVal(3, 4)],
+      ["regionalOffice", cellVal(4, 4)],
+      ["referenceNumber", cellVal(5, 4)],
+      ["province", cellVal(6, 4)],
+      ["municipality", cellVal(7, 4)],
+      ["barangay", cellVal(8, 4)],
+      ["adlNumber", cellVal(3, 17)],
+      ["periodOfCoverage", cellVal(4, 17)],
+      ["tupadIdPrefix", cellVal(5, 17)],
+      ["tupadIdStart", cellVal(6, 17).replace(/\.0$/, "")],
+      ["batchNumber", cellVal(3, 22)],
+      ["proponent", cellVal(4, 22)],
+      ["orientationDate", cellDate(5, 22)],
+      ["payoutDate", cellDate(6, 22)],
+    ];
+    for (const [k, v] of metaPairs) if (v) workbookMeta[k] = v;
+
+    for (let r = 13; r < editRows.length; r++) {
+      const row = editRows[r];
+      if (!row || row.length === 0) continue;
+      const d = cleanStr(row[0]).replace(/\.0$/, "");
+      const hasName = Boolean(cleanStr(row[3]) || cleanStr(row[5]) || cleanStr(row[51]));
+      if (d && /^\d+$/.test(d) && hasName) {
+        form4EditByDesig.set(d, row);
+      }
+    }
+  }
+
+  let sheetName = consolidatedSheetName || form4EditSheetName || workbook.SheetNames[0];
+  if (consolidatedSheetName && form4EditSheetName && form4EditByDesig.size > 0) {
+    const consRows: any[] = XLSX.utils.sheet_to_json(workbook.Sheets[consolidatedSheetName], { header: 1, defval: "" });
+    const consHasData = consRows.slice(2).some((r) => r && (cleanStr(r[10]) || cleanStr(r[12]) || cleanStr(r[8])));
+    if (!consHasData) sheetName = form4EditSheetName;
+  }
+
   const worksheet = workbook.Sheets[sheetName];
   const rawRows: any[] = XLSX.utils.sheet_to_json(worksheet, { header: 1, defval: "" });
 
@@ -146,31 +221,31 @@ export async function parseBeneficiaryExcelBuffer(
   for (let i = 0; i < Math.min(30, rawRows.length); i++) {
     const row = rawRows[i] || [];
     const rowStr = row.map((c: any) => String(c).toLowerCase()).join(" ");
-    if (
-      rowStr.includes("no.") ||
-      rowStr.includes("formula full name") ||
-      rowStr.includes("name of beneficiary") ||
-      rowStr.includes("beneficiary name") ||
-      rowStr.includes("full name") ||
-      rowStr.includes("birthdate") ||
-      rowStr.includes("birthday") ||
-      rowStr.includes("address") ||
-      rowStr.includes("barangay")
-    ) {
+    const nextRowStr = i + 1 < rawRows.length ? (rawRows[i + 1] || []).map((c: any) => String(c).toLowerCase()).join(" ") : "";
+    const hasSubHeader =
+      nextRowStr.includes("first name") ||
+      nextRowStr.includes("street") ||
+      nextRowStr.includes("montrh") ||
+      nextRowStr.includes("month") ||
+      nextRowStr.includes("brgy") ||
+      nextRowStr.includes("sitio") ||
+      nextRowStr.includes("yyyy/mm/dd");
+    const headerKeywords = [
+      "formula full name",
+      "name of beneficiary",
+      "beneficiary name",
+      "full name",
+      "birthdate",
+      "birthday",
+      "type of id",
+      "civil status",
+      "occupation",
+    ].filter((k) => rowStr.includes(k)).length;
+
+    if (hasSubHeader || headerKeywords >= 2 || (headerKeywords >= 1 && (rowStr.includes("no.") || rowStr.includes("barangay") || rowStr.includes("address")))) {
       headerRowIndex = i;
-      // Check if next row contains sub-headers like "first name", "street", "brgy", "sitio"
-      if (i + 1 < rawRows.length) {
-        const nextRowStr = rawRows[i + 1].map((c: any) => String(c).toLowerCase()).join(" ");
-        if (
-          nextRowStr.includes("first name") ||
-          nextRowStr.includes("street") ||
-          nextRowStr.includes("montrh") ||
-          nextRowStr.includes("month") ||
-          nextRowStr.includes("brgy") ||
-          nextRowStr.includes("sitio")
-        ) {
-          subHeaderRowIndex = i + 1;
-        }
+      if (hasSubHeader) {
+        subHeaderRowIndex = i + 1;
       }
       break;
     }
@@ -180,9 +255,10 @@ export async function parseBeneficiaryExcelBuffer(
   const topHeaders = (rawRows[headerRowIndex] || []).map((h: any) => String(h).trim());
   const subHeaders = subHeaderRowIndex !== -1 ? (rawRows[subHeaderRowIndex] || []).map((h: any) => String(h).trim()) : [];
   const isConsolidated = topHeaders[0]?.toUpperCase() === "BATCH" && topHeaders[7]?.toLowerCase() === "no." && subHeaders[10]?.toLowerCase() === "first name";
+  const isForm4Edit = topHeaders[0]?.toLowerCase() === "no." && subHeaders[3]?.toLowerCase() === "first name" && topHeaders[3]?.toLowerCase().includes("name of beneficiary");
   const mergedHeaders: string[] = [];
 
-  const maxCols = Math.max(topHeaders.length, subHeaders.length, 35);
+  const maxCols = Math.max(topHeaders.length, subHeaders.length, 55);
   for (let c = 0; c < maxCols; c++) {
     const top = topHeaders[c] || "";
     const sub = subHeaders[c] || "";
@@ -196,7 +272,7 @@ export async function parseBeneficiaryExcelBuffer(
   };
 
   // Specific column indexes based on template
-  const colDesig = findCol("no. |", "designated", "seq", "# |");
+  const colDesig = isConsolidated ? 7 : isForm4Edit ? 0 : findCol("no. |", "designated", "seq", "# |");
   const colFormulaFullName = findCol("formula full name", "full name |");
   const colFormulaLastFirst = findCol("formula last name, first name");
 
@@ -218,6 +294,7 @@ export async function parseBeneficiaryExcelBuffer(
   }
 
   if (isConsolidated) { colBeneFirst = 10; colBeneMiddle = 11; colBeneLast = 12; colBeneExt = 13; }
+  if (isForm4Edit) { colBeneFirst = 3; colBeneMiddle = 4; colBeneLast = 5; colBeneExt = 6; }
 
   // Birthdate sub-headers (Month, Day, Year, or Single Date Column)
   let colBdayMonth = -1;
@@ -243,7 +320,12 @@ export async function parseBeneficiaryExcelBuffer(
     }
   }
 
-  if (colBdaySingle !== -1) {
+  if (isForm4Edit) {
+    colBdaySingle = 7;
+    colBdayMonth = 11;
+    colBdayDay = 12;
+    colBdayYear = 13;
+  } else if (colBdaySingle !== -1) {
     if (colBdayMonth === -1 && colBdaySingle + 1 < maxCols) colBdayMonth = colBdaySingle + 1;
     if (colBdayDay === -1 && colBdaySingle + 2 < maxCols) colBdayDay = colBdaySingle + 2;
     if (colBdayYear === -1 && colBdaySingle + 3 < maxCols) colBdayYear = colBdaySingle + 3;
@@ -254,6 +336,7 @@ export async function parseBeneficiaryExcelBuffer(
   let colBrgy = -1;
   let colCity = -1;
   let colProvince = -1;
+  let colDistrict = -1;
 
   for (let c = 0; c < maxCols; c++) {
     const sub = (subHeaders[c] || "").toLowerCase();
@@ -296,18 +379,28 @@ export async function parseBeneficiaryExcelBuffer(
     ) {
       colProvince = c;
     }
+    if (
+      colDistrict === -1 &&
+      (sub.includes("district") || combined.includes("district"))
+    ) {
+      colDistrict = c;
+    }
   }
 
+  if (isConsolidated) { colSitio = 18; colBrgy = 19; colCity = 20; colProvince = 21; colDistrict = 22; }
+  if (isForm4Edit) { colSitio = 14; colBrgy = 15; colCity = 16; colProvince = 17; colDistrict = 18; }
+
   // Demographics
-  const colIdType = findCol("type of id");
-  const colIdNo = findCol("id no");
-  const colContact = findCol("contact no", "phone", "mobile");
-  const colBeneType = findCol("type of beneficiary");
-  const colOccupation = findCol("occupation");
-  const colSex = findCol("sex |", "gender");
-  const colCivilStatus = findCol("civil status");
-  const colAge = findCol("age |", "edad");
-  const colMonthlyIncome = findCol("monthly income", "income");
+  const colIdType = isConsolidated ? 23 : isForm4Edit ? 19 : findCol("type of id");
+  const colIdNo = isConsolidated ? 24 : isForm4Edit ? 20 : findCol("id no");
+  const colContact = isConsolidated ? 25 : isForm4Edit ? 23 : findCol("contact no", "phone", "mobile");
+  const colBankAccount = isConsolidated ? 26 : isForm4Edit ? 24 : findCol("account no", "e-payment");
+  const colBeneType = isConsolidated ? 27 : isForm4Edit ? 25 : findCol("type of beneficiary");
+  const colOccupation = isConsolidated ? 28 : isForm4Edit ? 26 : findCol("occupation");
+  const colSex = isConsolidated ? 29 : isForm4Edit ? 27 : findCol("sex |", "gender");
+  const colCivilStatus = isConsolidated ? 30 : isForm4Edit ? 28 : findCol("civil status");
+  const colAge = isConsolidated ? 31 : isForm4Edit ? 29 : findCol("age |", "edad");
+  const colMonthlyIncome = isConsolidated ? 32 : isForm4Edit ? 31 : findCol("monthly income", "income");
 
   // Dependent sub-headers
   let colDepFirst = -1;
@@ -327,13 +420,16 @@ export async function parseBeneficiaryExcelBuffer(
   }
 
   if (isConsolidated) { colDepFirst = 35; colDepMiddle = 36; colDepLast = 37; colDepExt = 38; }
+  if (isForm4Edit) { colDepFirst = 32; colDepMiddle = 33; colDepLast = 34; colDepExt = 35; }
 
-  const colDepRelationship = findCol("relationship of dependent", "relationship");
-  const colDepAge = findCol("age (18 above) of dependent", "age of dependent");
-  const colSkills = findCol("skills training needed", "skills");
-  const colPwd = findCol("pwd");
-  const col4Ps = findCol("4p's", "4ps");
-  const colIps = findCol("ip's", "ips");
+  const colDepRelationship = isConsolidated ? 39 : isForm4Edit ? 36 : findCol("relationship of dependent", "relationship of dependemt", "relationship");
+  const colDepAge = isConsolidated ? 40 : isForm4Edit ? 37 : findCol("age (18 above) of dependent", "age of dependent");
+  const colEmploymentInterest = isConsolidated ? 41 : isForm4Edit ? 40 : findCol("interested in wage employment", "wage employment");
+  const colSkills = isConsolidated ? 42 : isForm4Edit ? 41 : findCol("skills training needed", "skills");
+  const colPwd = isConsolidated ? 43 : isForm4Edit ? 42 : findCol("pwd");
+  const col4Ps = isConsolidated ? 44 : isForm4Edit ? 43 : findCol("4p's", "4ps");
+  const colIps = isConsolidated ? 45 : isForm4Edit ? 44 : findCol("ip's", "ips");
+  const colRemarks = isConsolidated ? 6 : isForm4Edit ? 45 : findCol("remarks");
 
   // Step 1: Parse rows from file
   const rawParsedItems: any[] = [];
@@ -357,14 +453,22 @@ export async function parseBeneficiaryExcelBuffer(
     }
     if (designated.endsWith(".0")) designated = designated.slice(0, -2);
 
+    // Companion FORM 4 EDIT row (if present in the same workbook)
+    const editRow = form4EditByDesig.get(designated);
+    const pickStr = (primary: unknown, editIdx?: number): string => {
+      const p = cleanStr(primary);
+      if (p) return p;
+      return editRow && editIdx !== undefined ? cleanStr(editRow[editIdx]) : "";
+    };
+
     // 2. Full Name Resolution
     let fullName = "";
-    let lastName = colBeneLast !== -1 && row[colBeneLast] ? String(row[colBeneLast]).trim().toUpperCase() : "";
-    let firstName = colBeneFirst !== -1 && row[colBeneFirst] ? String(row[colBeneFirst]).trim().toUpperCase() : "";
-    let middleName = colBeneMiddle !== -1 && row[colBeneMiddle] ? String(row[colBeneMiddle]).trim().toUpperCase() : "";
-    let extensionName = colBeneExt !== -1 && row[colBeneExt] ? String(row[colBeneExt]).trim().toUpperCase() : "";
+    let lastName = pickStr(colBeneLast !== -1 ? row[colBeneLast] : "", 5).toUpperCase();
+    let firstName = pickStr(colBeneFirst !== -1 ? row[colBeneFirst] : "", 3).toUpperCase();
+    let middleName = pickStr(colBeneMiddle !== -1 ? row[colBeneMiddle] : "", 4).toUpperCase();
+    let extensionName = pickStr(colBeneExt !== -1 ? row[colBeneExt] : "", 6).toUpperCase();
 
-    const formulaFullName = colFormulaFullName !== -1 && row[colFormulaFullName] ? String(row[colFormulaFullName]).trim().toUpperCase() : "";
+    const formulaFullName = pickStr(colFormulaFullName !== -1 ? row[colFormulaFullName] : "", 51).toUpperCase();
 
     if (formulaFullName && !formulaFullName.startsWith("=")) {
       fullName = formulaFullName;
@@ -385,18 +489,12 @@ export async function parseBeneficiaryExcelBuffer(
     let birthday = ""; // YYYY-MM-DD
     let birthdayPin = ""; // MM-DD-YYYY
 
-    if (
-      colBdayMonth !== -1 &&
-      colBdayDay !== -1 &&
-      colBdayYear !== -1 &&
-      row[colBdayMonth] !== undefined &&
-      row[colBdayDay] !== undefined &&
-      row[colBdayYear] !== undefined &&
-      String(row[colBdayMonth]).trim() !== "" &&
-      String(row[colBdayDay]).trim() !== "" &&
-      String(row[colBdayYear]).trim() !== ""
-    ) {
-      let mStr = String(row[colBdayMonth]).trim().toLowerCase();
+    const rawMonth = pickStr(colBdayMonth !== -1 ? row[colBdayMonth] : "", 11);
+    const rawDay = pickStr(colBdayDay !== -1 ? row[colBdayDay] : "", 12);
+    const rawYear = pickStr(colBdayYear !== -1 ? row[colBdayYear] : "", 13);
+
+    if (rawMonth !== "" && rawDay !== "" && rawYear !== "") {
+      let mStr = rawMonth.toLowerCase();
       if (MONTH_NAME_MAP[mStr]) {
         mStr = MONTH_NAME_MAP[mStr];
       } else {
@@ -404,10 +502,10 @@ export async function parseBeneficiaryExcelBuffer(
         if (!isNaN(mNum)) mStr = mNum.toString().padStart(2, "0");
       }
 
-      const dNum = parseInt(String(row[colBdayDay]).trim(), 10);
+      const dNum = parseInt(rawDay, 10);
       const dStr = !isNaN(dNum) ? dNum.toString().padStart(2, "0") : "";
 
-      let yNum = parseInt(String(row[colBdayYear]).trim(), 10);
+      let yNum = parseInt(rawYear, 10);
       if (!isNaN(yNum) && yNum < 100) yNum += yNum > 30 ? 1900 : 2000;
       const yStr = !isNaN(yNum) ? yNum.toString() : "";
 
@@ -418,46 +516,15 @@ export async function parseBeneficiaryExcelBuffer(
     }
 
     // Fallback: Single date column e.g. "2000/11/08" or "14/06/1978" or Date object or serial
-    if (!birthday && colBdaySingle !== -1 && row[colBdaySingle] !== undefined && String(row[colBdaySingle]).trim() !== "") {
-      const val = row[colBdaySingle];
-      const strVal = String(val).trim();
-
-      if (/^\d{4}[\/\-]\d{1,2}[\/\-]\d{1,2}$/.test(strVal)) {
-        const parts = strVal.split(/[\/\-]/);
-        const y = parts[0];
-        const m = parts[1].padStart(2, "0");
-        const d = parts[2].padStart(2, "0");
-        birthday = `${y}-${m}-${d}`;
-        birthdayPin = `${m}-${d}-${y}`;
-      } else if (/^\d{1,2}[\/\-]\d{1,2}[\/\-]\d{4}$/.test(strVal)) {
-        const parts = strVal.split(/[\/\-]/);
-        const num1 = parseInt(parts[0], 10);
-        const num2 = parseInt(parts[1], 10);
-        const y = parts[2];
-        let m = "";
-        let d = "";
-        if (num1 > 12) {
-          // DD/MM/YYYY
-          d = String(num1).padStart(2, "0");
-          m = String(num2).padStart(2, "0");
-        } else {
-          // MM/DD/YYYY
-          m = String(num1).padStart(2, "0");
-          d = String(num2).padStart(2, "0");
-        }
-        birthday = `${y}-${m}-${d}`;
-        birthdayPin = `${m}-${d}-${y}`;
-      } else if (val instanceof Date && !isNaN(val.getTime())) {
-        birthday = val.toISOString().split("T")[0];
+    if (!birthday) {
+      const singleCandidate = colBdaySingle !== -1 && row[colBdaySingle] !== undefined && String(row[colBdaySingle]).trim() !== ""
+        ? row[colBdaySingle]
+        : editRow?.[7] || editRow?.[53] || editRow?.[54];
+      const parsedIso = parseCellDateIso(singleCandidate);
+      if (parsedIso) {
+        birthday = parsedIso;
         const [y, m, d] = birthday.split("-");
         birthdayPin = `${m}-${d}-${y}`;
-      } else if (typeof val === "number") {
-        const parsedDate = new Date(Math.round((val - 25569) * 86400 * 1000));
-        if (!isNaN(parsedDate.getTime())) {
-          birthday = parsedDate.toISOString().split("T")[0];
-          const [y, m, d] = birthday.split("-");
-          birthdayPin = `${m}-${d}-${y}`;
-        }
       }
     }
 
@@ -481,38 +548,56 @@ export async function parseBeneficiaryExcelBuffer(
     if (lastName) candidateLastNames.add(lastName);
 
     // 4. Address & Demographics
-    const rawBrgy = colBrgy !== -1 && row[colBrgy] ? String(row[colBrgy]).trim() : "Dingalan";
+    const rawBrgy = pickStr(colBrgy !== -1 ? row[colBrgy] : "", 15) || "Dingalan";
     const barangay = normalizeBarangayName(rawBrgy);
-    const rawSitio = colSitio !== -1 && row[colSitio] ? String(row[colSitio]).trim() : "";
+    const rawSitio = pickStr(colSitio !== -1 ? row[colSitio] : "", 14);
     const sitio = normalizeSitioName(rawSitio, barangay);
-    const contact = colContact !== -1 && row[colContact] ? String(row[colContact]).trim() : "";
+    const rawCity = pickStr(colCity !== -1 ? row[colCity] : "", 16) || "Dingalan";
+    const rawProvince = pickStr(colProvince !== -1 ? row[colProvince] : "", 17) || "Aurora";
+    const rawDistrict = pickStr(colDistrict !== -1 ? row[colDistrict] : "", 18);
 
-    const rawSex = colSex !== -1 && row[colSex] ? String(row[colSex]).trim().toUpperCase() : "";
+    // Prefer FORM 4 EDIT raw contact number when consolidated formula produced INCOMPLETE/EXCESS
+    let contact = colContact !== -1 && row[colContact] ? cleanStr(row[colContact]) : "";
+    const editContact = editRow ? cleanStr(editRow[23]) : "";
+    if ((!contact || contact === "INCOMPLETE" || contact === "EXCESS") && editContact) {
+      contact = editContact;
+    } else if (editContact && contact.startsWith("639") && editContact.startsWith("09")) {
+      contact = editContact;
+    }
+    if (contact.endsWith(".0")) contact = contact.slice(0, -2);
+
+    const rawSex = pickStr(colSex !== -1 ? row[colSex] : "", 27).toUpperCase();
     const sex = rawSex.startsWith("M") ? "MALE" : rawSex.startsWith("F") ? "FEMALE" : rawSex;
 
-    const rawCivil = colCivilStatus !== -1 && row[colCivilStatus] ? String(row[colCivilStatus]).trim().toUpperCase() : "";
-    const civilStatus = rawCivil === "M" ? "MARRIED" : rawCivil === "S" ? "SINGLE" : rawCivil === "W" ? "WIDOWED" : rawCivil;
+    const rawCivil = pickStr(colCivilStatus !== -1 ? row[colCivilStatus] : "", 28).toUpperCase();
+    const civilStatus = rawCivil === "M" ? "MARRIED" : rawCivil === "S" ? "SINGLE" : rawCivil === "W" ? "WIDOWED" : rawCivil === "SP" ? "SEPARATED" : rawCivil;
 
-    const age = colAge !== -1 && row[colAge] ? parseInt(String(row[colAge]).trim(), 10) || undefined : undefined;
-    const incomeInput = colMonthlyIncome !== -1 ? String(row[colMonthlyIncome] ?? "").trim() : "";
+    const rawAgeStr = pickStr(colAge !== -1 ? row[colAge] : "", 29);
+    const age = rawAgeStr ? parseInt(rawAgeStr, 10) || undefined : undefined;
+    const incomeInput = pickStr(colMonthlyIncome !== -1 ? row[colMonthlyIncome] : "", 31);
     const parsedIncome = incomeInput !== "" ? Number(incomeInput.replace(/,/g, "")) : NaN;
     const monthlyIncome = Number.isFinite(parsedIncome) ? parsedIncome : undefined;
 
-    const idType = colIdType !== -1 && row[colIdType] ? String(row[colIdType]).trim() : undefined;
-    let idNumber = colIdNo !== -1 && row[colIdNo] ? String(row[colIdNo]).trim() : undefined;
+    const idType = pickStr(colIdType !== -1 ? row[colIdType] : "", 19) || undefined;
+    let idNumber = pickStr(colIdNo !== -1 ? row[colIdNo] : "", 20) || undefined;
     if (idNumber && idNumber.endsWith(".0")) idNumber = idNumber.slice(0, -2);
 
-    const typeOfBeneficiary = colBeneType !== -1 && row[colBeneType] ? String(row[colBeneType]).trim() : undefined;
-    const occupation = colOccupation !== -1 && row[colOccupation] ? String(row[colOccupation]).trim() : undefined;
-    const skillsTraining = colSkills !== -1 && row[colSkills] ? String(row[colSkills]).trim() : undefined;
+    const typeOfBeneficiary = pickStr(colBeneType !== -1 ? row[colBeneType] : "", 25) || undefined;
+    const occupation = pickStr(colOccupation !== -1 ? row[colOccupation] : "", 26) || undefined;
+    const skillsTraining = pickStr(colSkills !== -1 ? row[colSkills] : "", 41) || undefined;
+    const bankAccount = pickStr(colBankAccount !== -1 ? row[colBankAccount] : "", 24);
+    const employmentInterest = pickStr(colEmploymentInterest !== -1 ? row[colEmploymentInterest] : "", 40);
+    const remarks = pickStr(colRemarks !== -1 ? row[colRemarks] : "", 45);
+    const timestamp = editRow ? cleanStr(editRow[1]) : isForm4Edit ? cleanStr(row[1]) : "";
+    const email = editRow ? cleanStr(editRow[2]) : isForm4Edit ? cleanStr(row[2]) : "";
 
-    const rawPwd = colPwd !== -1 && row[colPwd] ? String(row[colPwd]).trim().toUpperCase() : "";
+    const rawPwd = pickStr(colPwd !== -1 ? row[colPwd] : "", 42).toUpperCase();
     const isPwd = rawPwd.startsWith("Y") || rawPwd === "YES" || (rawPwd.length > 0 && rawPwd !== "N" && rawPwd !== "NO");
 
-    const raw4Ps = col4Ps !== -1 && row[col4Ps] ? String(row[col4Ps]).trim().toUpperCase() : "";
+    const raw4Ps = pickStr(col4Ps !== -1 ? row[col4Ps] : "", 43).toUpperCase();
     const is4Ps = raw4Ps.startsWith("Y") || raw4Ps === "YES";
 
-    const rawIps = colIps !== -1 && row[colIps] ? String(row[colIps]).trim().toUpperCase() : "";
+    const rawIps = pickStr(colIps !== -1 ? row[colIps] : "", 44).toUpperCase();
     const isIp = rawIps.startsWith("Y") || rawIps === "YES";
 
     const isSenior = (age && age >= 60) || (typeOfBeneficiary && typeOfBeneficiary.toLowerCase().includes("senior"));
@@ -521,16 +606,47 @@ export async function parseBeneficiaryExcelBuffer(
     const groupInfo = classifyBeneficiaryGroup(barangay, sitio);
 
     // Dependent fields
-    const depFirst = colDepFirst !== -1 && row[colDepFirst] ? String(row[colDepFirst]).trim().toUpperCase() : undefined;
-    const depMiddle = colDepMiddle !== -1 && row[colDepMiddle] ? String(row[colDepMiddle]).trim().toUpperCase() : undefined;
-    const depLast = colDepLast !== -1 && row[colDepLast] ? String(row[colDepLast]).trim().toUpperCase() : undefined;
-    const depExt = colDepExt !== -1 && row[colDepExt] ? String(row[colDepExt]).trim().toUpperCase() : undefined;
+    const depFirst = pickStr(colDepFirst !== -1 ? row[colDepFirst] : "", 32).toUpperCase() || undefined;
+    const depMiddle = pickStr(colDepMiddle !== -1 ? row[colDepMiddle] : "", 33).toUpperCase() || undefined;
+    const depLast = pickStr(colDepLast !== -1 ? row[colDepLast] : "", 34).toUpperCase() || undefined;
+    const depExt = pickStr(colDepExt !== -1 ? row[colDepExt] : "", 35).toUpperCase() || undefined;
     let dependentFullName: string | undefined;
     if (depFirst || depLast) {
       dependentFullName = [depFirst, depMiddle, depLast, depExt].filter(Boolean).join(" ");
     }
-    const dependentRelationship = colDepRelationship !== -1 && row[colDepRelationship] ? String(row[colDepRelationship]).trim().toUpperCase() : undefined;
-    const dependentAge = colDepAge !== -1 && row[colDepAge] ? parseInt(String(row[colDepAge]).trim(), 10) || undefined : undefined;
+    const dependentRelationship = pickStr(colDepRelationship !== -1 ? row[colDepRelationship] : "", 36).toUpperCase() || undefined;
+    const rawDepAge = pickStr(colDepAge !== -1 ? row[colDepAge] : "", 37);
+    const dependentAge = rawDepAge ? parseInt(rawDepAge, 10) || undefined : undefined;
+
+    const rawReportInputs: Record<string, unknown> = {
+      ...(rawParsedItems.length === 0 ? workbookMeta : {}),
+      sitio: rawSitio,
+      barangay: rawBrgy,
+      municipality: rawCity,
+      province: rawProvince,
+      district: rawDistrict || workbookMeta.proponent || "",
+      timestamp,
+      email,
+      contactNumber: contact,
+      bankAccount,
+      civilStatus: rawCivil,
+      sex: rawSex,
+      employmentInterest,
+      pwd: rawPwd,
+      fourPs: raw4Ps,
+      ip: rawIps,
+      remarks,
+    };
+    if (isConsolidated) {
+      Object.assign(rawReportInputs, {
+        batchLabel: workbookMeta.batchNumber || cleanStr(row[0]),
+        proponentLabel: workbookMeta.proponent || cleanStr(row[1]),
+        orientationDate: workbookMeta.orientationDate || parseCellDateIso(row[2]) || cleanStr(row[2]),
+        periodOfCoverage: workbookMeta.periodOfCoverage || cleanStr(row[3]),
+        payoutDate: workbookMeta.payoutDate || parseCellDateIso(row[4]) || cleanStr(row[4]),
+        salary: cleanStr(row[5]),
+      });
+    }
 
     rawParsedItems.push({
       rowNumber: r + 1,
@@ -552,8 +668,8 @@ export async function parseBeneficiaryExcelBuffer(
       idNumber,
       barangay,
       sitio,
-      municipality: colCity !== -1 && row[colCity] ? String(row[colCity]).trim() : "Dingalan",
-      province: colProvince !== -1 && row[colProvince] ? String(row[colProvince]).trim() : "Aurora",
+      municipality: rawCity,
+      province: rawProvince,
       contactNumber: contact,
       isSenior: Boolean(isSenior),
       isPwd,
@@ -567,9 +683,9 @@ export async function parseBeneficiaryExcelBuffer(
       dependentExtensionName: depExt,
       dependentRelationship,
       dependentAge,
-      reportInputs: isConsolidated ? Object.fromEntries(Object.entries({
-        batchLabel: row[0], proponentLabel: row[1], orientationDate: row[2], periodOfCoverage: row[3], payoutDate: row[4], salary: row[5], remarks: row[6], district: row[22], bankAccount: row[26], employmentInterest: row[41], pwd: row[43], fourPs: row[44], ip: row[45],
-      }).map(([k, v]) => [k, v instanceof Date ? v.toISOString().slice(0, 10) : String(v ?? "").trim()])) : undefined,
+      reportInputs: Object.fromEntries(
+        Object.entries(rawReportInputs).map(([k, v]) => [k, v instanceof Date ? v.toISOString().slice(0, 10) : String(v ?? "").trim()])
+      ),
       groupName: groupInfo.groupName,
       groupLabel: groupInfo.groupLabel,
       designatedMainArea: groupInfo.designatedMainArea,

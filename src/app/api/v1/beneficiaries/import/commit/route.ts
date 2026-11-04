@@ -161,6 +161,7 @@ export async function POST(request: Request) {
       // Step 2: Separate new vs existing beneficiaries & assemble data in-memory
       const newBeneficiariesData: any[] = [];
       const newDependentsData: any[] = [];
+      const updatedBeneIdsWithDeps: string[] = [];
       const beneUpdateOps: BeneficiaryImportUpdate[] = [];
       const exemptedBeneIds: string[] = [];
 
@@ -189,8 +190,8 @@ export async function POST(request: Request) {
             idNumber: r.idNumber,
             barangay: normalizeBarangayName(r.barangay),
             sitio: r.sitio,
-            municipality: "Dingalan",
-            province: "Aurora",
+            municipality: r.municipality || "Dingalan",
+            province: r.province || "Aurora",
             contactNumber: r.contactNumber,
             isSenior: Boolean(r.isSenior),
             isPwd: Boolean(r.isPwd),
@@ -219,10 +220,24 @@ export async function POST(request: Request) {
           }
         } else {
           if (duplicateStrategy === "MERGE_AND_REPLACE") {
-            beneUpdateOps.push({
+            const updatePayload: BeneficiaryImportUpdate = {
               id: existing.id,
+              firstName: r.firstName?.trim().toUpperCase() || undefined,
+              middleName: r.middleName?.trim().toUpperCase() || undefined,
+              lastName: r.lastName?.trim().toUpperCase() || undefined,
+              extensionName: r.extensionName?.trim().toUpperCase() || undefined,
+              birthday: r.birthday || undefined,
+              sex: r.sex?.trim().toUpperCase() || undefined,
+              age: r.age !== undefined ? r.age : undefined,
+              monthlyIncome: r.monthlyIncome !== undefined ? r.monthlyIncome : undefined,
+              typeOfBeneficiary: r.typeOfBeneficiary || undefined,
+              idType: r.idType || undefined,
+              idNumber: r.idNumber || undefined,
+              skillsTraining: r.skillsTraining || undefined,
               barangay: normalizeBarangayName(r.barangay),
               sitio: r.sitio || undefined,
+              municipality: r.municipality || undefined,
+              province: r.province || undefined,
               contactNumber: r.contactNumber || undefined,
               civilStatus: r.civilStatus || undefined,
               occupation: r.occupation || undefined,
@@ -230,7 +245,24 @@ export async function POST(request: Request) {
               isPwd: Boolean(r.isPwd),
               is4Ps: Boolean(r.is4Ps),
               isIp: Boolean(r.isIp),
-            });
+            };
+            beneUpdateOps.push(updatePayload);
+            Object.assign(existing, Object.fromEntries(Object.entries(updatePayload).filter(([, v]) => v !== undefined)));
+            beneMap.set(key, existing);
+            if (r.dependentFullName && (r.dependentFirstName || r.dependentLastName) && (tx as any).dependent?.deleteMany) {
+              updatedBeneIdsWithDeps.push(existing.id);
+              newDependentsData.push({
+                id: crypto.randomUUID(),
+                beneficiaryId: existing.id,
+                firstName: r.dependentFirstName,
+                middleName: r.dependentMiddleName,
+                lastName: r.dependentLastName,
+                extensionName: r.dependentExtensionName,
+                fullName: r.dependentFullName,
+                relationship: r.dependentRelationship,
+                age: r.dependentAge,
+              });
+            }
             updatedCount++;
           } else {
             skippedCount++;
@@ -246,6 +278,9 @@ export async function POST(request: Request) {
 
       // Parent records must exist before inserting dependents (foreign keys).
       if (newBeneficiariesData.length) await tx.beneficiary.createMany({ data: newBeneficiariesData });
+      if (updatedBeneIdsWithDeps.length && (tx as any).dependent?.deleteMany) {
+        await tx.dependent.deleteMany({ where: { beneficiaryId: { in: updatedBeneIdsWithDeps } } });
+      }
       if (newDependentsData.length) await tx.dependent.createMany({ data: newDependentsData });
 
       // Step 4: Assemble program beneficiaries with Designated Number reference slot resolution
