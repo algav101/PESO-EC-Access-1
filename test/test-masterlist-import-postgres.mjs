@@ -132,6 +132,9 @@ try {
   assert.equal((await commit.POST(request([{ ...rows[0], designatedNumber: "2" }, { ...rows[1], designatedNumber: "1" }]))).status, 200);
   assert.equal(await db.programBeneficiary.count({ where: { participationStatus: "ACTIVE" } }), 500, "moving existing beneficiaries between slots must not mark either one replaced");
   assert.equal(await db.beneficiaryReplacement.count(), 0);
+  const { registeredQrSlot } = load("src/lib/program-qr-slot.ts");
+  const swappedSlot1 = await db.programBeneficiary.findFirst({ where: { programId: program.id, designatedNumber: "1" }, include: { qrCodes: true } });
+  assert.equal(registeredQrSlot(swappedSlot1.qrCodes[0].publicToken, swappedSlot1.designatedNumber), "1", "slot #1 enrollee must hold slot #1 QR token after slot swap");
   failCommitAcknowledgement = true;
   const uncertain = await commit.POST(request([rows[0]]));
   assert.equal(uncertain.status, 503);

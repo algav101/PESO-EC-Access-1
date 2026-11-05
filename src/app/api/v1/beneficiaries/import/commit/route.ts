@@ -7,8 +7,9 @@ import { saveImportedReportRows } from "@/lib/dole-report-data";
 import prisma from "@/lib/prisma";
 import { getCurrentUser, hasPermission } from "@/lib/auth";
 import { generateBeneficiaryToken } from "@/lib/qr";
+import { normalizeQrSlot, registeredQrSlot } from "@/lib/program-qr-slot";
 import { normalizeBarangayName } from "@/lib/utils";
-import { updateImportedBeneficiaries, updateImportedEnrollments, type BeneficiaryImportUpdate, type ProgramImportUpdate } from "@/lib/masterlist-bulk-updates";
+import { updateImportedBeneficiaries, updateImportedEnrollments, updateImportedQrBindings, type BeneficiaryImportUpdate, type ProgramImportUpdate, type QrBindingUpdate } from "@/lib/masterlist-bulk-updates";
 
 class ImportConflict extends Error {}
 
@@ -116,7 +117,7 @@ export async function POST(request: Request) {
             beneficiaryId: true,
             designatedNumber: true,
             participationStatus: true,
-            qrCodes: { where: { status: { in: ["ACTIVE", "REPRINTED"] } }, select: { id: true }, take: 1 },
+            qrCodes: { where: { status: { in: ["ACTIVE", "REPRINTED"] } }, select: { id: true, publicToken: true, programBeneficiaryId: true, status: true }, take: 1 },
             beneficiary: {
               select: { id: true, fullName: true, birthday: true },
             },
@@ -286,8 +287,19 @@ export async function POST(request: Request) {
       // Step 4: Assemble program beneficiaries with Designated Number reference slot resolution
       const progBeneficiariesToInsert: any[] = [];
       const qrCodesToInsert: any[] = [];
+      const qrRebindOps: QrBindingUpdate[] = [];
       const pbUpdateOps: ProgramImportUpdate[] = [];
       const replacementLogsToInsert: any[] = [];
+      const existingSlotQrMap = new Map<string, { id: string; programBeneficiaryId: string; status: string }>();
+      for (const pb of existingPbs) {
+        for (const qr of pb.qrCodes || []) {
+          if (qr.status === "INVALIDATED") continue;
+          const slotKey = registeredQrSlot(qr.publicToken, pb.designatedNumber);
+          if (slotKey && !existingSlotQrMap.has(slotKey)) {
+            existingSlotQrMap.set(slotKey, qr);
+          }
+        }
+      }
       const incomingBeneficiaryIds = new Set(validRows.map((r: any) => {
         const key = `${r.fullName.trim().toUpperCase()}_${r.birthday}`;
         return (beneMap.get(key) || beneMap.get(r.fullName.trim().toUpperCase()))?.id;
@@ -329,7 +341,7 @@ export async function POST(request: Request) {
 
         // Check if this beneficiary already has a program enrollment
         const existingPbOfBene = existingPbBeneMap.get(bene.id);
-        let qrProgramBeneficiaryId: string | undefined;
+        let targetProgramBeneficiaryId: string | undefined;
 
         if (existingPbOfBene) {
           if (duplicateStrategy === "MERGE_AND_REPLACE" || isDifferentPersonAtSlot) {
@@ -340,7 +352,7 @@ export async function POST(request: Request) {
               tableNumber: assignment.table,
               slotGroup: assignment.slotGroup,
             });
-            if (!existingPbOfBene.qrCodes?.length) qrProgramBeneficiaryId = existingPbOfBene.id;
+            targetProgramBeneficiaryId = existingPbOfBene.id;
             importedCount++;
           }
         } else {
@@ -355,21 +367,33 @@ export async function POST(request: Request) {
             tableNumber: assignment.table,
             slotGroup: assignment.slotGroup,
           });
-          qrProgramBeneficiaryId = progBeneId;
+          targetProgramBeneficiaryId = progBeneId;
           importedCount++;
         }
-        // Also repair an enrollment left without a QR by a legacy partial import.
-        if (qrProgramBeneficiaryId) {
-          const qrData = generateBeneficiaryToken(targetProgramId, desigStr);
-          qrCodesToInsert.push({
-            id: crypto.randomUUID(),
-            programId: targetProgramId,
-            programBeneficiaryId: qrProgramBeneficiaryId,
-            publicToken: qrData.publicToken,
-            tokenHash: qrData.tokenHash,
-            status: "ACTIVE",
-            generatedById: user.id,
-          });
+        // Ensure the slot's QR token stays bound to the beneficiary occupying this designatedNumber.
+        if (targetProgramBeneficiaryId) {
+          const slotKey = normalizeQrSlot(desigStr) || desigStr;
+          const existingSlotQr = existingSlotQrMap.get(slotKey);
+          if (existingSlotQr) {
+            if (existingSlotQr.programBeneficiaryId !== targetProgramBeneficiaryId || existingSlotQr.status !== "ACTIVE") {
+              qrRebindOps.push({
+                id: existingSlotQr.id,
+                programBeneficiaryId: targetProgramBeneficiaryId,
+                status: "ACTIVE",
+              });
+            }
+          } else {
+            const qrData = generateBeneficiaryToken(targetProgramId, desigStr);
+            qrCodesToInsert.push({
+              id: crypto.randomUUID(),
+              programId: targetProgramId,
+              programBeneficiaryId: targetProgramBeneficiaryId,
+              publicToken: qrData.publicToken,
+              tokenHash: qrData.tokenHash,
+              status: "ACTIVE",
+              generatedById: user.id,
+            });
+          }
         }
       }
 
@@ -383,6 +407,7 @@ export async function POST(request: Request) {
       // Bulk updates avoid hundreds of sequential UPDATE round trips for a 500-row roster.
       await updateImportedBeneficiaries(tx, beneUpdateOps);
       await updateImportedEnrollments(tx, targetProgramId, pbUpdateOps);
+      await updateImportedQrBindings(tx, targetProgramId, qrRebindOps);
       if (qrCodesToInsert.length) await tx.qrCode.createMany({ data: qrCodesToInsert });
       if (replacementLogsToInsert.length) await tx.beneficiaryReplacement.createMany({ data: replacementLogsToInsert });
       if (exemptedBeneIds.length) {

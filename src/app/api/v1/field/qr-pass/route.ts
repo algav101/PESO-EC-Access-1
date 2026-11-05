@@ -4,6 +4,7 @@ import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth";
 import { generateBeneficiaryToken, formatBeneficiaryQrPayload, generateQrDataUrl } from "@/lib/qr";
+import { normalizeQrSlot, registeredQrSlot } from "@/lib/program-qr-slot";
 import { assignBeneficiaryWorkArea, WorkProgramItemAllocation } from "@/lib/work-assignment";
 import { format } from "date-fns";
 
@@ -163,21 +164,38 @@ async function handleQrPassSearch(params: {
 
   const results = await Promise.all(
     programBeneficiaries.map(async (pb) => {
-      let activeQr = pb.qrCodes.find((q) => q.status === "ACTIVE") || pb.qrCodes[0];
+      const targetSlot = normalizeQrSlot(pb.designatedNumber) || pb.designatedNumber;
+      let activeQr = pb.qrCodes.find(
+        (q) => q.status === "ACTIVE" && registeredQrSlot(q.publicToken, pb.designatedNumber) === targetSlot
+      );
 
-      // If no QR exists, auto-generate and store
+      // If no slot-matching QR exists, re-bind existing slot QR in program or auto-generate
       if (!activeQr) {
-        const generated = generateBeneficiaryToken(program.id, pb.designatedNumber);
-        activeQr = await prisma.qrCode.create({
-          data: {
+        const existingSlotQr = await prisma.qrCode.findFirst({
+          where: {
             programId: program.id,
-            programBeneficiaryId: pb.id,
-            publicToken: generated.publicToken,
-            tokenHash: generated.tokenHash,
-            status: "ACTIVE",
-            generatedById: user?.id || null,
+            status: { not: "INVALIDATED" },
+            publicToken: { contains: `-${targetSlot}-`, mode: "insensitive" },
           },
         });
+        if (existingSlotQr && registeredQrSlot(existingSlotQr.publicToken, "") === targetSlot) {
+          activeQr = await prisma.qrCode.update({
+            where: { id: existingSlotQr.id },
+            data: { programBeneficiaryId: pb.id, status: "ACTIVE" },
+          });
+        } else {
+          const generated = generateBeneficiaryToken(program.id, pb.designatedNumber);
+          activeQr = await prisma.qrCode.create({
+            data: {
+              programId: program.id,
+              programBeneficiaryId: pb.id,
+              publicToken: generated.publicToken,
+              tokenHash: generated.tokenHash,
+              status: "ACTIVE",
+              generatedById: user?.id || null,
+            },
+          });
+        }
       }
 
       // Build scannable web URL and QR Image Data URL

@@ -60,6 +60,8 @@ export function FieldQrPassGeneratorCard({
   onClose,
   isModal = false,
 }: FieldQrPassGeneratorCardProps) {
+  const [programs, setPrograms] = useState<any[]>([]);
+  const [selectedProgramId, setSelectedProgramId] = useState(programId || "");
   const [searchTerm, setSearchTerm] = useState(initialSlot || "");
   const [selectedBarangay, setSelectedBarangay] = useState(initialBarangay || "ALL");
   const [loading, setLoading] = useState(false);
@@ -73,16 +75,32 @@ export function FieldQrPassGeneratorCard({
   const passCardRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    fetchQrPasses(initialSlot || "", selectedBarangay);
+    if (programId) {
+      setSelectedProgramId(programId);
+      return;
+    }
+    fetch("/api/v1/programs")
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (Array.isArray(data?.programs) && data.programs.length > 0) {
+          setPrograms(data.programs);
+          setSelectedProgramId((prev) => prev || data.programs[0].id);
+        }
+      })
+      .catch(() => {});
   }, [programId]);
 
-  const fetchQrPasses = async (query: string, brgy: string) => {
+  useEffect(() => {
+    fetchQrPasses(initialSlot || searchTerm || "", selectedBarangay, selectedProgramId || programId);
+  }, [programId, selectedProgramId]);
+
+  const fetchQrPasses = async (query: string, brgy: string, targetProgId = selectedProgramId || programId) => {
     setLoading(true);
     setError(null);
     try {
       if (typeof navigator === "undefined" || navigator.onLine) {
         const params = new URLSearchParams();
-        if (programId) params.set("programId", programId);
+        if (targetProgId) params.set("programId", targetProgId);
         if (query && query.trim()) params.set("query", query.trim());
         if (brgy && brgy !== "ALL") params.set("barangay", brgy);
 
@@ -104,7 +122,7 @@ export function FieldQrPassGeneratorCard({
     // Offline QR Pass Fallback from IndexedDB
     try {
       let cached = await offlineDb.cachedBeneficiaries.toArray();
-      if (programId) cached = cached.filter((b) => b.programId === programId);
+      if (targetProgId) cached = cached.filter((b) => b.programId === targetProgId);
       if (brgy && brgy !== "ALL") {
         cached = cached.filter((b) => b.barangay?.toUpperCase() === brgy.toUpperCase());
       }
@@ -264,6 +282,26 @@ export function FieldQrPassGeneratorCard({
         </div>
 
         <form onSubmit={handleSearchSubmit} className="grid grid-cols-1 sm:grid-cols-12 gap-2.5">
+          {!programId && programs.length > 0 && (
+            <div className="sm:col-span-12">
+              <label className="block text-[10px] uppercase font-bold text-slate-400 mb-1">
+                Target TUPAD Program
+              </label>
+              <select
+                value={selectedProgramId}
+                onChange={(e) => {
+                  setSelectedProgramId(e.target.value);
+                }}
+                className="w-full bg-slate-950 border border-slate-700 text-white rounded-xl px-3 py-2 text-xs font-semibold focus:outline-none focus:border-gov-goldLight"
+              >
+                {programs.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.programCode} — {p.programName}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
           {/* Barangay Filter */}
           <div className="sm:col-span-4">
             <label className="block text-[10px] uppercase font-bold text-slate-400 mb-1">

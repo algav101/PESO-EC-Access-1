@@ -35,6 +35,12 @@ export interface ProgramImportUpdate {
   slotGroup?: string;
 }
 
+export interface QrBindingUpdate {
+  id: string;
+  programBeneficiaryId: string;
+  status: string;
+}
+
 // Constant SQL + bound JSON values: one round trip, not one query per row.
 // Keep Prisma's @updatedAt behavior when using SQL for the beneficiary update.
 export async function updateImportedBeneficiaries(tx: Prisma.TransactionClient, updates: BeneficiaryImportUpdate[]) {
@@ -90,4 +96,17 @@ export async function updateImportedEnrollments(tx: Prisma.TransactionClient, pr
     ) WHERE p.id = v.id AND p."programId" = ${programId}
   `;
   if (count !== data.length) throw new Error("Program roster changed during import");
+}
+
+export async function updateImportedQrBindings(tx: Prisma.TransactionClient, programId: string, updates: QrBindingUpdate[]) {
+  if (!updates.length) return;
+  const data = [...new Map(updates.map((row) => [row.id, row])).values()];
+  await tx.$executeRaw`
+    UPDATE "QrCode" AS q SET
+      "programBeneficiaryId" = v."programBeneficiaryId",
+      "status" = v."status"
+    FROM jsonb_to_recordset(${JSON.stringify(data)}::jsonb) AS v(
+      id text, "programBeneficiaryId" text, "status" text
+    ) WHERE q.id = v.id AND q."programId" = ${programId}
+  `;
 }
