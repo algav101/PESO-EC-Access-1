@@ -129,7 +129,7 @@ async function compressFileToPayload(file: File): Promise<CapturedIdPayload> {
     const img = new Image();
     img.onload = () => {
       try {
-        const maxDim = 1280;
+        const maxDim = 1024;
         const scale = Math.min(1, maxDim / Math.max(img.width || 1, img.height || 1));
         const width = Math.max(1, Math.round(img.width * scale));
         const height = Math.max(1, Math.round(img.height * scale));
@@ -139,7 +139,7 @@ async function compressFileToPayload(file: File): Promise<CapturedIdPayload> {
         const ctx = canvas.getContext("2d");
         if (!ctx) throw new Error("Canvas context unavailable");
         ctx.drawImage(img, 0, 0, width, height);
-        const dataUrl = canvas.toDataURL("image/jpeg", 0.82);
+        const dataUrl = canvas.toDataURL("image/jpeg", 0.76);
         const approxBytes = Math.round((dataUrl.length * 3) / 4);
         URL.revokeObjectURL(objectUrl);
         resolve({

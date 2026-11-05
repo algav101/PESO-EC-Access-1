@@ -179,184 +179,189 @@ export async function POST(request: Request) {
     const parsedDepAge = dependentAge ? parseInt(String(dependentAge), 10) || null : null;
     const summaryRemarks = `Replaced ${pb.beneficiary.fullName} (Consent Verified via Birthday PIN • Relationship: ${relationshipWithReplacement.trim().toUpperCase()}) with ${applicantEval.normalizedFullName} (Dependent: ${dependentEval.normalizedFullName}) — Reason: ${reason}${remarks ? ` (${remarks})` : ""}`;
 
-    const result = await prisma.$transaction(async (tx) => {
-      // 1. Mark original ProgramBeneficiary as REPLACED
-      await tx.programBeneficiary.update({
-        where: { id: pb.id },
-        data: { participationStatus: "REPLACED" },
-      });
+    // Pre-fetch existing replacement beneficiary outside the transaction to minimize transaction time
+    const existingReplacementBene = await prisma.beneficiary.findFirst({
+      where: {
+        fullName: applicantEval.normalizedFullName,
+        birthday: isoApplicantBirthday,
+      },
+    });
 
-      // 2. Record audit StubDistribution on original beneficiary
-      if (activeQr) {
+    const docPayloads = [
+      { docType: "ID_FRONT", file: applicantIdFront, defaultName: "applicant_id_front.jpg" },
+      { docType: "ID_BACK", file: applicantIdBack, defaultName: "applicant_id_back.jpg" },
+      { docType: "DEPENDENT_ID_FRONT", file: dependentIdFront, defaultName: "dependent_id_front.jpg" },
+      { docType: "DEPENDENT_ID_BACK", file: dependentIdBack, defaultName: "dependent_id_back.jpg" },
+    ];
+
+    const result = await prisma.$transaction(
+      async (tx) => {
+        // 1. Mark original ProgramBeneficiary as REPLACED
+        await tx.programBeneficiary.update({
+          where: { id: pb.id },
+          data: { participationStatus: "REPLACED" },
+        });
+
+        // 2. Record audit StubDistribution on original beneficiary
+        if (activeQr) {
+          await tx.stubDistribution.create({
+            data: {
+              qrId: activeQr.id,
+              programBeneficiaryId: pb.id,
+              distributedById: user.id,
+              verificationMethod: "ORIGINAL_BENEFICIARY_CONSENT_PIN",
+              status: "FLAGGED_REPLACEMENT",
+              remarks: summaryRemarks,
+            },
+          });
+        }
+
+        // 3. Create or update Replacement Beneficiary
+        let newBene = existingReplacementBene;
+        if (!newBene) {
+          newBene = await tx.beneficiary.create({
+            data: {
+              beneficiaryNumber: `BN-REP-${pb.designatedNumber}-${Date.now().toString(36).slice(-4).toUpperCase()}`,
+              fullName: applicantEval.normalizedFullName,
+              lastName: applicantEval.parsedName.lastName,
+              firstName: applicantEval.parsedName.firstName,
+              middleName: applicantEval.parsedName.middleName || null,
+              extensionName: applicantEval.parsedName.extensionName || null,
+              birthday: isoApplicantBirthday,
+              sex: (applicantSex || pb.beneficiary.sex || "FEMALE").toUpperCase(),
+              barangay: resolvedBarangay,
+              sitio: resolvedSitio,
+              municipality: "Dingalan",
+              province: "Aurora",
+              contactNumber: applicantContactNumber || null,
+              idType: applicantIdType || null,
+              idNumber: applicantIdNumber || null,
+              status: "ACTIVE",
+            },
+          });
+        } else {
+          newBene = await tx.beneficiary.update({
+            where: { id: newBene.id },
+            data: {
+              sex: (applicantSex || newBene.sex || "FEMALE").toUpperCase(),
+              barangay: resolvedBarangay,
+              sitio: resolvedSitio,
+              contactNumber: applicantContactNumber || newBene.contactNumber,
+              idType: applicantIdType || newBene.idType,
+              idNumber: applicantIdNumber || newBene.idNumber,
+              status: "ACTIVE",
+            },
+          });
+        }
+
+        // 4. Upsert Dependent for Replacement Beneficiary
+        await tx.dependent.deleteMany({ where: { beneficiaryId: newBene.id } });
+        const createdDependent = await tx.dependent.create({
+          data: {
+            beneficiaryId: newBene.id,
+            fullName: dependentEval.normalizedFullName,
+            lastName: dependentEval.parsedName.lastName,
+            firstName: dependentEval.parsedName.firstName,
+            middleName: dependentEval.parsedName.middleName || null,
+            extensionName: dependentEval.parsedName.extensionName || null,
+            relationship: (dependentRelationship || "DEPENDENT").trim().toUpperCase(),
+            birthday: toIsoBirthday(dependentBirthday) || dependentBirthday || null,
+            age: parsedDepAge,
+          },
+        });
+
+        // 5. Batch-insert all 4 ID Documents in a single query
+        await tx.beneficiaryDocument.createMany({
+          data: docPayloads.map((item) => {
+            const f = item.file || {};
+            return {
+              beneficiaryId: newBene!.id,
+              documentType: item.docType,
+              fileKey: f.dataUrl || `replacement_${item.docType.toLowerCase()}_${newBene!.id}`,
+              fileName: f.name || item.defaultName,
+              fileSize: Number(f.size) || 2048,
+              mimeType: f.type || "image/jpeg",
+              uploadedById: user.id,
+              verificationStatus: "VERIFIED",
+            };
+          }),
+        });
+
+        // 6. Create Replacement ProgramBeneficiary occupying the same slot & table
+        const newPb = await tx.programBeneficiary.create({
+          data: {
+            programId: pb.programId,
+            beneficiaryId: newBene.id,
+            designatedNumber: pb.designatedNumber,
+            participationStatus: "ACTIVE",
+            originalBeneficiary: false,
+            tableNumber: pb.tableNumber,
+            slotGroup: pb.slotGroup,
+          },
+        });
+
+        // 7. Re-bind the slot's active QR code to the replacement ProgramBeneficiary
+        let assignedQr = activeQr;
+        if (assignedQr) {
+          assignedQr = await tx.qrCode.update({
+            where: { id: assignedQr.id },
+            data: {
+              programBeneficiaryId: newPb.id,
+              status: "ACTIVE",
+              invalidatedAt: null,
+              invalidatedById: null,
+            },
+          });
+        } else {
+          const qrData = generateBeneficiaryToken(pb.programId, pb.designatedNumber);
+          assignedQr = await tx.qrCode.create({
+            data: {
+              programId: pb.programId,
+              programBeneficiaryId: newPb.id,
+              publicToken: qrData.publicToken,
+              tokenHash: qrData.tokenHash,
+              status: "ACTIVE",
+              generatedById: user.id,
+            },
+          });
+        }
+
+        // 8. Create StubDistribution record for the replacement beneficiary
         await tx.stubDistribution.create({
           data: {
-            qrId: activeQr.id,
-            programBeneficiaryId: pb.id,
+            qrId: assignedQr.id,
+            programBeneficiaryId: newPb.id,
             distributedById: user.id,
-            verificationMethod: "ORIGINAL_BENEFICIARY_CONSENT_PIN",
-            status: "FLAGGED_REPLACEMENT",
+            verificationMethod: "ONSITE_REPLACEMENT_CONSENT",
+            status: "DISTRIBUTED",
             remarks: summaryRemarks,
           },
         });
-      }
 
-      // 3. Create or update Replacement Beneficiary
-      let newBene = await tx.beneficiary.findFirst({
-        where: {
-          fullName: applicantEval.normalizedFullName,
-          birthday: isoApplicantBirthday,
-        },
-      });
-
-      if (!newBene) {
-        newBene = await tx.beneficiary.create({
-          data: {
-            beneficiaryNumber: `BN-REP-${pb.designatedNumber}-${Date.now().toString(36).slice(-4).toUpperCase()}`,
-            fullName: applicantEval.normalizedFullName,
-            lastName: applicantEval.parsedName.lastName,
-            firstName: applicantEval.parsedName.firstName,
-            middleName: applicantEval.parsedName.middleName || null,
-            extensionName: applicantEval.parsedName.extensionName || null,
-            birthday: isoApplicantBirthday,
-            sex: (applicantSex || pb.beneficiary.sex || "FEMALE").toUpperCase(),
-            barangay: resolvedBarangay,
-            sitio: resolvedSitio,
-            municipality: "Dingalan",
-            province: "Aurora",
-            contactNumber: applicantContactNumber || null,
-            idType: applicantIdType || null,
-            idNumber: applicantIdNumber || null,
-            status: "ACTIVE",
-          },
-        });
-      } else {
-        newBene = await tx.beneficiary.update({
-          where: { id: newBene.id },
-          data: {
-            sex: (applicantSex || newBene.sex || "FEMALE").toUpperCase(),
-            barangay: resolvedBarangay,
-            sitio: resolvedSitio,
-            contactNumber: applicantContactNumber || newBene.contactNumber,
-            idType: applicantIdType || newBene.idType,
-            idNumber: applicantIdNumber || newBene.idNumber,
-            status: "ACTIVE",
-          },
-        });
-      }
-
-      // 4. Upsert Dependent for Replacement Beneficiary
-      await tx.dependent.deleteMany({ where: { beneficiaryId: newBene.id } });
-      const createdDependent = await tx.dependent.create({
-        data: {
-          beneficiaryId: newBene.id,
-          fullName: dependentEval.normalizedFullName,
-          lastName: dependentEval.parsedName.lastName,
-          firstName: dependentEval.parsedName.firstName,
-          middleName: dependentEval.parsedName.middleName || null,
-          extensionName: dependentEval.parsedName.extensionName || null,
-          relationship: (dependentRelationship || "DEPENDENT").trim().toUpperCase(),
-          birthday: toIsoBirthday(dependentBirthday) || dependentBirthday || null,
-          age: parsedDepAge,
-        },
-      });
-
-      // 5. Save all 4 ID Documents (Applicant Front/Back & Dependent Front/Back)
-      const docPayloads = [
-        { docType: "ID_FRONT", file: applicantIdFront, defaultName: "applicant_id_front.jpg" },
-        { docType: "ID_BACK", file: applicantIdBack, defaultName: "applicant_id_back.jpg" },
-        { docType: "DEPENDENT_ID_FRONT", file: dependentIdFront, defaultName: "dependent_id_front.jpg" },
-        { docType: "DEPENDENT_ID_BACK", file: dependentIdBack, defaultName: "dependent_id_back.jpg" },
-      ];
-
-      for (const item of docPayloads) {
-        const f = item.file || {};
-        await tx.beneficiaryDocument.create({
-          data: {
-            beneficiaryId: newBene.id,
-            documentType: item.docType,
-            fileKey: f.dataUrl || `replacement_${item.docType.toLowerCase()}_${newBene.id}`,
-            fileName: f.name || item.defaultName,
-            fileSize: Number(f.size) || 2048,
-            mimeType: f.type || "image/jpeg",
-            uploadedById: user.id,
-            verificationStatus: "VERIFIED",
-          },
-        });
-      }
-
-      // 6. Create Replacement ProgramBeneficiary occupying the same slot & table
-      const newPb = await tx.programBeneficiary.create({
-        data: {
-          programId: pb.programId,
-          beneficiaryId: newBene.id,
-          designatedNumber: pb.designatedNumber,
-          participationStatus: "ACTIVE",
-          originalBeneficiary: false,
-          tableNumber: pb.tableNumber,
-          slotGroup: pb.slotGroup,
-        },
-      });
-
-      // 7. Re-bind the slot's active QR code to the replacement ProgramBeneficiary
-      let assignedQr = activeQr;
-      if (assignedQr) {
-        assignedQr = await tx.qrCode.update({
-          where: { id: assignedQr.id },
-          data: {
-            programBeneficiaryId: newPb.id,
-            status: "ACTIVE",
-            invalidatedAt: null,
-            invalidatedById: null,
-          },
-        });
-      } else {
-        const qrData = generateBeneficiaryToken(pb.programId, pb.designatedNumber);
-        assignedQr = await tx.qrCode.create({
+        // 9. Create BeneficiaryReplacement audit record
+        const replacementRecord = await tx.beneficiaryReplacement.create({
           data: {
             programId: pb.programId,
-            programBeneficiaryId: newPb.id,
-            publicToken: qrData.publicToken,
-            tokenHash: qrData.tokenHash,
-            status: "ACTIVE",
-            generatedById: user.id,
+            originalProgramBeneficiaryId: pb.id,
+            replacementProgramBeneficiaryId: newPb.id,
+            reason: `${reason} | Original Consent Relationship: ${relationshipWithReplacement.trim().toUpperCase()} | Dependent: ${dependentEval.normalizedFullName}${remarks ? ` | ${remarks}` : ""}`,
+            initiatedById: user.id,
+            approvedById: user.id,
+            approvedAt: new Date(),
+            status: "APPROVED",
           },
         });
-      }
 
-      // 8. Create StubDistribution record for the replacement beneficiary
-      await tx.stubDistribution.create({
-        data: {
-          qrId: assignedQr.id,
-          programBeneficiaryId: newPb.id,
-          distributedById: user.id,
-          verificationMethod: "ONSITE_REPLACEMENT_CONSENT",
-          status: "DISTRIBUTED",
-          remarks: summaryRemarks,
-        },
-      });
-
-      // 9. Create BeneficiaryReplacement audit record
-      const replacementRecord = await tx.beneficiaryReplacement.create({
-        data: {
-          programId: pb.programId,
-          originalProgramBeneficiaryId: pb.id,
-          replacementProgramBeneficiaryId: newPb.id,
-          reason: `${reason} | Original Consent Relationship: ${relationshipWithReplacement.trim().toUpperCase()} | Dependent: ${dependentEval.normalizedFullName}${remarks ? ` | ${remarks}` : ""}`,
-          initiatedById: user.id,
-          approvedById: user.id,
-          approvedAt: new Date(),
-          status: "APPROVED",
-        },
-      });
-
-      return {
-        newBene,
-        newPb,
-        createdDependent,
-        assignedQr,
-        replacementRecord,
-      };
-    });
+        return {
+          newBene,
+          newPb,
+          createdDependent,
+          assignedQr,
+          replacementRecord,
+        };
+      },
+      { maxWait: 20000, timeout: 45000 }
+    );
 
     await logAudit({
       userId: user.id,
