@@ -30,14 +30,29 @@ import {
 } from "lucide-react";
 import { QrScannerModal } from "@/components/scanner/QrScannerModal";
 import { FieldQrPassGeneratorModal } from "@/components/field/FieldQrPassGeneratorCard";
+import {
+  StubReplacementWizardModal,
+  type StubReplacementTarget,
+} from "@/components/field/StubReplacementWizardModal";
 import { useAuth } from "@/context/AuthContext";
 import { useOffline } from "@/context/OfflineContext";
-import { offlineDb, queueOfflineTransaction, findBeneficiaryOffline, extractCleanQrToken } from "@/lib/dexie";
+import {
+  offlineDb,
+  queueOfflineTransaction,
+  findBeneficiaryOffline,
+  extractCleanQrToken,
+} from "@/lib/dexie";
 import { formatDate, normalizeBarangayName } from "@/lib/utils";
 
 export default function StubDistributionPage() {
   return (
-    <React.Suspense fallback={<div className="p-8 text-center text-xs text-slate-400">Loading Stub Distribution & Monitoring...</div>}>
+    <React.Suspense
+      fallback={
+        <div className="p-8 text-center text-xs text-slate-400">
+          Loading Stub Distribution & Monitoring...
+        </div>
+      }
+    >
       <StubDistributionContent />
     </React.Suspense>
   );
@@ -45,11 +60,14 @@ export default function StubDistributionPage() {
 
 function StubDistributionContent() {
   const searchParams = useSearchParams();
-  const initialTab = searchParams.get("tab") === "monitoring" ? "monitoring" : "scanner";
+  const initialTab =
+    searchParams.get("tab") === "monitoring" ? "monitoring" : "scanner";
   const { user, can } = useAuth();
   const { isOnline } = useOffline();
 
-  const [activeTab, setActiveTab] = useState<"scanner" | "monitoring">(initialTab);
+  const [activeTab, setActiveTab] = useState<"scanner" | "monitoring">(
+    initialTab
+  );
   const [programs, setPrograms] = useState<any[]>([]);
   const [selectedProgramId, setSelectedProgramId] = useState<string>("");
   const programRef = useRef(selectedProgramId);
@@ -60,9 +78,8 @@ function StubDistributionContent() {
   const [qrGeneratorOpen, setQrGeneratorOpen] = useState(false);
   const [scannedData, setScannedData] = useState<any | null>(null);
   const [birthdayPin, setBirthdayPin] = useState("");
-  const [isFlaggingModalOpen, setIsFlaggingModalOpen] = useState(false);
-  const [flagReason, setFlagReason] = useState("UNREACHABLE_PHONE_OR_RESIDENCE");
-  const [flagRemarks, setFlagRemarks] = useState("");
+  const [replacementTarget, setReplacementTarget] =
+    useState<StubReplacementTarget | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [successResult, setSuccessResult] = useState<any | null>(null);
@@ -101,7 +118,10 @@ function StubDistributionContent() {
         }
       }
     } catch (e) {
-      console.warn("Failed to load online programs, falling back to offline storage:", e);
+      console.warn(
+        "Failed to load online programs, falling back to offline storage:",
+        e
+      );
     }
 
     // Offline fallback from IndexedDB
@@ -122,7 +142,9 @@ function StubDistributionContent() {
     setMonitoringLoading(true);
     try {
       if (typeof navigator === "undefined" || navigator.onLine) {
-        const res = await fetch(`/api/v1/stub-distribution/monitoring?programId=${progId}`);
+        const res = await fetch(
+          `/api/v1/stub-distribution/monitoring?programId=${progId}`
+        );
         if (res.ok) {
           const data = await res.json();
           if (programRef.current !== progId) return;
@@ -131,7 +153,10 @@ function StubDistributionContent() {
         }
       }
     } catch (e) {
-      console.warn("Online stub monitoring fetch failed, falling back to offline storage:", e);
+      console.warn(
+        "Online stub monitoring fetch failed, falling back to offline storage:",
+        e
+      );
     } finally {
       setMonitoringLoading(false);
     }
@@ -148,7 +173,9 @@ function StubDistributionContent() {
         setMonitoringData({
           stats: {
             totalBeneficiaries: cachedBeneficiaries.length,
-            distributedCount: cachedBeneficiaries.filter((b) => b.status === "ACTIVE").length,
+            distributedCount: cachedBeneficiaries.filter(
+              (b) => b.status === "ACTIVE"
+            ).length,
             pendingCount: 0,
             distributionRate: 100,
           },
@@ -170,7 +197,15 @@ function StubDistributionContent() {
   };
 
   // 1. Scan Handler
-  useEffect(() => { setScannedData(null); setSuccessResult(null); setError(null); setBirthdayPin(""); setMonitoringData(null); setScannerOpen(false); }, [selectedProgramId]);
+  useEffect(() => {
+    setScannedData(null);
+    setSuccessResult(null);
+    setError(null);
+    setBirthdayPin("");
+    setMonitoringData(null);
+    setScannerOpen(false);
+    setReplacementTarget(null);
+  }, [selectedProgramId]);
 
   const handleScan = async (token: string) => {
     setScannerOpen(false);
@@ -179,31 +214,46 @@ function StubDistributionContent() {
     setSuccessResult(null);
 
     try {
-      if (!selectedProgramId) throw new ScanRequestError("Pumili muna ng TUPAD program.");
+      if (!selectedProgramId)
+        throw new ScanRequestError("Pumili muna ng TUPAD program.");
       if (isOnline) {
         try {
           const res = await fetch("/api/v1/stub-distribution/scan", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ qrToken: token, programId: selectedProgramId }),
+            body: JSON.stringify({
+              qrToken: token,
+              programId: selectedProgramId,
+            }),
           });
 
-          const data = await readScanResponse(res, "Scan rejected for the selected program.");
+          const data = await readScanResponse(
+            res,
+            "Scan rejected for the selected program."
+          );
 
           setScannedData(data.data);
           return;
         } catch (onlineErr: any) {
           if (onlineErr instanceof ScanRequestError) throw onlineErr;
-          console.warn("Online stub scan failed, switching to local offline engine:", onlineErr);
+          console.warn(
+            "Online stub scan failed, switching to local offline engine:",
+            onlineErr
+          );
         }
       }
 
       // Offline mode check with universal token resolution
       const bene = await findBeneficiaryOffline(token, selectedProgramId);
-      if (!bene) throw new Error(`QR Stub or Beneficiary "${token}" not found in offline database cache.`);
+      if (!bene)
+        throw new Error(
+          `QR Stub or Beneficiary "${token}" not found in offline database cache.`
+        );
 
       if (bene.stubDistributed) {
-        throw new Error(`ALREADY DISTRIBUTED: Stub for #${bene.designatedNumber} (${bene.fullName}) was already issued and confirmed.`);
+        throw new Error(
+          `ALREADY DISTRIBUTED: Stub for #${bene.designatedNumber} (${bene.fullName}) was already issued and confirmed.`
+        );
       }
 
       setScannedData({
@@ -258,7 +308,8 @@ function StubDistributionContent() {
             birthdayPin: birthdayPin.trim(),
             latitude: geoLat,
             longitude: geoLong,
-            deviceId: localStorage.getItem("tupad_device_id") || "MOBILE_DEVICE",
+            deviceId:
+              localStorage.getItem("tupad_device_id") || "MOBILE_DEVICE",
           }),
         });
 
@@ -266,7 +317,8 @@ function StubDistributionContent() {
         if (!res.ok) throw new Error(data.error || "Verification failed");
 
         setSuccessResult({
-          message: "✓ Beneficiary Birthday Confirmed! Stub verified as officially distributed & orientation attendance affirmed.",
+          message:
+            "✓ Beneficiary Birthday Confirmed! Stub verified as officially distributed & orientation attendance affirmed.",
           data: data.data,
           isOffline: false,
         });
@@ -285,7 +337,10 @@ function StubDistributionContent() {
           longitude: geoLong,
         });
 
-        await offlineDb.cachedBeneficiaries.update(scannedData.programBeneficiaryId, { stubDistributed: true });
+        await offlineDb.cachedBeneficiaries.update(
+          scannedData.programBeneficiaryId,
+          { stubDistributed: true }
+        );
         setSuccessResult({
           message: "✓ Verified & Saved Offline (Queued for Sync)",
           data: scannedData,
@@ -305,41 +360,25 @@ function StubDistributionContent() {
     }
   };
 
-  // 3. Flag as Possible Replacement Handler
-  const handleFlagReplacement = async () => {
-    if (!scannedData) return;
-    setLoading(true);
-    setError(null);
-
-    try {
-      const res = await fetch("/api/v1/stub-distribution/flag-replacement", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          programBeneficiaryId: scannedData.programBeneficiaryId,
-          reason: flagReason,
-          remarks: flagRemarks,
-        }),
-      });
-
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Failed to flag replacement");
-
-      setIsFlaggingModalOpen(false);
-      setSuccessResult({
-        message: `Flagged as Possible Onsite Replacement (${flagReason}). Recorded for PESO audit.`,
-        data: data.data,
-        isFlagged: true,
-      });
-
-      setScannedData(null);
-      setBirthdayPin("");
-      if (selectedProgramId) fetchMonitoringData(selectedProgramId);
-    } catch (err: any) {
-      setError(err.message);
-    } finally {
-      setLoading(false);
-    }
+  // 3. Open Guided Replacement & Consent Wizard
+  const openReplacementWizard = (targetData: {
+    programId?: string;
+    programBeneficiaryId: string;
+    designatedNumber: number;
+    fullName: string;
+    barangay: string;
+    sitio?: string | null;
+    tableNumber?: string | null;
+  }) => {
+    setReplacementTarget({
+      programId: targetData.programId || selectedProgramId,
+      programBeneficiaryId: targetData.programBeneficiaryId,
+      designatedNumber: targetData.designatedNumber,
+      fullName: targetData.fullName,
+      barangay: targetData.barangay,
+      sitio: targetData.sitio,
+      tableNumber: targetData.tableNumber,
+    });
   };
 
   // CSV Exporter for Distribution Report
@@ -370,37 +409,52 @@ function StubDistributionContent() {
       `"${b.remarks || ""}"`,
     ]);
 
-    const csvContent = [headers.join(","), ...rows.map((r: any[]) => r.join(","))].join("\n");
+    const csvContent = [
+      headers.join(","),
+      ...rows.map((r: any[]) => r.join(",")),
+    ].join("\n");
     const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.setAttribute("href", url);
-    link.setAttribute("download", `Stub_Distribution_Monitoring_${monitoringData.program?.programCode || "Report"}.csv`);
+    link.setAttribute(
+      "download",
+      `Stub_Distribution_Monitoring_${
+        monitoringData.program?.programCode || "Report"
+      }.csv`
+    );
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
   };
 
-  const filteredRoster = (monitoringData?.beneficiaries || []).filter((b: any) => {
-    const matchesSearch =
-      b.fullName.toLowerCase().includes(rosterSearch.toLowerCase()) ||
-      String(b.designatedNumber).includes(rosterSearch);
+  const filteredRoster = (monitoringData?.beneficiaries || []).filter(
+    (b: any) => {
+      const matchesSearch =
+        b.fullName.toLowerCase().includes(rosterSearch.toLowerCase()) ||
+        String(b.designatedNumber).includes(rosterSearch) ||
+        (b.originalBeneficiaryName &&
+          b.originalBeneficiaryName
+            .toLowerCase()
+            .includes(rosterSearch.toLowerCase()));
 
-    const matchesStatus =
-      rosterFilter === "ALL"
-        ? true
-        : rosterFilter === "CONFIRMED"
-        ? b.status === "CONFIRMED"
-        : rosterFilter === "PENDING"
-        ? b.status === "PENDING"
-        : b.status === "FLAGGED_REPLACEMENT";
+      const matchesStatus =
+        rosterFilter === "ALL"
+          ? true
+          : rosterFilter === "CONFIRMED"
+          ? b.status === "CONFIRMED"
+          : rosterFilter === "PENDING"
+          ? b.status === "PENDING"
+          : b.status === "FLAGGED_REPLACEMENT" || b.isCompletedReplacement;
 
-    const matchesBarangay =
-      selectedBarangayFilter === "ALL" ||
-      normalizeBarangayName(b.barangay).toLowerCase() === normalizeBarangayName(selectedBarangayFilter).toLowerCase();
+      const matchesBarangay =
+        selectedBarangayFilter === "ALL" ||
+        normalizeBarangayName(b.barangay).toLowerCase() ===
+          normalizeBarangayName(selectedBarangayFilter).toLowerCase();
 
-    return matchesSearch && matchesStatus && matchesBarangay;
-  });
+      return matchesSearch && matchesStatus && matchesBarangay;
+    }
+  );
 
   if (user && !can("stub.distribution.scan")) {
     return (
@@ -409,9 +463,14 @@ function StubDistributionContent() {
           <ShieldCheck className="w-8 h-8" />
         </div>
         <div className="space-y-1">
-          <h2 className="text-base font-black text-slate-900">Access Restricted</h2>
+          <h2 className="text-base font-black text-slate-900">
+            Access Restricted
+          </h2>
           <p className="text-xs text-slate-500">
-            Ang iyong user role ({(user.role || "").replace(/_/g, " ")}) ay para lamang sa <strong>Daily Accomplishment Photo</strong> at <strong>DTR Attendance Scanning</strong>. Ang Stub Distribution ay para sa authorized TUPAD Coordinators at PESO Officers lamang.
+            Ang iyong user role ({(user.role || "").replace(/_/g, " ")}) ay para
+            lamang sa <strong>Daily Accomplishment Photo</strong> at{" "}
+            <strong>DTR Attendance Scanning</strong>. Ang Stub Distribution ay
+            para sa authorized TUPAD Coordinators at PESO Officers lamang.
           </p>
         </div>
         <div className="pt-2 flex flex-col gap-2">
@@ -439,19 +498,34 @@ function StubDistributionContent() {
         <div>
           <h1 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight flex items-center space-x-2">
             <QrCode className="w-6 h-6 text-gov-blue" />
-            <span>Stub Distribution & Informed Beneficiary Monitoring</span>
+            <span>
+              Stub Distribution & Informed Beneficiary Monitoring
+            </span>
           </h1>
           <p className="text-xs text-slate-500">
-            Scan Format 1 printed stubs, verify beneficiary Birthday PIN affirmation, and monitor coordinator field coverage
+            Scan Format 1 printed stubs, verify beneficiary Birthday PIN
+            affirmation, and monitor coordinator field coverage
           </p>
         </div>
 
         {/* Tab & Action Switcher */}
         <div className="flex flex-wrap items-center gap-2 self-start sm:self-auto">
-          <label className="text-xs font-bold" htmlFor="stub-program">TUPAD Program</label>
-          <select id="stub-program" value={selectedProgramId} disabled={loading} onChange={(e) => setSelectedProgramId(e.target.value)} className="gov-input max-w-xs text-xs">
+          <label className="text-xs font-bold" htmlFor="stub-program">
+            TUPAD Program
+          </label>
+          <select
+            id="stub-program"
+            value={selectedProgramId}
+            disabled={loading}
+            onChange={(e) => setSelectedProgramId(e.target.value)}
+            className="gov-input max-w-xs text-xs"
+          >
             <option value="">Pumili ng program</option>
-            {programs.map((p) => <option key={p.id} value={p.id}>{p.programCode} — {p.programName}</option>)}
+            {programs.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.programCode} — {p.programName}
+              </option>
+            ))}
           </select>
           <button
             type="button"
@@ -503,9 +577,12 @@ function StubDistributionContent() {
               </div>
 
               <div className="space-y-1">
-                <h3 className="text-base font-extrabold text-slate-900">Ready for Stub Distribution</h3>
+                <h3 className="text-base font-extrabold text-slate-900">
+                  Ready for Stub Distribution
+                </h3>
                 <p className="text-xs text-slate-500 max-w-xs mx-auto">
-                  Scan the Format 1 printed verification stub in front of the beneficiary to record affirmation and proof of receipt.
+                  Scan the Format 1 printed verification stub in front of the
+                  beneficiary to record affirmation and proof of receipt.
                 </p>
               </div>
 
@@ -531,12 +608,18 @@ function StubDistributionContent() {
 
           {/* Scanned Beneficiary & Birthday PIN Affirmation Form */}
           {scannedData && (
-            <form onSubmit={handleVerifyBirthday} className="gov-card p-6 space-y-5 shadow-xl border-t-4 border-t-gov-gold">
+            <form
+              onSubmit={handleVerifyBirthday}
+              className="gov-card p-6 space-y-5 shadow-xl border-t-4 border-t-gov-gold"
+            >
               <div className="text-center space-y-1 pb-3 border-b border-slate-100">
                 <span className="text-[10px] font-black font-mono text-gov-blue uppercase bg-blue-50 px-2.5 py-0.5 rounded border border-blue-200">
-                  DESIGNATED #{scannedData.designatedNumber} • {scannedData.tableNumber || "Table 1"}
+                  DESIGNATED #{scannedData.designatedNumber} •{" "}
+                  {scannedData.tableNumber || "Table 1"}
                 </span>
-                <h2 className="text-lg font-black text-slate-900">{scannedData.fullName}</h2>
+                <h2 className="text-lg font-black text-slate-900">
+                  {scannedData.fullName}
+                </h2>
                 <p className="text-xs text-slate-500">
                   Barangay {scannedData.barangay}, Municipality of Dingalan
                 </p>
@@ -550,13 +633,20 @@ function StubDistributionContent() {
                   </div>
                   {scannedData.remarks && (
                     <div className="text-[11px] text-rose-800 bg-white/90 p-2 rounded-lg border border-rose-200">
-                      <strong className="block text-[10px] font-bold uppercase text-rose-600 mb-0.5">Recorded Flag Reason & Remarks:</strong>
+                      <strong className="block text-[10px] font-bold uppercase text-rose-600 mb-0.5">
+                        Recorded Flag Reason & Remarks:
+                      </strong>
                       <span>{scannedData.remarks}</span>
                     </div>
                   )}
                   {scannedData.flaggedBy && (
                     <p className="text-[10px] text-rose-600 italic">
-                      Flagged by {scannedData.flaggedBy} {scannedData.flaggedAt ? `on ${new Date(scannedData.flaggedAt).toLocaleDateString()}` : ""}
+                      Flagged by {scannedData.flaggedBy}{" "}
+                      {scannedData.flaggedAt
+                        ? `on ${new Date(
+                            scannedData.flaggedAt
+                          ).toLocaleDateString()}`
+                        : ""}
                     </p>
                   )}
                 </div>
@@ -565,7 +655,9 @@ function StubDistributionContent() {
               <div>
                 <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1 flex items-center justify-between">
                   <span>Enter Beneficiary Birthday PIN *</span>
-                  <span className="text-[10px] text-slate-400 font-mono">MM-DD-YYYY</span>
+                  <span className="text-[10px] text-slate-400 font-mono">
+                    MM-DD-YYYY
+                  </span>
                 </label>
                 <div className="relative">
                   <KeyRound className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
@@ -577,7 +669,10 @@ function StubDistributionContent() {
                       if (val.length > 2 && val.length <= 4) {
                         val = `${val.slice(0, 2)}-${val.slice(2)}`;
                       } else if (val.length > 4) {
-                        val = `${val.slice(0, 2)}-${val.slice(2, 4)}-${val.slice(4, 8)}`;
+                        val = `${val.slice(0, 2)}-${val.slice(2, 4)}-${val.slice(
+                          4,
+                          8
+                        )}`;
                       }
                       setBirthdayPin(val);
                     }}
@@ -589,7 +684,8 @@ function StubDistributionContent() {
                   />
                 </div>
                 <p className="text-[10px] text-slate-500 mt-1 italic">
-                  Ask beneficiary for their Month-Day-Year of birth as proof of identity and confirmation of orientation attendance.
+                  Ask beneficiary for their Month-Day-Year of birth as proof of
+                  identity and confirmation of orientation attendance.
                 </p>
               </div>
 
@@ -600,8 +696,16 @@ function StubDistributionContent() {
                   disabled={loading || birthdayPin.length < 8}
                   className="w-full py-3 bg-gov-blue hover:bg-gov-light text-white font-black text-xs rounded-xl shadow-lg flex items-center justify-center space-x-1.5 transition disabled:opacity-50"
                 >
-                  {loading ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4 text-gov-goldLight" />}
-                  <span>{loading ? "Verifying PIN..." : "Confirm Stub Receipt & Orientation Attendance"}</span>
+                  {loading ? (
+                    <RefreshCw className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <Check className="w-4 h-4 text-gov-goldLight" />
+                  )}
+                  <span>
+                    {loading
+                      ? "Verifying PIN..."
+                      : "Confirm Stub Receipt & Orientation Attendance"}
+                  </span>
                 </button>
 
                 <div className="flex space-x-2">
@@ -615,7 +719,17 @@ function StubDistributionContent() {
 
                   <button
                     type="button"
-                    onClick={() => setIsFlaggingModalOpen(true)}
+                    onClick={() =>
+                      openReplacementWizard({
+                        programId: scannedData.programId || selectedProgramId,
+                        programBeneficiaryId: scannedData.programBeneficiaryId,
+                        designatedNumber: scannedData.designatedNumber,
+                        fullName: scannedData.fullName,
+                        barangay: scannedData.barangay,
+                        sitio: scannedData.sitio,
+                        tableNumber: scannedData.tableNumber,
+                      })
+                    }
                     className="flex-1 py-2 bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold text-xs rounded-lg border border-rose-200 flex items-center justify-center space-x-1"
                   >
                     <UserX className="w-3.5 h-3.5" />
@@ -628,25 +742,48 @@ function StubDistributionContent() {
 
           {/* Success Feedback View */}
           {successResult && (
-            <div className={`gov-card p-6 text-center space-y-4 shadow-xl border-t-4 ${
-              successResult.isFlagged ? "border-t-rose-600" : "border-t-emerald-600"
-            }`}>
-              <div className={`w-16 h-16 rounded-full flex items-center justify-center mx-auto ${
-                successResult.isFlagged ? "bg-rose-100 text-rose-700" : "bg-emerald-100 text-emerald-700"
-              }`}>
-                {successResult.isFlagged ? <AlertTriangle className="w-9 h-9" /> : <CheckCircle2 className="w-9 h-9" />}
+            <div
+              className={`gov-card p-6 text-center space-y-4 shadow-xl border-t-4 ${
+                successResult.isFlagged
+                  ? "border-t-rose-600"
+                  : "border-t-emerald-600"
+              }`}
+            >
+              <div
+                className={`w-16 h-16 rounded-full flex items-center justify-center mx-auto ${
+                  successResult.isFlagged
+                    ? "bg-rose-100 text-rose-700"
+                    : "bg-emerald-100 text-emerald-700"
+                }`}
+              >
+                <CheckCircle2 className="w-9 h-9" />
               </div>
 
               <div className="space-y-1">
-                <span className={`text-[10px] font-black uppercase tracking-wider ${
-                  successResult.isFlagged ? "text-rose-700" : "text-emerald-700"
-                }`}>
-                  {successResult.isFlagged ? "FLAGGED FOR ONSITE REPLACEMENT" : "✓ AFFIRMED & DISTRIBUTED"}
+                <span
+                  className={`text-[10px] font-black uppercase tracking-wider ${
+                    successResult.isFlagged
+                      ? "text-rose-700"
+                      : "text-emerald-700"
+                  }`}
+                >
+                  {successResult.isFlagged
+                    ? "✓ REPLACEMENT & CONSENT VERIFIED"
+                    : "✓ AFFIRMED & DISTRIBUTED"}
                 </span>
                 <h2 className="text-base font-black text-slate-900">
-                  {successResult.data?.fullName} (#{successResult.data?.designatedNumber})
+                  {successResult.data?.fullName} (#
+                  {successResult.data?.designatedNumber})
                 </h2>
-                <p className="text-xs text-slate-600">{successResult.message}</p>
+                {successResult.data?.originalBeneficiaryName && (
+                  <p className="text-[11px] font-bold text-rose-700">
+                    Replaced: {successResult.data.originalBeneficiaryName} •
+                    Dependent: {successResult.data.dependentFullName}
+                  </p>
+                )}
+                <p className="text-xs text-slate-600">
+                  {successResult.message}
+                </p>
               </div>
 
               <button
@@ -671,7 +808,9 @@ function StubDistributionContent() {
           {/* Program Filter Bar & Exporter */}
           <div className="gov-card p-4 flex flex-col sm:flex-row items-center justify-between gap-4">
             <div className="flex items-center space-x-3 w-full sm:w-auto">
-              <span className="text-xs font-bold text-slate-700 whitespace-nowrap">Program:</span>
+              <span className="text-xs font-bold text-slate-700 whitespace-nowrap">
+                Program:
+              </span>
               <select
                 value={selectedProgramId}
                 disabled={loading}
@@ -688,11 +827,17 @@ function StubDistributionContent() {
 
             <div className="flex items-center space-x-2 w-full sm:w-auto justify-end">
               <button
-                onClick={() => selectedProgramId && fetchMonitoringData(selectedProgramId)}
+                onClick={() =>
+                  selectedProgramId && fetchMonitoringData(selectedProgramId)
+                }
                 className="px-3 py-2 text-xs font-bold text-slate-700 hover:text-slate-900 border rounded-lg bg-white flex items-center space-x-1.5"
                 title="Refresh Metrics"
               >
-                <RefreshCw className={`w-3.5 h-3.5 ${monitoringLoading ? "animate-spin" : ""}`} />
+                <RefreshCw
+                  className={`w-3.5 h-3.5 ${
+                    monitoringLoading ? "animate-spin" : ""
+                  }`}
+                />
                 <span>Refresh</span>
               </button>
 
@@ -717,7 +862,9 @@ function StubDistributionContent() {
                 <div className="text-2xl font-black text-slate-900">
                   {monitoringData.summary.totalBeneficiaries}
                 </div>
-                <p className="text-[11px] text-slate-500">100% Enrolled Roster</p>
+                <p className="text-[11px] text-slate-500">
+                  100% Enrolled Roster
+                </p>
               </div>
 
               {/* Card 2: Distributed & Confirmed */}
@@ -731,7 +878,9 @@ function StubDistributionContent() {
                     ({monitoringData.summary.confirmationRate}%)
                   </span>
                 </div>
-                <p className="text-[11px] text-emerald-600 font-semibold">Birthday PIN Verified</p>
+                <p className="text-[11px] text-emerald-600 font-semibold">
+                  Birthday PIN Verified
+                </p>
               </div>
 
               {/* Card 3: Pending / Uninformed */}
@@ -742,18 +891,22 @@ function StubDistributionContent() {
                 <div className="text-2xl font-black text-amber-700">
                   {monitoringData.summary.totalPending}
                 </div>
-                <p className="text-[11px] text-amber-600">Awaiting field distribution</p>
+                <p className="text-[11px] text-amber-600">
+                  Awaiting field distribution
+                </p>
               </div>
 
               {/* Card 4: Flagged for Replacement */}
               <div className="gov-card p-4 border-l-4 border-l-rose-600 space-y-1">
                 <span className="text-[10px] font-bold uppercase tracking-wider text-rose-600">
-                  Flagged for Replacement
+                  Flagged / Replaced
                 </span>
                 <div className="text-2xl font-black text-rose-700">
                   {monitoringData.summary.totalFlaggedReplacement}
                 </div>
-                <p className="text-[11px] text-rose-600">Unreachable / Candidate subs</p>
+                <p className="text-[11px] text-rose-600">
+                  Onsite replacements & flags
+                </p>
               </div>
             </div>
           )}
@@ -767,7 +920,8 @@ function StubDistributionContent() {
                   <span>Barangay Stub Distribution & Coverage Matrix</span>
                 </h3>
                 <p className="text-xs text-slate-500">
-                  Real-time status of whether TUPAD coordinators have reached and informed beneficiaries per barangay
+                  Real-time status of whether TUPAD coordinators have reached
+                  and informed beneficiaries per barangay
                 </p>
               </div>
             </div>
@@ -779,19 +933,28 @@ function StubDistributionContent() {
                     <th className="py-2.5 px-3">Barangay</th>
                     <th className="py-2.5 px-3 text-center">Target</th>
                     <th className="py-2.5 px-3 text-center">Confirmed</th>
-                    <th className="py-2.5 px-3 text-center">Pending (Uninformed)</th>
-                    <th className="py-2.5 px-3 text-center">Flagged Replacement</th>
+                    <th className="py-2.5 px-3 text-center">
+                      Pending (Uninformed)
+                    </th>
+                    <th className="py-2.5 px-3 text-center">
+                      Flagged / Replaced
+                    </th>
                     <th className="py-2.5 px-3">Progress</th>
                     <th className="py-2.5 px-3 text-center">Status</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
                   {(monitoringData?.barangays || []).map((brgy: any) => (
-                    <tr key={brgy.barangayName} className="hover:bg-slate-50/80 transition">
+                    <tr
+                      key={brgy.barangayName}
+                      className="hover:bg-slate-50/80 transition"
+                    >
                       <td className="py-3 px-3 font-extrabold text-slate-900">
                         {brgy.barangayName}
                       </td>
-                      <td className="py-3 px-3 text-center font-mono font-bold">{brgy.total}</td>
+                      <td className="py-3 px-3 text-center font-mono font-bold">
+                        {brgy.total}
+                      </td>
                       <td className="py-3 px-3 text-center font-mono font-bold text-emerald-700">
                         {brgy.confirmed}
                       </td>
@@ -805,7 +968,9 @@ function StubDistributionContent() {
                         <div className="space-y-1">
                           <div className="flex justify-between text-[10px] font-bold text-slate-600">
                             <span>{brgy.completionPercentage}%</span>
-                            <span>{brgy.confirmed}/{brgy.total}</span>
+                            <span>
+                              {brgy.confirmed}/{brgy.total}
+                            </span>
                           </div>
                           <div className="w-full bg-slate-200 rounded-full h-2 overflow-hidden">
                             <div
@@ -818,7 +983,9 @@ function StubDistributionContent() {
                                   ? "bg-amber-500"
                                   : "bg-slate-300"
                               }`}
-                              style={{ width: `${brgy.completionPercentage}%` }}
+                              style={{
+                                width: `${brgy.completionPercentage}%`,
+                              }}
                             />
                           </div>
                         </div>
@@ -856,7 +1023,10 @@ function StubDistributionContent() {
             <div className="flex flex-col sm:flex-row items-center justify-between gap-3">
               <h3 className="text-sm font-black text-slate-900 uppercase tracking-tight flex items-center space-x-2">
                 <Users className="w-4 h-4 text-gov-blue" />
-                <span>Beneficiary Verification & Informed Status Roster ({filteredRoster.length})</span>
+                <span>
+                  Beneficiary Verification & Informed Status Roster (
+                  {filteredRoster.length})
+                </span>
               </h3>
 
               {/* Filters */}
@@ -880,7 +1050,9 @@ function StubDistributionContent() {
                   <option value="ALL">All Statuses</option>
                   <option value="CONFIRMED">Confirmed & Distributed</option>
                   <option value="PENDING">Pending (Uninformed)</option>
-                  <option value="FLAGGED_REPLACEMENT">Flagged Replacement</option>
+                  <option value="FLAGGED_REPLACEMENT">
+                    Flagged / Replaced
+                  </option>
                 </select>
 
                 <select
@@ -890,11 +1062,21 @@ function StubDistributionContent() {
                 >
                   <option value="ALL">All Barangays</option>
                   {[
-                    "Aplaya", "Butas na Bato", "Caragsacan", "Davildavilan",
-                    "Dikapanikian", "Ibona", "Matawe", "Paltic",
-                    "Poblacion", "Tanawan", "Umiray"
+                    "Aplaya",
+                    "Butas na Bato",
+                    "Caragsacan",
+                    "Davildavilan",
+                    "Dikapanikian",
+                    "Ibona",
+                    "Matawe",
+                    "Paltic",
+                    "Poblacion",
+                    "Tanawan",
+                    "Umiray",
                   ].map((b) => (
-                    <option key={b} value={b}>{b}</option>
+                    <option key={b} value={b}>
+                      {b}
+                    </option>
                   ))}
                 </select>
               </div>
@@ -921,21 +1103,45 @@ function StubDistributionContent() {
                       <td className="py-2.5 px-3 font-mono font-black text-gov-blue">
                         #{b.designatedNumber}
                       </td>
-                      <td className="py-2.5 px-3 font-bold text-slate-900">{b.fullName}</td>
-                      <td className="py-2.5 px-3 text-slate-600">{b.barangay}</td>
-                      <td className="py-2.5 px-3 font-mono text-slate-700">{b.tableNumber}</td>
-                      <td className="py-2.5 px-3 font-mono text-slate-500">{b.contactNumber}</td>
+                      <td className="py-2.5 px-3">
+                        <div className="font-bold text-slate-900">
+                          {b.fullName}
+                        </div>
+                        {b.originalBeneficiaryName && (
+                          <div className="text-[10px] font-bold text-rose-700">
+                            Replaced: {b.originalBeneficiaryName}
+                          </div>
+                        )}
+                        {b.dependentFullName && (
+                          <div className="text-[10px] text-slate-500">
+                            Dependent: {b.dependentFullName}
+                          </div>
+                        )}
+                      </td>
+                      <td className="py-2.5 px-3 text-slate-600">
+                        {b.barangay}
+                      </td>
+                      <td className="py-2.5 px-3 font-mono text-slate-700">
+                        {b.tableNumber}
+                      </td>
+                      <td className="py-2.5 px-3 font-mono text-slate-500">
+                        {b.contactNumber}
+                      </td>
                       <td className="py-2.5 px-3">
                         <span
                           className={`text-[10px] font-black uppercase px-2 py-0.5 rounded ${
-                            b.status === "CONFIRMED"
+                            b.isCompletedReplacement
+                              ? "bg-purple-100 text-purple-800 border border-purple-200"
+                              : b.status === "CONFIRMED"
                               ? "bg-emerald-100 text-emerald-800"
                               : b.status === "FLAGGED_REPLACEMENT"
                               ? "bg-rose-100 text-rose-800"
                               : "bg-amber-100 text-amber-800"
                           }`}
                         >
-                          {b.status === "CONFIRMED"
+                          {b.isCompletedReplacement
+                            ? "✓ Replaced & Confirmed"
+                            : b.status === "CONFIRMED"
                             ? "✓ Confirmed"
                             : b.status === "FLAGGED_REPLACEMENT"
                             ? "⚠ Flagged Replacement"
@@ -943,41 +1149,66 @@ function StubDistributionContent() {
                         </span>
                       </td>
                       <td className="py-2.5 px-3">
-                        {b.status === "FLAGGED_REPLACEMENT" ? (
+                        {b.status === "FLAGGED_REPLACEMENT" ||
+                        b.isCompletedReplacement ? (
                           <div className="flex items-start space-x-1 max-w-xs">
                             <AlertTriangle className="w-3.5 h-3.5 text-rose-600 flex-shrink-0 mt-0.5" />
-                            <span className="text-[11px] font-bold text-rose-700 line-clamp-2" title={b.remarks || "Flagged for replacement"}>
+                            <span
+                              className="text-[11px] font-bold text-rose-700 line-clamp-2"
+                              title={b.remarks || "Flagged for replacement"}
+                            >
                               {b.remarks || "Flagged for onsite replacement"}
                             </span>
                           </div>
                         ) : b.remarks ? (
-                          <span className="text-[11px] text-slate-600 truncate block max-w-xs" title={b.remarks}>
+                          <span
+                            className="text-[11px] text-slate-600 truncate block max-w-xs"
+                            title={b.remarks}
+                          >
                             {b.remarks}
                           </span>
                         ) : (
-                          <span className="text-[10px] text-slate-400 italic">—</span>
+                          <span className="text-[10px] text-slate-400 italic">
+                            —
+                          </span>
                         )}
                       </td>
                       <td className="py-2.5 px-3 text-[11px] text-slate-500">
                         {b.distributedBy ? (
                           <span>
-                            {b.distributedBy} • {new Date(b.distributedAt).toLocaleDateString()}
+                            {b.distributedBy} •{" "}
+                            {new Date(b.distributedAt).toLocaleDateString()}
                           </span>
                         ) : (
-                          <span className="text-slate-400 italic">Not yet verified</span>
+                          <span className="text-slate-400 italic">
+                            Not yet verified
+                          </span>
                         )}
                       </td>
                       <td className="py-2.5 px-3 text-center">
-                        {b.status === "FLAGGED_REPLACEMENT" ? (
-                          <Link
-                            href={`/replacements?programId=${selectedProgramId}&originalPbId=${b.id}`}
+                        {!b.isCompletedReplacement &&
+                        b.status !== "CONFIRMED" ? (
+                          <button
+                            type="button"
+                            onClick={() =>
+                              openReplacementWizard({
+                                programId: selectedProgramId,
+                                programBeneficiaryId: b.id,
+                                designatedNumber: b.designatedNumber,
+                                fullName: b.fullName,
+                                barangay: b.barangay,
+                                tableNumber: b.tableNumber,
+                              })
+                            }
                             className="inline-flex items-center space-x-1 px-2.5 py-1 bg-rose-600 hover:bg-rose-700 text-white font-bold text-[10px] rounded-lg shadow-sm transition whitespace-nowrap"
                           >
-                            <span>Process Replacement</span>
+                            <span>Flag / Replace</span>
                             <ArrowRight className="w-3 h-3" />
-                          </Link>
+                          </button>
                         ) : (
-                          <span className="text-[10px] text-slate-300 font-mono">—</span>
+                          <span className="text-[10px] text-slate-300 font-mono">
+                            —
+                          </span>
                         )}
                       </td>
                     </tr>
@@ -989,70 +1220,23 @@ function StubDistributionContent() {
         </div>
       )}
 
-      {/* Flag Replacement Modal */}
-      {isFlaggingModalOpen && scannedData && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-4 backdrop-blur-sm">
-          <div className="bg-white rounded-2xl max-w-md w-full shadow-2xl border border-rose-200 overflow-hidden p-6 space-y-4">
-            <div className="flex items-center space-x-2 text-rose-600">
-              <AlertTriangle className="w-6 h-6" />
-              <h3 className="text-sm font-black text-slate-900">
-                Flag as Possible Onsite Replacement
-              </h3>
-            </div>
-
-            <p className="text-xs text-slate-600">
-              Flag <strong>{scannedData.fullName} (#{scannedData.designatedNumber})</strong> if the beneficiary cannot be contacted, refuses the slot, or cannot attend.
-            </p>
-
-            <div className="space-y-3 text-xs">
-              <div>
-                <label className="block font-bold text-slate-700 mb-1">Reason for Replacement Flag *</label>
-                <select
-                  value={flagReason}
-                  onChange={(e) => setFlagReason(e.target.value)}
-                  className="w-full p-2 border rounded-lg font-bold bg-slate-50"
-                >
-                  <option value="UNREACHABLE_PHONE_OR_RESIDENCE">Unreachable (Phone uncontactable / not in residence)</option>
-                  <option value="MOVED_OUT_OF_TOWN">Relocated / Moved out of Dingalan</option>
-                  <option value="REFUSED_EMPLOYMENT">Declined / Not interested in 10-day work program</option>
-                  <option value="MEDICAL_UNFIT">Medically unfit / Hospitalized</option>
-                  <option value="EMPLOYED_ELSEWHERE">Currently regularly employed elsewhere</option>
-                  <option value="OTHER">Other specific reason</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="block font-bold text-slate-700 mb-1">Coordinator Remarks (Optional)</label>
-                <textarea
-                  rows={2}
-                  value={flagRemarks}
-                  onChange={(e) => setFlagRemarks(e.target.value)}
-                  placeholder="e.g. Visited Sitio 3 times, neighbor stated relocated to Manila..."
-                  className="w-full p-2 border rounded-lg bg-slate-50"
-                />
-              </div>
-            </div>
-
-            <div className="flex items-center justify-end space-x-2 pt-2 border-t">
-              <button
-                type="button"
-                onClick={() => setIsFlaggingModalOpen(false)}
-                className="px-4 py-2 text-xs font-bold text-slate-600 hover:text-slate-900 border rounded-lg"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={handleFlagReplacement}
-                disabled={loading}
-                className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white font-black text-xs rounded-xl shadow transition"
-              >
-                {loading ? "Flagging..." : "Confirm Flag as Replacement"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Guided 3-Step Replacement, Eligibility Check, Consent & 4-ID Capture Modal */}
+      <StubReplacementWizardModal
+        isOpen={Boolean(replacementTarget)}
+        target={replacementTarget}
+        onClose={() => setReplacementTarget(null)}
+        onSuccess={(resultData, summaryMessage) => {
+          setReplacementTarget(null);
+          setSuccessResult({
+            message: summaryMessage,
+            data: resultData,
+            isFlagged: true,
+          });
+          setScannedData(null);
+          setBirthdayPin("");
+          if (selectedProgramId) fetchMonitoringData(selectedProgramId);
+        }}
+      />
 
       {/* Scanner Modal */}
       <QrScannerModal

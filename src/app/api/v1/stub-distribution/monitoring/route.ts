@@ -32,12 +32,22 @@ export async function GET(request: Request) {
         programBeneficiaries: {
           where: { participationStatus: { not: "REPLACED" } },
           include: {
-            beneficiary: true,
+            beneficiary: {
+              include: { dependents: { take: 1 } },
+            },
             stubDistributions: {
               include: { distributedBy: { select: { fullName: true } } },
               orderBy: { distributedAt: "desc" },
             },
             qrCodes: { where: { status: "ACTIVE" } },
+            newReplacements: {
+              include: {
+                originalProgramBeneficiary: {
+                  include: { beneficiary: { select: { fullName: true } } },
+                },
+              },
+              take: 1,
+            },
           },
         },
       },
@@ -69,15 +79,20 @@ export async function GET(request: Request) {
     const beneficiaryRoster = beneficiaries.map((pb) => {
       const flaggedDist = pb.stubDistributions?.find((d: any) => d.status === "FLAGGED_REPLACEMENT");
       const distributedDist = pb.stubDistributions?.find((d: any) => d.status === "DISTRIBUTED");
+      const isCompletedReplacement =
+        !pb.originalBeneficiary ||
+        distributedDist?.verificationMethod === "ONSITE_REPLACEMENT_CONSENT" ||
+        distributedDist?.verificationMethod === "ONSITE_REPLACEMENT";
 
-      const isFlagged =
-        pb.participationStatus === "FLAGGED_FOR_REPLACEMENT" ||
-        Boolean(flaggedDist);
+      const isUnresolvedFlag =
+        !isCompletedReplacement &&
+        (pb.participationStatus === "FLAGGED_FOR_REPLACEMENT" || Boolean(flaggedDist));
 
-      const isConfirmed = !isFlagged && Boolean(distributedDist);
+      const isFlagged = isUnresolvedFlag || isCompletedReplacement;
+      const isConfirmed = Boolean(distributedDist) && !isUnresolvedFlag;
 
       let status = "PENDING";
-      if (isFlagged) {
+      if (isUnresolvedFlag) {
         status = "FLAGGED_REPLACEMENT";
       } else if (isConfirmed) {
         status = "CONFIRMED";
@@ -95,12 +110,18 @@ export async function GET(request: Request) {
       brgyStats[normalizedBrgy].total++;
       if (isFlagged) {
         brgyStats[normalizedBrgy].flaggedReplacement++;
-      } else if (isConfirmed) {
+      }
+      if (isConfirmed) {
         brgyStats[normalizedBrgy].confirmed++;
         brgyStats[normalizedBrgy].distributed++;
       }
+      if (!isConfirmed && !isUnresolvedFlag) {
+        brgyStats[normalizedBrgy].pending++;
+      }
 
-      const activeDist = isFlagged ? (flaggedDist || distributedDist) : (distributedDist || flaggedDist);
+      const activeDist = isUnresolvedFlag ? (flaggedDist || distributedDist) : (distributedDist || flaggedDist);
+      const originalBeneficiaryName = pb.newReplacements?.[0]?.originalProgramBeneficiary?.beneficiary?.fullName || null;
+      const dependentFullName = pb.beneficiary.dependents?.[0]?.fullName || null;
 
       return {
         id: pb.id,
@@ -111,6 +132,9 @@ export async function GET(request: Request) {
         contactNumber: pb.beneficiary.contactNumber || "N/A",
         birthday: pb.beneficiary.birthday,
         status,
+        isCompletedReplacement,
+        originalBeneficiaryName,
+        dependentFullName,
         distributedAt: activeDist?.distributedAt || null,
         distributedBy: activeDist?.distributedBy?.fullName || null,
         remarks: activeDist?.remarks || (isFlagged ? "Flagged for onsite replacement" : null),
@@ -118,18 +142,10 @@ export async function GET(request: Request) {
       };
     });
 
-    // Compute Pending (Uninformed) mathematically: Target - (Confirmed + Flagged for Replacement)
-    for (const key of Object.keys(brgyStats)) {
-      brgyStats[key].pending = Math.max(
-        0,
-        brgyStats[key].total - (brgyStats[key].confirmed + brgyStats[key].flaggedReplacement)
-      );
-    }
-
     const totalConfirmed = Object.values(brgyStats).reduce((acc, s) => acc + s.confirmed, 0);
     const totalFlaggedReplacement = Object.values(brgyStats).reduce((acc, s) => acc + s.flaggedReplacement, 0);
     const totalDistributed = totalConfirmed;
-    const totalPending = Math.max(0, totalBeneficiaries - (totalConfirmed + totalFlaggedReplacement));
+    const totalPending = Object.values(brgyStats).reduce((acc, s) => acc + s.pending, 0);
 
     const barangaysBreakdown = Object.entries(brgyStats).map(([name, stats]) => {
       const percentage = stats.total > 0 ? Math.round((stats.confirmed / stats.total) * 100) : 0;
