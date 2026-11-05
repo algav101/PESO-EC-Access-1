@@ -71,25 +71,51 @@ export function PublicWorkAssignmentLookupCard() {
         throw new Error("Camera API is not supported on this browser or device.");
       }
 
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: {
-          facingMode: facingMode,
-          width: { ideal: 1280 },
-          height: { ideal: 720 },
-        },
-      });
+      let stream: MediaStream | null = null;
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({
+          video: {
+            facingMode: { ideal: facingMode },
+            width: { ideal: 1280 },
+            height: { ideal: 720 },
+          },
+          audio: false,
+        });
+      } catch (err1) {
+        console.warn("Tier 1 constraint failed, trying fallback:", err1);
+      }
+
+      if (!stream) {
+        try {
+          stream = await navigator.mediaDevices.getUserMedia({
+            video: { facingMode },
+            audio: false,
+          });
+        } catch (err2) {
+          console.warn("Tier 2 constraint failed, trying any video:", err2);
+        }
+      }
+
+      if (!stream) {
+        stream = await navigator.mediaDevices.getUserMedia({
+          video: true,
+          audio: false,
+        });
+      }
 
       streamRef.current = stream;
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
         videoRef.current.setAttribute("playsinline", "true");
+        videoRef.current.setAttribute("muted", "true");
+        videoRef.current.muted = true;
         await videoRef.current.play();
         requestAnimationFrame(scanVideoFrame);
       }
     } catch (err: any) {
       console.warn("Camera access failed:", err);
       setCameraError(
-        "Hindi mabuksan ang camera o walang pahintulot. Maaaring gamitin ang 'Upload Larawan ng QR' sa ibaba."
+        "Hindi mabuksan ang live stream ng camera o walang pahintulot. Maaaring gamitin ang 'Upload Larawan ng QR' sa ibaba."
       );
       setCameraActive(false);
     }
@@ -344,7 +370,7 @@ export function PublicWorkAssignmentLookupCard() {
                 <div className="bg-slate-900 text-white rounded-3xl p-6 sm:p-8 flex flex-col items-center justify-center border border-slate-800 shadow-2xl relative overflow-hidden min-h-[380px]">
                   {cameraActive ? (
                     <div className="w-full max-w-sm aspect-square rounded-2xl overflow-hidden bg-black relative border-2 border-emerald-500 shadow-2xl flex items-center justify-center">
-                      <video ref={videoRef} className="w-full h-full object-cover" />
+                      <video ref={videoRef} autoPlay playsInline muted className="w-full h-full object-cover" />
                       <canvas ref={canvasRef} className="hidden" />
 
                       {/* Laser scanning visual overlay */}
