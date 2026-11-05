@@ -6,6 +6,7 @@ import {
   generateWorkProgramExcel,
   generateOrientationExcel,
   generatePayoutExcel,
+  generateFlaggedReplacementsExcel,
 } from "@/lib/excel-exporter";
 import prisma from "@/lib/prisma";
 
@@ -62,6 +63,14 @@ export async function GET(request: Request) {
         headers: {
           "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
           "Content-Disposition": `attachment; filename="TUPAD_Payout_Verification_Dingalan_${programId.slice(0, 6)}.xlsx"`,
+        },
+      });
+    } else if (reportType === "FLAGGED_REPLACEMENTS" || reportType === "REPLACEMENTS") {
+      const buffer = await generateFlaggedReplacementsExcel(programId);
+      return new Response(new Uint8Array(buffer), {
+        headers: {
+          "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+          "Content-Disposition": `attachment; filename="TUPAD_Flagged_Replacements_Masterlist_Dingalan_${programId.slice(0, 6)}.xlsx"`,
         },
       });
     } else {

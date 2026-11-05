@@ -567,6 +567,334 @@ export async function generatePayoutExcel(programId: string): Promise<Buffer> {
   return Buffer.from(buffer);
 }
 
+/**
+ * Generates an official Excel Masterlist of Beneficiaries Flagged for Replacement
+ * Includes original beneficiary, replacement applicant, declared dependent, reason,
+ * remarks (Replaced - [Original Beneficiary Name] or pending remarks), and approval status (Approved vs Pending).
+ */
+export async function generateFlaggedReplacementsExcel(programId: string): Promise<Buffer> {
+  const program = await prisma.program.findUnique({
+    where: { id: programId },
+  });
+
+  if (!program) throw new Error("Program not found");
+
+  const replacements = await prisma.beneficiaryReplacement.findMany({
+    where: { programId },
+    include: {
+      originalProgramBeneficiary: {
+        include: {
+          beneficiary: {
+            include: { dependents: true },
+          },
+        },
+      },
+      replacementProgramBeneficiary: {
+        include: {
+          beneficiary: {
+            include: {
+              dependents: true,
+              documents: true,
+            },
+          },
+        },
+      },
+      initiatedBy: { select: { fullName: true, role: true } },
+      approvedBy: { select: { fullName: true, role: true } },
+    },
+    orderBy: [
+      { originalProgramBeneficiary: { designatedNumber: "asc" } },
+      { initiatedAt: "desc" },
+    ],
+  });
+
+  // Also query any program beneficiaries with participationStatus = FLAGGED_FOR_REPLACEMENT
+  // who do not yet have a replacement record
+  const existingOrigPbIds = new Set(replacements.map((r) => r.originalProgramBeneficiaryId));
+  const unlinkedFlaggedPb = await prisma.programBeneficiary.findMany({
+    where: {
+      programId,
+      participationStatus: "FLAGGED_FOR_REPLACEMENT",
+      id: { notIn: Array.from(existingOrigPbIds) },
+    },
+    include: {
+      beneficiary: { include: { dependents: true } },
+      stubDistributions: {
+        where: { status: "FLAGGED_REPLACEMENT" },
+        include: { distributedBy: { select: { fullName: true } } },
+        orderBy: { distributedAt: "desc" },
+      },
+    },
+    orderBy: { designatedNumber: "asc" },
+  });
+
+  interface UnifiedRow {
+    designatedNumber: string | number;
+    originalName: string;
+    barangaySitio: string;
+    replacementName: string;
+    dependentInfo: string;
+    reason: string;
+    remarks: string;
+    status: string;
+    initiatorText: string;
+    approverText: string;
+    uploadedIdsText: string;
+  }
+
+  const rows: UnifiedRow[] = [];
+
+  for (const rep of replacements) {
+    const origPb = rep.originalProgramBeneficiary;
+    const candPb = rep.replacementProgramBeneficiary;
+    const origBene = origPb?.beneficiary;
+    const candBene = candPb?.beneficiary;
+    const dep = candBene?.dependents?.[0];
+
+    const isOrigAsDep =
+      Boolean(origBene?.fullName) &&
+      Boolean(dep?.fullName) &&
+      dep!.fullName.trim().toUpperCase() === origBene!.fullName.trim().toUpperCase();
+
+    const dependentText = dep
+      ? `${dep.fullName} (${dep.relationship || "DEPENDENT"}${dep.age ? `, ${dep.age} y/o` : ""})${
+          isOrigAsDep ? " [ORIGINAL BENEFICIARY AS DEPENDENT]" : ""
+        }`
+      : "—";
+
+    const docs = candBene?.documents || [];
+    const docTypes = docs.map((d) => d.documentType);
+    const uploadedIdsText =
+      docs.length > 0
+        ? `${docs.length} IDs (${docTypes.join(", ")})`
+        : "None Uploaded";
+
+    const isApproved = rep.status === "APPROVED";
+    const isPending = rep.status === "PENDING";
+
+    let remarks = "";
+    if (isApproved) {
+      remarks = `Replaced - ${origBene?.fullName || "Original Beneficiary"}`;
+    } else if (isPending) {
+      remarks = `Pending Admin/PESO Approval — ${rep.reason}`;
+    } else {
+      remarks = `Replacement Rejected — ${rep.reason}`;
+    }
+
+    const initiatorText = rep.initiatedBy?.fullName
+      ? `${rep.initiatedBy.fullName} (${format(new Date(rep.initiatedAt), "MM/dd/yyyy HH:mm")})`
+      : format(new Date(rep.initiatedAt), "MM/dd/yyyy HH:mm");
+
+    const approverText = isApproved
+      ? rep.approvedBy?.fullName
+        ? `${rep.approvedBy.fullName} (${rep.approvedAt ? format(new Date(rep.approvedAt), "MM/dd/yyyy HH:mm") : ""})`
+        : `Admin/PESO (${rep.approvedAt ? format(new Date(rep.approvedAt), "MM/dd/yyyy HH:mm") : ""})`
+      : isPending
+      ? "Pending Assessment"
+      : `Rejected by ${rep.approvedBy?.fullName || "Admin"}`;
+
+    rows.push({
+      designatedNumber: origPb?.designatedNumber || 0,
+      originalName: origBene?.fullName || "N/A",
+      barangaySitio: `${origBene?.barangay || "Dingalan"}${origBene?.sitio ? `, ${origBene.sitio}` : ""}`,
+      replacementName: candBene?.fullName || "Pending Candidate Entry",
+      dependentInfo: dependentText,
+      reason: rep.reason || "Flagged in field distribution",
+      remarks,
+      status: rep.status,
+      initiatorText,
+      approverText,
+      uploadedIdsText,
+    });
+  }
+
+  for (const pb of unlinkedFlaggedPb) {
+    const dist = pb.stubDistributions?.[0];
+    const initiatorText = dist?.distributedBy?.fullName
+      ? `${dist.distributedBy.fullName} (${format(new Date(dist.distributedAt), "MM/dd/yyyy HH:mm")})`
+      : dist?.distributedAt
+      ? format(new Date(dist.distributedAt), "MM/dd/yyyy HH:mm")
+      : "Field Coordinator";
+
+    rows.push({
+      designatedNumber: pb.designatedNumber,
+      originalName: pb.beneficiary?.fullName || "N/A",
+      barangaySitio: `${pb.beneficiary?.barangay || "Dingalan"}${pb.beneficiary?.sitio ? `, ${pb.beneficiary.sitio}` : ""}`,
+      replacementName: "Awaiting Candidate Entry",
+      dependentInfo: "—",
+      reason: dist?.remarks || "Flagged during stub distribution",
+      remarks: "Flagged for Onsite Replacement (Awaiting Candidate Entry)",
+      status: "PENDING",
+      initiatorText,
+      approverText: "Pending Assessment",
+      uploadedIdsText: "None Uploaded",
+    });
+  }
+
+  rows.sort((a, b) => Number(a.designatedNumber) - Number(b.designatedNumber));
+
+  const totalFlagged = rows.length;
+  const totalApproved = rows.filter((r) => r.status === "APPROVED").length;
+  const totalPending = rows.filter((r) => r.status === "PENDING").length;
+
+  const workbook = new ExcelJS.Workbook();
+  workbook.creator = "LGU Dingalan - PESO TUPAD System";
+  workbook.created = new Date();
+
+  const ws = workbook.addWorksheet("FLAGGED REPLACEMENTS", {
+    views: [{ state: "frozen", xSplit: 2, ySplit: 7 }],
+  });
+
+  // Header Titles
+  ws.mergeCells("A1:L1");
+  ws.getCell("A1").value = "LOCAL GOVERNMENT UNIT OF DINGALAN, AURORA";
+  ws.getCell("A1").font = { name: "Arial", size: 12, bold: true, color: { argb: "FF0C3B6D" } };
+  ws.getCell("A1").alignment = { horizontal: "center", vertical: "middle" };
+
+  ws.mergeCells("A2:L2");
+  ws.getCell("A2").value = "PUBLIC EMPLOYMENT SERVICE OFFICE (PESO) - DOLE TUPAD PROGRAM";
+  ws.getCell("A2").font = { name: "Arial", size: 11, bold: true };
+  ws.getCell("A2").alignment = { horizontal: "center", vertical: "middle" };
+
+  ws.mergeCells("A3:L3");
+  ws.getCell("A3").value = "OFFICIAL MASTERLIST OF BENEFICIARIES FLAGGED FOR REPLACEMENT";
+  ws.getCell("A3").font = { name: "Arial", size: 11, bold: true };
+  ws.getCell("A3").alignment = { horizontal: "center", vertical: "middle" };
+
+  ws.mergeCells("A4:L4");
+  ws.getCell("A4").value = `PROGRAM: ${program.programName.toUpperCase()} (${program.programCode}) | MUNICIPALITY: DINGALAN, AURORA`;
+  ws.getCell("A4").font = { name: "Arial", size: 10, bold: true };
+  ws.getCell("A4").alignment = { horizontal: "center", vertical: "middle" };
+
+  ws.mergeCells("A5:L5");
+  ws.getCell("A5").value = `SUMMARY: TOTAL FLAGGED: ${totalFlagged} | APPROVED BY ADMIN: ${totalApproved} | PENDING ASSESSMENT: ${totalPending} | EXPORT DATE: ${format(new Date(), "MMMM dd, yyyy HH:mm")}`;
+  ws.getCell("A5").font = { name: "Arial", size: 9, italic: true };
+  ws.getCell("A5").alignment = { horizontal: "center", vertical: "middle" };
+
+  // Headers on Row 7
+  const headers = [
+    "ITEM #",
+    "DESIGNATED #",
+    "ORIGINAL BENEFICIARY NAME",
+    "BARANGAY / SITIO",
+    "REPLACEMENT BENEFICIARY (SUBSTITUTE)",
+    "DECLARED DEPENDENT & RELATIONSHIP",
+    "REASON FOR REPLACEMENT",
+    "OFFICIAL REMARKS",
+    "APPROVAL STATUS",
+    "FIELD INITIATOR & DATE",
+    "ASSESSED / APPROVED BY",
+    "UPLOADED IDS",
+  ];
+
+  const headerRow = ws.getRow(7);
+  headers.forEach((h, idx) => {
+    const cell = headerRow.getCell(idx + 1);
+    cell.value = h;
+    cell.font = { name: "Arial", size: 9, bold: true, color: { argb: "FFFFFFFF" } };
+    cell.fill = {
+      type: "pattern",
+      pattern: "solid",
+      fgColor: { argb: "FF0C3B6D" },
+    };
+    cell.alignment = { horizontal: "center", vertical: "middle", wrapText: true };
+    cell.border = {
+      top: { style: "thin", color: { argb: "FFCBD5E1" } },
+      left: { style: "thin", color: { argb: "FFCBD5E1" } },
+      bottom: { style: "medium", color: { argb: "FF0F172A" } },
+      right: { style: "thin", color: { argb: "FFCBD5E1" } },
+    };
+  });
+  headerRow.height = 28;
+
+  // Insert Data Rows
+  rows.forEach((r, idx) => {
+    const rowNum = idx + 8;
+    const row = ws.getRow(rowNum);
+
+    row.getCell(1).value = idx + 1;
+    row.getCell(2).value = r.designatedNumber;
+    row.getCell(3).value = r.originalName;
+    row.getCell(4).value = r.barangaySitio;
+    row.getCell(5).value = r.replacementName;
+    row.getCell(6).value = r.dependentInfo;
+    row.getCell(7).value = r.reason;
+    row.getCell(8).value = r.remarks;
+    row.getCell(9).value = r.status === "APPROVED" ? "APPROVED" : r.status === "REJECTED" ? "REJECTED" : "PENDING APPROVAL";
+    row.getCell(10).value = r.initiatorText;
+    row.getCell(11).value = r.approverText;
+    row.getCell(12).value = r.uploadedIdsText;
+
+    row.font = { name: "Arial", size: 8.5 };
+    row.alignment = { vertical: "middle" };
+
+    row.getCell(1).alignment = { horizontal: "center", vertical: "middle" };
+    row.getCell(2).alignment = { horizontal: "center", vertical: "middle" };
+    row.getCell(9).alignment = { horizontal: "center", vertical: "middle" };
+
+    if (r.status === "APPROVED") {
+      row.getCell(9).font = { name: "Arial", size: 8.5, bold: true, color: { argb: "FF047857" } };
+      row.getCell(8).font = { name: "Arial", size: 8.5, bold: true, color: { argb: "FF047857" } };
+    } else if (r.status === "PENDING") {
+      row.getCell(9).font = { name: "Arial", size: 8.5, bold: true, color: { argb: "FFB45309" } };
+    } else {
+      row.getCell(9).font = { name: "Arial", size: 8.5, bold: true, color: { argb: "FFBE123C" } };
+    }
+
+    if (idx % 2 === 1) {
+      for (let c = 1; c <= 12; c++) {
+        row.getCell(c).fill = {
+          type: "pattern",
+          pattern: "solid",
+          fgColor: { argb: "FFF8FAFC" },
+        };
+      }
+    }
+
+    for (let c = 1; c <= 12; c++) {
+      row.getCell(c).border = {
+        top: { style: "thin", color: { argb: "FFE2E8F0" } },
+        left: { style: "thin", color: { argb: "FFE2E8F0" } },
+        bottom: { style: "thin", color: { argb: "FFE2E8F0" } },
+        right: { style: "thin", color: { argb: "FFE2E8F0" } },
+      };
+    }
+
+    row.height = 24;
+  });
+
+  const colWidths = [8, 14, 28, 22, 28, 28, 26, 32, 18, 24, 24, 22];
+  colWidths.forEach((w, i) => {
+    ws.getColumn(i + 1).width = w;
+  });
+
+  const startSignRow = rows.length + 10;
+
+  ws.getCell(`B${startSignRow}`).value = "Prepared by:";
+  ws.getCell(`B${startSignRow}`).font = { name: "Arial", size: 9, bold: true };
+  ws.getCell(`B${startSignRow + 3}`).value = "PESO TECHNICAL STAFF / FIELD OFFICER";
+  ws.getCell(`B${startSignRow + 3}`).font = { name: "Arial", size: 9, bold: true, underline: true };
+  ws.getCell(`B${startSignRow + 4}`).value = "Public Employment Service Office";
+  ws.getCell(`B${startSignRow + 4}`).font = { name: "Arial", size: 8, italic: true };
+
+  ws.getCell(`F${startSignRow}`).value = "Reviewed & Verified by:";
+  ws.getCell(`F${startSignRow}`).font = { name: "Arial", size: 9, bold: true };
+  ws.getCell(`F${startSignRow + 3}`).value = "PESO MANAGER / COORDINATOR";
+  ws.getCell(`F${startSignRow + 3}`).font = { name: "Arial", size: 9, bold: true, underline: true };
+  ws.getCell(`F${startSignRow + 4}`).value = "LGU Dingalan, Aurora";
+  ws.getCell(`F${startSignRow + 4}`).font = { name: "Arial", size: 8, italic: true };
+
+  ws.getCell(`J${startSignRow}`).value = "Approved by:";
+  ws.getCell(`J${startSignRow}`).font = { name: "Arial", size: 9, bold: true };
+  ws.getCell(`J${startSignRow + 3}`).value = "HON. MUNICIPAL MAYOR";
+  ws.getCell(`J${startSignRow + 3}`).font = { name: "Arial", size: 9, bold: true, underline: true };
+  ws.getCell(`J${startSignRow + 4}`).value = "Head of Procuring Entity / LGU Dingalan";
+  ws.getCell(`J${startSignRow + 4}`).font = { name: "Arial", size: 8, italic: true };
+
+  const buffer = await workbook.xlsx.writeBuffer();
+  return Buffer.from(buffer);
+}
+
 
 function getColLetter(colIndex: number): string {
   let temp = "";

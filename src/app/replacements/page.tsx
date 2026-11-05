@@ -7,12 +7,9 @@ import {
   Search,
   CheckCircle2,
   AlertCircle,
-  UploadCloud,
   QrCode,
   ArrowRight,
-  ArrowLeft,
   ShieldCheck,
-  ShieldAlert,
   User,
   Calendar,
   MapPin,
@@ -20,21 +17,33 @@ import {
   AlertTriangle,
   Zap,
   Clock,
-  Check,
+  Printer,
+  FileSpreadsheet,
+  Eye,
+  IdCard,
+  Users,
+  X,
 } from "lucide-react";
 import { StatusBadge } from "@/components/common/StatusBadge";
 import { TableScrollWrapper } from "@/components/common/TableScrollWrapper";
-import QRCode from "qrcode";
 import { useAuth } from "@/context/AuthContext";
-import { useOffline } from "@/context/OfflineContext";
-import { isFieldCoordinator } from "@/lib/permissions";
-import { offlineDb, queueOfflineTransaction } from "@/lib/dexie";
+import { isFieldCoordinator, isAdminUser } from "@/lib/permissions";
+import {
+  StubReplacementWizardModal,
+  StubReplacementTarget,
+} from "@/components/field/StubReplacementWizardModal";
+import {
+  ReplacementApprovalModal,
+  PendingReplacementAssessmentItem,
+} from "@/components/field/ReplacementApprovalModal";
+import { PrintableReplacementMasterlistModal } from "@/components/reports/PrintableReplacementMasterlistModal";
 
 function ReplacementsContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const { user } = useAuth();
-  const { isOnline } = useOffline();
+  const isPesoAdmin = isAdminUser(user);
+
   const urlProgramId = searchParams.get("programId");
   const urlOriginalPbId = searchParams.get("originalPbId");
 
@@ -48,28 +57,18 @@ function ReplacementsContent() {
   const [selectedProgramId, setSelectedProgramId] = useState<string>(urlProgramId || "");
   const [beneficiaries, setBeneficiaries] = useState<any[]>([]);
   const [existingReplacements, setExistingReplacements] = useState<any[]>([]);
-  const [isCreating, setIsCreating] = useState(false);
-  const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
-  // Replacement Form State
-  const [originalPbId, setOriginalPbId] = useState("");
-  const [reason, setReason] = useState("");
-  const [repName, setRepName] = useState("");
-  const [repBday, setRepBday] = useState("");
-  const [repSex, setRepSex] = useState("MALE");
-  const [repBrgy, setRepBrgy] = useState("Paltic");
-  const [repSitio, setRepSitio] = useState("");
-  const [repContact, setRepContact] = useState("");
-
-  // Eligibility check state
-  const [checkingEligibility, setCheckingEligibility] = useState(false);
-  const [eligibilityResult, setEligibilityResult] = useState<any | null>(null);
-
-  // Created Replacement Result
-  const [createdResult, setCreatedResult] = useState<any | null>(null);
-  const [newQrImage, setNewQrImage] = useState<string | null>(null);
+  // Wizard & Assessment Modal States
+  const [isWizardOpen, setIsWizardOpen] = useState(false);
+  const [wizardTarget, setWizardTarget] = useState<StubReplacementTarget | null>(null);
+  const [assessmentItem, setAssessmentItem] = useState<PendingReplacementAssessmentItem | null>(null);
+  const [isPrintableMasterlistOpen, setIsPrintableMasterlistOpen] = useState(false);
+  const [isSelectModalOpen, setIsSelectModalOpen] = useState(false);
+  const [manualSelectedPbId, setManualSelectedPbId] = useState("");
+  const [filterQuery, setFilterQuery] = useState("");
 
   useEffect(() => {
     fetchPrograms();
@@ -98,20 +97,25 @@ function ReplacementsContent() {
   };
 
   const fetchBeneficiariesAndReplacements = async (programId: string) => {
+    setLoading(true);
     try {
-      const bRes = await fetch(`/api/v1/programs/${programId}/beneficiaries`);
+      const [bRes, rRes] = await Promise.all([
+        fetch(`/api/v1/programs/${programId}/beneficiaries`),
+        fetch(`/api/v1/replacements?programId=${programId}`),
+      ]);
+
       if (bRes.ok) {
         const data = await bRes.json();
         setBeneficiaries(data.beneficiaries || []);
       }
-
-      const rRes = await fetch(`/api/v1/replacements?programId=${programId}`);
       if (rRes.ok) {
         const data = await rRes.json();
         setExistingReplacements(data.replacements || []);
       }
     } catch (e) {
       console.error(e);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -131,19 +135,19 @@ function ReplacementsContent() {
       !b.stubDistributions?.some((d: any) => d.status === "FLAGGED_REPLACEMENT")
   );
 
-  // Helper to start replacement for a flagged beneficiary
-  const handleSelectFlaggedForReplacement = (flaggedPb: any) => {
-    setOriginalPbId(flaggedPb.id);
-    const flaggedDist = flaggedPb.stubDistributions?.find((d: any) => d.status === "FLAGGED_REPLACEMENT");
-    const defaultReason = flaggedDist?.remarks || "Flagged in field stub distribution (Unreachable / Relocated / Declined)";
-    setReason(defaultReason);
-    setRepBrgy(flaggedPb.beneficiary?.barangay || "Paltic");
-    setRepSitio(flaggedPb.beneficiary?.sitio || "");
-    setIsCreating(true);
-    setStep(2);
-    setCreatedResult(null);
-    setError(null);
-    window.scrollTo({ top: 0, behavior: "smooth" });
+  // Helper to open wizard for a specific beneficiary
+  const handleLaunchWizard = (pb: any) => {
+    setWizardTarget({
+      programId: selectedProgramId,
+      programBeneficiaryId: pb.id,
+      designatedNumber: pb.designatedNumber,
+      fullName: pb.beneficiary?.fullName || "BENEFICIARY",
+      barangay: pb.beneficiary?.barangay || "Dingalan",
+      sitio: pb.beneficiary?.sitio || "",
+      tableNumber: pb.tableNumber || "Table 1",
+    });
+    setIsWizardOpen(true);
+    setIsSelectModalOpen(false);
   };
 
   // Auto-trigger if URL contains originalPbId
@@ -151,147 +155,76 @@ function ReplacementsContent() {
     if (urlOriginalPbId && beneficiaries.length > 0) {
       const target = beneficiaries.find((b) => b.id === urlOriginalPbId);
       if (target) {
-        handleSelectFlaggedForReplacement(target);
+        handleLaunchWizard(target);
       }
     }
   }, [urlOriginalPbId, beneficiaries]);
 
-  const handleCheckEligibility = async () => {
-    if (!repName || !repBday) {
-      setError("Please provide replacement name and birthday to check 365-day eligibility.");
-      return;
-    }
-
-    setCheckingEligibility(true);
-    setError(null);
-
-    try {
-      const res = await fetch("/api/v1/restrictions", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ fullName: repName, birthday: repBday }),
-      });
-
-      const data = await res.json();
-      setEligibilityResult(data);
-      if (!data.eligible) {
-        setError(`Restricted until ${data.restrictionEnd}: ${data.reason}`);
-      } else {
-        setStep(3); // Proceed to document review
-      }
-    } catch (err: any) {
-      setError(err.message);
-    } finally {
-      setCheckingEligibility(false);
-    }
+  // Find candidate replacement record for a given original PB if already submitted
+  const getPendingReplacementForPb = (pbId: string) => {
+    return existingReplacements.find(
+      (r) => r.originalProgramBeneficiaryId === pbId && r.status === "PENDING"
+    );
   };
 
-  const handleCommitReplacement = async () => {
-    setLoading(true);
-    setError(null);
+  // Convert a replacement record to PendingReplacementAssessmentItem
+  const openAssessmentForReplacement = (rep: any) => {
+    const origPb = rep.originalProgramBeneficiary;
+    const candPb = rep.replacementProgramBeneficiary;
+    const candBene = candPb?.beneficiary;
+    const dep = candBene?.dependents?.[0];
 
-    const replacementPayload = {
-      programId: selectedProgramId,
-      originalProgramBeneficiaryId: originalPbId,
-      reason,
-      fullName: repName,
-      birthday: repBday,
-      sex: repSex,
-      barangay: repBrgy,
-      sitio: repSitio,
-      contactNumber: repContact,
-      idFrontFile: { name: "id_front.jpg", size: 2048, type: "image/jpeg" },
-      idBackFile: { name: "id_back.jpg", size: 2048, type: "image/jpeg" },
+    const assessmentPayload: PendingReplacementAssessmentItem = {
+      id: rep.id,
+      reason: rep.reason,
+      initiatedAt: rep.initiatedAt,
+      initiatedBy: rep.initiatedBy?.fullName,
+      originalBeneficiary: {
+        designatedNumber: origPb?.designatedNumber || "N/A",
+        fullName: origPb?.beneficiary?.fullName || "Original Beneficiary",
+        birthday: origPb?.beneficiary?.birthday,
+        barangay: origPb?.beneficiary?.barangay,
+        sitio: origPb?.beneficiary?.sitio,
+      },
+      candidateBeneficiary: candBene
+        ? {
+            fullName: candBene.fullName,
+            birthday: candBene.birthday,
+            sex: candBene.sex,
+            barangay: candBene.barangay,
+            sitio: candBene.sitio,
+            contactNumber: candBene.contactNumber,
+            idType: candBene.idType,
+            idNumber: candBene.idNumber,
+            dependentFullName: dep?.fullName,
+            dependentRelationship: dep?.relationship,
+            dependentBirthday: dep?.birthday,
+            dependentAge: dep?.age,
+            documents: (candBene.documents || []).map((d: any) => ({
+              id: d.id,
+              documentType: d.documentType,
+              fileKey: d.fileKey,
+              fileName: d.fileName,
+            })),
+          }
+        : null,
     };
 
-    try {
-      if (isOnline) {
-        try {
-          const res = await fetch("/api/v1/replacements", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(replacementPayload),
-          });
-
-          const data = await res.json();
-          if (!res.ok) throw new Error(data.error || "Replacement failed");
-
-          setCreatedResult(data);
-          if (data.qr?.publicToken) {
-            const qrUrl = await QRCode.toDataURL(data.qr.publicToken, {
-              width: 200,
-              margin: 1,
-              color: { dark: "#0c3b6d", light: "#ffffff" },
-            });
-            setNewQrImage(qrUrl);
-          }
-          setStep(4);
-          fetchBeneficiariesAndReplacements(selectedProgramId);
-          return;
-        } catch (onlineErr: any) {
-          console.warn("Online replacement submission failed, queuing to offline engine:", onlineErr);
-        }
-      }
-
-      // Offline Replacement Engine
-      const originalPb = beneficiaries.find((b) => b.id === originalPbId);
-      const offlineToken = `TUPAD-OFFLINE-REP-${Date.now().toString(36).toUpperCase()}`;
-
-      await queueOfflineTransaction("REPLACEMENT", "CREATE", replacementPayload);
-
-      // Update local IndexedDB cache
-      if (originalPb) {
-        await offlineDb.cachedBeneficiaries.update(originalPb.id, {
-          status: "REPLACED",
-        });
-
-        await offlineDb.cachedBeneficiaries.add({
-          id: `pb-offline-${Date.now()}`,
-          programId: selectedProgramId,
-          beneficiaryId: `bene-offline-${Date.now()}`,
-          designatedNumber: originalPb.designatedNumber,
-          fullName: repName.trim().toUpperCase(),
-          birthday: repBday,
-          birthdayPin: repBday,
-          barangay: repBrgy,
-          sitio: repSitio,
-          tableNumber: originalPb.tableNumber || "Table 1",
-          qrToken: offlineToken,
-          status: "ACTIVE",
-          orientationStatus: "PRESENT",
-        });
-      }
-
-      const qrUrl = await QRCode.toDataURL(offlineToken, {
-        width: 200,
-        margin: 1,
-        color: { dark: "#0c3b6d", light: "#ffffff" },
-      });
-      setNewQrImage(qrUrl);
-
-      setCreatedResult({
-        message: "✓ Replacement Successfully Queued to Local Cache! Will auto-sync when online.",
-        qr: { publicToken: offlineToken },
-        replacement: {
-          fullName: repName,
-          barangay: repBrgy,
-          designatedNumber: originalPb?.designatedNumber || "N/A",
-        },
-      });
-
-      setStep(4);
-      fetchBeneficiariesAndReplacements(selectedProgramId);
-    } catch (err: any) {
-      setError(err.message);
-    } finally {
-      setLoading(false);
-    }
+    setAssessmentItem(assessmentPayload);
   };
 
-  const originalBeneficiary = beneficiaries.find((b) => b.id === originalPbId);
+  const filteredHistory = existingReplacements.filter((r) => {
+    if (!filterQuery.trim()) return true;
+    const q = filterQuery.toLowerCase();
+    const origName = (r.originalProgramBeneficiary?.beneficiary?.fullName || "").toLowerCase();
+    const repName = (r.replacementProgramBeneficiary?.beneficiary?.fullName || "").toLowerCase();
+    const reason = (r.reason || "").toLowerCase();
+    const num = String(r.originalProgramBeneficiary?.designatedNumber || "");
+    return origName.includes(q) || repName.includes(q) || reason.includes(q) || num.includes(q);
+  });
 
   return (
-    <div className="max-w-5xl mx-auto space-y-6">
+    <div className="max-w-6xl mx-auto space-y-6">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
@@ -300,24 +233,39 @@ function ReplacementsContent() {
             <span>Onsite Beneficiary Replacement Hub</span>
           </h1>
           <p className="text-xs text-slate-500">
-            Confirm and process emergency field replacements for flagged candidates with automated 365-day restriction checking
+            Field replacement workflow with 365-day lockout guarantee, declared dependents, original beneficiary consent, and ID document verification.
           </p>
         </div>
 
-        {!isCreating && (
+        <div className="flex items-center space-x-2 flex-wrap">
           <button
-            onClick={() => {
-              setIsCreating(true);
-              setStep(1);
-              setCreatedResult(null);
-              setError(null);
-            }}
-            className="px-4 py-2 bg-gov-blue hover:bg-gov-light text-white font-bold text-xs rounded-xl shadow flex items-center space-x-1.5 transition"
+            onClick={() => setIsPrintableMasterlistOpen(true)}
+            className="px-3.5 py-2 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-xl shadow-sm flex items-center space-x-1.5 transition"
+            title="Open printable masterlist of flagged beneficiaries"
+          >
+            <Printer className="w-3.5 h-3.5 text-gov-goldLight" />
+            <span>Print Masterlist</span>
+          </button>
+
+          <a
+            href={`/api/v1/reports/export?type=FLAGGED_REPLACEMENTS&programId=${selectedProgramId}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow-sm flex items-center space-x-1.5 transition"
+            title="Download Excel Workbook"
+          >
+            <FileSpreadsheet className="w-3.5 h-3.5" />
+            <span>Export Excel</span>
+          </a>
+
+          <button
+            onClick={() => setIsSelectModalOpen(true)}
+            className="px-4 py-2 bg-gov-blue hover:bg-gov-dark text-white font-bold text-xs rounded-xl shadow flex items-center space-x-1.5 transition"
           >
             <UserPlus className="w-4 h-4 text-gov-goldLight" />
             <span>New Replacement Wizard</span>
           </button>
-        )}
+        </div>
       </div>
 
       {/* Program Selector Bar */}
@@ -327,7 +275,7 @@ function ReplacementsContent() {
           <select
             value={selectedProgramId}
             onChange={(e) => setSelectedProgramId(e.target.value)}
-            className="px-3 py-1.5 text-xs font-bold border border-slate-300 rounded-lg bg-slate-50 focus:bg-white focus:outline-none focus:border-gov-blue w-full sm:w-80"
+            className="px-3 py-1.5 text-xs font-bold border border-slate-300 rounded-lg bg-slate-50 focus:bg-white focus:outline-none focus:border-gov-blue w-full sm:w-96"
           >
             {programs.map((p) => (
               <option key={p.id} value={p.id}>
@@ -339,12 +287,29 @@ function ReplacementsContent() {
 
         <button
           onClick={() => selectedProgramId && fetchBeneficiariesAndReplacements(selectedProgramId)}
-          className="px-3 py-1.5 text-xs font-bold text-slate-700 hover:text-slate-900 border rounded-lg bg-white flex items-center space-x-1.5 self-end sm:self-auto"
+          disabled={loading}
+          className="px-3 py-1.5 text-xs font-bold text-slate-700 hover:text-slate-900 border rounded-lg bg-white flex items-center space-x-1.5 self-end sm:self-auto disabled:opacity-50"
         >
-          <RefreshCw className="w-3.5 h-3.5" />
+          <RefreshCw className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`} />
           <span>Refresh Data</span>
         </button>
       </div>
+
+      {/* Success Notification Alert */}
+      {successMessage && (
+        <div className="p-3.5 bg-emerald-50 border border-emerald-200 rounded-xl flex items-center justify-between text-xs text-emerald-800 shadow-sm animate-fadeIn">
+          <div className="flex items-center space-x-2">
+            <CheckCircle2 className="w-4 h-4 text-emerald-600 flex-shrink-0" />
+            <span className="font-semibold">{successMessage}</span>
+          </div>
+          <button
+            onClick={() => setSuccessMessage(null)}
+            className="text-emerald-700 hover:text-emerald-900"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      )}
 
       {error && (
         <div className="p-3.5 bg-red-50 border border-red-200 rounded-xl flex items-center space-x-2 text-xs text-red-700 shadow-sm">
@@ -356,477 +321,405 @@ function ReplacementsContent() {
       {/* =========================================================================
           SECTION 1: FLAGGED FOR REPLACEMENT CONFIRMATION QUEUE
           ========================================================================= */}
-      {!isCreating && (
-        <div className="gov-card overflow-hidden border-t-4 border-t-rose-600 shadow-md">
-          <div className="p-4 bg-rose-50/70 border-b border-rose-100 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-            <div className="flex items-center space-x-2">
-              <div className="w-7 h-7 rounded-lg bg-rose-600 text-white flex items-center justify-center font-black text-xs shadow-xs">
-                {flaggedQueue.length}
-              </div>
-              <div>
-                <h3 className="text-xs font-black text-rose-950 uppercase tracking-wider flex items-center space-x-1.5">
-                  <AlertTriangle className="w-3.5 h-3.5 text-rose-600" />
-                  <span>Flagged for Replacement Queue (Awaiting Onsite Substitute)</span>
-                </h3>
-                <p className="text-[11px] text-rose-700">
-                  Beneficiaries flagged during field stub distribution as unreachable, relocated, or declined
-                </p>
-              </div>
+      <div className="gov-card overflow-hidden border-t-4 border-t-rose-600 shadow-md">
+        <div className="p-4 bg-rose-50/70 border-b border-rose-100 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+          <div className="flex items-center space-x-2">
+            <div className="w-7 h-7 rounded-lg bg-rose-600 text-white flex items-center justify-center font-black text-xs shadow-xs">
+              {flaggedQueue.length}
             </div>
-          </div>
-
-          {flaggedQueue.length === 0 ? (
-            <div className="p-8 text-center text-xs text-slate-500 space-y-1">
-              <CheckCircle2 className="w-8 h-8 text-emerald-500 mx-auto" />
-              <p className="font-bold text-slate-700">No Pending Flagged Beneficiaries</p>
-              <p className="text-[11px] text-slate-400">
-                All enrolled beneficiaries are either confirmed distributed, undergoing field distribution, or already processed.
+            <div>
+              <h3 className="text-xs font-black text-rose-950 uppercase tracking-wider flex items-center space-x-1.5">
+                <AlertTriangle className="w-3.5 h-3.5 text-rose-600" />
+                <span>Flagged for Replacement Queue ({flaggedQueue.length})</span>
+              </h3>
+              <p className="text-[11px] text-rose-700">
+                Beneficiaries flagged during stub distribution or field verification awaiting substitute entry or Admin/PESO assessment
               </p>
             </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs">
-                <thead className="bg-slate-50 text-slate-700 font-bold uppercase text-[10px] border-b">
-                  <tr>
-                    <th className="px-3.5 py-2.5">Slot #</th>
-                    <th className="px-3.5 py-2.5">Flagged Beneficiary</th>
-                    <th className="px-3.5 py-2.5">Barangay / Sitio</th>
-                    <th className="px-3.5 py-2.5">Flag Reason & Field Remarks</th>
-                    <th className="px-3.5 py-2.5">Contact</th>
-                    <th className="px-3.5 py-2.5 text-center">Action</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-rose-50">
-                  {flaggedQueue.map((b) => {
-                    const flaggedDist = b.stubDistributions?.find((d: any) => d.status === "FLAGGED_REPLACEMENT");
-                    return (
-                      <tr key={b.id} className="hover:bg-rose-50/40 transition">
-                        <td className="px-3.5 py-3 font-mono font-black text-rose-800">
-                          #{b.designatedNumber}
-                          <span className="block text-[10px] text-slate-400 font-normal">{b.tableNumber}</span>
-                        </td>
-                        <td className="px-3.5 py-3">
-                          <span className="font-bold text-slate-900 block">{b.beneficiary?.fullName}</span>
-                          <span className="text-[10px] text-slate-500 font-mono">
-                            Born: {b.beneficiary?.birthday || "N/A"}
-                          </span>
-                        </td>
-                        <td className="px-3.5 py-3">
-                          <span className="font-semibold text-slate-700 block">{b.beneficiary?.barangay}</span>
-                          <span className="text-[10px] text-slate-500">{b.beneficiary?.sitio || "—"}</span>
-                        </td>
-                        <td className="px-3.5 py-3 max-w-xs">
-                          <div className="text-[11px] font-bold text-rose-800 bg-rose-50 p-1.5 rounded border border-rose-200">
+          </div>
+        </div>
+
+        {flaggedQueue.length === 0 ? (
+          <div className="p-8 text-center text-xs text-slate-500 space-y-1">
+            <CheckCircle2 className="w-8 h-8 text-emerald-500 mx-auto" />
+            <p className="font-bold text-slate-700">No Pending Flagged Beneficiaries</p>
+            <p className="text-[11px] text-slate-400">
+              All enrolled beneficiaries are confirmed distributed or already approved.
+            </p>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs">
+              <thead className="bg-slate-50 text-slate-700 font-bold uppercase text-[10px] border-b">
+                <tr>
+                  <th className="px-3.5 py-2.5">Slot #</th>
+                  <th className="px-3.5 py-2.5">Flagged Beneficiary</th>
+                  <th className="px-3.5 py-2.5">Barangay / Sitio</th>
+                  <th className="px-3.5 py-2.5">Candidate / Field Remarks</th>
+                  <th className="px-3.5 py-2.5 text-center">Status</th>
+                  <th className="px-3.5 py-2.5 text-center">Action</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-rose-50">
+                {flaggedQueue.map((b) => {
+                  const pendingRep = getPendingReplacementForPb(b.id);
+                  const candBene = pendingRep?.replacementProgramBeneficiary?.beneficiary;
+                  const dep = candBene?.dependents?.[0];
+                  const docs = candBene?.documents || [];
+                  const flaggedDist = b.stubDistributions?.find(
+                    (d: any) => d.status === "FLAGGED_REPLACEMENT"
+                  );
+
+                  return (
+                    <tr key={b.id} className="hover:bg-rose-50/40 transition">
+                      <td className="px-3.5 py-3 font-mono font-black text-rose-800">
+                        #{b.designatedNumber}
+                        <span className="block text-[10px] text-slate-400 font-normal">
+                          {b.tableNumber}
+                        </span>
+                      </td>
+
+                      <td className="px-3.5 py-3">
+                        <span className="font-bold text-slate-900 block">
+                          {b.beneficiary?.fullName}
+                        </span>
+                        <span className="text-[10px] text-slate-500 font-mono">
+                          Born: {b.beneficiary?.birthday || "N/A"}
+                        </span>
+                      </td>
+
+                      <td className="px-3.5 py-3">
+                        <span className="font-semibold text-slate-700 block">
+                          {b.beneficiary?.barangay}
+                        </span>
+                        <span className="text-[10px] text-slate-500">
+                          {b.beneficiary?.sitio || "—"}
+                        </span>
+                      </td>
+
+                      <td className="px-3.5 py-3 max-w-sm">
+                        {pendingRep && candBene ? (
+                          <div className="space-y-1">
+                            <div className="text-[11px] font-bold text-slate-900">
+                              Candidate:{" "}
+                              <strong className="text-emerald-800">{candBene.fullName}</strong>
+                            </div>
+                            {dep && (
+                              <div className="text-[10px] text-slate-600">
+                                Dep: {dep.fullName} ({dep.relationship})
+                              </div>
+                            )}
+                            <div className="flex items-center space-x-1.5 mt-0.5">
+                              <span className="px-2 py-0.5 bg-blue-100 text-gov-blue text-[9.5px] font-black rounded border border-blue-200">
+                                📷 {docs.length || 4} IDs Attached
+                              </span>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="text-[11px] font-medium text-rose-900 bg-rose-50 p-1.5 rounded border border-rose-200">
                             {flaggedDist?.remarks || "Flagged for onsite replacement"}
                           </div>
-                          {flaggedDist?.distributedAt && (
-                            <span className="text-[10px] text-slate-400 block mt-0.5">
-                              Flagged {new Date(flaggedDist.distributedAt).toLocaleDateString()}
-                            </span>
-                          )}
-                        </td>
-                        <td className="px-3.5 py-3 font-mono text-slate-600">
-                          {b.beneficiary?.contactNumber || "N/A"}
-                        </td>
-                        <td className="px-3.5 py-3 text-center">
+                        )}
+                      </td>
+
+                      <td className="px-3.5 py-3 text-center">
+                        {pendingRep ? (
+                          <span className="inline-flex items-center px-2 py-1 bg-amber-100 text-amber-900 text-[10px] font-black rounded-full border border-amber-300">
+                            ⏳ Pending Approval
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center px-2 py-1 bg-rose-100 text-rose-900 text-[10px] font-bold rounded-full border border-rose-300">
+                            🚩 Awaiting Substitute
+                          </span>
+                        )}
+                      </td>
+
+                      <td className="px-3.5 py-3 text-center">
+                        {pendingRep ? (
                           <button
-                            onClick={() => handleSelectFlaggedForReplacement(b)}
-                            className="inline-flex items-center space-x-1.5 px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs rounded-lg shadow-sm transition transform active:scale-95"
+                            onClick={() => openAssessmentForReplacement(pendingRep)}
+                            className="inline-flex items-center space-x-1 px-3 py-1.5 bg-gov-blue hover:bg-gov-dark text-white font-bold text-xs rounded-lg shadow-sm transition"
+                          >
+                            <ShieldCheck className="w-3.5 h-3.5 text-gov-goldLight" />
+                            <span>Assess &amp; View IDs</span>
+                          </button>
+                        ) : (
+                          <button
+                            onClick={() => handleLaunchWizard(b)}
+                            className="inline-flex items-center space-x-1 px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs rounded-lg shadow-sm transition"
                           >
                             <Zap className="w-3.5 h-3.5 text-amber-300" />
-                            <span>Process Onsite Replacement</span>
+                            <span>Enter Substitute &amp; Upload IDs</span>
                           </button>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
-      )}
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
 
       {/* =========================================================================
-          SECTION 2: REPLACEMENT WIZARD (STEP 1 - 4)
+          SECTION 2: RECORDED REPLACEMENTS HISTORY & AUDIT MASTERLIST
           ========================================================================= */}
-      {isCreating ? (
-        <div className="gov-card p-6 space-y-6 shadow-xl border-t-4 border-t-gov-blue">
-          {/* Stepper */}
-          <div className="grid grid-cols-4 gap-2 text-center text-xs font-bold border-b pb-4">
-            <div className={`p-2 rounded ${step === 1 ? "bg-gov-blue text-white" : "bg-slate-100 text-slate-500"}`}>
-              1. Original Beneficiary
-            </div>
-            <div className={`p-2 rounded ${step === 2 ? "bg-gov-blue text-white" : "bg-slate-100 text-slate-500"}`}>
-              2. Replacement & Eligibility
-            </div>
-            <div className={`p-2 rounded ${step === 3 ? "bg-gov-blue text-white" : "bg-slate-100 text-slate-500"}`}>
-              3. ID Review & Confirmation
-            </div>
-            <div className={`p-2 rounded ${step === 4 ? "bg-emerald-700 text-white" : "bg-slate-100 text-slate-500"}`}>
-              4. Complete & QR
-            </div>
-          </div>
-
-          {/* Step 1: Select Original Beneficiary */}
-          {step === 1 && (
-            <div className="space-y-4">
-              <h3 className="text-sm font-bold text-slate-900 uppercase">
-                Step 1: Select Original Beneficiary to Replace
-              </h3>
-              <p className="text-xs text-slate-500">
-                The original beneficiary record will be marked as REPLACED and preserved in historical audit reports.
-              </p>
-
-              <div>
-                <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
-                  Choose Beneficiary *
-                </label>
-                <select
-                  value={originalPbId}
-                  onChange={(e) => {
-                    const selectedId = e.target.value;
-                    setOriginalPbId(selectedId);
-                    const b = beneficiaries.find((x) => x.id === selectedId);
-                    if (b) {
-                      setRepBrgy(b.beneficiary?.barangay || "Paltic");
-                      setRepSitio(b.beneficiary?.sitio || "");
-                      const flaggedDist = b.stubDistributions?.find((d: any) => d.status === "FLAGGED_REPLACEMENT");
-                      if (flaggedDist?.remarks) {
-                        setReason(flaggedDist.remarks);
-                      }
-                    }
-                  }}
-                  className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg bg-slate-50 font-semibold focus:outline-none focus:border-gov-blue"
-                >
-                  <option value="">-- Select Original Beneficiary --</option>
-                  {flaggedQueue.length > 0 && (
-                    <optgroup label="🚩 Flagged for Replacement (Field Candidates)">
-                      {flaggedQueue.map((b) => (
-                        <option key={b.id} value={b.id}>
-                          #{b.designatedNumber} - {b.beneficiary?.fullName} ({b.beneficiary?.barangay}) [FLAGGED]
-                        </option>
-                      ))}
-                    </optgroup>
-                  )}
-                  <optgroup label="Active Beneficiaries">
-                    {activeBeneficiaries.map((b) => (
-                      <option key={b.id} value={b.id}>
-                        #{b.designatedNumber} - {b.beneficiary?.fullName} ({b.beneficiary?.barangay}) - {b.tableNumber}
-                      </option>
-                    ))}
-                  </optgroup>
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
-                  Reason for Replacement *
-                </label>
-                <select
-                  value={reason}
-                  onChange={(e) => setReason(e.target.value)}
-                  className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg bg-slate-50 mb-2"
-                >
-                  <option value="">-- Select Official Reason --</option>
-                  <option value="Unreachable (Phone uncontactable / not in residence)">Unreachable (Phone uncontactable / not in residence)</option>
-                  <option value="Absent during orientation session">Absent during orientation session</option>
-                  <option value="Relocated / Moved out of Dingalan">Relocated / Moved out of Dingalan</option>
-                  <option value="Declined / Not interested in 10-day work program">Declined / Not interested in 10-day work program</option>
-                  <option value="Medical condition / Illness">Medical condition / Illness</option>
-                  <option value="Secured other employment">Secured other employment</option>
-                  <option value="Voluntary withdrawal">Voluntary withdrawal</option>
-                </select>
-                <textarea
-                  rows={2}
-                  value={reason}
-                  onChange={(e) => setReason(e.target.value)}
-                  placeholder="Or provide custom reason..."
-                  className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg"
-                />
-              </div>
-
-              <div className="flex justify-between pt-2">
-                <button
-                  type="button"
-                  onClick={() => setIsCreating(false)}
-                  className="px-4 py-2 text-xs font-bold text-slate-600 border rounded-lg"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="button"
-                  disabled={!originalPbId || !reason}
-                  onClick={() => setStep(2)}
-                  className="px-5 py-2 bg-gov-blue text-white font-bold text-xs rounded-lg shadow disabled:opacity-50 flex items-center space-x-1"
-                >
-                  <span>Next: Replacement Info</span>
-                  <ArrowRight className="w-3.5 h-3.5" />
-                </button>
-              </div>
-            </div>
-          )}
-
-          {/* Step 2: Replacement Demographic Info & Eligibility Check */}
-          {step === 2 && (
-            <div className="space-y-4">
-              <div className="flex items-center justify-between border-b pb-2">
-                <h3 className="text-sm font-bold text-slate-900 uppercase">
-                  Step 2: Replacement Beneficiary Profile & 365-Day Eligibility Check
-                </h3>
-                {originalBeneficiary && (
-                  <span className="text-[11px] font-mono font-bold text-gov-blue bg-blue-50 px-2 py-0.5 rounded border border-blue-200">
-                    Replacing #{originalBeneficiary.designatedNumber} ({originalBeneficiary.beneficiary?.fullName})
-                  </span>
-                )}
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
-                <div className="sm:col-span-2">
-                  <label className="block font-bold text-slate-700 uppercase mb-1">
-                    Full Name (Last Name, First Name Middle Name) *
-                  </label>
-                  <input
-                    type="text"
-                    value={repName}
-                    onChange={(e) => setRepName(e.target.value)}
-                    placeholder="e.g. DELA CRUZ, JUANITO M."
-                    className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg font-bold"
-                    required
-                  />
-                </div>
-
-                <div>
-                  <label className="block font-bold text-slate-700 uppercase mb-1">
-                    Birthday (YYYY-MM-DD) *
-                  </label>
-                  <input
-                    type="date"
-                    value={repBday}
-                    onChange={(e) => setRepBday(e.target.value)}
-                    className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg font-mono"
-                    required
-                  />
-                </div>
-
-                <div>
-                  <label className="block font-bold text-slate-700 uppercase mb-1">Sex</label>
-                  <select
-                    value={repSex}
-                    onChange={(e) => setRepSex(e.target.value)}
-                    className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg bg-slate-50"
-                  >
-                    <option value="MALE">Male</option>
-                    <option value="FEMALE">Female</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block font-bold text-slate-700 uppercase mb-1">Barangay</label>
-                  <input
-                    type="text"
-                    value={repBrgy}
-                    onChange={(e) => setRepBrgy(e.target.value)}
-                    className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg"
-                  />
-                </div>
-
-                <div>
-                  <label className="block font-bold text-slate-700 uppercase mb-1">Contact Number</label>
-                  <input
-                    type="text"
-                    value={repContact}
-                    onChange={(e) => setRepContact(e.target.value)}
-                    placeholder="0917XXXXXXX"
-                    className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg"
-                  />
-                </div>
-              </div>
-
-              <div className="p-4 bg-blue-50/60 rounded-xl border border-blue-100 flex flex-col sm:flex-row items-center justify-between gap-3">
-                <div className="space-y-0.5">
-                  <h4 className="text-xs font-bold text-gov-blue uppercase">365-Day Restriction Guarantee</h4>
-                  <p className="text-[11px] text-slate-500">
-                    Verifies whether the substitute beneficiary has received a TUPAD payout within the last 365 days.
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  onClick={handleCheckEligibility}
-                  disabled={checkingEligibility || !repName || !repBday}
-                  className="px-4 py-2 bg-gov-blue hover:bg-gov-light text-white font-bold text-xs rounded-lg shadow flex items-center space-x-1.5 disabled:opacity-50 whitespace-nowrap"
-                >
-                  <ShieldCheck className="w-3.5 h-3.5 text-gov-goldLight" />
-                  <span>{checkingEligibility ? "Checking Lockout..." : "Run Eligibility Check"}</span>
-                </button>
-              </div>
-
-              <div className="flex justify-between pt-2">
-                <button
-                  type="button"
-                  onClick={() => setStep(1)}
-                  className="px-4 py-2 text-xs font-bold text-slate-600 border rounded-lg"
-                >
-                  Back
-                </button>
-              </div>
-            </div>
-          )}
-
-          {/* Step 3: ID Upload & Review */}
-          {step === 3 && (
-            <div className="space-y-4">
-              <h3 className="text-sm font-bold text-slate-900 uppercase">
-                Step 3: Verification Documents & Review
-              </h3>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div className="p-4 border-2 border-dashed border-slate-300 rounded-xl text-center space-y-2 bg-slate-50">
-                  <UploadCloud className="w-6 h-6 text-slate-400 mx-auto" />
-                  <span className="text-xs font-bold text-slate-700 block">ID Front Photo</span>
-                  <span className="text-[10px] text-emerald-700 font-semibold">✓ Attached & Verified</span>
-                </div>
-                <div className="p-4 border-2 border-dashed border-slate-300 rounded-xl text-center space-y-2 bg-slate-50">
-                  <UploadCloud className="w-6 h-6 text-slate-400 mx-auto" />
-                  <span className="text-xs font-bold text-slate-700 block">ID Back Photo</span>
-                  <span className="text-[10px] text-emerald-700 font-semibold">✓ Attached & Verified</span>
-                </div>
-              </div>
-
-              <div className="gov-card p-4 bg-slate-50 space-y-2 text-xs">
-                <h4 className="font-bold text-slate-800 uppercase text-[11px]">Replacement Summary</h4>
-                <p>
-                  <span className="text-slate-500">Original Beneficiary: </span>
-                  <strong className="text-red-700 line-through">
-                    #{originalBeneficiary?.designatedNumber} - {originalBeneficiary?.beneficiary?.fullName}
-                  </strong>
-                </p>
-                <p>
-                  <span className="text-slate-500">Replacement Beneficiary: </span>
-                  <strong className="text-emerald-700">
-                    {repName} (Born {repBday}) • Brgy. {repBrgy}
-                  </strong>
-                </p>
-                <p>
-                  <span className="text-slate-500">Assigned Slot: </span>
-                  <strong>Designated #{originalBeneficiary?.designatedNumber} • {originalBeneficiary?.tableNumber}</strong>
-                </p>
-              </div>
-
-              <div className="flex justify-between pt-2">
-                <button
-                  type="button"
-                  onClick={() => setStep(2)}
-                  className="px-4 py-2 text-xs font-bold text-slate-600 border rounded-lg"
-                >
-                  Back
-                </button>
-                <button
-                  type="button"
-                  onClick={handleCommitReplacement}
-                  disabled={loading}
-                  className="px-5 py-2.5 bg-gov-gold hover:bg-gov-goldLight text-gov-dark font-extrabold text-xs rounded-lg shadow-lg flex items-center space-x-1.5 disabled:opacity-50"
-                >
-                  <CheckCircle2 className="w-4 h-4" />
-                  <span>{loading ? "Issuing Replacement..." : "Approve & Issue Replacement QR"}</span>
-                </button>
-              </div>
-            </div>
-          )}
-
-          {/* Step 4: Replacement Completed */}
-          {step === 4 && createdResult && (
-            <div className="text-center space-y-5">
-              <div className="w-16 h-16 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center mx-auto">
-                <CheckCircle2 className="w-10 h-10" />
-              </div>
-
-              <div className="space-y-1">
-                <h3 className="text-base font-black text-slate-900">
-                  Replacement Successfully Approved & Registered!
-                </h3>
-                <p className="text-xs text-slate-500">
-                  New Cryptographic QR Token generated. Original beneficiary history has been archived with REPLACED status.
-                </p>
-              </div>
-
-              {newQrImage && (
-                <div className="p-4 bg-slate-50 border rounded-xl max-w-xs mx-auto space-y-2">
-                  <img src={newQrImage} alt="Replacement QR" className="w-40 h-40 mx-auto" />
-                  <p className="font-mono text-xs font-bold text-gov-blue">{createdResult.qr.publicToken}</p>
-                </div>
-              )}
-
-              <button
-                onClick={() => {
-                  setIsCreating(false);
-                  setStep(1);
-                  setCreatedResult(null);
-                }}
-                className="px-6 py-2.5 bg-gov-blue hover:bg-gov-light text-white font-bold text-xs rounded-xl shadow transition"
-              >
-                Back to Replacements Masterlist
-              </button>
-            </div>
-          )}
-        </div>
-      ) : (
-        /* =========================================================================
-            SECTION 3: EXISTING RECORDED REPLACEMENTS MASTERLIST
-            ========================================================================= */
-        <div className="gov-card overflow-hidden">
-          <div className="p-4 bg-slate-50 border-b flex items-center justify-between">
+      <div className="gov-card overflow-hidden">
+        <div className="p-4 bg-slate-50 border-b flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="flex items-center space-x-2">
             <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider">
-              Recorded Replacements History ({existingReplacements.length})
+              Recorded Replacements &amp; Substitutions ({existingReplacements.length})
             </h3>
           </div>
 
-          {existingReplacements.length === 0 ? (
-            <div className="p-12 text-center text-xs text-slate-400">
-              No approved replacements recorded yet for this program.
-            </div>
-          ) : (
-            <TableScrollWrapper>
-              <table className="w-full text-left text-xs min-w-[750px]">
-                <thead className="bg-slate-100 text-slate-700 font-bold uppercase text-[10px] border-b">
-                  <tr>
-                    <th className="px-4 py-3"># Slot</th>
-                    <th className="px-4 py-3">Original Beneficiary</th>
-                    <th className="px-4 py-3">Replacement Beneficiary</th>
-                    <th className="px-4 py-3">Official Reason</th>
-                    <th className="px-4 py-3">Initiated By</th>
-                    <th className="px-4 py-3">Status</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {existingReplacements.map((r) => (
-                    <tr key={r.id} className="hover:bg-slate-50">
-                      <td className="px-4 py-3 font-mono font-bold text-gov-blue">
+          <div className="relative w-full sm:w-64">
+            <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
+            <input
+              type="text"
+              value={filterQuery}
+              onChange={(e) => setFilterQuery(e.target.value)}
+              placeholder="Search history..."
+              className="w-full pl-8 pr-3 py-1.5 text-xs border border-slate-300 rounded-lg bg-white focus:outline-none focus:border-gov-blue"
+            />
+          </div>
+        </div>
+
+        {existingReplacements.length === 0 ? (
+          <div className="p-12 text-center text-xs text-slate-400">
+            No replacements recorded yet for this program.
+          </div>
+        ) : (
+          <TableScrollWrapper>
+            <table className="w-full text-left text-xs min-w-[850px]">
+              <thead className="bg-slate-100 text-slate-700 font-bold uppercase text-[10px] border-b">
+                <tr>
+                  <th className="px-3.5 py-3"># Slot</th>
+                  <th className="px-3.5 py-3">Original Beneficiary</th>
+                  <th className="px-3.5 py-3">Replacement Beneficiary</th>
+                  <th className="px-3.5 py-3">Declared Dependent</th>
+                  <th className="px-3.5 py-3">Official Reason</th>
+                  <th className="px-3.5 py-3 text-center">Status</th>
+                  <th className="px-3.5 py-3 text-center">Uploaded IDs &amp; Action</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {filteredHistory.map((r) => {
+                  const origBene = r.originalProgramBeneficiary?.beneficiary;
+                  const candBene = r.replacementProgramBeneficiary?.beneficiary;
+                  const dep = candBene?.dependents?.[0];
+                  const docs = candBene?.documents || [];
+                  const isApproved = r.status === "APPROVED";
+                  const isOrigAsDep =
+                    Boolean(origBene?.fullName) &&
+                    Boolean(dep?.fullName) &&
+                    dep!.fullName.trim().toUpperCase() === origBene!.fullName.trim().toUpperCase();
+
+                  return (
+                    <tr key={r.id} className="hover:bg-slate-50 transition">
+                      <td className="px-3.5 py-3 font-mono font-bold text-gov-blue">
                         #{r.originalProgramBeneficiary?.designatedNumber}
+                        <span className="block text-[10px] text-slate-400 font-normal">
+                          {r.originalProgramBeneficiary?.tableNumber}
+                        </span>
                       </td>
-                      <td className="px-4 py-3 font-bold text-slate-700 line-through">
-                        {r.originalProgramBeneficiary?.beneficiary?.fullName}
+
+                      <td className="px-3.5 py-3">
+                        <span
+                          className={`font-bold block ${
+                            isApproved ? "text-slate-500 line-through" : "text-slate-900"
+                          }`}
+                        >
+                          {origBene?.fullName}
+                        </span>
+                        <span className="text-[10px] text-slate-500">
+                          {origBene?.barangay} {origBene?.sitio ? `(${origBene.sitio})` : ""}
+                        </span>
                       </td>
-                      <td className="px-4 py-3 font-bold text-emerald-800">
-                        {r.replacementProgramBeneficiary?.beneficiary?.fullName}
+
+                      <td className="px-3.5 py-3">
+                        <span className="font-bold text-emerald-800 block">
+                          {candBene?.fullName || "Pending Candidate"}
+                        </span>
+                        <span className="text-[10px] text-slate-500">
+                          {candBene?.barangay} • Born: {candBene?.birthday || "N/A"}
+                        </span>
                       </td>
-                      <td className="px-4 py-3 text-slate-600">
-                        {r.reason}
+
+                      <td className="px-3.5 py-3">
+                        {dep ? (
+                          <div>
+                            <span className="font-semibold text-slate-800 block">{dep.fullName}</span>
+                            <span className="text-[10px] text-slate-500">
+                              {dep.relationship} {dep.age ? `(${dep.age} y/o)` : ""}
+                            </span>
+                            {isOrigAsDep && (
+                              <span className="inline-block mt-0.5 px-1 py-0.2 bg-purple-100 text-purple-900 text-[9px] font-black rounded border border-purple-200">
+                                ★ Original Beneficiary as Dependent
+                              </span>
+                            )}
+                          </div>
+                        ) : (
+                          <span className="text-slate-400">—</span>
+                        )}
                       </td>
-                      <td className="px-4 py-3 text-[11px] text-slate-500">
-                        {r.initiatedBy?.fullName}
+
+                      <td className="px-3.5 py-3 max-w-xs text-slate-600 text-[11px]">
+                        <div>{r.reason}</div>
+                        {isApproved && (
+                          <div className="text-[10px] font-bold text-emerald-700 mt-0.5">
+                            Remarks: Replaced - {origBene?.fullName}
+                          </div>
+                        )}
                       </td>
-                      <td className="px-4 py-3">
+
+                      <td className="px-3.5 py-3 text-center">
                         <StatusBadge status={r.status} />
                       </td>
+
+                      <td className="px-3.5 py-3 text-center">
+                        <button
+                          onClick={() => openAssessmentForReplacement(r)}
+                          className="px-2.5 py-1 bg-blue-50 hover:bg-blue-100 text-gov-blue text-[11px] font-bold rounded-lg border border-blue-200 transition inline-flex items-center space-x-1"
+                        >
+                          <Eye className="w-3.5 h-3.5" />
+                          <span>{docs.length > 0 ? `${docs.length} IDs Attached` : "View Details"}</span>
+                        </button>
+                      </td>
                     </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </TableScrollWrapper>
+        )}
+      </div>
+
+      {/* Manual Beneficiary Selection Modal */}
+      {isSelectModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-xs animate-fadeIn">
+          <div className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl space-y-4">
+            <div className="flex items-center justify-between border-b pb-3">
+              <div className="flex items-center space-x-2">
+                <UserPlus className="w-5 h-5 text-gov-blue" />
+                <h3 className="text-sm font-black text-slate-900 uppercase">
+                  Select Beneficiary to Replace
+                </h3>
+              </div>
+              <button
+                onClick={() => setIsSelectModalOpen(false)}
+                className="text-slate-400 hover:text-slate-700 p-1"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <p className="text-xs text-slate-500 leading-relaxed">
+              Choose an enrolled beneficiary to flag for replacement. The 3-step wizard will capture the replacement applicant, declared dependent, consent PIN, and Front/Back IDs.
+            </p>
+
+            <div>
+              <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
+                Beneficiary Slot *
+              </label>
+              <select
+                value={manualSelectedPbId}
+                onChange={(e) => setManualSelectedPbId(e.target.value)}
+                className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg bg-slate-50 font-semibold focus:outline-none focus:border-gov-blue"
+              >
+                <option value="">-- Select Beneficiary Slot --</option>
+                {flaggedQueue.length > 0 && (
+                  <optgroup label="🚩 Flagged for Replacement (Field Queue)">
+                    {flaggedQueue.map((b) => (
+                      <option key={b.id} value={b.id}>
+                        #{b.designatedNumber} — {b.beneficiary?.fullName} ({b.beneficiary?.barangay}) [FLAGGED]
+                      </option>
+                    ))}
+                  </optgroup>
+                )}
+                <optgroup label="Active Beneficiaries">
+                  {activeBeneficiaries.map((b) => (
+                    <option key={b.id} value={b.id}>
+                      #{b.designatedNumber} — {b.beneficiary?.fullName} ({b.beneficiary?.barangay})
+                    </option>
                   ))}
-                </tbody>
-              </table>
-            </TableScrollWrapper>
-          )}
+                </optgroup>
+              </select>
+            </div>
+
+            <div className="flex justify-end space-x-2 pt-2 border-t">
+              <button
+                type="button"
+                onClick={() => setIsSelectModalOpen(false)}
+                className="px-4 py-2 text-xs font-bold text-slate-600 border rounded-lg hover:bg-slate-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={!manualSelectedPbId}
+                onClick={() => {
+                  const target = beneficiaries.find((b) => b.id === manualSelectedPbId);
+                  if (target) handleLaunchWizard(target);
+                }}
+                className="px-5 py-2 bg-gov-blue text-white font-bold text-xs rounded-lg shadow disabled:opacity-50 flex items-center space-x-1"
+              >
+                <span>Launch Replacement Wizard</span>
+                <ArrowRight className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          </div>
         </div>
       )}
+
+      {/* 3-Step Stub Replacement Wizard Modal (Applicant, Dependent, Consent, 4 IDs) */}
+      <StubReplacementWizardModal
+        isOpen={isWizardOpen}
+        target={wizardTarget}
+        onClose={() => {
+          setIsWizardOpen(false);
+          setWizardTarget(null);
+        }}
+        onSuccess={(resultData, summaryMessage) => {
+          setIsWizardOpen(false);
+          setWizardTarget(null);
+          setSuccessMessage(summaryMessage || "Replacement successfully submitted and details saved!");
+          if (selectedProgramId) {
+            fetchBeneficiariesAndReplacements(selectedProgramId);
+          }
+        }}
+      />
+
+      {/* Replacement Assessment & ID Inspection Modal (Zoom lightbox + Admin approval) */}
+      <ReplacementApprovalModal
+        isOpen={Boolean(assessmentItem)}
+        item={assessmentItem}
+        onClose={() => setAssessmentItem(null)}
+        onProcessed={(status, message) => {
+          setAssessmentItem(null);
+          setSuccessMessage(message);
+          if (selectedProgramId) {
+            fetchBeneficiariesAndReplacements(selectedProgramId);
+          }
+        }}
+      />
+
+      {/* Printable Masterlist of Flagged Beneficiaries Modal */}
+      <PrintableReplacementMasterlistModal
+        isOpen={isPrintableMasterlistOpen}
+        programId={selectedProgramId}
+        onClose={() => setIsPrintableMasterlistOpen(false)}
+        onOpenApprovalModal={(item) => {
+          setAssessmentItem({
+            id: item.id,
+            reason: item.reason,
+            initiatedAt: item.initiatedAt,
+            initiatedBy: item.initiatedBy,
+            originalBeneficiary: item.originalBeneficiary,
+            candidateBeneficiary: item.candidateBeneficiary,
+          });
+        }}
+      />
     </div>
   );
 }

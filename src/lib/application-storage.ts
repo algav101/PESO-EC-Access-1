@@ -88,5 +88,5 @@ export async function removeApplicationDocuments(paths: Array<{ bucket: string; 
   const client = getPrivateStorageClient();
   const grouped = new Map<string, string[]>();
   for (const path of paths) grouped.set(path.bucket, [...(grouped.get(path.bucket) || []), path.key]);
-  await Promise.all([...grouped.entries()].map(([bucket, keys]) => client.storage.from(bucket).remove(keys)));
+  await Promise.all(Array.from(grouped.entries()).map(([bucket, keys]) => client.storage.from(bucket).remove(keys)));
 }

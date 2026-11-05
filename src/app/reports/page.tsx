@@ -31,6 +31,8 @@ import { useAuth } from "@/context/AuthContext";
 import { isAdminUser, isFieldCoordinator } from "@/lib/permissions";
 import { QrScannerModal } from "@/components/scanner/QrScannerModal";
 import { useRouter } from "next/navigation";
+import { PrintableReplacementMasterlistModal } from "@/components/reports/PrintableReplacementMasterlistModal";
+import { ReplacementApprovalModal } from "@/components/field/ReplacementApprovalModal";
 
 export default function ReportCenterPage() {
   const { user } = useAuth();
@@ -40,6 +42,10 @@ export default function ReportCenterPage() {
   const [programs, setPrograms] = useState<any[]>([]);
   const [selectedProgramId, setSelectedProgramId] = useState<string>("");
   const [loading, setLoading] = useState(true);
+
+  // Flagged Replacements Masterlist Modal State
+  const [isPrintableMasterlistOpen, setIsPrintableMasterlistOpen] = useState(false);
+  const [assessmentItem, setAssessmentItem] = useState<any | null>(null);
 
   // Quick Assignment Scanner Modal State
   const [isScannerOpen, setIsScannerOpen] = useState(false);
@@ -175,13 +181,29 @@ export default function ReportCenterPage() {
     },
     {
       id: "REPLACEMENTS",
-      title: "Onsite Replacements Audit Report",
-      refNote: "Integrity Trail",
-      description: "Full mapping of original absent beneficiaries to replacement recipients, reasons, and ID verification logs.",
+      title: "Masterlist of Beneficiaries Flagged for Replacement",
+      refNote: "Official DOLE Audit & Print",
+      description: "Official printable masterlist of beneficiaries flagged for replacement with Remarks ('Replaced - [Name]') and Admin Approval status (Approved vs Pending). Includes Excel export and ID inspection.",
       icon: UserPlus,
       color: "text-purple-700 bg-purple-50",
-      action: "View Replacements",
-      href: `/replacements?programId=${selectedProgramId}`,
+      action: "Print Masterlist",
+      isCustomAction: true,
+      customIcon: Printer,
+      onClick: () => {
+        setIsPrintableMasterlistOpen(true);
+      },
+      secondaryActions: [
+        {
+          label: "Export Excel",
+          icon: Download,
+          href: `/api/v1/reports/export?type=FLAGGED_REPLACEMENTS&programId=${selectedProgramId}`,
+        },
+        {
+          label: "Replacements Hub",
+          icon: UserPlus,
+          href: `/replacements?programId=${selectedProgramId}`,
+        },
+      ],
     },
     {
       id: "RESTRICTIONS",
@@ -288,14 +310,18 @@ export default function ReportCenterPage() {
                 <p className="text-xs text-slate-500 leading-relaxed">{r.description}</p>
               </div>
 
-              <div className="pt-3 border-t border-slate-100">
+              <div className="pt-3 border-t border-slate-100 space-y-2">
                 {r.isCustomAction ? (
                   <button
                     type="button"
                     onClick={r.onClick}
                     className="w-full py-2 px-3 bg-gov-blue hover:bg-gov-dark text-white rounded-lg text-xs font-bold transition flex items-center justify-center space-x-2 shadow-xs"
                   >
-                    <QrCode className="w-3.5 h-3.5 text-gov-goldLight" />
+                    {r.customIcon ? (
+                      <r.customIcon className="w-3.5 h-3.5 text-gov-goldLight" />
+                    ) : (
+                      <QrCode className="w-3.5 h-3.5 text-gov-goldLight" />
+                    )}
                     <span>{r.action}</span>
                   </button>
                 ) : (
@@ -306,6 +332,24 @@ export default function ReportCenterPage() {
                     <Download className="w-3.5 h-3.5 text-gov-goldLight" />
                     <span>{r.action}</span>
                   </a>
+                )}
+
+                {r.secondaryActions && r.secondaryActions.length > 0 && (
+                  <div className="flex items-center gap-1.5 pt-1">
+                    {r.secondaryActions.map((sec: any) => {
+                      const SecIcon = sec.icon;
+                      return (
+                        <a
+                          key={sec.label}
+                          href={sec.href}
+                          className="flex-1 py-1.5 px-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-[11px] font-bold transition flex items-center justify-center space-x-1 border border-slate-200"
+                        >
+                          <SecIcon className="w-3 h-3 text-slate-500" />
+                          <span>{sec.label}</span>
+                        </a>
+                      );
+                    })}
+                  </div>
                 )}
               </div>
             </div>
@@ -495,6 +539,33 @@ export default function ReportCenterPage() {
           title="Scan Beneficiary QR Code for Work Area Lookup"
         />
       )}
+
+      {/* Printable Masterlist of Flagged Beneficiaries Modal */}
+      <PrintableReplacementMasterlistModal
+        isOpen={isPrintableMasterlistOpen}
+        programId={selectedProgramId}
+        onClose={() => setIsPrintableMasterlistOpen(false)}
+        onOpenApprovalModal={(item) => {
+          setAssessmentItem({
+            id: item.id,
+            reason: item.reason,
+            initiatedAt: item.initiatedAt,
+            initiatedBy: item.initiatedBy,
+            originalBeneficiary: item.originalBeneficiary,
+            candidateBeneficiary: item.candidateBeneficiary,
+          });
+        }}
+      />
+
+      {/* Replacement Approval / ID Inspection Modal */}
+      <ReplacementApprovalModal
+        isOpen={Boolean(assessmentItem)}
+        item={assessmentItem}
+        onClose={() => setAssessmentItem(null)}
+        onProcessed={() => {
+          setAssessmentItem(null);
+        }}
+      />
     </div>
   );
 }
