@@ -177,7 +177,7 @@ export async function POST(request: Request) {
     const resolvedSitio = (applicantSitio || pb.beneficiary.sitio || "Centro").trim();
     const activeQr = pb.qrCodes[0];
     const parsedDepAge = dependentAge ? parseInt(String(dependentAge), 10) || null : null;
-    const summaryRemarks = `Replaced ${pb.beneficiary.fullName} (Consent Verified via Birthday PIN • Relationship: ${relationshipWithReplacement.trim().toUpperCase()}) with ${applicantEval.normalizedFullName} (Dependent: ${dependentEval.normalizedFullName}) — Reason: ${reason}${remarks ? ` (${remarks})` : ""}`;
+    const pendingRemarks = `Pending Admin/PESO Approval — Candidate: ${applicantEval.normalizedFullName} (Dependent: ${dependentEval.normalizedFullName}) | Reason: ${reason}${remarks ? ` (${remarks})` : ""} | Consent Verified (${relationshipWithReplacement.trim().toUpperCase()})`;
 
     // Pre-fetch existing replacement beneficiary outside the transaction to minimize transaction time
     const existingReplacementBene = await prisma.beneficiary.findFirst({
@@ -196,27 +196,64 @@ export async function POST(request: Request) {
 
     const result = await prisma.$transaction(
       async (tx) => {
-        // 1. Mark original ProgramBeneficiary as REPLACED
+        // 1. Mark original ProgramBeneficiary as FLAGGED_FOR_REPLACEMENT
+        // (Original beneficiary details/data & QR code remain active on the slot until Admin/PESO approves!)
         await tx.programBeneficiary.update({
           where: { id: pb.id },
-          data: { participationStatus: "REPLACED" },
+          data: { participationStatus: "FLAGGED_FOR_REPLACEMENT" },
         });
 
-        // 2. Record audit StubDistribution on original beneficiary
-        if (activeQr) {
-          await tx.stubDistribution.create({
+        // 2. Supersede any earlier PENDING replacement requests for this original beneficiary
+        const existingPendingReps = await tx.beneficiaryReplacement.findMany({
+          where: {
+            originalProgramBeneficiaryId: pb.id,
+            status: "PENDING",
+          },
+        });
+        for (const prevRep of existingPendingReps) {
+          if (prevRep.replacementProgramBeneficiaryId) {
+            await tx.programBeneficiary.update({
+              where: { id: prevRep.replacementProgramBeneficiaryId },
+              data: { participationStatus: "WITHDRAWN" },
+            });
+          }
+          await tx.beneficiaryReplacement.update({
+            where: { id: prevRep.id },
+            data: { status: "REJECTED" },
+          });
+        }
+
+        // 3. Record FLAGGED_REPLACEMENT StubDistribution on original beneficiary while awaiting approval
+        let qrForFlag = activeQr;
+        if (!qrForFlag) {
+          const qrData = generateBeneficiaryToken(pb.programId, pb.designatedNumber);
+          qrForFlag = await tx.qrCode.create({
             data: {
-              qrId: activeQr.id,
+              programId: pb.programId,
               programBeneficiaryId: pb.id,
-              distributedById: user.id,
-              verificationMethod: "ORIGINAL_BENEFICIARY_CONSENT_PIN",
-              status: "FLAGGED_REPLACEMENT",
-              remarks: summaryRemarks,
+              publicToken: qrData.publicToken,
+              tokenHash: qrData.tokenHash,
+              status: "ACTIVE",
+              generatedById: user.id,
             },
           });
         }
 
-        // 3. Create or update Replacement Beneficiary
+        await tx.stubDistribution.deleteMany({
+          where: { programBeneficiaryId: pb.id, status: "FLAGGED_REPLACEMENT" },
+        });
+        await tx.stubDistribution.create({
+          data: {
+            qrId: qrForFlag.id,
+            programBeneficiaryId: pb.id,
+            distributedById: user.id,
+            verificationMethod: "ORIGINAL_BENEFICIARY_CONSENT_PIN",
+            status: "FLAGGED_REPLACEMENT",
+            remarks: pendingRemarks,
+          },
+        });
+
+        // 4. Create or update Candidate Replacement Beneficiary
         let newBene = existingReplacementBene;
         if (!newBene) {
           newBene = await tx.beneficiary.create({
@@ -254,7 +291,7 @@ export async function POST(request: Request) {
           });
         }
 
-        // 4. Upsert Dependent for Replacement Beneficiary
+        // 5. Upsert Dependent for Candidate Replacement Beneficiary
         await tx.dependent.deleteMany({ where: { beneficiaryId: newBene.id } });
         const createdDependent = await tx.dependent.create({
           data: {
@@ -270,7 +307,13 @@ export async function POST(request: Request) {
           },
         });
 
-        // 5. Batch-insert all 4 ID Documents in a single query
+        // 6. Batch-insert all 4 ID Documents in a single query
+        await tx.beneficiaryDocument.deleteMany({
+          where: {
+            beneficiaryId: newBene.id,
+            documentType: { in: ["ID_FRONT", "ID_BACK", "DEPENDENT_ID_FRONT", "DEPENDENT_ID_BACK"] },
+          },
+        });
         await tx.beneficiaryDocument.createMany({
           data: docPayloads.map((item) => {
             const f = item.file || {};
@@ -287,58 +330,21 @@ export async function POST(request: Request) {
           }),
         });
 
-        // 6. Create Replacement ProgramBeneficiary occupying the same slot & table
+        // 7. Create Candidate Replacement ProgramBeneficiary with PENDING_APPROVAL status
+        // (Does NOT replace the active slot occupant until Admin / PESO Personnel approves!)
         const newPb = await tx.programBeneficiary.create({
           data: {
             programId: pb.programId,
             beneficiaryId: newBene.id,
             designatedNumber: pb.designatedNumber,
-            participationStatus: "ACTIVE",
+            participationStatus: "PENDING_APPROVAL",
             originalBeneficiary: false,
             tableNumber: pb.tableNumber,
             slotGroup: pb.slotGroup,
           },
         });
 
-        // 7. Re-bind the slot's active QR code to the replacement ProgramBeneficiary
-        let assignedQr = activeQr;
-        if (assignedQr) {
-          assignedQr = await tx.qrCode.update({
-            where: { id: assignedQr.id },
-            data: {
-              programBeneficiaryId: newPb.id,
-              status: "ACTIVE",
-              invalidatedAt: null,
-              invalidatedById: null,
-            },
-          });
-        } else {
-          const qrData = generateBeneficiaryToken(pb.programId, pb.designatedNumber);
-          assignedQr = await tx.qrCode.create({
-            data: {
-              programId: pb.programId,
-              programBeneficiaryId: newPb.id,
-              publicToken: qrData.publicToken,
-              tokenHash: qrData.tokenHash,
-              status: "ACTIVE",
-              generatedById: user.id,
-            },
-          });
-        }
-
-        // 8. Create StubDistribution record for the replacement beneficiary
-        await tx.stubDistribution.create({
-          data: {
-            qrId: assignedQr.id,
-            programBeneficiaryId: newPb.id,
-            distributedById: user.id,
-            verificationMethod: "ONSITE_REPLACEMENT_CONSENT",
-            status: "DISTRIBUTED",
-            remarks: summaryRemarks,
-          },
-        });
-
-        // 9. Create BeneficiaryReplacement audit record
+        // 8. Create BeneficiaryReplacement record with PENDING status for Admin / PESO assessment & approval
         const replacementRecord = await tx.beneficiaryReplacement.create({
           data: {
             programId: pb.programId,
@@ -346,9 +352,9 @@ export async function POST(request: Request) {
             replacementProgramBeneficiaryId: newPb.id,
             reason: `${reason} | Original Consent Relationship: ${relationshipWithReplacement.trim().toUpperCase()} | Dependent: ${dependentEval.normalizedFullName}${remarks ? ` | ${remarks}` : ""}`,
             initiatedById: user.id,
-            approvedById: user.id,
-            approvedAt: new Date(),
-            status: "APPROVED",
+            approvedById: null,
+            approvedAt: null,
+            status: "PENDING",
           },
         });
 
@@ -356,7 +362,7 @@ export async function POST(request: Request) {
           newBene,
           newPb,
           createdDependent,
-          assignedQr,
+          qrForFlag,
           replacementRecord,
         };
       },
@@ -365,21 +371,22 @@ export async function POST(request: Request) {
 
     await logAudit({
       userId: user.id,
-      action: "STUB_DISTRIBUTION_REPLACEMENT_COMPLETED",
-      entityType: "PROGRAM_BENEFICIARY",
-      entityId: result.newPb.id,
+      action: "STUB_DISTRIBUTION_REPLACEMENT_SUBMITTED_FOR_APPROVAL",
+      entityType: "BENEFICIARY_REPLACEMENT",
+      entityId: result.replacementRecord.id,
       metadata: {
         designatedNumber: pb.designatedNumber,
         originalProgramBeneficiaryId: pb.id,
         originalBeneficiaryName: pb.beneficiary.fullName,
         relationshipWithReplacement: relationshipWithReplacement.trim().toUpperCase(),
         originalConsentVerifiedByBirthday: true,
-        replacementProgramBeneficiaryId: result.newPb.id,
-        replacementBeneficiaryName: result.newBene.fullName,
+        candidateProgramBeneficiaryId: result.newPb.id,
+        candidateBeneficiaryName: result.newBene.fullName,
         dependentName: result.createdDependent.fullName,
         dependentRelationship: result.createdDependent.relationship,
         reason,
         remarks,
+        status: "PENDING",
         documentsCaptured: [
           "ID_FRONT",
           "ID_BACK",
@@ -391,18 +398,23 @@ export async function POST(request: Request) {
 
     return NextResponse.json({
       success: true,
-      message: `Slot #${pb.designatedNumber} replacement confirmed! ${result.newBene.fullName} (with dependent ${result.createdDependent.fullName}) is now enrolled with original beneficiary consent and verified IDs.`,
+      status: "PENDING_APPROVAL",
+      message: `Slot #${pb.designatedNumber} (${pb.beneficiary.fullName}) is now flagged for replacement with candidate ${result.newBene.fullName} (Dependent: ${result.createdDependent.fullName}). Awaiting assessment and approval by Admin / PESO Personnel before slot data is changed.`,
       data: {
+        replacementId: result.replacementRecord.id,
+        status: "PENDING",
         designatedNumber: pb.designatedNumber,
-        fullName: result.newBene.fullName,
+        fullName: pb.beneficiary.fullName,
+        candidateFullName: result.newBene.fullName,
         originalFullName: pb.beneficiary.fullName,
         originalBeneficiaryName: pb.beneficiary.fullName,
         dependentFullName: result.createdDependent.fullName,
         relationshipWithReplacement: relationshipWithReplacement.trim().toUpperCase(),
         barangay: resolvedBarangay,
         reason,
-        qrToken: result.assignedQr.publicToken,
-        programBeneficiaryId: result.newPb.id,
+        qrToken: result.qrForFlag.publicToken,
+        programBeneficiaryId: pb.id,
+        candidateProgramBeneficiaryId: result.newPb.id,
       },
     });
   } catch (error: any) {

@@ -30,7 +30,11 @@ export async function GET(request: Request) {
       include: {
         programBarangays: true,
         programBeneficiaries: {
-          where: { participationStatus: { not: "REPLACED" } },
+          where: {
+            participationStatus: {
+              notIn: ["REPLACED", "PENDING_APPROVAL", "WITHDRAWN"],
+            },
+          },
           include: {
             beneficiary: {
               include: { dependents: { take: 1 } },
@@ -40,12 +44,33 @@ export async function GET(request: Request) {
               orderBy: { distributedAt: "desc" },
             },
             qrCodes: { where: { status: "ACTIVE" } },
-            newReplacements: {
+            originalReplacements: {
+              where: { status: "PENDING" },
               include: {
+                initiatedBy: { select: { fullName: true, role: true } },
+                replacementProgramBeneficiary: {
+                  include: {
+                    beneficiary: {
+                      include: {
+                        dependents: true,
+                        documents: true,
+                      },
+                    },
+                  },
+                },
+              },
+              orderBy: { initiatedAt: "desc" },
+              take: 1,
+            },
+            newReplacements: {
+              where: { status: "APPROVED" },
+              include: {
+                approvedBy: { select: { fullName: true, role: true } },
                 originalProgramBeneficiary: {
                   include: { beneficiary: { select: { fullName: true } } },
                 },
               },
+              orderBy: { approvedAt: "desc" },
               take: 1,
             },
           },
@@ -79,14 +104,20 @@ export async function GET(request: Request) {
     const beneficiaryRoster = beneficiaries.map((pb) => {
       const flaggedDist = pb.stubDistributions?.find((d: any) => d.status === "FLAGGED_REPLACEMENT");
       const distributedDist = pb.stubDistributions?.find((d: any) => d.status === "DISTRIBUTED");
+      const pendingRep = pb.originalReplacements?.[0] || null;
+      const approvedRep = pb.newReplacements?.[0] || null;
+
       const isCompletedReplacement =
+        Boolean(approvedRep) ||
         !pb.originalBeneficiary ||
         distributedDist?.verificationMethod === "ONSITE_REPLACEMENT_CONSENT" ||
         distributedDist?.verificationMethod === "ONSITE_REPLACEMENT";
 
       const isUnresolvedFlag =
         !isCompletedReplacement &&
-        (pb.participationStatus === "FLAGGED_FOR_REPLACEMENT" || Boolean(flaggedDist));
+        (Boolean(pendingRep) ||
+          pb.participationStatus === "FLAGGED_FOR_REPLACEMENT" ||
+          Boolean(flaggedDist));
 
       const isFlagged = isUnresolvedFlag || isCompletedReplacement;
       const isConfirmed = Boolean(distributedDist) && !isUnresolvedFlag;
@@ -120,24 +151,69 @@ export async function GET(request: Request) {
       }
 
       const activeDist = isUnresolvedFlag ? (flaggedDist || distributedDist) : (distributedDist || flaggedDist);
-      const originalBeneficiaryName = pb.newReplacements?.[0]?.originalProgramBeneficiary?.beneficiary?.fullName || null;
+      const originalBeneficiaryName = approvedRep?.originalProgramBeneficiary?.beneficiary?.fullName || null;
       const dependentFullName = pb.beneficiary.dependents?.[0]?.fullName || null;
+
+      // Once assessed & approved by Admin/PESO, Remarks is marked as "Replaced - <Original Beneficiary Name>"
+      const resolvedRemarks = isCompletedReplacement && originalBeneficiaryName
+        ? `Replaced - ${originalBeneficiaryName}`
+        : activeDist?.remarks || (isFlagged ? "Flagged for onsite replacement" : null);
+
+      const candidateBene = pendingRep?.replacementProgramBeneficiary?.beneficiary || null;
+      const candidateDep = candidateBene?.dependents?.[0] || null;
 
       return {
         id: pb.id,
         designatedNumber: pb.designatedNumber,
         fullName: pb.beneficiary.fullName,
         barangay: normalizedBrgy,
+        sitio: pb.beneficiary.sitio || null,
         tableNumber: pb.tableNumber || "Table 1",
         contactNumber: pb.beneficiary.contactNumber || "N/A",
         birthday: pb.beneficiary.birthday,
         status,
         isCompletedReplacement,
+        hasPendingReplacementApproval: Boolean(pendingRep),
+        pendingReplacement: pendingRep
+          ? {
+              id: pendingRep.id,
+              reason: pendingRep.reason,
+              initiatedAt: pendingRep.initiatedAt,
+              initiatedBy: pendingRep.initiatedBy?.fullName || "Field Coordinator",
+              originalBeneficiary: {
+                designatedNumber: pb.designatedNumber,
+                fullName: pb.beneficiary.fullName,
+                birthday: pb.beneficiary.birthday,
+                barangay: normalizedBrgy,
+                sitio: pb.beneficiary.sitio || "",
+              },
+              candidateBeneficiary: candidateBene
+                ? {
+                    fullName: candidateBene.fullName,
+                    birthday: candidateBene.birthday,
+                    sex: candidateBene.sex,
+                    barangay: candidateBene.barangay,
+                    sitio: candidateBene.sitio,
+                    contactNumber: candidateBene.contactNumber,
+                    idType: candidateBene.idType,
+                    idNumber: candidateBene.idNumber,
+                    dependentFullName: candidateDep?.fullName || "",
+                    dependentRelationship: candidateDep?.relationship || "",
+                    dependentBirthday: candidateDep?.birthday || "",
+                    dependentAge: candidateDep?.age ?? null,
+                    documents: candidateBene.documents || [],
+                  }
+                : null,
+            }
+          : null,
         originalBeneficiaryName,
         dependentFullName,
         distributedAt: activeDist?.distributedAt || null,
-        distributedBy: activeDist?.distributedBy?.fullName || null,
-        remarks: activeDist?.remarks || (isFlagged ? "Flagged for onsite replacement" : null),
+        distributedBy:
+          (isCompletedReplacement && approvedRep?.approvedBy?.fullName) ||
+          activeDist?.distributedBy?.fullName ||
+          null,
+        remarks: resolvedRemarks,
         qrToken: pb.qrCodes[0]?.publicToken || null,
       };
     });
@@ -146,6 +222,7 @@ export async function GET(request: Request) {
     const totalFlaggedReplacement = Object.values(brgyStats).reduce((acc, s) => acc + s.flaggedReplacement, 0);
     const totalDistributed = totalConfirmed;
     const totalPending = Object.values(brgyStats).reduce((acc, s) => acc + s.pending, 0);
+    const totalPendingApprovals = beneficiaryRoster.filter((r) => r.hasPendingReplacementApproval).length;
 
     const barangaysBreakdown = Object.entries(brgyStats).map(([name, stats]) => {
       const percentage = stats.total > 0 ? Math.round((stats.confirmed / stats.total) * 100) : 0;
@@ -184,6 +261,7 @@ export async function GET(request: Request) {
         totalConfirmed,
         totalPending,
         totalFlaggedReplacement,
+        totalPendingApprovals,
         distributionRate: totalBeneficiaries > 0 ? ((totalDistributed / totalBeneficiaries) * 100).toFixed(1) : "0",
         confirmationRate: totalBeneficiaries > 0 ? ((totalConfirmed / totalBeneficiaries) * 100).toFixed(1) : "0",
       },

@@ -23,7 +23,23 @@ export async function loadDoleReport(programId: string, draftOverride?: unknown)
   const [program, sourceEvent, draftEvent] = await Promise.all([
     prisma.program.findUnique({ where: { id: programId }, include: {
       workDays: { orderBy: { dayNumber: "asc" } },
-      programBeneficiaries: { where: { participationStatus: { in: ["ACTIVE", "ENROLLED", "FLAGGED_FOR_REPLACEMENT"] } }, include: { beneficiary: { include: { dependents: { orderBy: { createdAt: "asc" } } } }, attendanceRecords: true } },
+      programBeneficiaries: {
+        where: { participationStatus: { in: ["ACTIVE", "ENROLLED", "FLAGGED_FOR_REPLACEMENT"] } },
+        include: {
+          beneficiary: { include: { dependents: { orderBy: { createdAt: "asc" } } } },
+          attendanceRecords: true,
+          newReplacements: {
+            where: { status: "APPROVED" },
+            include: {
+              originalProgramBeneficiary: {
+                include: { beneficiary: { select: { fullName: true } } },
+              },
+            },
+            orderBy: { approvedAt: "desc" },
+            take: 1,
+          },
+        },
+      },
     } }),
     prisma.auditLog.findFirst({ where: { entityType: "PROGRAM_REPORT_MASTERLIST", entityId: programId }, orderBy: [{ createdAt: "desc" }, { id: "desc" }] }),
     prisma.auditLog.findFirst({ where: { entityType: "PROGRAM_REPORT_DRAFT", entityId: programId }, orderBy: [{ createdAt: "desc" }, { id: "desc" }] }),

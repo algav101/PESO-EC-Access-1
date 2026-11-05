@@ -233,10 +233,38 @@ export async function evaluatePersonTupadEligibility(params: {
 
   // 2. Check if already enrolled as an active Beneficiary or Dependent in the current program
   if (params.programId) {
+    // If checking the APPLICANT, verify they are not the exact same person as the Original Beneficiary being replaced
+    if (params.roleLabel === "APPLICANT" && params.excludeProgramBeneficiaryId) {
+      const origPbBeingReplaced = await prisma.programBeneficiary.findUnique({
+        where: { id: params.excludeProgramBeneficiaryId },
+        include: { beneficiary: true },
+      });
+      if (origPbBeingReplaced) {
+        const origParsed = parseEnteredFullName(origPbBeingReplaced.beneficiary.fullName);
+        if (
+          origParsed.fullName === combinedTargetName ||
+          (origParsed.lastName === lName && origParsed.firstName === fName)
+        ) {
+          return {
+            eligible: false,
+            disqualified: true,
+            inputName: params.fullName,
+            normalizedFullName: combinedTargetName,
+            parsedName: parsed,
+            source: "CURRENT_PROGRAM_BENEFICIARY",
+            barangay: origPbBeingReplaced.beneficiary.barangay || "Dingalan",
+            reason: `Not Eligible: Replacement Applicant cannot be the same person as the Original Beneficiary being replaced (${origPbBeingReplaced.beneficiary.fullName}).`,
+          };
+        }
+      }
+    }
+
+    // Note: When roleLabel === "DEPENDENT", excludeProgramBeneficiaryId is excluded so the Original Beneficiary
+    // being replaced (e.g. spouse/immediate family member) IS allowed to be declared as Dependent of the replacement!
     const existingActivePb = await prisma.programBeneficiary.findFirst({
       where: {
         programId: params.programId,
-        participationStatus: { in: ["ACTIVE", "ENROLLED"] },
+        participationStatus: { in: ["ACTIVE", "ENROLLED", "FLAGGED_FOR_REPLACEMENT"] },
         ...(params.excludeProgramBeneficiaryId ? { id: { not: params.excludeProgramBeneficiaryId } } : {}),
         OR: [
           { beneficiary: { fullName: { equals: combinedTargetName, mode: "insensitive" } } },
@@ -281,7 +309,7 @@ export async function evaluatePersonTupadEligibility(params: {
           programBeneficiaries: {
             some: {
               programId: params.programId,
-              participationStatus: { in: ["ACTIVE", "ENROLLED"] },
+              participationStatus: { in: ["ACTIVE", "ENROLLED", "FLAGGED_FOR_REPLACEMENT"] },
               ...(params.excludeProgramBeneficiaryId ? { id: { not: params.excludeProgramBeneficiaryId } } : {}),
             },
           },
@@ -291,7 +319,11 @@ export async function evaluatePersonTupadEligibility(params: {
         beneficiary: {
           include: {
             programBeneficiaries: {
-              where: { programId: params.programId, participationStatus: { in: ["ACTIVE", "ENROLLED"] } },
+              where: {
+                programId: params.programId,
+                participationStatus: { in: ["ACTIVE", "ENROLLED", "FLAGGED_FOR_REPLACEMENT"] },
+                ...(params.excludeProgramBeneficiaryId ? { id: { not: params.excludeProgramBeneficiaryId } } : {}),
+              },
               take: 1,
             },
           },
@@ -310,6 +342,31 @@ export async function evaluatePersonTupadEligibility(params: {
         source: "CURRENT_PROGRAM_DEPENDENT",
         reason: `Not Eligible: Already registered as a dependent of active Beneficiary #${parentPb?.designatedNumber || "?"} (${existingActiveDependent.beneficiary.fullName}) in this program.`,
       };
+    }
+
+    // Check if the Dependent is the Original Beneficiary being replaced, to show a helpful confirmation note
+    if (params.roleLabel === "DEPENDENT" && params.excludeProgramBeneficiaryId) {
+      const origPbBeingReplaced = await prisma.programBeneficiary.findUnique({
+        where: { id: params.excludeProgramBeneficiaryId },
+        include: { beneficiary: true },
+      });
+      if (origPbBeingReplaced) {
+        const origParsed = parseEnteredFullName(origPbBeingReplaced.beneficiary.fullName);
+        if (
+          origParsed.fullName === combinedTargetName ||
+          (origParsed.lastName === lName && origParsed.firstName === fName)
+        ) {
+          return {
+            eligible: true,
+            disqualified: false,
+            inputName: params.fullName,
+            normalizedFullName: combinedTargetName,
+            parsedName: parsed,
+            source: "CLEAN",
+            reason: `Qualified (Original Beneficiary as Dependent): ${origPbBeingReplaced.beneficiary.fullName} is the original beneficiary of Slot #${origPbBeingReplaced.designatedNumber} and is eligible to be declared as the Dependent of their replacement family member.`,
+          };
+        }
+      }
     }
   }
 

@@ -167,11 +167,14 @@ export function composeDoleReportData(program: any, source: Record<string, any>,
     const mergedBrgy = String(input.barangay || baseRow.barangay || "").trim().toUpperCase();
     const mergedCity = String(input.municipality || baseRow.municipality || program.municipality || "DINGALAN").trim().toUpperCase();
     const mergedProv = String(input.province || baseRow.province || program.province || "AURORA").trim().toUpperCase();
+    const replacedOriginalName = pb.newReplacements?.[0]?.originalProgramBeneficiary?.beneficiary?.fullName || "";
+    const defaultRemarks = replacedOriginalName ? `Replaced - ${replacedOriginalName}` : (input.remarks || baseRow.remarks || "");
     const row: DoleReportRow = {
       id: pb.id, designatedNumber: pb.designatedNumber, ...baseRow,
       dependentFirstName: depFirst, dependentMiddleName: depMiddle, dependentLastName: depLast, dependentExtensionName: depExt, dependentRelationship: dep.relationship || "", dependentAge: dep.age == null ? "" : String(dep.age),
       fullName: b.fullName, birthday: normalizeIsoDate(b.birthday), ...input,
       sitio: mergedSitio, barangay: mergedBrgy, municipality: mergedCity, province: mergedProv,
+      remarks: defaultRemarks,
       ...(draft.rows[pb.id] || {}),
       attendance: workDays.map((day: any) => {
         const record = pb.attendanceRecords.find((a: any) => a.workDayId === day.id && a.programId === program.id);

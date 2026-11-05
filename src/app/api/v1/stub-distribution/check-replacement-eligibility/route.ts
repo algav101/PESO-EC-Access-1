@@ -17,7 +17,10 @@ export async function POST(request: Request) {
       dependentBirthday = "",
       programId = "",
       originalProgramBeneficiaryId = "",
+      programBeneficiaryId = "",
     } = body || {};
+
+    const excludedPbId = originalProgramBeneficiaryId || programBeneficiaryId || null;
 
     if (!String(applicantFullName).trim() || !String(dependentFullName).trim()) {
       return NextResponse.json(
@@ -31,14 +34,14 @@ export async function POST(request: Request) {
         fullName: applicantFullName,
         birthday: applicantBirthday,
         programId: programId || null,
-        excludeProgramBeneficiaryId: originalProgramBeneficiaryId || null,
+        excludeProgramBeneficiaryId: excludedPbId,
         roleLabel: "APPLICANT",
       }),
       evaluatePersonTupadEligibility({
         fullName: dependentFullName,
         birthday: dependentBirthday,
         programId: programId || null,
-        excludeProgramBeneficiaryId: originalProgramBeneficiaryId || null,
+        excludeProgramBeneficiaryId: excludedPbId,
         roleLabel: "DEPENDENT",
       }),
     ]);

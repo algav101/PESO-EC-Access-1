@@ -34,6 +34,10 @@ import {
   StubReplacementWizardModal,
   type StubReplacementTarget,
 } from "@/components/field/StubReplacementWizardModal";
+import {
+  ReplacementApprovalModal,
+  type PendingReplacementAssessmentItem,
+} from "@/components/field/ReplacementApprovalModal";
 import { useAuth } from "@/context/AuthContext";
 import { useOffline } from "@/context/OfflineContext";
 import {
@@ -80,6 +84,9 @@ function StubDistributionContent() {
   const [birthdayPin, setBirthdayPin] = useState("");
   const [replacementTarget, setReplacementTarget] =
     useState<StubReplacementTarget | null>(null);
+  const [approvalTarget, setApprovalTarget] =
+    useState<PendingReplacementAssessmentItem | null>(null);
+  const [approvalNotice, setApprovalNotice] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [successResult, setSuccessResult] = useState<any | null>(null);
@@ -763,21 +770,21 @@ function StubDistributionContent() {
                 <span
                   className={`text-[10px] font-black uppercase tracking-wider ${
                     successResult.isFlagged
-                      ? "text-rose-700"
+                      ? "text-amber-700"
                       : "text-emerald-700"
                   }`}
                 >
                   {successResult.isFlagged
-                    ? "✓ REPLACEMENT & CONSENT VERIFIED"
+                    ? "⏳ SUBMITTED FOR ADMIN / PESO APPROVAL"
                     : "✓ AFFIRMED & DISTRIBUTED"}
                 </span>
                 <h2 className="text-base font-black text-slate-900">
                   {successResult.data?.fullName} (#
                   {successResult.data?.designatedNumber})
                 </h2>
-                {successResult.data?.originalBeneficiaryName && (
-                  <p className="text-[11px] font-bold text-rose-700">
-                    Replaced: {successResult.data.originalBeneficiaryName} •
+                {successResult.data?.candidateFullName && (
+                  <p className="text-[11px] font-bold text-amber-800 bg-amber-50 px-2.5 py-1 rounded-lg border border-amber-200 inline-block">
+                    Candidate: {successResult.data.candidateFullName} •
                     Dependent: {successResult.data.dependentFullName}
                   </p>
                 )}
@@ -1107,11 +1114,18 @@ function StubDistributionContent() {
                         <div className="font-bold text-slate-900">
                           {b.fullName}
                         </div>
-                        {b.originalBeneficiaryName && (
-                          <div className="text-[10px] font-bold text-rose-700">
+                        {b.isCompletedReplacement && b.originalBeneficiaryName && (
+                          <div className="text-[10px] font-bold text-emerald-800">
                             Replaced: {b.originalBeneficiaryName}
                           </div>
                         )}
+                        {b.hasPendingReplacementApproval &&
+                          b.pendingReplacement?.candidateBeneficiary && (
+                            <div className="text-[10px] font-bold text-amber-800">
+                              Pending Candidate:{" "}
+                              {b.pendingReplacement.candidateBeneficiary.fullName}
+                            </div>
+                          )}
                         {b.dependentFullName && (
                           <div className="text-[10px] text-slate-500">
                             Dependent: {b.dependentFullName}
@@ -1132,6 +1146,8 @@ function StubDistributionContent() {
                           className={`text-[10px] font-black uppercase px-2 py-0.5 rounded ${
                             b.isCompletedReplacement
                               ? "bg-purple-100 text-purple-800 border border-purple-200"
+                              : b.hasPendingReplacementApproval
+                              ? "bg-amber-100 text-amber-900 border border-amber-300"
                               : b.status === "CONFIRMED"
                               ? "bg-emerald-100 text-emerald-800"
                               : b.status === "FLAGGED_REPLACEMENT"
@@ -1140,7 +1156,9 @@ function StubDistributionContent() {
                           }`}
                         >
                           {b.isCompletedReplacement
-                            ? "✓ Replaced & Confirmed"
+                            ? "✓ Replaced & Approved"
+                            : b.hasPendingReplacementApproval
+                            ? "⏳ Pending PESO Approval"
                             : b.status === "CONFIRMED"
                             ? "✓ Confirmed"
                             : b.status === "FLAGGED_REPLACEMENT"
@@ -1149,8 +1167,15 @@ function StubDistributionContent() {
                         </span>
                       </td>
                       <td className="py-2.5 px-3">
-                        {b.status === "FLAGGED_REPLACEMENT" ||
-                        b.isCompletedReplacement ? (
+                        {b.isCompletedReplacement ? (
+                          <span
+                            className="inline-flex items-center px-2 py-0.5 rounded bg-emerald-50 border border-emerald-200 text-[11px] font-black text-emerald-900"
+                            title={b.remarks || ""}
+                          >
+                            {b.remarks ||
+                              `Replaced - ${b.originalBeneficiaryName || ""}`}
+                          </span>
+                        ) : b.status === "FLAGGED_REPLACEMENT" ? (
                           <div className="flex items-start space-x-1 max-w-xs">
                             <AlertTriangle className="w-3.5 h-3.5 text-rose-600 flex-shrink-0 mt-0.5" />
                             <span
@@ -1186,30 +1211,50 @@ function StubDistributionContent() {
                         )}
                       </td>
                       <td className="py-2.5 px-3 text-center">
-                        {!b.isCompletedReplacement &&
-                        b.status !== "CONFIRMED" ? (
-                          <button
-                            type="button"
-                            onClick={() =>
-                              openReplacementWizard({
-                                programId: selectedProgramId,
-                                programBeneficiaryId: b.id,
-                                designatedNumber: b.designatedNumber,
-                                fullName: b.fullName,
-                                barangay: b.barangay,
-                                tableNumber: b.tableNumber,
-                              })
-                            }
-                            className="inline-flex items-center space-x-1 px-2.5 py-1 bg-rose-600 hover:bg-rose-700 text-white font-bold text-[10px] rounded-lg shadow-sm transition whitespace-nowrap"
-                          >
-                            <span>Flag / Replace</span>
-                            <ArrowRight className="w-3 h-3" />
-                          </button>
-                        ) : (
-                          <span className="text-[10px] text-slate-300 font-mono">
-                            —
-                          </span>
-                        )}
+                        <div className="flex items-center justify-center gap-1.5">
+                          {b.hasPendingReplacementApproval &&
+                            b.pendingReplacement &&
+                            can("replacement.approve") && (
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  setApprovalTarget(b.pendingReplacement)
+                                }
+                                className="inline-flex items-center space-x-1 px-2.5 py-1 bg-gov-blue hover:bg-gov-light text-white font-black text-[10px] rounded-lg shadow-sm transition whitespace-nowrap"
+                              >
+                                <ShieldCheck className="w-3 h-3 text-gov-goldLight" />
+                                <span>Assess & Approve</span>
+                              </button>
+                            )}
+                          {!b.isCompletedReplacement &&
+                          b.status !== "CONFIRMED" ? (
+                            <button
+                              type="button"
+                              onClick={() =>
+                                openReplacementWizard({
+                                  programId: selectedProgramId,
+                                  programBeneficiaryId: b.id,
+                                  designatedNumber: b.designatedNumber,
+                                  fullName: b.fullName,
+                                  barangay: b.barangay,
+                                  tableNumber: b.tableNumber,
+                                })
+                              }
+                              className="inline-flex items-center space-x-1 px-2.5 py-1 bg-rose-600 hover:bg-rose-700 text-white font-bold text-[10px] rounded-lg shadow-sm transition whitespace-nowrap"
+                            >
+                              <span>
+                                {b.hasPendingReplacementApproval
+                                  ? "Update Request"
+                                  : "Flag / Replace"}
+                              </span>
+                              <ArrowRight className="w-3 h-3" />
+                            </button>
+                          ) : !b.hasPendingReplacementApproval ? (
+                            <span className="text-[10px] text-slate-300 font-mono">
+                              —
+                            </span>
+                          ) : null}
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -1234,6 +1279,18 @@ function StubDistributionContent() {
           });
           setScannedData(null);
           setBirthdayPin("");
+          if (selectedProgramId) fetchMonitoringData(selectedProgramId);
+        }}
+      />
+
+      {/* Admin & PESO Personnel Replacement Assessment & Approval Modal */}
+      <ReplacementApprovalModal
+        isOpen={Boolean(approvalTarget)}
+        item={approvalTarget}
+        onClose={() => setApprovalTarget(null)}
+        onProcessed={(_status, message) => {
+          setApprovalTarget(null);
+          setApprovalNotice(message);
           if (selectedProgramId) fetchMonitoringData(selectedProgramId);
         }}
       />

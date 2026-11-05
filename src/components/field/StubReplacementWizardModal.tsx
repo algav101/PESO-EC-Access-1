@@ -314,6 +314,7 @@ export function StubReplacementWizardModal({
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             programId: target.programId,
+            originalProgramBeneficiaryId: target.programBeneficiaryId,
             applicantFullName: applicantFullName.trim(),
             applicantBirthday: applicantBirthday.trim(),
             dependentFullName: dependentFullName.trim(),
@@ -773,12 +774,29 @@ export function StubReplacementWizardModal({
 
                 {/* Dependent Section */}
                 <div className="p-4 border border-slate-200 rounded-xl bg-white space-y-3 shadow-2xs">
-                  <div className="flex items-center space-x-2 border-b border-slate-100 pb-2">
-                    <Users className="w-4 h-4 text-gov-blue" />
-                    <h4 className="font-black text-slate-900 uppercase tracking-tight">
-                      B. Replacement&apos;s Dependent Details (Full Name Required)
-                    </h4>
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 pb-2">
+                    <div className="flex items-center space-x-2">
+                      <Users className="w-4 h-4 text-gov-blue" />
+                      <h4 className="font-black text-slate-900 uppercase tracking-tight">
+                        B. Replacement&apos;s Dependent Details (Full Name Required)
+                      </h4>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setDependentFullName(target.fullName.toUpperCase());
+                        invalidateEligibility();
+                      }}
+                      className="px-2.5 py-1 bg-blue-50 hover:bg-blue-100 text-gov-blue border border-blue-200 rounded-lg text-[10px] font-black transition self-start sm:self-auto"
+                      title="Use the original beneficiary as the dependent of the replacement (e.g. when replaced by spouse or immediate family)"
+                    >
+                      + Use Original Beneficiary ({target.fullName}) as Dependent
+                    </button>
                   </div>
+
+                  <p className="text-[11px] text-slate-500 bg-slate-50 p-2 rounded-lg border border-slate-200">
+                    If the original beneficiary (<strong>{target.fullName}</strong>) is being replaced by their spouse or immediate family member, you may declare the original beneficiary as the <strong>Dependent</strong> of the replacement applicant.
+                  </p>
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div className="sm:col-span-2">
@@ -1301,8 +1319,8 @@ export function StubReplacementWizardModal({
                 )}
                 <span>
                   {submitting
-                    ? "Verifying Consent & Saving Replacement..."
-                    : "Confirm Consent & Complete Replacement"}
+                    ? "Submitting Replacement for Approval..."
+                    : "Submit Replacement for Admin / PESO Approval"}
                 </span>
               </button>
             )}

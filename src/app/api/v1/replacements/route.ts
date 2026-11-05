@@ -23,13 +23,25 @@ export async function GET(request: Request) {
       include: {
         program: true,
         originalProgramBeneficiary: {
-          include: { beneficiary: true },
+          include: {
+            beneficiary: {
+              include: { dependents: true },
+            },
+          },
         },
         replacementProgramBeneficiary: {
-          include: { beneficiary: true, qrCodes: true },
+          include: {
+            beneficiary: {
+              include: {
+                dependents: true,
+                documents: true,
+              },
+            },
+            qrCodes: true,
+          },
         },
-        initiatedBy: { select: { fullName: true } },
-        approvedBy: { select: { fullName: true } },
+        initiatedBy: { select: { fullName: true, role: true } },
+        approvedBy: { select: { fullName: true, role: true } },
       },
       orderBy: { initiatedAt: "desc" },
     });
@@ -111,15 +123,17 @@ export async function POST(request: Request) {
       );
     }
 
+    const canApproveDirectly = hasPermission(user.role, "replacement.approve") || isAdminUser(user);
+    const replacedRemarks = `Replaced - ${originalPb.beneficiary.fullName}`;
+
     const result = await prisma.$transaction(async (tx) => {
-      // 1. Mark original program beneficiary as REPLACED (Preserves history!)
+      // 1. Mark original program beneficiary as REPLACED if approved directly, or FLAGGED_FOR_REPLACEMENT if pending
       await tx.programBeneficiary.update({
         where: { id: originalPb.id },
-        data: { participationStatus: "REPLACED" },
+        data: { participationStatus: canApproveDirectly ? "REPLACED" : "FLAGGED_FOR_REPLACEMENT" },
       });
 
-      // 2. Retain and transfer the original physical QR code to the new replacement beneficiary
-      // The physical printed card/image remains active and fixed to this designated number slot!
+      // 2. Retain and transfer the original physical QR code to the new replacement beneficiary once approved
       let activeQr = originalPb.qrCodes.find((q) => q.status === "ACTIVE") || originalPb.qrCodes[0];
 
       // 3. Create or find replacement beneficiary
@@ -156,7 +170,7 @@ export async function POST(request: Request) {
           data: {
             beneficiaryId: newBene.id,
             documentType: "ID_FRONT",
-            fileKey: `id_front_${newBene.id}`,
+            fileKey: idFrontFile.dataUrl || `id_front_${newBene.id}`,
             fileName: idFrontFile.name || "id_front.jpg",
             fileSize: idFrontFile.size || 1024,
             mimeType: idFrontFile.type || "image/jpeg",
@@ -171,7 +185,7 @@ export async function POST(request: Request) {
           data: {
             beneficiaryId: newBene.id,
             documentType: "ID_BACK",
-            fileKey: `id_back_${newBene.id}`,
+            fileKey: idBackFile.dataUrl || `id_back_${newBene.id}`,
             fileName: idBackFile.name || "id_back.jpg",
             fileSize: idBackFile.size || 1024,
             mimeType: idBackFile.type || "image/jpeg",
@@ -187,50 +201,51 @@ export async function POST(request: Request) {
           programId,
           beneficiaryId: newBene.id,
           designatedNumber: originalPb.designatedNumber,
-          participationStatus: "ACTIVE",
+          participationStatus: canApproveDirectly ? "ACTIVE" : "PENDING_APPROVAL",
           originalBeneficiary: false,
           tableNumber: originalPb.tableNumber,
           slotGroup: originalPb.slotGroup,
         },
       });
 
-      // 6. Re-bind the original physical QR code to the new active beneficiary slot
-      if (activeQr) {
-        await tx.qrCode.update({
-          where: { id: activeQr.id },
+      if (canApproveDirectly) {
+        // 6. Re-bind the original physical QR code to the new active beneficiary slot
+        if (activeQr) {
+          activeQr = await tx.qrCode.update({
+            where: { id: activeQr.id },
+            data: {
+              programBeneficiaryId: newPb.id,
+              status: "ACTIVE",
+              invalidatedAt: null,
+              invalidatedById: null,
+            },
+          });
+        } else {
+          const qrData = generateBeneficiaryToken(programId, originalPb.designatedNumber);
+          activeQr = await tx.qrCode.create({
+            data: {
+              programId,
+              programBeneficiaryId: newPb.id,
+              publicToken: qrData.publicToken,
+              tokenHash: qrData.tokenHash,
+              status: "ACTIVE",
+              generatedById: user.id,
+            },
+          });
+        }
+
+        // 7. Create affirmed StubDistribution record with remarks: "Replaced - <Original Beneficiary Name>"
+        await tx.stubDistribution.create({
           data: {
+            qrId: activeQr.id,
             programBeneficiaryId: newPb.id,
-            status: "ACTIVE",
-            invalidatedAt: null,
-            invalidatedById: null,
-          },
-        });
-      } else {
-        const qrData = generateBeneficiaryToken(programId, originalPb.designatedNumber);
-        await tx.qrCode.create({
-          data: {
-            programId,
-            programBeneficiaryId: newPb.id,
-            publicToken: qrData.publicToken,
-            tokenHash: qrData.tokenHash,
-            status: "ACTIVE",
-            generatedById: user.id,
+            distributedById: user.id,
+            verificationMethod: "ONSITE_REPLACEMENT",
+            status: "DISTRIBUTED",
+            remarks: replacedRemarks,
           },
         });
       }
-
-      // 7. Create affirmed StubDistribution record for the newly enrolled replacement beneficiary
-      const assignedQrId = activeQr?.id || "ONSITE_REPLACEMENT_QR";
-      await tx.stubDistribution.create({
-        data: {
-          qrId: assignedQrId,
-          programBeneficiaryId: newPb.id,
-          distributedById: user.id,
-          verificationMethod: "ONSITE_REPLACEMENT",
-          status: "DISTRIBUTED",
-          remarks: `Onsite replacement enrolled for slot #${originalPb.designatedNumber} (Replaced ${originalPb.beneficiary.fullName})`,
-        },
-      });
 
       // 8. Log replacement record
       const rep = await tx.beneficiaryReplacement.create({
@@ -240,9 +255,9 @@ export async function POST(request: Request) {
           replacementProgramBeneficiaryId: newPb.id,
           reason,
           initiatedById: user.id,
-          approvedById: isAdminUser(user) ? user.id : null,
-          approvedAt: isAdminUser(user) ? new Date() : null,
-          status: isAdminUser(user) ? "APPROVED" : "PENDING",
+          approvedById: canApproveDirectly ? user.id : null,
+          approvedAt: canApproveDirectly ? new Date() : null,
+          status: canApproveDirectly ? "APPROVED" : "PENDING",
         },
         include: {
           originalProgramBeneficiary: { include: { beneficiary: true } },
@@ -277,21 +292,39 @@ export async function PATCH(request: Request) {
   try {
     const user = await getCurrentUser(request);
     if (!user || !hasPermission(user.role, "replacement.approve")) {
-      return NextResponse.json({ error: "Forbidden: insufficient permissions to approve or reject replacements" }, { status: 403 });
+      return NextResponse.json(
+        { error: "Forbidden: Only Admin and PESO Personnel are authorized to assess and approve replacements." },
+        { status: 403 }
+      );
     }
 
-    const { id, replacementId, status } = await request.json();
+    const { id, replacementId, status, approvalRemarks } = await request.json();
     const targetId = id || replacementId;
 
     if (!targetId || !["APPROVED", "REJECTED"].includes(status)) {
-      return NextResponse.json({ error: "Replacement ID and valid status (APPROVED or REJECTED) are required" }, { status: 400 });
+      return NextResponse.json(
+        { error: "Replacement ID and valid status (APPROVED or REJECTED) are required" },
+        { status: 400 }
+      );
     }
 
     const existing = await prisma.beneficiaryReplacement.findUnique({
       where: { id: targetId },
       include: {
-        originalProgramBeneficiary: true,
-        replacementProgramBeneficiary: true,
+        originalProgramBeneficiary: {
+          include: {
+            beneficiary: true,
+            qrCodes: true,
+          },
+        },
+        replacementProgramBeneficiary: {
+          include: {
+            beneficiary: {
+              include: { dependents: true, documents: true },
+            },
+            qrCodes: true,
+          },
+        },
       },
     });
 
@@ -299,53 +332,172 @@ export async function PATCH(request: Request) {
       return NextResponse.json({ error: "Replacement record not found" }, { status: 404 });
     }
 
-    const updated = await prisma.$transaction(async (tx) => {
-      if (status === "REJECTED") {
-        // Restore original beneficiary to ACTIVE
-        await tx.programBeneficiary.update({
-          where: { id: existing.originalProgramBeneficiaryId },
-          data: { participationStatus: "ACTIVE" },
-        });
+    const originalBeneficiaryName = existing.originalProgramBeneficiary.beneficiary.fullName;
+    const replacedRemarks = `Replaced - ${originalBeneficiaryName}`;
 
-        // Mark replacement beneficiary as WITHDRAWN and transfer QR code back to original
-        if (existing.replacementProgramBeneficiaryId) {
+    const updated = await prisma.$transaction(
+      async (tx) => {
+        if (status === "APPROVED") {
+          if (!existing.replacementProgramBeneficiaryId || !existing.replacementProgramBeneficiary) {
+            throw new Error("Replacement candidate record is missing and cannot be approved.");
+          }
+
+          // 1. Mark Original ProgramBeneficiary as REPLACED
+          await tx.programBeneficiary.update({
+            where: { id: existing.originalProgramBeneficiaryId },
+            data: { participationStatus: "REPLACED" },
+          });
+
+          // 2. Activate Replacement ProgramBeneficiary on the same designatedNumber & tableNumber
           await tx.programBeneficiary.update({
             where: { id: existing.replacementProgramBeneficiaryId },
-            data: { participationStatus: "WITHDRAWN" },
-          });
-          await tx.qrCode.updateMany({
-            where: { programBeneficiaryId: existing.replacementProgramBeneficiaryId },
             data: {
-              programBeneficiaryId: existing.originalProgramBeneficiaryId,
-              status: "ACTIVE",
+              participationStatus: "ACTIVE",
+              designatedNumber: existing.originalProgramBeneficiary.designatedNumber,
+              tableNumber: existing.originalProgramBeneficiary.tableNumber,
+              slotGroup: existing.originalProgramBeneficiary.slotGroup,
             },
           });
-        }
-      }
 
-      return tx.beneficiaryReplacement.update({
-        where: { id: targetId },
-        data: {
-          status,
-          approvedById: user.id,
-          approvedAt: new Date(),
-        },
-        include: {
-          originalProgramBeneficiary: { include: { beneficiary: true } },
-          replacementProgramBeneficiary: { include: { beneficiary: true, qrCodes: true } },
-        },
-      });
-    });
+          // 3. Transfer / re-bind the slot's active QR code to the newly approved Replacement ProgramBeneficiary
+          let activeQr =
+            existing.originalProgramBeneficiary.qrCodes.find((q) => q.status === "ACTIVE") ||
+            existing.originalProgramBeneficiary.qrCodes[0] ||
+            existing.replacementProgramBeneficiary.qrCodes.find((q) => q.status === "ACTIVE") ||
+            existing.replacementProgramBeneficiary.qrCodes[0];
+
+          if (activeQr) {
+            activeQr = await tx.qrCode.update({
+              where: { id: activeQr.id },
+              data: {
+                programBeneficiaryId: existing.replacementProgramBeneficiaryId,
+                status: "ACTIVE",
+                invalidatedAt: null,
+                invalidatedById: null,
+              },
+            });
+          } else {
+            const qrData = generateBeneficiaryToken(
+              existing.programId,
+              existing.originalProgramBeneficiary.designatedNumber
+            );
+            activeQr = await tx.qrCode.create({
+              data: {
+                programId: existing.programId,
+                programBeneficiaryId: existing.replacementProgramBeneficiaryId,
+                publicToken: qrData.publicToken,
+                tokenHash: qrData.tokenHash,
+                status: "ACTIVE",
+                generatedById: user.id,
+              },
+            });
+          }
+
+          // 4. Update original beneficiary's FLAGGED_REPLACEMENT stub distribution remarks
+          await tx.stubDistribution.updateMany({
+            where: {
+              programBeneficiaryId: existing.originalProgramBeneficiaryId,
+              status: "FLAGGED_REPLACEMENT",
+            },
+            data: {
+              remarks: replacedRemarks,
+            },
+          });
+
+          // 5. Create/update DISTRIBUTED StubDistribution on the replacement beneficiary with remarks "Replaced - <Original Beneficiary Name>"
+          await tx.stubDistribution.deleteMany({
+            where: { programBeneficiaryId: existing.replacementProgramBeneficiaryId },
+          });
+          await tx.stubDistribution.create({
+            data: {
+              qrId: activeQr.id,
+              programBeneficiaryId: existing.replacementProgramBeneficiaryId,
+              distributedById: user.id,
+              verificationMethod: "ONSITE_REPLACEMENT_CONSENT",
+              status: "DISTRIBUTED",
+              remarks: replacedRemarks,
+            },
+          });
+        } else if (status === "REJECTED") {
+          // 1. Restore original beneficiary to ACTIVE
+          await tx.programBeneficiary.update({
+            where: { id: existing.originalProgramBeneficiaryId },
+            data: { participationStatus: "ACTIVE" },
+          });
+
+          // 2. Remove FLAGGED_REPLACEMENT StubDistribution on original beneficiary
+          await tx.stubDistribution.deleteMany({
+            where: {
+              programBeneficiaryId: existing.originalProgramBeneficiaryId,
+              status: "FLAGGED_REPLACEMENT",
+            },
+          });
+
+          // 3. Mark replacement candidate as WITHDRAWN and ensure QR code stays on original beneficiary
+          if (existing.replacementProgramBeneficiaryId) {
+            await tx.programBeneficiary.update({
+              where: { id: existing.replacementProgramBeneficiaryId },
+              data: { participationStatus: "WITHDRAWN" },
+            });
+            await tx.qrCode.updateMany({
+              where: { programBeneficiaryId: existing.replacementProgramBeneficiaryId },
+              data: {
+                programBeneficiaryId: existing.originalProgramBeneficiaryId,
+                status: "ACTIVE",
+              },
+            });
+          }
+        }
+
+        return tx.beneficiaryReplacement.update({
+          where: { id: targetId },
+          data: {
+            status,
+            approvedById: user.id,
+            approvedAt: new Date(),
+            ...(approvalRemarks
+              ? { reason: `${existing.reason} | Approval Note: ${approvalRemarks}` }
+              : {}),
+          },
+          include: {
+            originalProgramBeneficiary: { include: { beneficiary: true } },
+            replacementProgramBeneficiary: {
+              include: {
+                beneficiary: { include: { dependents: true, documents: true } },
+                qrCodes: true,
+              },
+            },
+            initiatedBy: { select: { fullName: true } },
+            approvedBy: { select: { fullName: true } },
+          },
+        });
+      },
+      { maxWait: 20000, timeout: 45000 }
+    );
 
     await logAudit({
       userId: user.id,
       action: status === "APPROVED" ? "REPLACEMENT_APPROVED" : "REPLACEMENT_REJECTED",
       entityType: "BENEFICIARY_REPLACEMENT",
       entityId: updated.id,
-      metadata: { status },
+      metadata: {
+        status,
+        designatedNumber: existing.originalProgramBeneficiary.designatedNumber,
+        originalBeneficiaryName,
+        replacementBeneficiaryName: existing.replacementProgramBeneficiary?.beneficiary?.fullName,
+        remarks: status === "APPROVED" ? replacedRemarks : "REJECTED",
+      },
     });
 
-    return NextResponse.json({ success: true, replacement: updated });
+    return NextResponse.json({
+      success: true,
+      replacement: updated,
+      remarks: status === "APPROVED" ? replacedRemarks : null,
+      message:
+        status === "APPROVED"
+          ? `Approved! Slot #${existing.originalProgramBeneficiary.designatedNumber} is now assigned to ${updated.replacementProgramBeneficiary?.beneficiary?.fullName} with Remarks: "${replacedRemarks}".`
+          : `Replacement request for Slot #${existing.originalProgramBeneficiary.designatedNumber} was rejected. Original beneficiary ${originalBeneficiaryName} remains active.`,
+    });
   } catch (error: any) {
     console.error("Replacement PATCH error:", error);
     return NextResponse.json({ error: error.message }, { status: 500 });
