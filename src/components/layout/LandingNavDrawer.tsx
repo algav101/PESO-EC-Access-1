@@ -3,7 +3,6 @@
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import {
-  Menu,
   X,
   Search,
   Home,
@@ -84,9 +83,9 @@ export function LandingNavDrawer() {
       category: "Core Mandate Services",
       links: [
         { title: "TUPAD Online Application & Registration", href: "/apply", icon: Sparkles, highlight: true, isExternal: false },
-        { title: "TUPAD Work Area & Assignment Lookup", href: "#work-assignment", icon: MapPin, highlight: true, badge: "DPA Verified", isExternal: false },
-        { title: "TUPAD Application Status Inquiry", href: "#inquiry", icon: FileCheck, isExternal: false },
-        { title: "365-Day Eligibility Rule Checker", href: "/restrictions/checker", icon: ShieldCheck, isExternal: false },
+        { title: "TUPAD Application Status Inquiry", href: "/apply/inquiry", icon: FileCheck, isExternal: false },
+        { title: "TUPAD Work Area Assignment", href: "/my-assignment/inquiry", icon: MapPin, isExternal: false },
+        { title: "365-Day Eligibility Rule Checker", href: "/restrictions/checker", icon: ShieldCheck, highlight: true, isExternal: false },
         { title: "Active Work Programs Hub", href: "#programs", icon: Briefcase, isExternal: false },
         { title: "DAMA E-Trabaho Job Matching", href: "#", icon: Globe, status: "Under Dev", isExternal: false },
         { title: "Technical Skills Accreditation", href: "#", icon: FileText, status: "Future Dev", isExternal: false },
@@ -113,7 +112,7 @@ export function LandingNavDrawer() {
     {
       category: "Ugnayan at Sumbong Desk",
       links: [
-        { title: "Direct Citizen Message & Feedback Desk", href: "#inquiry-form", icon: MessageSquare, isExternal: false },
+        { title: "Direct Citizen Message & Feedback Desk", href: "/apply/inquiry#message", icon: MessageSquare, isExternal: false },
         { title: "Staff & Coordinator Terminal Log In", href: "/login", icon: Lock, highlight: true, isExternal: false },
       ],
     },
@@ -133,27 +132,12 @@ export function LandingNavDrawer() {
       {/* Primary Navigation Bar Matching Screenshot */}
       <nav className="sticky top-0 z-40 bg-slate-900 text-white shadow-md border-b-2 border-emerald-500" data-purpose="primary-navigation">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-between gap-2 h-14 sm:h-16">
-          {/* Left: Drawer Menu Trigger & e PESO Logo */}
+          {/* Left: e PESO Logo */}
           <div className="flex items-center gap-3 sm:gap-4 shrink-0">
-            {/* Green Popping Drawer Trigger Button */}
-            <button
-              onClick={() => setIsOpen(true)}
-              aria-controls="portal-sidebar-drawer"
-              aria-expanded={isOpen}
-              className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-500 text-white text-xs sm:text-sm font-bold px-3 sm:px-4 py-2 rounded-lg shadow transition-all transform active:scale-95 shrink-0 focus:outline-none focus:ring-2 focus:ring-emerald-400 ring-offset-2 ring-offset-slate-900"
-              type="button"
-            >
-              <Menu className="w-5 h-5" />
-              <span>Narito ang mga Serbisyo ng PESO</span>
-              <span className="bg-emerald-800 text-[10px] px-1.5 py-0.5 rounded font-mono uppercase tracking-wide hidden sm:inline-block">
-                Menu
-              </span>
-            </button>
-
             {/* e PESO access logo mark */}
             <div className="flex items-center shrink-0 pl-1">
               <img
-                src="https://lh3.googleusercontent.com/aida-public/AB6AXuAtqq1AnBWH-IzGl0TscldgxBJ_eyEGCS0nd9WZmSFUVAf4L7caXSH1ql5LKwwNGYrQxSDRH8ctQQlAJtTQhTf0YcatJbBY-2WCk4q-2-B7xqHWzGcNbALIlc8_2AjPiM6XNqJz1SKhth4ueruC9B4xKn_oypFD1xnFXZLL5fKWRPe4ra1UzHRCbkBmdowTklgFaPj6KVn3sY2Ch2nnAwbYsNAvjA4sYP5gfObxzMBHZJDJHGdtgOTN8yubzq8xruwNxGk"
+                src="/images/peso-eccess-chrome-emblem.png?v=ffeb0acf"
                 alt="e PESO access Logo"
                 className="h-8 sm:h-10 w-auto object-contain transition-transform hover:scale-105"
               />

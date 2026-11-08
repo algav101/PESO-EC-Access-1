@@ -150,9 +150,9 @@
     "semantic_hash": ""
   },
   "next.config.mjs": {
-    "mtime": 1793176235.0024683,
-    "seen": 1793176879.305742,
-    "ast_hash": "30cd6b5e8abcc23e8c73d539937489a3",
+    "mtime": 1793783890.9790783,
+    "seen": 1794118658.0864797,
+    "ast_hash": "fc9f23aede1a91b760ab6b56245aa04a",
     "semantic_hash": ""
   },
   "package.json": {
@@ -654,9 +654,9 @@
     "semantic_hash": ""
   },
   "src/app/api/v1/beneficiaries/import/commit/route.ts": {
-    "mtime": 1793780228.202715,
-    "seen": 1793781390.4938612,
-    "ast_hash": "1bef9c63d05df113557db70e85fba70f",
+    "mtime": 1793843820.3496642,
+    "seen": 1794118658.0916085,
+    "ast_hash": "06b20167678d65a74fb0b3b1af38eb87",
     "semantic_hash": ""
   },
   "src/app/api/v1/beneficiaries/import/preview/route.ts": {
@@ -672,9 +672,9 @@
     "semantic_hash": ""
   },
   "src/app/api/v1/field/qr-pass/route.ts": {
-    "mtime": 1793765479.2523775,
-    "seen": 1793766075.1085238,
-    "ast_hash": "549d7561b2edf3c2753551fedea526c2",
+    "mtime": 1793843523.24569,
+    "seen": 1794118658.0917773,
+    "ast_hash": "c8866507554e69b0d0bd867110bfd395",
     "semantic_hash": ""
   },
   "src/app/api/v1/health/route.ts": {
@@ -882,15 +882,15 @@
     "semantic_hash": ""
   },
   "src/app/api/v1/replacements/route.ts": {
-    "mtime": 1793171874.0089054,
-    "seen": 1793172745.378414,
-    "ast_hash": "59ff4bed27ffcc6eb0e1e2207516124d",
+    "mtime": 1793859293.5585668,
+    "seen": 1794118658.0938714,
+    "ast_hash": "f0ba01ae9100bf1ab290df4dddfa5098",
     "semantic_hash": ""
   },
   "src/app/api/v1/reports/export/route.ts": {
-    "mtime": 1793171874.0089054,
-    "seen": 1793172745.3784144,
-    "ast_hash": "73b9a1bf0ee1d1bf71016fcda29e5e7f",
+    "mtime": 1793858441.9388492,
+    "seen": 1794118658.0938723,
+    "ast_hash": "9ca68236c5bf80da1052bf73054a69eb",
     "semantic_hash": ""
   },
   "src/app/api/v1/restrictions/import/route.ts": {
@@ -918,15 +918,15 @@
     "semantic_hash": ""
   },
   "src/app/api/v1/stub-distribution/flag-replacement/route.ts": {
-    "mtime": 1793171874.0256581,
-    "seen": 1793172745.3784165,
-    "ast_hash": "df54b6c7ec263e32b952c849849c438a",
+    "mtime": 1793854837.818884,
+    "seen": 1794118658.0941296,
+    "ast_hash": "249ac145d8c2b5ecb20cf14ae2773ce7",
     "semantic_hash": ""
   },
   "src/app/api/v1/stub-distribution/monitoring/route.ts": {
-    "mtime": 1793171874.0256581,
-    "seen": 1793172745.3784173,
-    "ast_hash": "ce2ef3e048a51c3799835271b738d717",
+    "mtime": 1793854837.9008002,
+    "seen": 1794118658.0941308,
+    "ast_hash": "b637449adff97d8e610a5b4d27df635d",
     "semantic_hash": ""
   },
   "src/app/api/v1/stub-distribution/scan/route.ts": {
@@ -1032,9 +1032,9 @@
     "semantic_hash": ""
   },
   "src/app/field/stub-distribution/page.tsx": {
-    "mtime": 1793766027.343986,
-    "seen": 1793766075.1116111,
-    "ast_hash": "65b81858bfe92db4437a8d30344f6033",
+    "mtime": 1793854837.9574473,
+    "seen": 1794118658.0952215,
+    "ast_hash": "36fbdaaeab0039a2899de38cda7cf64c",
     "semantic_hash": ""
   },
   "src/app/field/work-program/page.tsx": {
@@ -1056,9 +1056,9 @@
     "semantic_hash": ""
   },
   "src/app/login/page.tsx": {
-    "mtime": 1793171874.0378222,
-    "seen": 1793172745.3784304,
-    "ast_hash": "f5f1d1fc9f254f58ee2df7202665f77f",
+    "mtime": 1794124538.7057116,
+    "seen": 1794124585.2853334,
+    "ast_hash": "59bf1c84852abeba6faaf519eb2f2b06",
     "semantic_hash": ""
   },
   "src/app/migrants/balik-pinas/page.tsx": {
@@ -1092,9 +1092,9 @@
     "semantic_hash": ""
   },
   "src/app/page.tsx": {
-    "mtime": 1793171874.041823,
-    "seen": 1793172745.3784335,
-    "ast_hash": "dde038ea686c1b53e88d53d6784ded49",
+    "mtime": 1794124097.1977377,
+    "seen": 1794124103.7598193,
+    "ast_hash": "7792afb95ca2ae4d0404685ce6065386",
     "semantic_hash": ""
   },
   "src/app/programs/[id]/import/page.tsx": {
@@ -1134,21 +1134,21 @@
     "semantic_hash": ""
   },
   "src/app/replacements/page.tsx": {
-    "mtime": 1793171874.0422177,
-    "seen": 1793172745.3784368,
-    "ast_hash": "eb3ab0cfe77df920d94313fbc316d724",
+    "mtime": 1793859293.7275636,
+    "seen": 1794118658.0961232,
+    "ast_hash": "af51570b2291b14483d5e9b0e87426a3",
     "semantic_hash": ""
   },
   "src/app/reports/page.tsx": {
-    "mtime": 1793780428.5661564,
-    "seen": 1793781390.4992115,
-    "ast_hash": "72495fd0b513f993be831e88b467efc4",
+    "mtime": 1793859293.7722895,
+    "seen": 1794118658.0961244,
+    "ast_hash": "43800f1d9a0c2fd699aa09e076d014bc",
     "semantic_hash": ""
   },
   "src/app/restrictions/checker/page.tsx": {
-    "mtime": 1793171874.0422177,
-    "seen": 1793172745.378438,
-    "ast_hash": "cee4b0692feb311cf5d2dea6b16785ff",
+    "mtime": 1794118598.4642537,
+    "seen": 1794118658.0961251,
+    "ast_hash": "6d641cc6f80e24435258d2957ca807a4",
     "semantic_hash": ""
   },
   "src/app/restrictions/page.tsx": {
@@ -1260,9 +1260,9 @@
     "semantic_hash": ""
   },
   "src/components/field/FieldQrPassGeneratorCard.tsx": {
-    "mtime": 1793765479.2523775,
-    "seen": 1793766075.1139653,
-    "ast_hash": "57190ef62ef740f6fb8343aeea2ffd3a",
+    "mtime": 1793843523.2972207,
+    "seen": 1794118658.0973442,
+    "ast_hash": "45630502cdea50f249d86d5fabc8e2e8",
     "semantic_hash": ""
   },
   "src/components/layout/BottomNav.tsx": {
@@ -1272,33 +1272,33 @@
     "semantic_hash": ""
   },
   "src/components/layout/ClientLayout.tsx": {
-    "mtime": 1793261585.859453,
-    "seen": 1793261602.0997498,
-    "ast_hash": "fc680bac6ea6e8790ddaa594088b1f92",
+    "mtime": 1794121473.1407716,
+    "seen": 1794121507.0788293,
+    "ast_hash": "1f061bd95b6750765f9f74a5498631c6",
     "semantic_hash": ""
   },
   "src/components/layout/LandingNavDrawer.tsx": {
-    "mtime": 1793171874.0520966,
-    "seen": 1793172745.378449,
-    "ast_hash": "ab197885ed35b103bcd19e1c24482d86",
+    "mtime": 1794123583.4312396,
+    "seen": 1794123604.5123546,
+    "ast_hash": "1d5ed3d21d0f175589166dc20f7fa17f",
     "semantic_hash": ""
   },
   "src/components/layout/Navbar.tsx": {
-    "mtime": 1793261585.859453,
-    "seen": 1793261602.0998013,
-    "ast_hash": "66f5ec7a9c5d2d3124ea6f44ba30e777",
+    "mtime": 1794123583.4312396,
+    "seen": 1794123604.5123563,
+    "ast_hash": "395e795ab0a54284addd38db2e60d04e",
     "semantic_hash": ""
   },
   "src/components/layout/PesoLogo.tsx": {
-    "mtime": 1793171874.0520966,
-    "seen": 1793172745.37845,
-    "ast_hash": "849b977df4ec04c6e388bb123d5d06cb",
+    "mtime": 1794121132.7278488,
+    "seen": 1794121150.7922716,
+    "ast_hash": "5e2d4b6cd7de06584ab46c30237753b7",
     "semantic_hash": ""
   },
   "src/components/layout/Sidebar.tsx": {
-    "mtime": 1793780428.5821435,
-    "seen": 1793781390.5009096,
-    "ast_hash": "42f3dd680dea172c661bd5b522a730b6",
+    "mtime": 1794123583.4312396,
+    "seen": 1794123604.5124202,
+    "ast_hash": "7fd1346df76084149003190bab3b8b34",
     "semantic_hash": ""
   },
   "src/components/programs/DeleteProgramModal.tsx": {
@@ -1326,9 +1326,9 @@
     "semantic_hash": ""
   },
   "src/components/public/PesoOrganizationalChart.tsx": {
-    "mtime": 1793171874.0520966,
-    "seen": 1793172745.378453,
-    "ast_hash": "dc5d002ef45c4cb01c54f23fcf37a4c1",
+    "mtime": 1793873279.3200524,
+    "seen": 1794118658.0979466,
+    "ast_hash": "22558ac882c0cc9d9b98cd7edb0acd1b",
     "semantic_hash": ""
   },
   "src/components/public/PublicInquiryMessageForm.tsx": {
@@ -1344,15 +1344,15 @@
     "semantic_hash": ""
   },
   "src/components/public/PublicWorkAssignmentLookupCard.tsx": {
-    "mtime": 1793171874.0520966,
-    "seen": 1793172745.3784544,
-    "ast_hash": "fa8e4089fc96ee5655ceca1ab7b99a5a",
+    "mtime": 1794119636.0360315,
+    "seen": 1794119680.125057,
+    "ast_hash": "df1db1e7f32d71671251c1e3ebb81fa8",
     "semantic_hash": ""
   },
   "src/components/scanner/QrScannerModal.tsx": {
-    "mtime": 1793171874.0520966,
-    "seen": 1793172745.378455,
-    "ast_hash": "0fb8c620206dca572fe7e246efa0fbf6",
+    "mtime": 1793870044.088583,
+    "seen": 1794118658.0981421,
+    "ast_hash": "753e59d66e79136ae7e9f1492b7dbc5a",
     "semantic_hash": ""
   },
   "src/components/stubs/ETupadCard.tsx": {
@@ -1422,9 +1422,9 @@
     "semantic_hash": ""
   },
   "src/lib/application-storage.ts": {
-    "mtime": 1793172625.865672,
-    "seen": 1793172745.378461,
-    "ast_hash": "bec06234eed9b50cc35ba107baf2ff3b",
+    "mtime": 1793859293.8056047,
+    "seen": 1794118658.0987945,
+    "ast_hash": "a7c097cb782647331b3f6a69889f678a",
     "semantic_hash": ""
   },
   "src/lib/audit.ts": {
@@ -1452,15 +1452,15 @@
     "semantic_hash": ""
   },
   "src/lib/excel-exporter.ts": {
-    "mtime": 1793171874.0651202,
-    "seen": 1793172745.378464,
-    "ast_hash": "daafa3215f728eb1a3617aa610b8fd4b",
+    "mtime": 1793858892.7878845,
+    "seen": 1794118658.099133,
+    "ast_hash": "fa1143d62113f9b96ddeebf943fd70bc",
     "semantic_hash": ""
   },
   "src/lib/excel-importer.ts": {
-    "mtime": 1793780511.0312982,
-    "seen": 1793781390.5025563,
-    "ast_hash": "4d2d0d04d190a729d55a544c17ed112b",
+    "mtime": 1793786218.540479,
+    "seen": 1794118658.0991337,
+    "ast_hash": "abe9138a886a5036ac17d25b942f13ea",
     "semantic_hash": ""
   },
   "src/lib/ocr/application-id-mapper.ts": {
@@ -1668,9 +1668,9 @@
     "semantic_hash": ""
   },
   "vercel.json": {
-    "mtime": 1793171874.073728,
-    "seen": 1793172745.3784819,
-    "ast_hash": "ef65b7e78adc6e59198d4ed2478ed814",
+    "mtime": 1793784120.8745077,
+    "seen": 1794118658.1026523,
+    "ast_hash": "b0885bf1cd0aae6f066101fceefd5924",
     "semantic_hash": ""
   },
   "DESIGN.md": {
@@ -1944,9 +1944,9 @@
     "semantic_hash": ""
   },
   "src/lib/masterlist-bulk-updates.ts": {
-    "mtime": 1793755810.7899332,
-    "seen": 1793756495.255429,
-    "ast_hash": "11438f0c0b517b51ef0ed2924fa9d86b",
+    "mtime": 1793842733.8849075,
+    "seen": 1794118658.0992477,
+    "ast_hash": "517db8ebe8a8805da4fd2e41b1f60209",
     "semantic_hash": ""
   },
   "test/test-import-response.mjs": {
@@ -1962,9 +1962,9 @@
     "semantic_hash": ""
   },
   "test/test-masterlist-import-postgres.mjs": {
-    "mtime": 1793780886.8286316,
-    "seen": 1793781390.5050106,
-    "ast_hash": "c6514af1c0e6119dd698cb8e79ae478b",
+    "mtime": 1793843845.159886,
+    "seen": 1794118658.1014602,
+    "ast_hash": "c34339b8ac7a22e1c0e6ef2fa145f485",
     "semantic_hash": ""
   },
   "src/components/applications/IdCameraCapture.tsx": {
@@ -2004,9 +2004,9 @@
     "semantic_hash": ""
   },
   "src/lib/program-qr-generation.ts": {
-    "mtime": 1793765251.060362,
-    "seen": 1793766075.1166806,
-    "ast_hash": "c4c5120c589ea788a66ef0487ce4b859",
+    "mtime": 1793843523.3384013,
+    "seen": 1794118658.0998378,
+    "ast_hash": "b3cae0fb4c8df985d7e3d60647fa4db0",
     "semantic_hash": ""
   },
   "src/lib/program-qr-slot.ts": {
@@ -2052,9 +2052,9 @@
     "semantic_hash": ""
   },
   "src/app/api/v1/programs/[id]/reports/route.ts": {
-    "mtime": 1793780886.8276305,
-    "seen": 1793781390.4950464,
-    "ast_hash": "73852df09905b44a3ad5e9510fa63d4a",
+    "mtime": 1793784120.7196572,
+    "seen": 1794118658.0927393,
+    "ast_hash": "c2717bf52f2104e1a766e74cdd1cee56",
     "semantic_hash": ""
   },
   "src/components/reports/DoleReportsPanel.tsx": {
@@ -2070,21 +2070,21 @@
     "semantic_hash": ""
   },
   "src/lib/dole-report-data.ts": {
-    "mtime": 1793780836.9996414,
-    "seen": 1793781390.502493,
-    "ast_hash": "7a2a106b3006b5485614bc3f3581de83",
+    "mtime": 1793854335.3672829,
+    "seen": 1794118658.0991297,
+    "ast_hash": "8db5a0303389e03006896cf83a75a099",
     "semantic_hash": ""
   },
   "src/lib/dole-report-service.ts": {
-    "mtime": 1793780304.6719382,
-    "seen": 1793781390.5024939,
-    "ast_hash": "7ca70ac9e5dc427a36c61ad0dcd3c73e",
+    "mtime": 1793854838.052699,
+    "seen": 1794118658.0991309,
+    "ast_hash": "d91310957bfe6b75fb2d9c3dcf7e241b",
     "semantic_hash": ""
   },
   "src/lib/dole-report-xml.ts": {
-    "mtime": 1793781298.9749713,
-    "seen": 1793781390.5024948,
-    "ast_hash": "ef7d54edac8aabbfd2a83be07fde87c7",
+    "mtime": 1793784120.8405416,
+    "seen": 1794118658.0991318,
+    "ast_hash": "eb803d26a7905c83b8fa0864600641e1",
     "semantic_hash": ""
   },
   "test/test-dole-reports-browser.mjs": {
@@ -2103,6 +2103,198 @@
     "mtime": 1793781373.7202294,
     "seen": 1793781390.5065098,
     "ast_hash": "017d69e407e5d1f65626b1e767ad397c",
+    "semantic_hash": ""
+  },
+  "src/app/api/v1/reports/flagged-replacements/route.ts": {
+    "mtime": 1793859293.6082845,
+    "seen": 1794118658.0938735,
+    "ast_hash": "d653da83314ac1dd070539fc7a810b24",
+    "semantic_hash": ""
+  },
+  "src/app/api/v1/stub-distribution/check-replacement-eligibility/route.ts": {
+    "mtime": 1793854837.7725122,
+    "seen": 1794118658.0941284,
+    "ast_hash": "d01e99de41f761b5635aacace67a4f72",
+    "semantic_hash": ""
+  },
+  "src/components/field/ReplacementApprovalModal.tsx": {
+    "mtime": 1793854534.7232008,
+    "seen": 1794118658.0973454,
+    "ast_hash": "d6a902dfcda1dbe34148d6461b40a0ff",
+    "semantic_hash": ""
+  },
+  "src/components/field/StubReplacementWizardModal.tsx": {
+    "mtime": 1793854838.008394,
+    "seen": 1794118658.0973463,
+    "ast_hash": "b0dc25f17b55dcedebcc9dc752e7708a",
+    "semantic_hash": ""
+  },
+  "src/components/public/PesoSystemModulesFlipCards.tsx": {
+    "mtime": 1794121473.1397724,
+    "seen": 1794121507.0798209,
+    "ast_hash": "6d229ae58de5bdf21589479db3fb4a8f",
+    "semantic_hash": ""
+  },
+  "src/components/public/TupadEligibilityChecker.tsx": {
+    "mtime": 1794119037.7479846,
+    "seen": 1794119056.1274133,
+    "ast_hash": "d103f47a09debe3095e6a3d44b34ac24",
+    "semantic_hash": ""
+  },
+  "src/components/reports/PrintableReplacementMasterlistModal.tsx": {
+    "mtime": 1793859292.1392756,
+    "seen": 1794118658.0981412,
+    "ast_hash": "9321eaaf39565d84786c46645d50301c",
+    "semantic_hash": ""
+  },
+  "src/lib/replacement-eligibility.ts": {
+    "mtime": 1793854838.0841293,
+    "seen": 1794118658.1000657,
+    "ast_hash": "de417078434a6afc1f1dac1a0f06f429",
+    "semantic_hash": ""
+  },
+  "test/test-landing-eligibility-browser.mjs": {
+    "mtime": 1794124119.822835,
+    "seen": 1794124147.286863,
+    "ast_hash": "d92aae3e487fcf5122d4e6eac5f990a5",
+    "semantic_hash": ""
+  },
+  "test/test-stub-replacement-postgres.mjs": {
+    "mtime": 1793851042.5667343,
+    "seen": 1794118658.1022196,
+    "ast_hash": "bd154665496452a7506e7c0a3f019cb1",
+    "semantic_hash": ""
+  },
+  "public/images/modules/tupad/module-01-ec-tupad-official-graphic.jpg": {
+    "mtime": 1793944569.5512931,
+    "seen": 1794118658.1035433,
+    "ast_hash": "faf3e7df7e25af6e7f86446d97707bef",
+    "semantic_hash": ""
+  },
+  "public/images/modules/tupad/module-01-tupad-banner.png": {
+    "mtime": 1793944569.5512931,
+    "seen": 1794118658.103544,
+    "ast_hash": "faf3e7df7e25af6e7f86446d97707bef",
+    "semantic_hash": ""
+  },
+  "public/images/modules/tupad/peso-eaccess-emblem.png": {
+    "mtime": 1793934312.9583223,
+    "seen": 1794118658.103545,
+    "ast_hash": "20b7f9082bea69af1165b7a2529b7773",
+    "semantic_hash": ""
+  },
+  "public/images/modules/tupad/tupad-hand-logo.jpg": {
+    "mtime": 1793934312.9577856,
+    "seen": 1794118658.1035457,
+    "ast_hash": "fd282f558bd0ca26b7bfd79d8a82015a",
+    "semantic_hash": ""
+  },
+  "public/images/modules/tupad/tupad-official-qr-card-reference.png": {
+    "mtime": 1793939142.6507304,
+    "seen": 1794118658.1035461,
+    "ast_hash": "4f3afd838c30e9a449c0e80ea98ee76c",
+    "semantic_hash": ""
+  },
+  "public/images/modules/tupad/tupad-qr-scanning.jpg": {
+    "mtime": 1793934312.9595087,
+    "seen": 1794118658.1035469,
+    "ast_hash": "656bbfc8ed191adbdae2cf82387a933e",
+    "semantic_hash": ""
+  },
+  "public/images/modules/tupad/tupad-worker-planting.jpg": {
+    "mtime": 1793934312.9589949,
+    "seen": 1794118658.1035476,
+    "ast_hash": "859044474a94d98c72d0f2f11d2c5035",
+    "semantic_hash": ""
+  },
+  "public/images/peso-organizational-structure.jpg": {
+    "mtime": 1793871965.3511772,
+    "seen": 1794118658.1037147,
+    "ast_hash": "5bb71b6437503e199226692be113ba60",
+    "semantic_hash": ""
+  },
+  "public/images/peso-organizational-structure.png": {
+    "mtime": 1793871965.3004484,
+    "seen": 1794118658.103716,
+    "ast_hash": "186e97559623cbeea909e167e97be85f",
+    "semantic_hash": ""
+  },
+  "src/app/my-assignment/inquiry/page.tsx": {
+    "mtime": 1794119636.0360315,
+    "seen": 1794119680.1217816,
+    "ast_hash": "3d1915cd72bd681a2ea5a39478dfc2a6",
+    "semantic_hash": ""
+  },
+  "test/test-navbar-landing-link-browser.mjs": {
+    "mtime": 1794123583.4312396,
+    "seen": 1794123604.5174882,
+    "ast_hash": "1514ec63154caa3207b52b5408dc2fa9",
+    "semantic_hash": ""
+  },
+  "public/images/peso-eccess-chrome-emblem.png": {
+    "mtime": 1794120814.7673414,
+    "seen": 1794121150.8001242,
+    "ast_hash": "8179e5d00e24e3272f36cefd7ae641a3",
+    "semantic_hash": ""
+  },
+  "src/app/apply/inquiry/page.tsx": {
+    "mtime": 1794121473.1417706,
+    "seen": 1794121507.0737467,
+    "ast_hash": "1d24c9f9cd1b916878b08741e36c8356",
+    "semantic_hash": ""
+  },
+  "src/components/public/FacebookUpdatesSection.tsx": {
+    "mtime": 1794122438.1581204,
+    "seen": 1794122500.247434,
+    "ast_hash": "4dbe19be3de4eb48e2ac475fefe9004d",
+    "semantic_hash": ""
+  },
+  "src/lib/facebook-page.ts": {
+    "mtime": 1794122438.1581204,
+    "seen": 1794122500.2495685,
+    "ast_hash": "e353e0ebd780bb33d8fae5aaae46b370",
+    "semantic_hash": ""
+  },
+  "test/test-facebook-page.mjs": {
+    "mtime": 1794122438.1591184,
+    "seen": 1794122500.2516384,
+    "ast_hash": "90b508e98e75c53cdd283093d5372639",
+    "semantic_hash": ""
+  },
+  "test/test-facebook-autorefresh-browser.mjs": {
+    "mtime": 1794122511.2542746,
+    "seen": 1794122529.6538486,
+    "ast_hash": "6e76336e6825b4010e324079d6dc173b",
+    "semantic_hash": ""
+  },
+  "docs/imagegen/bagong-pilipinas-prompt.md": {
+    "mtime": 1794124097.1977377,
+    "seen": 1794124103.7714355,
+    "ast_hash": "62574b7c279dd7842ae1b6656ff3d6f0",
+    "semantic_hash": ""
+  },
+  "public/images/bagong-pilipinas-transparent.png": {
+    "mtime": 1794124045.5244644,
+    "seen": 1794124103.7720587,
+    "ast_hash": "e6778c7eeb155d62edec51744750b293",
+    "semantic_hash": ""
+  },
+  "test/test-login-branding-browser.mjs": {
+    "mtime": 1794124579.452494,
+    "seen": 1794124585.2937644,
+    "ast_hash": "0f2f5c0f9a71df49cca8cc003dc2c9c8",
+    "semantic_hash": ""
+  },
+  "public/images/dingalan-official-seal.jpg": {
+    "mtime": 1792054362.3149405,
+    "seen": 1794124585.2963457,
+    "ast_hash": "871c002424a1c3336d6500bf4758843e",
+    "semantic_hash": ""
+  },
+  "public/images/peso-official-seal.png": {
+    "mtime": 1794124365.1702354,
+    "seen": 1794124585.2971036,
+    "ast_hash": "d38e463f2a8b98face2daf8a3389800e",
     "semantic_hash": ""
   }
 }

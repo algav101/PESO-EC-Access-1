@@ -25,7 +25,7 @@ import {
   CupSoda,
 } from "lucide-react";
 
-export function PublicWorkAssignmentLookupCard() {
+export function PublicWorkAssignmentLookupCard({ collapsible = true }: { collapsible?: boolean }) {
   // Collapsible Dropdown State
   const [isOpen, setIsOpen] = useState(true);
 
@@ -269,9 +269,11 @@ export function PublicWorkAssignmentLookupCard() {
     <div className="gov-card border-2 border-emerald-600/40 overflow-hidden bg-white shadow-xl rounded-3xl transition-all">
       {/* 1. Header Accordion Toggle Bar */}
       <div
-        role="button"
-        tabIndex={0}
+        role={collapsible ? "button" : undefined}
+        tabIndex={collapsible ? 0 : undefined}
+        aria-expanded={collapsible ? isOpen : undefined}
         onClick={() => {
+          if (!collapsible) return;
           const nextState = !isOpen;
           setIsOpen(nextState);
           if (!nextState) {
@@ -280,12 +282,13 @@ export function PublicWorkAssignmentLookupCard() {
           }
         }}
         onKeyDown={(e) => {
+          if (!collapsible) return;
           if (e.key === "Enter" || e.key === " ") {
             e.preventDefault();
             setIsOpen((prev) => !prev);
           }
         }}
-        className="bg-gradient-to-r from-emerald-950 via-slate-900 to-blue-950 p-5 sm:p-7 text-white relative cursor-pointer select-none transition-colors hover:brightness-105"
+        className={`bg-gradient-to-r from-emerald-950 via-slate-900 to-blue-950 p-5 sm:p-7 text-white relative ${collapsible ? "cursor-pointer select-none transition-colors hover:brightness-105" : ""}`}
       >
         <div className="relative z-10 flex items-center justify-between gap-4">
           <div className="space-y-1.5 flex-1">
@@ -312,9 +315,9 @@ export function PublicWorkAssignmentLookupCard() {
             </p>
           </div>
 
-          <div className="p-3 bg-white/10 hover:bg-white/20 border border-white/20 rounded-2xl text-white transition-transform duration-200">
+          {collapsible && <div className="p-3 bg-white/10 hover:bg-white/20 border border-white/20 rounded-2xl text-white transition-transform duration-200">
             {isOpen ? <ChevronUp className="w-6 h-6" /> : <ChevronDown className="w-6 h-6" />}
-          </div>
+          </div>}
         </div>
 
         {/* Decorative Background Elements */}

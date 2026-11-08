@@ -16,6 +16,7 @@ import {
   Menu,
   FileSpreadsheet,
   Key,
+  Home,
 } from "lucide-react";
 
 interface NavbarProps {
@@ -56,7 +57,7 @@ export function Navbar({ onToggleSidebar }: NavbarProps) {
               }
               className="flex items-center space-x-3 group"
             >
-              <PesoLogo className="h-10 w-10" />
+              <PesoLogo className="h-10 w-10" src="/images/peso-eccess-chrome-emblem.png?v=ffeb0acf" />
               <div className="flex flex-col">
                 <div className="flex items-center space-x-1.5">
                   <span className="font-bold tracking-tight text-base sm:text-lg">LGU DINGALAN</span>
@@ -122,6 +123,18 @@ export function Navbar({ onToggleSidebar }: NavbarProps) {
                 </button>
               )}
             </div>
+
+            {user && pathname !== "/" && (
+              <Link
+                href="/"
+                aria-label="Back to Landing Page"
+                title="Back to Landing Page"
+                className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-white/20 bg-white/10 p-2 text-xs font-bold text-white transition hover:bg-white/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300"
+              >
+                <Home className="h-4 w-4" aria-hidden="true" />
+                <span className="hidden lg:inline">Back to Landing Page</span>
+              </Link>
+            )}
 
             {/* User Profile & Role */}
             {user ? (

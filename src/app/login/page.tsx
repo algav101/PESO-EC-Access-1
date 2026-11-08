@@ -2,7 +2,6 @@
 
 import React, { useState } from "react";
 import { useRouter } from "next/navigation";
-import { PesoLogo } from "@/components/layout/PesoLogo";
 import { useAuth } from "@/context/AuthContext";
 import {
   Shield,
@@ -392,18 +391,6 @@ export default function LoginPage() {
 
   return (
     <div className="min-h-[calc(100vh-4rem)] flex items-center justify-center p-4 sm:p-6 lg:p-8 bg-slate-100 relative overflow-hidden">
-      {/* Official PESO EC Access Emblem Logo Page Background Watermark */}
-      <div
-        aria-hidden="true"
-        className="fixed inset-0 pointer-events-none z-0 flex items-center justify-center overflow-hidden"
-      >
-        <img
-          src="/images/peso-ec-access-emblem.gif"
-          alt="PESO EC Access Official Emblem Watermark"
-          className="w-[90vw] max-w-[700px] object-contain opacity-[0.06] select-none scale-105 filter blur-[0.2px]"
-        />
-      </div>
-
       <div className="w-full max-w-md space-y-4 relative z-10">
         {/* Top Back Navigation Button */}
         <div className="flex items-center justify-between">
@@ -429,11 +416,21 @@ export default function LoginPage() {
         <div className="gov-card p-6 sm:p-8 border-t-4 border-t-gov-gold shadow-xl bg-white/95 backdrop-blur-xs">
           {/* Header */}
           <div className="text-center space-y-3 pb-6 border-b border-slate-100">
-            <div className="flex items-center justify-center">
+            <div role="group" aria-label="Login partner logos" className="flex items-center justify-center gap-4 pb-2 sm:gap-6">
               <img
-                src="/images/peso-ec-access-emblem.gif"
-                alt="Official PESO EC Access Emblem Logo"
-                className="h-24 sm:h-28 w-auto object-contain drop-shadow-md rounded-2xl hover:scale-105 transition-transform"
+                src="/images/peso-eccess-chrome-emblem.png?v=ffeb0acf"
+                alt="PESO eCCESS Logo"
+                className="h-16 w-16 shrink-0 object-contain sm:h-20 sm:w-20"
+              />
+              <img
+                src="/images/peso-official-seal.png"
+                alt="Public Employment Service Office (PESO) Seal"
+                className="h-16 w-16 shrink-0 rounded-full object-contain sm:h-20 sm:w-20"
+              />
+              <img
+                src="/images/dingalan-official-seal.jpg"
+                alt="Municipality of Dingalan, Aurora Seal"
+                className="h-16 w-16 shrink-0 rounded-full object-contain sm:h-20 sm:w-20"
               />
             </div>
             <div className="space-y-0.5">

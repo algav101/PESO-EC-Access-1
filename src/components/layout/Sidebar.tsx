@@ -250,7 +250,7 @@ export function Sidebar({ isMobile = false, onClose }: SidebarProps) {
         {isMobile && (
           <div className="p-4 border-b border-slate-800 flex items-center justify-between bg-slate-950/80 sticky top-0 z-20 backdrop-blur-md">
             <div className="flex items-center space-x-2.5">
-              <PesoLogo className="h-8 w-8" size={32} />
+              <PesoLogo className="h-8 w-8" size={32} src="/images/peso-eccess-chrome-emblem.png?v=ffeb0acf" />
               <div>
                 <h2 className="text-xs font-black text-white tracking-tight leading-tight">PESO DINGALAN</h2>
                 <p className="text-[10px] text-gov-goldLight font-bold uppercase">

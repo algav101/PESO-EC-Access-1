@@ -80,6 +80,8 @@ export function ClientLayout({ children }: { children: React.ReactNode }) {
   // must stay in the standalone Landing Page Portal layout and NEVER open the Dashboard Sidebar/BottomNav
   const isStandaloneLandingPortal =
     pathname.startsWith("/migrants") ||
+    pathname === "/my-assignment/inquiry" ||
+    pathname === "/apply/inquiry" ||
     (!user &&
       (pathname.startsWith("/apply") ||
         pathname.startsWith("/restrictions/checker") ||
