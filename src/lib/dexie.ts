@@ -45,6 +45,8 @@ export interface CachedBeneficiary {
   orientationStatus?: "PRESENT" | "ABSENT";
   stubDistributed?: boolean;
   payoutStatus?: string;
+  serverStubDistributed?: boolean;
+  serverOrientationStatus?: "PRESENT" | "ABSENT";
 }
 
 export interface CachedWorkDay {
@@ -100,6 +102,7 @@ export interface OfflineTransaction {
   retryCount: number;
   lastError?: string;
   createdAt: string;
+  syncStartedAt?: string;
 }
 
 export class TupadOfflineDatabase extends Dexie {
@@ -122,23 +125,14 @@ export class TupadOfflineDatabase extends Dexie {
       offlineQueue: "++id, clientTransactionId, entityType, status, createdAt",
     });
     this.version(3).stores({ cachedQrSlots: "publicToken, designatedNumber" });
+    // Existing records are retained. Matrix lookups require the previously missing programId index.
+    this.version(4).stores({
+      offlineAttendanceRecords: "++id, programId, [programId+workDayId+programBeneficiaryId], programBeneficiaryId, workDayId, attendanceDate",
+    });
   }
 }
 
 export const offlineDb = new TupadOfflineDatabase();
-
-async function cacheRegisteredQrSlots() {
-  const response = await fetch("/api/v1/qr/slots", { headers: getClientAuthHeaders() });
-  if (response.status === 403) return; // Non-scanner roles can still cache their permitted data.
-  if (!response.ok) throw new Error("Cannot refresh registered QR slot references.");
-  const { slots } = await response.json();
-  if (!Array.isArray(slots)) throw new Error("Invalid QR slot reference response.");
-  await offlineDb.transaction("rw", offlineDb.cachedQrSlots, async () => {
-    await offlineDb.cachedQrSlots.clear();
-    if (slots.length) await offlineDb.cachedQrSlots.bulkPut(slots);
-    await offlineDb.cachedQrSlots.put({ publicToken: "__SYNCED__", designatedNumber: "" });
-  });
-}
 
 /**
  * Resolves standard authorization headers from localStorage to prevent 401 Unauthorized during sync
@@ -450,6 +444,7 @@ export async function recordOfflineAttendance(params: {
   // Save/update locally
   if (existingRecord && existingRecord.id) {
     const updates: Partial<OfflineAttendanceRecord> = {
+      isSynced: false,
       workArea: resolvedArea || existingRecord.workArea,
       activityName: resolvedActivity || existingRecord.activityName,
       workProgramItemId: resolvedItemId || existingRecord.workProgramItemId,
@@ -479,6 +474,7 @@ export async function recordOfflineAttendance(params: {
       activityName: resolvedActivity,
       status: "PRESENT",
       scannedAt: nowIso,
+      isSynced: false,
     });
   }
 
@@ -534,604 +530,330 @@ export async function recordOfflineAttendance(params: {
   };
 }
 
+export const UNSYNCED_QUEUE_STATUSES = ["PENDING", "FAILED", "SYNCING", "CONFLICT"];
+export const SYNC_LEASE_MS = 5 * 60 * 1000;
+
+function notifyQueueChanged(enqueued = false) {
+  if (typeof window !== "undefined") window.dispatchEvent(new CustomEvent("tupad-queue-updated", { detail: { enqueued } }));
+}
+
 export async function queueOfflineTransaction(
-  entityType: OfflineTransaction["entityType"],
-  operation: OfflineTransaction["operation"],
-  payload: any
+  entityType: OfflineTransaction["entityType"], operation: OfflineTransaction["operation"], payload: any
 ): Promise<string> {
-  const clientTransactionId = `TX-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
-  const deviceId = typeof window !== "undefined" ? localStorage.getItem("tupad_device_id") || "BROWSER_DEVICE" : "SERVER";
-
-  await offlineDb.offlineQueue.add({
-    clientTransactionId,
-    deviceId,
-    entityType,
-    operation,
-    payload,
-    status: "PENDING",
-    retryCount: 0,
-    createdAt: new Date().toISOString(),
+  const clientTransactionId = "TX-" + Date.now() + "-" + Math.random().toString(36).substring(2, 9);
+  await offlineDb.transaction("rw", offlineDb.offlineQueue, offlineDb.offlineAttendanceRecords, async () => {
+    await offlineDb.offlineQueue.add({
+      clientTransactionId,
+      deviceId: typeof window !== "undefined" ? localStorage.getItem("tupad_device_id") || "BROWSER_DEVICE" : "SERVER",
+      entityType, operation, payload, status: "PENDING", retryCount: 0, createdAt: new Date().toISOString(),
+    });
+    if (entityType === "ATTENDANCE") {
+      const rec = await offlineDb.offlineAttendanceRecords.where("[programId+workDayId+programBeneficiaryId]")
+        .equals([payload.programId, payload.workDayId, payload.programBeneficiaryId]).first();
+      if (rec?.id) await offlineDb.offlineAttendanceRecords.update(rec.id, { isSynced: false });
+    }
   });
-
+  notifyQueueChanged(true);
   return clientTransactionId;
 }
 
 export async function getPendingQueueCount(): Promise<number> {
   if (typeof window === "undefined") return 0;
-  try {
-    return await offlineDb.offlineQueue
-      .where("status")
-      .anyOf(["PENDING", "FAILED"])
-      .count();
-  } catch (e) {
-    return 0;
-  }
+  return offlineDb.offlineQueue.where("status").anyOf(UNSYNCED_QUEUE_STATUSES).count();
 }
 
-export async function pushSyncQueue() {
-  if (typeof window === "undefined") return { accepted: [], failed: [], duplicates: [], conflicts: [], errors: {} };
-  const queueToSync = await offlineDb.offlineQueue
-    .where("status")
-    .anyOf(["PENDING", "FAILED"])
-    .toArray();
-  if (queueToSync.length === 0) return { accepted: [], failed: [], duplicates: [], conflicts: [], errors: {} };
-
-  // Mark in-flight items as SYNCING
-  for (const item of queueToSync) {
-    if (item.id) {
-      await offlineDb.offlineQueue.update(item.id, { status: "SYNCING" });
+/** Recover interrupted requests, not active requests. Keep the original idempotency key. */
+export async function recoverInterruptedSync(now = Date.now()) {
+  let recovered = 0;
+  await offlineDb.transaction("rw", offlineDb.offlineQueue, async () => {
+    const rows = await offlineDb.offlineQueue.where("status").equals("SYNCING").toArray();
+    for (const row of rows) {
+      const started = Date.parse(row.syncStartedAt || row.createdAt);
+      if (!Number.isFinite(started) || now - started >= SYNC_LEASE_MS) {
+        await offlineDb.offlineQueue.update(row.id!, {
+          status: "PENDING", syncStartedAt: undefined,
+          lastError: "Previous upload was interrupted. Waiting for server acknowledgment on retry.",
+        });
+        recovered++;
+      }
     }
-  }
+  });
+  if (recovered) notifyQueueChanged();
+  return recovered;
+}
 
-  // Split queue into chunks: PHOTO items pushed individually (or in pairs) to keep HTTP payload < 1MB, other items in batches of 20
+type SyncResult = {
+  accepted: string[]; duplicates: string[]; conflicts: string[]; failed: string[];
+  errors: Record<string, string>; authRequired: boolean; remaining: number;
+};
+let syncInFlight: Promise<SyncResult> | null = null;
+
+/** Serialize tabs when possible; atomic IDB claims also protect browsers without Web Locks. */
+export function pushSyncQueue(): Promise<SyncResult> {
+  if (syncInFlight) return syncInFlight;
+  const run = () => pushClaimedSyncQueue();
+  const task = (async () => {
+    if (typeof navigator !== "undefined" && navigator.locks) return await navigator.locks.request("tupad-offline-upload", run);
+    return run();
+  })();
+  const pending = task.finally(() => { syncInFlight = null; });
+  syncInFlight = pending;
+  return pending;
+}
+
+async function pushClaimedSyncQueue(): Promise<SyncResult> {
+  const result: SyncResult = { accepted: [], duplicates: [], conflicts: [], failed: [], errors: {}, authRequired: false, remaining: 0 };
+  if (typeof window === "undefined") return result;
+  await recoverInterruptedSync();
+  const candidates = await offlineDb.offlineQueue.where("status").anyOf(["PENDING", "FAILED"]).toArray();
+  // Preserve chronological order. Photos have separate requests to bound payload size.
   const chunks: OfflineTransaction[][] = [];
-  let currentNonPhotoChunk: OfflineTransaction[] = [];
-
-  for (const item of queueToSync) {
-    if (item.entityType === "PHOTO") {
-      // Photos get their own dedicated single-item chunk
-      chunks.push([item]);
-    } else {
-      currentNonPhotoChunk.push(item);
-      if (currentNonPhotoChunk.length >= 20) {
-        chunks.push(currentNonPhotoChunk);
-        currentNonPhotoChunk = [];
+  for (const item of candidates) {
+    const last = chunks[chunks.length - 1];
+    if (item.entityType !== "PHOTO" && last && last[0].entityType !== "PHOTO" && last.length < 20) last.push(item);
+    else chunks.push([item]);
+  }
+  for (const candidatesChunk of chunks) {
+    const chunk: OfflineTransaction[] = [];
+    await offlineDb.transaction("rw", offlineDb.offlineQueue, async () => {
+      for (const candidate of candidatesChunk) {
+        const row = await offlineDb.offlineQueue.get(candidate.id!);
+        if (!row || !["PENDING", "FAILED"].includes(row.status)) continue;
+        await offlineDb.offlineQueue.update(row.id!, { status: "SYNCING", syncStartedAt: new Date().toISOString() });
+        chunk.push(row);
       }
-    }
-  }
-  if (currentNonPhotoChunk.length > 0) {
-    chunks.push(currentNonPhotoChunk);
-  }
-
-  const aggregateResult = {
-    accepted: [] as string[],
-    duplicates: [] as string[],
-    conflicts: [] as string[],
-    failed: [] as string[],
-    errors: {} as Record<string, string>,
-  };
-
-  for (const chunk of chunks) {
+    });
+    if (!chunk.length) continue;
+    notifyQueueChanged();
     try {
-      const res = await fetch("/api/v1/sync/push", {
-        method: "POST",
-        headers: getClientAuthHeaders(),
-        body: JSON.stringify({ transactions: chunk }),
-        signal: typeof AbortSignal !== "undefined" && AbortSignal.timeout ? AbortSignal.timeout(30000) : undefined,
+      const response = await fetch("/api/v1/sync/push", {
+        method: "POST", headers: getClientAuthHeaders(), body: JSON.stringify({ transactions: chunk }),
+        signal: AbortSignal.timeout(30000),
       });
-
-      if (!res.ok) {
-        const errData = await res.json().catch(() => ({}));
-        const errMsg = errData.error || `Sync push failed with status ${res.status}`;
-        for (const item of chunk) {
-          aggregateResult.failed.push(item.clientTransactionId);
-          aggregateResult.errors[item.clientTransactionId] = errMsg;
-          if (item.id) {
-            await offlineDb.offlineQueue.update(item.id, {
-              status: "FAILED",
-              retryCount: (item.retryCount || 0) + 1,
-              lastError: errMsg,
-            });
-          }
-        }
-        continue;
+      const body = await response.json().catch(() => null);
+      if (!response.ok) {
+        result.authRequired = response.status === 401 || response.status === 403;
+        throw new Error(result.authRequired
+          ? "Sign in again with the authorized scanning account, then retry. Unsynced records are still on this device."
+          : body?.error || "Upload failed (HTTP " + response.status + "). Records kept for retry.");
       }
-
-      const result = await res.json();
-      const errors = result.errors || {};
-
+      if (!body || !Array.isArray(body.accepted) || !Array.isArray(body.duplicates) || !Array.isArray(body.conflicts)) {
+        throw new Error("Invalid server acknowledgment. Records kept for retry.");
+      }
       for (const item of chunk) {
         const txId = item.clientTransactionId;
-        if (result.accepted?.includes(txId) || result.duplicates?.includes(txId)) {
-          if (result.accepted?.includes(txId)) aggregateResult.accepted.push(txId);
-          if (result.duplicates?.includes(txId)) aggregateResult.duplicates.push(txId);
-          // Successfully synced to central storage: remove from local offline queue
-          if (item.id) {
-            await offlineDb.offlineQueue.delete(item.id);
-          }
-          // Mark local attendance record as synced
-          if (item.entityType === "ATTENDANCE" && item.payload) {
-            const { programId, workDayId, programBeneficiaryId } = item.payload;
-            if (programId && workDayId && programBeneficiaryId) {
-              const existingRec = await offlineDb.offlineAttendanceRecords
-                .where("[programId+workDayId+programBeneficiaryId]")
-                .equals([programId, workDayId, programBeneficiaryId])
-                .first();
-              if (existingRec && existingRec.id) {
-                await offlineDb.offlineAttendanceRecords.update(existingRec.id, { isSynced: true });
-              }
+        if (body.accepted.includes(txId) || body.duplicates.includes(txId)) {
+          await offlineDb.transaction("rw", offlineDb.offlineQueue, offlineDb.offlineAttendanceRecords, async () => {
+            await offlineDb.offlineQueue.delete(item.id!);
+            if (item.entityType === "ATTENDANCE") {
+              const { programId, workDayId, programBeneficiaryId } = item.payload;
+              const other = (await offlineDb.offlineQueue.where("status").anyOf(UNSYNCED_QUEUE_STATUSES).toArray())
+                .some(q => q.entityType === "ATTENDANCE" && q.payload.programId === programId
+                  && q.payload.workDayId === workDayId && q.payload.programBeneficiaryId === programBeneficiaryId);
+              const rec = await offlineDb.offlineAttendanceRecords.where("[programId+workDayId+programBeneficiaryId]")
+                .equals([programId, workDayId, programBeneficiaryId]).first();
+              if (rec?.id) await offlineDb.offlineAttendanceRecords.update(rec.id, { isSynced: !other });
             }
-          }
-        } else if (result.conflicts?.includes(txId)) {
-          aggregateResult.conflicts.push(txId);
-          const err = errors[txId] || "Conflict detected on server";
-          aggregateResult.errors[txId] = err;
-          if (item.id) {
-            await offlineDb.offlineQueue.update(item.id, {
-              status: "CONFLICT",
-              lastError: err,
-            });
-          }
+          });
+          (body.accepted.includes(txId) ? result.accepted : result.duplicates).push(txId);
         } else {
-          aggregateResult.failed.push(txId);
-          const err = errors[txId] || "Failed during sync processing";
-          aggregateResult.errors[txId] = err;
-          if (item.id) {
-            await offlineDb.offlineQueue.update(item.id, {
-              status: "FAILED",
-              retryCount: (item.retryCount || 0) + 1,
-              lastError: err,
-            });
-          }
-        }
-      }
-    } catch (chunkErr: any) {
-      console.error("Chunk sync push error:", chunkErr);
-      const errMsg = chunkErr.name === "TimeoutError"
-        ? "Network timed out. Connection is slow, please retry."
-        : (chunkErr.message || "Network or connection error");
-      for (const item of chunk) {
-        aggregateResult.failed.push(item.clientTransactionId);
-        aggregateResult.errors[item.clientTransactionId] = errMsg;
-        if (item.id) {
-          await offlineDb.offlineQueue.update(item.id, {
-            status: "FAILED",
-            retryCount: (item.retryCount || 0) + 1,
-            lastError: errMsg,
+          const conflict = body.conflicts.includes(txId);
+          const error = body.errors?.[txId] || (conflict ? "Server conflict. Review before retrying." : "Server did not acknowledge this record.");
+          (conflict ? result.conflicts : result.failed).push(txId);
+          result.errors[txId] = error;
+          await offlineDb.offlineQueue.update(item.id!, {
+            status: conflict ? "CONFLICT" : "FAILED", lastError: error,
+            syncStartedAt: undefined, retryCount: item.retryCount + 1,
           });
         }
       }
+    } catch (error: any) {
+      for (const item of chunk) {
+        const current = await offlineDb.offlineQueue.get(item.id!);
+        if (!current || current.status !== "SYNCING") continue;
+        if (!result.failed.includes(item.clientTransactionId)) result.failed.push(item.clientTransactionId);
+        result.errors[item.clientTransactionId] = error.message || "Upload interrupted. Retry when online.";
+        await offlineDb.offlineQueue.update(item.id!, {
+          status: "FAILED", retryCount: item.retryCount + 1,
+          lastError: result.errors[item.clientTransactionId], syncStartedAt: undefined,
+        });
+      }
     }
+    notifyQueueChanged();
+    if (result.authRequired) break;
   }
-
-  if (typeof window !== "undefined") {
-    window.dispatchEvent(new CustomEvent("tupad-offline-synced", { detail: aggregateResult }));
+  result.remaining = await getPendingQueueCount();
+  if (result.accepted.length || result.duplicates.length) {
+    window.dispatchEvent(new CustomEvent("tupad-offline-synced", { detail: result }));
     window.dispatchEvent(new CustomEvent("tupad-photos-updated"));
   }
-
-  return aggregateResult;
+  return result;
 }
 
 export async function retryOfflineTransaction(id: number) {
-  if (typeof window === "undefined") return;
-  await offlineDb.offlineQueue.update(id, {
-    status: "PENDING",
+  await offlineDb.transaction("rw", offlineDb.offlineQueue, async () => {
+    const row = await offlineDb.offlineQueue.get(id);
+    if (row?.status === "FAILED") await offlineDb.offlineQueue.update(id, { status: "PENDING" });
   });
+  notifyQueueChanged();
 }
 
 export async function retryAllFailedTransactions() {
-  if (typeof window === "undefined") return;
-  const failedItems = await offlineDb.offlineQueue.where("status").equals("FAILED").toArray();
-  for (const item of failedItems) {
-    if (item.id) {
-      await offlineDb.offlineQueue.update(item.id, { status: "PENDING" });
-    }
-  }
+  await recoverInterruptedSync();
+  await offlineDb.offlineQueue.where("status").equals("FAILED").modify({ status: "PENDING" });
+  notifyQueueChanged();
 }
 
-/**
- * Automatically initializes and caches active programs, work days, work program activities,
- * and beneficiaries into IndexedDB on the installed unit.
- */
-export async function initializeUserOfflineCache(user?: {
-  id?: string;
-  role?: string;
-  assignedBarangay?: string | null;
-}) {
-  if (typeof window === "undefined") return;
+type CacheUser = { id?: string; role?: string; assignedBarangay?: string | null };
+let cacheInFlight: Promise<{ beneficiariesCount: number; attendanceCount: number; scope: string }> | null = null;
 
-  try {
-    const progRes = await fetch("/api/v1/programs", {
-      headers: getClientAuthHeaders(),
-      signal: typeof AbortSignal !== "undefined" && AbortSignal.timeout ? AbortSignal.timeout(20000) : undefined,
-    });
-    if (!progRes.ok) return;
-    const { programs } = await progRes.json();
-    if (!programs || programs.length === 0) return;
-    await cacheRegisteredQrSlots();
-
-    for (const prog of programs) {
-      // 1. Cache Program
-      await offlineDb.cachedPrograms.put({
-        id: prog.id,
-        programCode: prog.programCode,
-        programName: prog.programName,
-        municipality: prog.municipality || "Dingalan",
-        province: prog.province || "Aurora",
-        status: prog.status,
-        requiredWorkDays: prog.requiredWorkDays || 10,
-        morningStart: prog.morningStart,
-        morningEnd: prog.morningEnd,
-        afternoonStart: prog.afternoonStart,
-        afternoonEnd: prog.afternoonEnd,
-        orientationDate: prog.orientationDate,
-        payoutDate: prog.payoutDate,
-      });
-
-      // 2. Cache Work Days
-      for (const wd of prog.workDays || []) {
-        await offlineDb.cachedWorkDays.put({
-          id: wd.id,
-          programId: prog.id,
-          dayNumber: wd.dayNumber,
-          workDate: wd.workDate,
-          status: wd.status,
-        });
-      }
-
-      // 3. Cache Work Program Items & Areas
-      try {
-        const wpRes = await fetch(`/api/v1/programs/${prog.id}/work-program`, {
-          headers: getClientAuthHeaders(),
-        });
-        if (wpRes.ok) {
-          const wpData = await wpRes.json();
-          const workPrograms = wpData.workPrograms || [];
-          for (const wp of workPrograms) {
-            for (const it of wp.items || []) {
-              await offlineDb.cachedWorkProgramItems.put({
-                id: it.id,
-                programId: prog.id,
-                barangay: wp.barangay,
-                dayNumber: it.dayNumber,
-                area: it.area,
-                specificActivities: it.specificActivities,
-                totalCount: it.totalCount || (it.maleCount || 0) + (it.femaleCount || 0),
-                maleCount: it.maleCount,
-                femaleCount: it.femaleCount,
-              });
-            }
-          }
-        }
-      } catch (err) {
-        console.warn("Work program caching notice:", err);
-      }
-
-      // 4. Fetch & Cache Beneficiaries (scoped if user has assigned barangay, or full roster for super admin)
-      let beneUrl = `/api/v1/programs/${prog.id}/beneficiaries`;
-      if (user?.assignedBarangay) {
-        beneUrl += `?barangay=${encodeURIComponent(normalizeBarangayName(user.assignedBarangay))}`;
-      }
-
-      const beneRes = await fetch(beneUrl, {
-        headers: getClientAuthHeaders(),
-        signal: typeof AbortSignal !== "undefined" && AbortSignal.timeout ? AbortSignal.timeout(25000) : undefined,
-      });
-      if (beneRes.ok) {
-        const { beneficiaries } = await beneRes.json();
-        const beneListToPut: CachedBeneficiary[] = [];
-        const attListToProcess: OfflineAttendanceRecord[] = [];
-
-        for (const pb of beneficiaries || []) {
-          const activeQr = pb.qrCodes?.find((q: any) => q.status === "ACTIVE") || pb.qrCodes?.[0];
-          let birthdayPin = pb.beneficiary?.birthday || "";
-          if (birthdayPin) {
-            const parts = birthdayPin.split("-");
-            if (parts.length === 3 && parts[0].length === 4) {
-              birthdayPin = `${parts[1]}-${parts[2]}-${parts[0]}`;
-            }
-          }
-
-          const hasOrientation = pb.orientationAttendance?.some((r: any) => r.status === "PRESENT");
-          const isStubDistributed = Boolean(pb.stubDistributions?.some((r: any) => r.status === "DISTRIBUTED"));
-          const normBrgy = normalizeBarangayName(pb.beneficiary?.barangay);
-          const normSitio = normalizeSitioName(pb.beneficiary?.sitio, normBrgy);
-
-          beneListToPut.push({
-            id: pb.id,
-            programId: prog.id,
-            beneficiaryId: pb.beneficiaryId,
-            designatedNumber: pb.designatedNumber,
-            fullName: pb.beneficiary?.fullName || "",
-            birthday: pb.beneficiary?.birthday || "",
-            birthdayPin,
-            barangay: normBrgy,
-            sitio: normSitio,
-            tableNumber: pb.tableNumber || "",
-            qrToken: activeQr?.publicToken || "",
-            status: pb.participationStatus || "ACTIVE",
-            orientationStatus: hasOrientation ? "PRESENT" : "ABSENT",
-            stubDistributed: isStubDistributed,
-            payoutStatus: pb.payouts?.find((p: any) => p.status === "PAID")?.status || "PENDING",
-          });
-
-          for (const rec of pb.attendanceRecords || []) {
-            attListToProcess.push({
-              programId: prog.id,
-              workDayId: rec.workDayId,
-              programBeneficiaryId: pb.id,
-              designatedNumber: pb.designatedNumber,
-              attendanceDate: rec.attendanceDate || "",
-              morningTimeIn: rec.morningTimeIn,
-              morningTimeOut: rec.morningTimeOut,
-              afternoonTimeIn: rec.afternoonTimeIn,
-              afternoonTimeOut: rec.afternoonTimeOut,
-              status: rec.status || "PRESENT",
-              scannedAt: rec.morningTimeIn || new Date().toISOString(),
-              scannedById: rec.scannedById,
-              scannedByName: rec.scannedBy?.fullName,
-              isSynced: true,
-            });
-          }
-        }
-
-        // Fast atomic bulk storage for beneficiaries
-        if (beneListToPut.length > 0) {
-          await offlineDb.cachedBeneficiaries.bulkPut(beneListToPut);
-        }
-
-        // Fast batch transaction for attendance records
-        if (attListToProcess.length > 0) {
-          await offlineDb.transaction("rw", offlineDb.offlineAttendanceRecords, async () => {
-            for (const rec of attListToProcess) {
-              const existing = await offlineDb.offlineAttendanceRecords
-                .where("[programId+workDayId+programBeneficiaryId]")
-                .equals([rec.programId, rec.workDayId, rec.programBeneficiaryId])
-                .first();
-
-              if (existing && existing.id) {
-                await offlineDb.offlineAttendanceRecords.update(existing.id, {
-                  morningTimeIn: rec.morningTimeIn || existing.morningTimeIn,
-                  morningTimeOut: rec.morningTimeOut || existing.morningTimeOut,
-                  afternoonTimeIn: rec.afternoonTimeIn || existing.afternoonTimeIn,
-                  afternoonTimeOut: rec.afternoonTimeOut || existing.afternoonTimeOut,
-                  status: rec.status || existing.status,
-                  isSynced: true,
-                  scannedById: rec.scannedById || existing.scannedById,
-                  scannedByName: rec.scannedByName || existing.scannedByName,
-                });
-              } else {
-                await offlineDb.offlineAttendanceRecords.add(rec);
-              }
-            }
-          });
-        }
-      }
-    }
-
-    localStorage.setItem("tupad_last_offline_sync", new Date().toISOString());
-    localStorage.setItem(
-      "tupad_offline_scope",
-      (user?.role === "TUPAD_COORDINATOR" || user?.role === "TUPAD_ASSISTING_DOCUMENTOR") && user.assignedBarangay
-        ? `Barangay ${user.assignedBarangay}`
-        : "Municipality-wide"
-    );
-  } catch (e) {
-    console.warn("Offline cache initialization warning:", e);
-  }
+/** Stage downloads before writing. Serialize scope changes instead of sharing another account's snapshot. */
+export function initializeUserOfflineCache(user?: CacheUser) {
+  const previous = cacheInFlight;
+  const task = (async () => {
+    if (previous) await previous.catch(() => {});
+    return downloadOfflineSnapshot(user);
+  })();
+  cacheInFlight = task;
+  void task.finally(() => { if (cacheInFlight === task) cacheInFlight = null; }).catch(() => {});
+  return task;
 }
 
-/**
- * MASTER KEY SYNC:
- * Forces a clean, authoritative purge and re-sync of all local client caches with the central PESO Admin database.
- * Scoped according to user's assigned barangay or municipality-wide access.
- */
-export async function forceMasterSyncWithServer(user?: {
-  id?: string;
-  role?: string;
-  assignedBarangay?: string | null;
-}) {
-  if (typeof window === "undefined") return { success: false, error: "Window is undefined" };
-
-  try {
-    // 1. Push any pending outgoing mutations first
-    await pushSyncQueue();
-
-    // 2. Fetch authoritative programs and workdays
-    const progRes = await fetch("/api/v1/programs", {
-      headers: getClientAuthHeaders(),
-      signal: typeof AbortSignal !== "undefined" && AbortSignal.timeout ? AbortSignal.timeout(20000) : undefined,
-    });
-    if (!progRes.ok) throw new Error("Could not connect to PESO Admin server to retrieve programs.");
-    const { programs } = await progRes.json();
-    if (!programs || programs.length === 0) throw new Error("No active programs found on PESO Admin server.");
-    await cacheRegisteredQrSlots();
-
-    // 3. Clear server mirror caches (do NOT wipe unsynced local offline attendance scans!)
+async function downloadOfflineSnapshot(user?: CacheUser) {
+  if (typeof window === "undefined") throw new Error("Offline cache requires a browser.");
+  const auth = getClientAuthHeaders();
+  const get = async (url: string, optional = false) => {
+    const response = await fetch(url, { headers: auth, cache: "no-store", signal: AbortSignal.timeout(30000) });
+    if (optional && response.status === 403) return null;
+    if (!response.ok) throw new Error("Cache download failed (HTTP " + response.status + "). Existing device data was kept.");
+    return response.json();
+  };
+  const { programs } = await get("/api/v1/programs");
+  if (!Array.isArray(programs)) throw new Error("Invalid program response. Existing cache was kept.");
+  const qrData = await get("/api/v1/qr/slots", true);
+  if (qrData && !Array.isArray(qrData.slots)) throw new Error("Invalid QR slot response.");
+  const beneRows: CachedBeneficiary[] = [];
+  const days: CachedWorkDay[] = [];
+  const activities: CachedWorkProgramItem[] = [];
+  const attendance: OfflineAttendanceRecord[] = [];
+  const programRows: CachedProgram[] = [];
+  for (const prog of programs) {
+    programRows.push({ ...prog, municipality: prog.municipality || "Dingalan", province: prog.province || "Aurora", requiredWorkDays: prog.requiredWorkDays || 10 });
+    for (const wd of prog.workDays || []) days.push({ ...wd, programId: prog.id });
+    const wpData = await get("/api/v1/programs/" + prog.id + "/work-program", true);
+    if (wpData && !Array.isArray(wpData.workPrograms)) throw new Error("Invalid work program response.");
+    for (const wp of wpData?.workPrograms || []) {
+      for (const it of wp.items || []) activities.push({ ...it, programId: prog.id, barangay: wp.barangay });
+    }
+    const query = user?.assignedBarangay ? "?barangay=" + encodeURIComponent(normalizeBarangayName(user.assignedBarangay)) : "";
+    const { beneficiaries } = await get("/api/v1/programs/" + prog.id + "/beneficiaries" + query);
+    if (!Array.isArray(beneficiaries)) throw new Error("Invalid beneficiary response. Existing cache was kept.");
+    for (const pb of beneficiaries) {
+      const birthday = (pb.beneficiary?.birthday || "").slice(0, 10);
+      const parts = birthday.split("-");
+      const brgy = normalizeBarangayName(pb.beneficiary?.barangay);
+      const stub = Boolean(pb.stubDistributions?.some((s: any) => s.status === "DISTRIBUTED"));
+      const orientation = pb.orientationAttendance?.some((o: any) => o.status === "PRESENT") ? "PRESENT" : "ABSENT";
+      beneRows.push({
+        id: pb.id, programId: prog.id, beneficiaryId: pb.beneficiaryId,
+        designatedNumber: pb.designatedNumber, fullName: pb.beneficiary?.fullName || "",
+        birthday, birthdayPin: parts.length === 3 ? parts[1] + "-" + parts[2] + "-" + parts[0] : "",
+        barangay: brgy, sitio: normalizeSitioName(pb.beneficiary?.sitio, brgy), tableNumber: pb.tableNumber || "",
+        qrToken: (pb.qrCodes?.find((q: any) => q.status === "ACTIVE") || pb.qrCodes?.[0])?.publicToken || "",
+        status: pb.participationStatus || "ACTIVE",
+        stubDistributed: stub, serverStubDistributed: stub,
+        orientationStatus: orientation, serverOrientationStatus: orientation,
+        payoutStatus: pb.payouts?.find((p: any) => p.status === "PAID")?.status || "PENDING",
+      });
+      for (const rec of pb.attendanceRecords || []) attendance.push({
+        programId: prog.id, workDayId: rec.workDayId, programBeneficiaryId: pb.id,
+        designatedNumber: pb.designatedNumber, attendanceDate: rec.attendanceDate || "",
+        morningTimeIn: rec.morningTimeIn, morningTimeOut: rec.morningTimeOut,
+        afternoonTimeIn: rec.afternoonTimeIn, afternoonTimeOut: rec.afternoonTimeOut,
+        status: rec.status || "PRESENT", scannedAt: rec.morningTimeIn || new Date().toISOString(),
+        scannedById: rec.scannedById, scannedByName: rec.scannedBy?.fullName, isSynced: true,
+      });
+    }
+  }
+  if (getClientAuthHeaders().Authorization !== auth.Authorization) throw new Error("Account changed during download. Please refresh again.");
+  await offlineDb.transaction("rw", [
+    offlineDb.cachedPrograms, offlineDb.cachedWorkDays, offlineDb.cachedWorkProgramItems,
+    offlineDb.cachedBeneficiaries, offlineDb.cachedQrSlots, offlineDb.offlineQueue, offlineDb.offlineAttendanceRecords,
+  ], async () => {
+    const queue = await offlineDb.offlineQueue.where("status").anyOf(UNSYNCED_QUEUE_STATUSES).toArray();
+    const existingBenes = await offlineDb.cachedBeneficiaries.toArray();
+    for (const bene of beneRows) {
+      for (const tx of queue) {
+        if (tx.payload.programId !== bene.programId || tx.payload.programBeneficiaryId !== bene.id) continue;
+        if (tx.entityType === "STUB_DISTRIBUTION") bene.stubDistributed = true;
+        if (tx.entityType === "ORIENTATION") bene.orientationStatus = tx.payload.status || "PRESENT";
+        if (tx.entityType === "PAYOUT") bene.payoutStatus = tx.payload.status;
+      }
+    }
+    const retained = existingBenes.filter(b => !beneRows.some(n => n.id === b.id)
+      && queue.some(q => q.payload.programId === b.programId && q.payload.programBeneficiaryId === b.id));
     await offlineDb.cachedPrograms.clear();
     await offlineDb.cachedWorkDays.clear();
     await offlineDb.cachedWorkProgramItems.clear();
     await offlineDb.cachedBeneficiaries.clear();
-
-    let totalBeneficiariesCount = 0;
-    let totalAttendanceRecordsCount = 0;
-
-    for (const prog of programs) {
-      // Put Program
-      await offlineDb.cachedPrograms.put({
-        id: prog.id,
-        programCode: prog.programCode,
-        programName: prog.programName,
-        municipality: prog.municipality || "Dingalan",
-        province: prog.province || "Aurora",
-        status: prog.status,
-        requiredWorkDays: prog.requiredWorkDays || 10,
-        morningStart: prog.morningStart,
-        morningEnd: prog.morningEnd,
-        afternoonStart: prog.afternoonStart,
-        afternoonEnd: prog.afternoonEnd,
-        orientationDate: prog.orientationDate,
-        payoutDate: prog.payoutDate,
-      });
-
-      // Put Work Days in bulk
-      const workDaysList = (prog.workDays || []).map((wd: any) => ({
-        id: wd.id,
-        programId: prog.id,
-        dayNumber: wd.dayNumber,
-        workDate: wd.workDate,
-        status: wd.status,
-      }));
-      if (workDaysList.length > 0) {
-        await offlineDb.cachedWorkDays.bulkPut(workDaysList);
-      }
-
-      // Put Work Program Items in bulk
-      try {
-        const wpRes = await fetch(`/api/v1/programs/${prog.id}/work-program`, {
-          headers: getClientAuthHeaders(),
-        });
-        if (wpRes.ok) {
-          const wpData = await wpRes.json();
-          const itemsList: CachedWorkProgramItem[] = [];
-          for (const wp of wpData.workPrograms || []) {
-            for (const it of wp.items || []) {
-              itemsList.push({
-                id: it.id,
-                programId: prog.id,
-                barangay: wp.barangay,
-                dayNumber: it.dayNumber,
-                area: it.area,
-                specificActivities: it.specificActivities,
-                totalCount: it.totalCount || (it.maleCount || 0) + (it.femaleCount || 0),
-                maleCount: it.maleCount,
-                femaleCount: it.femaleCount,
-              });
-            }
-          }
-          if (itemsList.length > 0) {
-            await offlineDb.cachedWorkProgramItems.bulkPut(itemsList);
-          }
-        }
-      } catch (err) {}
-
-      // Put Authoritative Beneficiaries & Attendance Records (scoped strictly to user's assigned barangay or full for admin)
-      let beneUrl = `/api/v1/programs/${prog.id}/beneficiaries`;
-      if (user?.assignedBarangay) {
-        beneUrl += `?barangay=${encodeURIComponent(normalizeBarangayName(user.assignedBarangay))}`;
-      }
-
-      const beneRes = await fetch(beneUrl, {
-        headers: getClientAuthHeaders(),
-        signal: typeof AbortSignal !== "undefined" && AbortSignal.timeout ? AbortSignal.timeout(30000) : undefined,
-      });
-      if (beneRes.ok) {
-        const { beneficiaries } = await beneRes.json();
-        totalBeneficiariesCount += (beneficiaries || []).length;
-
-        const beneList: CachedBeneficiary[] = [];
-        const attList: OfflineAttendanceRecord[] = [];
-
-        for (const pb of beneficiaries || []) {
-          const activeQr = pb.qrCodes?.find((q: any) => q.status === "ACTIVE") || pb.qrCodes?.[0];
-          let birthdayPin = pb.beneficiary?.birthday || "";
-          if (birthdayPin) {
-            const parts = birthdayPin.split("-");
-            if (parts.length === 3 && parts[0].length === 4) {
-              birthdayPin = `${parts[1]}-${parts[2]}-${parts[0]}`;
-            }
-          }
-
-          const hasOrientation = pb.orientationAttendance?.some((r: any) => r.status === "PRESENT");
-          const isStubDistributed = Boolean(pb.stubDistributions?.some((r: any) => r.status === "DISTRIBUTED"));
-          const normBrgy = normalizeBarangayName(pb.beneficiary?.barangay);
-          const normSitio = normalizeSitioName(pb.beneficiary?.sitio, normBrgy);
-
-          beneList.push({
-            id: pb.id,
-            programId: prog.id,
-            beneficiaryId: pb.beneficiaryId,
-            designatedNumber: pb.designatedNumber,
-            fullName: pb.beneficiary?.fullName || "",
-            birthday: pb.beneficiary?.birthday || "",
-            birthdayPin,
-            barangay: normBrgy,
-            sitio: normSitio,
-            tableNumber: pb.tableNumber || "",
-            qrToken: activeQr?.publicToken || "",
-            status: pb.participationStatus || "ACTIVE",
-            orientationStatus: hasOrientation ? "PRESENT" : "ABSENT",
-            stubDistributed: isStubDistributed,
-            payoutStatus: pb.payouts?.find((p: any) => p.status === "PAID")?.status || "PENDING",
-          });
-
-          // Store authoritative server attendance records (including records scanned by other users in the same barangay)
-          for (const rec of pb.attendanceRecords || []) {
-            totalAttendanceRecordsCount++;
-            attList.push({
-              programId: prog.id,
-              workDayId: rec.workDayId,
-              programBeneficiaryId: pb.id,
-              designatedNumber: pb.designatedNumber,
-              attendanceDate: rec.attendanceDate || "",
-              morningTimeIn: rec.morningTimeIn,
-              morningTimeOut: rec.morningTimeOut,
-              afternoonTimeIn: rec.afternoonTimeIn,
-              afternoonTimeOut: rec.afternoonTimeOut,
-              status: rec.status || "PRESENT",
-              scannedAt: rec.morningTimeIn || new Date().toISOString(),
-              scannedById: rec.scannedById,
-              scannedByName: rec.scannedBy?.fullName,
-              isSynced: true,
-            });
-          }
-        }
-
-        if (beneList.length > 0) {
-          await offlineDb.cachedBeneficiaries.bulkPut(beneList);
-        }
-        if (attList.length > 0) {
-          await offlineDb.transaction("rw", offlineDb.offlineAttendanceRecords, async () => {
-            for (const rec of attList) {
-              const existing = await offlineDb.offlineAttendanceRecords
-                .where("[programId+workDayId+programBeneficiaryId]")
-                .equals([rec.programId, rec.workDayId, rec.programBeneficiaryId])
-                .first();
-
-              if (existing && existing.id) {
-                await offlineDb.offlineAttendanceRecords.update(existing.id, {
-                  ...rec,
-                  scannedByName: rec.scannedByName || existing.scannedByName,
-                });
-              } else {
-                await offlineDb.offlineAttendanceRecords.add(rec);
-              }
-            }
-          });
-        }
-      }
+    await offlineDb.cachedPrograms.bulkPut(programRows);
+    await offlineDb.cachedWorkDays.bulkPut(days);
+    await offlineDb.cachedWorkProgramItems.bulkPut(activities);
+    await offlineDb.cachedBeneficiaries.bulkPut([...beneRows, ...retained]);
+    if (qrData) {
+      await offlineDb.cachedQrSlots.clear();
+      await offlineDb.cachedQrSlots.bulkPut(qrData.slots);
+      await offlineDb.cachedQrSlots.put({ publicToken: "__SYNCED__", designatedNumber: "" });
     }
+    for (const rec of attendance) {
+      const local = await offlineDb.offlineAttendanceRecords.where("[programId+workDayId+programBeneficiaryId]")
+        .equals([rec.programId, rec.workDayId, rec.programBeneficiaryId]).first();
+      const pending = queue.some(q => q.entityType === "ATTENDANCE" && q.payload.programId === rec.programId
+        && q.payload.workDayId === rec.workDayId && q.payload.programBeneficiaryId === rec.programBeneficiaryId);
+      if (local?.id) {
+        const merged = { ...rec, isSynced: !pending };
+        if (pending || local.isSynced === false) {
+          for (const field of ["morningTimeIn", "morningTimeOut", "afternoonTimeIn", "afternoonTimeOut"] as const) {
+            if (local[field]) merged[field] = local[field];
+          }
+          merged.isSynced = false;
+        }
+        await offlineDb.offlineAttendanceRecords.update(local.id, merged);
+      } else await offlineDb.offlineAttendanceRecords.add({ ...rec, isSynced: !pending });
+    }
+    // Restore queued timestamps even if an older app version previously overwrote the local mirror.
+    for (const tx of queue.filter(q => q.entityType === "ATTENDANCE")) {
+      const { programId, workDayId, programBeneficiaryId } = tx.payload;
+      if (!programId || !workDayId || !programBeneficiaryId) continue;
+      const local = await offlineDb.offlineAttendanceRecords.where("[programId+workDayId+programBeneficiaryId]")
+        .equals([programId, workDayId, programBeneficiaryId]).first();
+      if (!local?.id) continue;
+      const updates: Partial<OfflineAttendanceRecord> = { isSynced: false };
+      for (const field of ["morningTimeIn", "morningTimeOut", "afternoonTimeIn", "afternoonTimeOut"] as const) {
+        if (tx.payload[field]) updates[field] = tx.payload[field];
+      }
+      await offlineDb.offlineAttendanceRecords.update(local.id, updates);
+    }
+  });
+  const scope = user?.assignedBarangay ? "Barangay " + normalizeBarangayName(user.assignedBarangay) : "Municipality-wide";
+  localStorage.setItem("tupad_last_offline_sync", new Date().toISOString());
+  localStorage.setItem("tupad_offline_scope", scope);
+  window.dispatchEvent(new CustomEvent("tupad-cache-updated"));
+  return { beneficiariesCount: beneRows.length, attendanceCount: attendance.length, scope };
+}
 
-    const scopeStr = user?.assignedBarangay
-      ? `Barangay ${normalizeBarangayName(user.assignedBarangay)}`
-      : "Municipality-wide (All 11 Barangays)";
-
-    localStorage.setItem("tupad_last_offline_sync", new Date().toISOString());
-    localStorage.setItem("tupad_offline_scope", scopeStr);
-
-    // Broadcast update events to all open tabs and components
-    window.dispatchEvent(new CustomEvent("tupad-offline-synced"));
-    window.dispatchEvent(new CustomEvent("tupad-attendance-updated"));
-
-    return {
-      success: true,
-      beneficiariesCount: totalBeneficiariesCount,
-      attendanceCount: totalAttendanceRecordsCount,
-      scope: scopeStr,
-    };
+/** Block a reset while any outgoing mutation still needs acknowledgment or conflict review. */
+export async function forceMasterSyncWithServer(user?: CacheUser) {
+  try {
+    const upload = await pushSyncQueue();
+    if (upload.remaining) throw new Error(upload.authRequired
+      ? "Sign in again before retrying. Unsynced records and cache were kept."
+      : upload.remaining + " record(s) still await server acknowledgment or conflict review. No cache reset was performed.");
+    const snapshot = await initializeUserOfflineCache(user);
+    if (await getPendingQueueCount()) throw new Error("New scans were queued during refresh. They are retained on this device; sync again before considering it complete.");
+    return { success: true as const, ...snapshot };
   } catch (error: any) {
-    console.error("forceMasterSyncWithServer error:", error);
-    return { success: false, error: error.message };
+    return { success: false as const, error: error.message };
   }
 }
 

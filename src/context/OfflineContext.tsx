@@ -1,243 +1,154 @@
 "use client";
 
-import React, { createContext, useContext, useEffect, useState, useCallback } from "react";
-import {
-  offlineDb,
-  pushSyncQueue,
-  getPendingQueueCount,
-  initializeUserOfflineCache,
-  forceMasterSyncWithServer,
-} from "@/lib/dexie";
+import React, { createContext, useContext, useEffect, useState, useCallback, useRef } from "react";
+import { pushSyncQueue, getPendingQueueCount, initializeUserOfflineCache, forceMasterSyncWithServer, recoverInterruptedSync } from "@/lib/dexie";
 import { useAuth } from "./AuthContext";
 
 interface OfflineContextType {
-  isOnline: boolean;
-  pendingCount: number;
-  isSyncing: boolean;
-  lastSyncTime: string | null;
-  syncNotice: string | null;
-  syncNow: () => Promise<any>;
-  masterSyncNow: () => Promise<any>;
-  cacheProgramData: (programId: string) => Promise<void>;
-  refreshOfflineCache: () => Promise<void>;
-  dismissNotice: () => void;
+  isOnline: boolean; pendingCount: number; isSyncing: boolean; lastSyncTime: string | null; syncNotice: string | null;
+  syncNow: () => Promise<any>; masterSyncNow: () => Promise<any>;
+  cacheProgramData: (programId: string) => Promise<void>; refreshOfflineCache: () => Promise<void>; dismissNotice: () => void;
 }
-
 const OfflineContext = createContext<OfflineContextType>({
-  isOnline: true,
-  pendingCount: 0,
-  isSyncing: false,
-  lastSyncTime: null,
-  syncNotice: null,
-  syncNow: async () => {},
-  masterSyncNow: async () => {},
-  cacheProgramData: async () => {},
-  refreshOfflineCache: async () => {},
-  dismissNotice: () => {},
+  isOnline: true, pendingCount: 0, isSyncing: false, lastSyncTime: null, syncNotice: null,
+  syncNow: async () => {}, masterSyncNow: async () => {}, cacheProgramData: async () => {},
+  refreshOfflineCache: async () => {}, dismissNotice: () => {},
 });
 
 export function OfflineProvider({ children }: { children: React.ReactNode }) {
   const { user } = useAuth();
-  const [isOnline, setIsOnline] = useState<boolean>(true);
-  const [pendingCount, setPendingCount] = useState<number>(0);
-  const [isSyncing, setIsSyncing] = useState<boolean>(false);
+  const [isOnline, setIsOnline] = useState(true);
+  const [pendingCount, setPendingCount] = useState(0);
+  const [isSyncing, setIsSyncing] = useState(false);
   const [lastSyncTime, setLastSyncTime] = useState<string | null>(null);
   const [syncNotice, setSyncNotice] = useState<string | null>(null);
-
+  const busy = useRef(false);
+  const authBlocked = useRef(false);
   const refreshPending = useCallback(async () => {
-    try {
-      const count = await getPendingQueueCount();
-      setPendingCount(count);
-    } catch (e) {}
+    try { setPendingCount(await getPendingQueueCount()); }
+    catch { setSyncNotice("Cannot read this device's offline queue. Do not clear browser data."); }
   }, []);
+  const markSuccess = () => setLastSyncTime(new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }));
 
-  const dismissNotice = () => setSyncNotice(null);
-
-  // Auto-sync function: Pushes pending mutations and refreshes local IndexedDB
-  const executeAutoSync = useCallback(async () => {
-    if (isSyncing) return;
+  const executeAutoSync = useCallback(async (manual = false) => {
+    if (!user || busy.current || !navigator.onLine || (authBlocked.current && !manual)) return;
+    busy.current = true;
     setIsSyncing(true);
     try {
-      // 1. Push pending offline mutations
-      const res = await pushSyncQueue();
+      const result = await pushSyncQueue();
+      authBlocked.current = result.authRequired;
       await refreshPending();
-
-      // 2. Refresh local offline cache with newest server data
-      if (user) {
-        await initializeUserOfflineCache(user);
+      const uploaded = result.accepted.length + result.duplicates.length;
+      if (result.authRequired) setSyncNotice("Upload needs an authorized login. Sign in again on this device, then retry. Your unsynced records are still saved here.");
+      else if (result.remaining) setSyncNotice(uploaded + " acknowledged; " + result.remaining + " still on this device. Open Offline Sync Center for failed uploads or conflicts.");
+      else {
+        markSuccess();
+        if (uploaded || manual) setSyncNotice(uploaded + " record(s) acknowledged by the server. Queue is clear.");
       }
-
-      const now = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-      setLastSyncTime(now);
-
-      if (res.accepted && res.accepted.length > 0) {
-        setSyncNotice(`Auto-synced ${res.accepted.length} offline record(s) to server successfully at ${now}.`);
-        setTimeout(() => setSyncNotice(null), 7000);
+      if (!result.remaining) {
+        try { await initializeUserOfflineCache(user); }
+        catch { setSyncNotice("Uploads checked, but the latest server cache could not be downloaded. Existing cache was kept."); }
       }
-      return res;
-    } catch (error) {
-      console.error("Auto-sync error:", error);
-    } finally {
-      setIsSyncing(false);
-    }
-  }, [isSyncing, refreshPending, user]);
-
-  const syncNow = async () => {
-    return await executeAutoSync();
-  };
+      return result;
+    } catch (error: any) { setSyncNotice(error.message || "Sync interrupted. Records remain on this device; please retry."); }
+    finally { busy.current = false; setIsSyncing(false); await refreshPending(); }
+  }, [user, refreshPending]);
 
   const masterSyncNow = async () => {
+    if (!user || busy.current) return;
+    busy.current = true;
     setIsSyncing(true);
     try {
-      const res = await forceMasterSyncWithServer(user || undefined);
-      await refreshPending();
-      const now = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-      setLastSyncTime(now);
-
-      if (res.success) {
-        setSyncNotice(`✓ Master Key Sync Complete: ${res.beneficiariesCount} beneficiaries & ${res.attendanceCount} attendance logs aligned with PESO Admin database (${res.scope}).`);
-        setTimeout(() => setSyncNotice(null), 8000);
-      } else {
-        setSyncNotice(`Master Sync Notice: ${res.error || "Could not complete sync."}`);
-        setTimeout(() => setSyncNotice(null), 6000);
-      }
-      return res;
-    } finally {
-      setIsSyncing(false);
-    }
+      const result = await forceMasterSyncWithServer(user);
+      if (result.success) {
+        markSuccess();
+        setSyncNotice("Master Sync complete: " + result.beneficiariesCount + " beneficiaries and " + result.attendanceCount + " attendance records downloaded (" + result.scope + ").");
+      } else setSyncNotice(result.error);
+      return result;
+    } finally { busy.current = false; setIsSyncing(false); await refreshPending(); }
   };
 
   const refreshOfflineCache = async () => {
-    if (user) {
-      setIsSyncing(true);
-      try {
-        await initializeUserOfflineCache(user);
-        const now = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-        setLastSyncTime(now);
-        setSyncNotice(`Offline cache refreshed for ${user.fullName} (${user.assignedBarangay ? 'Brgy. ' + user.assignedBarangay : 'Municipality-wide'}).`);
-        setTimeout(() => setSyncNotice(null), 5000);
-      } finally {
-        setIsSyncing(false);
-      }
-    }
-  };
-
-  const cacheProgramData = async (programId: string) => {
-    if (user) {
+    if (!user || busy.current) return;
+    busy.current = true;
+    setIsSyncing(true);
+    try {
       await initializeUserOfflineCache(user);
-    }
+      setSyncNotice("Server cache downloaded. Unsynced scans are retained separately until acknowledged.");
+    } catch (error: any) { setSyncNotice(error.message || "Cache download failed. Existing cache was kept."); }
+    finally { busy.current = false; setIsSyncing(false); await refreshPending(); }
   };
 
-  // Initial user cache bootstrap when user logs in (deferred to not block mobile UI hydration)
   useEffect(() => {
-    if (!user || !isOnline) return;
-
+    authBlocked.current = false;
+    if (!user) return;
     const timer = setTimeout(() => {
-      initializeUserOfflineCache(user).then(() => {
-        refreshPending();
-      }).catch(() => {});
+      void recoverInterruptedSync().then(() => executeAutoSync()).catch(() => refreshPending());
     }, 1500);
-
     return () => clearTimeout(timer);
-  }, [user, isOnline, refreshPending]);
+  }, [user, executeAutoSync, refreshPending]);
 
-  // Online / Offline & Polling Heartbeat
   useEffect(() => {
-    setIsOnline(typeof navigator !== "undefined" ? navigator.onLine : true);
-
-    const handleOnlineEvent = () => {
-      setIsOnline(true);
-      executeAutoSync();
-    };
-
-    const handleOfflineEvent = () => {
+    setIsOnline(navigator.onLine);
+    let debounce: ReturnType<typeof setTimeout> | undefined;
+    const attempt = () => { if (!document.hidden && navigator.onLine) void executeAutoSync(); };
+    const online = () => { setIsOnline(true); attempt(); };
+    const offline = () => {
       setIsOnline(false);
-      setSyncNotice("Device is now Offline. Changes will be saved locally and auto-synced when connection returns.");
-      setTimeout(() => setSyncNotice(null), 6000);
+      setSyncNotice("Offline: scans are saved on this device only until the server acknowledges their upload.");
     };
-
-    const handleAttendanceUpdate = () => {
-      refreshPending();
-    };
-
-    window.addEventListener("online", handleOnlineEvent);
-    window.addEventListener("offline", handleOfflineEvent);
-    window.addEventListener("tupad-attendance-updated", handleAttendanceUpdate);
-    window.addEventListener("tupad-offline-synced", handleAttendanceUpdate);
-
-    // Periodic heartbeat (every 45s, paused when tab is inactive) to preserve mobile battery & network
-    const heartbeatInterval = setInterval(async () => {
-      if (typeof navigator === "undefined" || (typeof document !== "undefined" && document.hidden)) return;
-
-      try {
-        const pingRes = await fetch("/api/v1/health", { method: "GET", cache: "no-store" });
-        if (pingRes.ok) {
-          if (!isOnline) {
-            setIsOnline(true);
-            executeAutoSync();
-          } else {
-            // If already online and has pending queue, auto-flush
-            const pending = await getPendingQueueCount();
-            setPendingCount(pending);
-            if (pending > 0 && !isSyncing) {
-              executeAutoSync();
-            }
-          }
-        } else {
-          setIsOnline(false);
-        }
-      } catch (err) {
-        setIsOnline(false);
+    const queueChanged = (event: Event) => {
+      void refreshPending();
+      if ((event as CustomEvent).detail?.enqueued) {
+        clearTimeout(debounce);
+        debounce = setTimeout(attempt, 1000);
       }
-    }, 45000);
-
-    refreshPending();
-
-    return () => {
-      window.removeEventListener("online", handleOnlineEvent);
-      window.removeEventListener("offline", handleOfflineEvent);
-      window.removeEventListener("tupad-attendance-updated", handleAttendanceUpdate);
-      window.removeEventListener("tupad-offline-synced", handleAttendanceUpdate);
-      clearInterval(heartbeatInterval);
     };
-  }, [executeAutoSync, isOnline, isSyncing, refreshPending]);
+    const refresh = () => { void refreshPending(); };
+    const heartbeat = setInterval(async () => {
+      if (document.hidden || !user) return;
+      try {
+        const response = await fetch("/api/v1/health", { cache: "no-store", signal: AbortSignal.timeout(10000) });
+        setIsOnline(response.ok);
+        if (response.ok && await getPendingQueueCount() > 0) attempt();
+      } catch { setIsOnline(false); }
+    }, 45000);
+    window.addEventListener("online", online);
+    window.addEventListener("offline", offline);
+    window.addEventListener("focus", attempt);
+    document.addEventListener("visibilitychange", attempt);
+    window.addEventListener("tupad-queue-updated", queueChanged);
+    window.addEventListener("tupad-offline-synced", refresh);
+    window.addEventListener("tupad-attendance-updated", refresh);
+    void refreshPending();
+    return () => {
+      clearInterval(heartbeat);
+      clearTimeout(debounce);
+      window.removeEventListener("online", online);
+      window.removeEventListener("offline", offline);
+      window.removeEventListener("focus", attempt);
+      document.removeEventListener("visibilitychange", attempt);
+      window.removeEventListener("tupad-queue-updated", queueChanged);
+      window.removeEventListener("tupad-offline-synced", refresh);
+      window.removeEventListener("tupad-attendance-updated", refresh);
+    };
+  }, [executeAutoSync, refreshPending, user]);
 
   return (
-    <OfflineContext.Provider
-      value={{
-        isOnline,
-        pendingCount,
-        isSyncing,
-        lastSyncTime,
-        syncNotice,
-        syncNow,
-        masterSyncNow,
-        cacheProgramData,
-        refreshOfflineCache,
-        dismissNotice,
-      }}
-    >
-      {/* Global Sync Notification Banner */}
+    <OfflineContext.Provider value={{
+      isOnline, pendingCount, isSyncing, lastSyncTime, syncNotice,
+      syncNow: () => executeAutoSync(true), masterSyncNow,
+      cacheProgramData: async () => { await refreshOfflineCache(); },
+      refreshOfflineCache, dismissNotice: () => setSyncNotice(null),
+    }}>
       {syncNotice && (
-        <div className="fixed bottom-4 right-4 z-50 max-w-sm bg-slate-900 text-white p-3.5 rounded-2xl shadow-2xl border border-slate-700 text-xs flex items-start justify-between space-x-3 animate-fadeIn">
-          <div className="flex items-center space-x-2">
-            <span className={`w-2.5 h-2.5 rounded-full ${isOnline ? "bg-emerald-400 animate-pulse" : "bg-amber-400"}`} />
-            <p className="font-medium leading-tight">{syncNotice}</p>
-          </div>
-          <button
-            onClick={dismissNotice}
-            className="text-slate-400 hover:text-white font-bold text-xs"
-          >
-            ✕
-          </button>
+        <div role="status" className="fixed bottom-4 right-4 z-50 max-w-sm bg-slate-900 text-white p-3.5 rounded-2xl shadow-2xl border border-slate-700 text-xs flex items-start justify-between gap-3">
+          <p className="font-medium leading-tight">{syncNotice}</p>
+          <button aria-label="Dismiss sync notice" onClick={() => setSyncNotice(null)} className="text-slate-300">Close</button>
         </div>
       )}
-
       {children}
     </OfflineContext.Provider>
   );
 }
-
-export function useOffline() {
-  return useContext(OfflineContext);
-}
+export function useOffline() { return useContext(OfflineContext); }

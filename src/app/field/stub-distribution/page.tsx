@@ -1,5 +1,7 @@
 "use client";
 
+import { getCachedMonitoring, includeLocalPending } from "@/lib/offline-monitoring";
+import { useMonitorRefresh } from "@/lib/use-monitor-refresh";
 import { ScanRequestError, readScanResponse } from "@/lib/program-qr-slot";
 
 import React, { useState, useEffect, useRef } from "react";
@@ -76,6 +78,7 @@ function StubDistributionContent() {
   const [selectedProgramId, setSelectedProgramId] = useState<string>("");
   const programRef = useRef(selectedProgramId);
   programRef.current = selectedProgramId;
+  const monitoringRequest = useRef(0);
 
   // Scanner States
   const [scannerOpen, setScannerOpen] = useState(false);
@@ -145,8 +148,9 @@ function StubDistributionContent() {
     }
   };
 
-  const fetchMonitoringData = async (progId: string) => {
-    setMonitoringLoading(true);
+  const fetchMonitoringData = async (progId: string, silent = false) => {
+    const request = ++monitoringRequest.current;
+    if (!silent) setMonitoringLoading(true);
     try {
       if (typeof navigator === "undefined" || navigator.onLine) {
         const res = await fetch(
@@ -154,8 +158,10 @@ function StubDistributionContent() {
         );
         if (res.ok) {
           const data = await res.json();
-          if (programRef.current !== progId) return;
-          setMonitoringData(data);
+          if (programRef.current !== progId || request !== monitoringRequest.current) return;
+          const snapshot = await includeLocalPending(data, progId);
+          if (programRef.current !== progId || request !== monitoringRequest.current) return;
+          setMonitoringData(snapshot);
           return;
         }
       }
@@ -165,43 +171,20 @@ function StubDistributionContent() {
         e
       );
     } finally {
-      setMonitoringLoading(false);
+      if (!silent && programRef.current === progId && request === monitoringRequest.current) setMonitoringLoading(false);
     }
 
     // Offline stub monitoring fallback
     try {
-      const cachedBeneficiaries = await offlineDb.cachedBeneficiaries
-        .where("programId")
-        .equals(progId)
-        .toArray();
-      if (programRef.current !== progId) return;
-
-      if (cachedBeneficiaries.length > 0) {
-        setMonitoringData({
-          stats: {
-            totalBeneficiaries: cachedBeneficiaries.length,
-            distributedCount: cachedBeneficiaries.filter(
-              (b) => b.status === "ACTIVE"
-            ).length,
-            pendingCount: 0,
-            distributionRate: 100,
-          },
-          beneficiaries: cachedBeneficiaries.map((b) => ({
-            id: b.id,
-            designatedNumber: b.designatedNumber,
-            fullName: b.fullName,
-            barangay: b.barangay,
-            sitio: b.sitio,
-            tableNumber: b.tableNumber,
-            status: "DISTRIBUTED",
-            qrToken: b.qrToken,
-          })),
-        });
-      }
+      const snapshot = await getCachedMonitoring(progId, "stub");
+      if (programRef.current !== progId || request !== monitoringRequest.current) return;
+      setMonitoringData(snapshot);
     } catch (err) {
       console.error("Failed to build offline stub monitoring:", err);
     }
   };
+
+  useMonitorRefresh(() => fetchMonitoringData(selectedProgramId, true), Boolean(selectedProgramId));
 
   // 1. Scan Handler
   useEffect(() => {
@@ -325,7 +308,7 @@ function StubDistributionContent() {
 
         setSuccessResult({
           message:
-            "✓ Beneficiary Birthday Confirmed! Stub verified as officially distributed & orientation attendance affirmed.",
+            "✓ Beneficiary Birthday Confirmed! Stub verified as officially distributed. Orientation attendance is recorded separately.",
           data: data.data,
           isOffline: false,
         });
@@ -451,7 +434,7 @@ function StubDistributionContent() {
           : rosterFilter === "CONFIRMED"
           ? b.status === "CONFIRMED"
           : rosterFilter === "PENDING"
-          ? b.status === "PENDING"
+          ? b.status === "PENDING" || b.status === "PENDING_SYNC"
           : b.status === "FLAGGED_REPLACEMENT" || b.isCompletedReplacement;
 
       const matchesBarangay =
@@ -500,6 +483,7 @@ function StubDistributionContent() {
 
   return (
     <div className="space-y-6">
+      {monitoringData?.isCached && <p role="status" className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">Cached device snapshot, not a live server report. Queued scans await upload; replacement details may be unavailable offline.</p>}
       {/* Top Header & Tab Navigation */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
@@ -753,6 +737,7 @@ function StubDistributionContent() {
               className={`gov-card p-6 text-center space-y-4 shadow-xl border-t-4 ${
                 successResult.isFlagged
                   ? "border-t-rose-600"
+                  : successResult.isOffline ? "border-t-amber-500"
                   : "border-t-emerald-600"
               }`}
             >
@@ -760,10 +745,11 @@ function StubDistributionContent() {
                 className={`w-16 h-16 rounded-full flex items-center justify-center mx-auto ${
                   successResult.isFlagged
                     ? "bg-rose-100 text-rose-700"
+                    : successResult.isOffline ? "bg-amber-100 text-amber-800"
                     : "bg-emerald-100 text-emerald-700"
                 }`}
               >
-                <CheckCircle2 className="w-9 h-9" />
+                {successResult.isOffline ? <Clock className="w-9 h-9" /> : <CheckCircle2 className="w-9 h-9" />}
               </div>
 
               <div className="space-y-1">
@@ -771,12 +757,13 @@ function StubDistributionContent() {
                   className={`text-[10px] font-black uppercase tracking-wider ${
                     successResult.isFlagged
                       ? "text-amber-700"
+                      : successResult.isOffline ? "text-amber-800"
                       : "text-emerald-700"
                   }`}
                 >
                   {successResult.isFlagged
                     ? "⏳ SUBMITTED FOR ADMIN / PESO APPROVAL"
-                    : "✓ AFFIRMED & DISTRIBUTED"}
+                    : successResult.isOffline ? "SAVED ON THIS DEVICE — AWAITING SERVER SYNC" : "✓ AFFIRMED & DISTRIBUTED"}
                 </span>
                 <h2 className="text-base font-black text-slate-900">
                   {successResult.data?.fullName} (#
@@ -1163,7 +1150,7 @@ function StubDistributionContent() {
                             ? "✓ Confirmed"
                             : b.status === "FLAGGED_REPLACEMENT"
                             ? "⚠ Flagged Replacement"
-                            : "Pending (Uninformed)"}
+                            : b.status === "PENDING_SYNC" ? "Saved locally — Pending sync" : "Pending (Uninformed)"}
                         </span>
                       </td>
                       <td className="py-2.5 px-3">
@@ -1206,7 +1193,7 @@ function StubDistributionContent() {
                           </span>
                         ) : (
                           <span className="text-slate-400 italic">
-                            Not yet verified
+                            {b.status === "CONFIRMED" ? "Confirmed in cached snapshot; verifier details unavailable" : b.status === "PENDING_SYNC" ? "Awaiting server sync" : "Not yet verified"}
                           </span>
                         )}
                       </td>

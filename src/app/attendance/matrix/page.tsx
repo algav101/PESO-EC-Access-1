@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState, useCallback, Suspense } from "react";
+import React, { useEffect, useState, useCallback, useRef, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import {
   FileSpreadsheet,
@@ -32,7 +32,8 @@ import {
 import { MultiSelectFilter } from "@/components/common/MultiSelectFilter";
 import { AdminStubOverrideModal } from "@/components/beneficiaries/AdminStubOverrideModal";
 import { TableScrollWrapper } from "@/components/common/TableScrollWrapper";
-import { offlineDb } from "@/lib/dexie";
+import { useMonitorRefresh } from "@/lib/use-monitor-refresh";
+import { offlineDb, UNSYNCED_QUEUE_STATUSES } from "@/lib/dexie";
 
 function AttendanceMatrixContent() {
   const searchParams = useSearchParams();
@@ -43,6 +44,9 @@ function AttendanceMatrixContent() {
 
   const [programs, setPrograms] = useState<any[]>([]);
   const [selectedProgramId, setSelectedProgramId] = useState<string>(urlProgramId || "");
+  const programRef = useRef(selectedProgramId);
+  programRef.current = selectedProgramId;
+  const matrixRequest = useRef(0);
   const [program, setProgram] = useState<any | null>(null);
   const [beneficiaries, setBeneficiaries] = useState<any[]>([]);
   const [selectedBarangays, setSelectedBarangays] = useState<string[]>(["ALL"]);
@@ -122,12 +126,15 @@ function AttendanceMatrixContent() {
 
   // 1. Merge server attendance records with local offline scans
   const mergeWithOfflineScans = useCallback(
-    async (serverBeneficiaries: any[], progId: string, workDays: any[]) => {
+    async (serverBeneficiaries: any[], progId: string, workDays: any[], includeSynced = false) => {
       try {
-        const offlineRecords = await offlineDb.offlineAttendanceRecords
+        const pending = (await offlineDb.offlineQueue.where("status").anyOf(UNSYNCED_QUEUE_STATUSES).toArray())
+          .filter(q => q.entityType === "ATTENDANCE" && q.payload.programId === progId);
+        const offlineRecords = (await offlineDb.offlineAttendanceRecords
           .where("programId")
           .equals(progId)
-          .toArray();
+          .toArray()).filter(r => includeSynced || r.isSynced !== true || pending.some(q =>
+            q.payload.programBeneficiaryId === r.programBeneficiaryId && q.payload.workDayId === r.workDayId));
 
         if (!offlineRecords || offlineRecords.length === 0) {
           return serverBeneficiaries;
@@ -233,6 +240,7 @@ function AttendanceMatrixContent() {
             ...cachedProg,
             workDays: cachedDays.sort((a, b) => a.dayNumber - b.dayNumber),
           };
+          if (programRef.current && programRef.current !== activeProgId) return;
           setProgram(fullProg);
 
           // Beneficiaries
@@ -266,7 +274,8 @@ function AttendanceMatrixContent() {
               });
             });
 
-            const merged = await mergeWithOfflineScans(formattedBenes, activeProgId, fullProg.workDays);
+            const merged = await mergeWithOfflineScans(formattedBenes, activeProgId, fullProg.workDays, true);
+            if (programRef.current && programRef.current !== activeProgId) return;
             setBeneficiaries(merged);
             setLoading(false);
           }
@@ -281,18 +290,21 @@ function AttendanceMatrixContent() {
   // 3. Fast Parallel Fetch from Optimized Server API
   const fetchProgramAndMatrix = useCallback(
     async (progId: string, isSilent = false) => {
+      const request = ++matrixRequest.current;
       if (!isSilent) setIsRefreshing(true);
       try {
-        const res = await fetch(`/api/v1/programs/${progId}/matrix`);
+        const res = await fetch(`/api/v1/programs/${progId}/matrix`, { cache: "no-store" });
         if (res.ok) {
           const data = await res.json();
           const progData = data.program;
           const beneData = data.beneficiaries || [];
 
+          if (programRef.current !== progId || request !== matrixRequest.current) return;
           setProgram(progData);
 
           // Merge with any local offline scans immediately
           const mergedBenes = await mergeWithOfflineScans(beneData, progId, progData.workDays || []);
+          if (programRef.current !== progId || request !== matrixRequest.current) return;
           setBeneficiaries(mergedBenes);
           setLoading(false);
         }
@@ -337,24 +349,16 @@ function AttendanceMatrixContent() {
     }
   }, [selectedProgramId, fetchProgramAndMatrix, loadFromLocalCache]);
 
-  // Listen to offline scan and sync events to re-merge attendance instantly
+  useMonitorRefresh(() => fetchProgramAndMatrix(selectedProgramId, true), Boolean(selectedProgramId) && isOnline, 30000);
+
   useEffect(() => {
-    const handleUpdate = () => {
-      if (selectedProgramId) {
-        loadFromLocalCache(selectedProgramId);
-        if (navigator.onLine) {
-          fetchProgramAndMatrix(selectedProgramId, true);
-        }
-      }
+    const update = () => {
+      if (!selectedProgramId) return;
+      if (navigator.onLine) void fetchProgramAndMatrix(selectedProgramId, true);
+      else void loadFromLocalCache(selectedProgramId);
     };
-
-    window.addEventListener("tupad-attendance-updated", handleUpdate);
-    window.addEventListener("tupad-offline-synced", handleUpdate);
-
-    return () => {
-      window.removeEventListener("tupad-attendance-updated", handleUpdate);
-      window.removeEventListener("tupad-offline-synced", handleUpdate);
-    };
+    window.addEventListener("tupad-attendance-updated", update);
+    return () => window.removeEventListener("tupad-attendance-updated", update);
   }, [selectedProgramId, loadFromLocalCache, fetchProgramAndMatrix]);
 
   const filtered = React.useMemo(() => {

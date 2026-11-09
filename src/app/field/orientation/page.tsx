@@ -1,5 +1,7 @@
 "use client";
 
+import { getCachedMonitoring, includeLocalPending } from "@/lib/offline-monitoring";
+import { useMonitorRefresh } from "@/lib/use-monitor-refresh";
 import { ScanRequestError, readScanResponse } from "@/lib/program-qr-slot";
 
 import React, { useState, useEffect, useRef } from "react";
@@ -57,6 +59,7 @@ function OrientationContent() {
   const [selectedProgramId, setSelectedProgramId] = useState<string>("");
   const programRef = useRef(selectedProgramId);
   programRef.current = selectedProgramId;
+  const monitoringRequest = useRef(0);
 
   // Scanner States
   const [scannerOpen, setScannerOpen] = useState(false);
@@ -73,7 +76,7 @@ function OrientationContent() {
   const [rosterFilter, setRosterFilter] = useState("ALL");
   const [selectedBarangayFilter, setSelectedBarangayFilter] = useState("ALL");
   const [selectedTableFilter, setSelectedTableFilter] = useState("ALL");
-  const [autoRefresh, setAutoRefresh] = useState(false);
+  const [autoRefresh, setAutoRefresh] = useState(true);
   const [lastRefreshedAt, setLastRefreshedAt] = useState<Date>(new Date());
 
   useEffect(() => {
@@ -86,18 +89,7 @@ function OrientationContent() {
     }
   }, [selectedProgramId]);
 
-  // Auto-refresh interval when enabled
-  useEffect(() => {
-    let interval: any = null;
-    if (autoRefresh && selectedProgramId) {
-      interval = setInterval(() => {
-        fetchMonitoringData(selectedProgramId, true);
-      }, 10000); // Poll every 10 seconds
-    }
-    return () => {
-      if (interval) clearInterval(interval);
-    };
-  }, [autoRefresh, selectedProgramId]);
+  useMonitorRefresh(() => fetchMonitoringData(selectedProgramId, true), Boolean(selectedProgramId) && autoRefresh, 10000);
 
   const fetchPrograms = async () => {
     try {
@@ -134,14 +126,17 @@ function OrientationContent() {
   };
 
   const fetchMonitoringData = async (progId: string, silent = false) => {
+    const request = ++monitoringRequest.current;
     if (!silent) setMonitoringLoading(true);
     try {
       if (typeof navigator === "undefined" || navigator.onLine) {
         const res = await fetch(`/api/v1/orientation/monitoring?programId=${progId}`);
         if (res.ok) {
           const data = await res.json();
-          if (programRef.current !== progId) return;
-          setMonitoringData(data);
+          if (programRef.current !== progId || request !== monitoringRequest.current) return;
+          const snapshot = await includeLocalPending(data, progId);
+          if (programRef.current !== progId || request !== monitoringRequest.current) return;
+          setMonitoringData(snapshot);
           setLastRefreshedAt(new Date());
           return;
         }
@@ -149,39 +144,15 @@ function OrientationContent() {
     } catch (e) {
       console.warn("Online orientation monitoring fetch failed, checking offline storage:", e);
     } finally {
-      if (!silent) setMonitoringLoading(false);
+      if (!silent && programRef.current === progId && request === monitoringRequest.current) setMonitoringLoading(false);
     }
 
     // Offline monitoring summary
     try {
-      const cachedBeneficiaries = await offlineDb.cachedBeneficiaries
-        .where("programId")
-        .equals(progId)
-        .toArray();
-      if (programRef.current !== progId) return;
-
-      if (cachedBeneficiaries.length > 0) {
-        const attendedCount = cachedBeneficiaries.filter((b) => b.orientationStatus === "PRESENT").length;
-        setMonitoringData({
-          stats: {
-            totalBeneficiaries: cachedBeneficiaries.length,
-            attendedCount,
-            absentCount: cachedBeneficiaries.length - attendedCount,
-            attendanceRate: Math.round((attendedCount / cachedBeneficiaries.length) * 100),
-          },
-          beneficiaries: cachedBeneficiaries.map((b) => ({
-            id: b.id,
-            designatedNumber: b.designatedNumber,
-            fullName: b.fullName,
-            barangay: b.barangay,
-            sitio: b.sitio,
-            tableNumber: b.tableNumber || "Table 1",
-            status: b.orientationStatus === "PRESENT" ? "PRESENT" : "ABSENT",
-            qrToken: b.qrToken,
-          })),
-        });
-        setLastRefreshedAt(new Date());
-      }
+      const snapshot = await getCachedMonitoring(progId, "orientation");
+      if (programRef.current !== progId || request !== monitoringRequest.current) return;
+      setMonitoringData(snapshot);
+      setLastRefreshedAt(new Date());
     } catch (err) {
       console.error("Failed to build offline orientation monitoring:", err);
     }
@@ -397,6 +368,7 @@ function OrientationContent() {
 
   return (
     <div className="max-w-6xl mx-auto space-y-6 pb-12">
+      {monitoringData?.isCached && <p role="status" className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">Cached device snapshot, not a live server report. Queued scans await upload; replacement details may be unavailable offline.</p>}
       {/* Top Header & Program Selector */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-200 pb-4">
         <div>
@@ -1057,7 +1029,9 @@ function OrientationContent() {
 
                           {/* Step 2: Orientation Status */}
                           <td className="py-3 px-3.5">
-                            {b.isOrientationScanned ? (
+                            {b.pendingOrientationSync && !b.isOrientationScanned ? (
+                              <span className="text-[10px] font-bold text-amber-800">Saved locally — Pending sync</span>
+                            ) : b.isOrientationScanned ? (
                               <div className="space-y-0.5">
                                 <span className="inline-flex items-center space-x-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
                                   <CheckCircle2 className="w-3 h-3 text-emerald-600" />

@@ -39,6 +39,7 @@ import {
   ChevronsLeft,
   ChevronsRight,
 } from "lucide-react";
+import { useMonitorRefresh } from "@/lib/use-monitor-refresh";
 import JSZip from "jszip";
 import { StatusBadge } from "@/components/common/StatusBadge";
 import { FieldQrPassGeneratorModal } from "@/components/field/FieldQrPassGeneratorCard";
@@ -56,6 +57,9 @@ export default function PhotosPage() {
   const [programs, setPrograms] = useState<any[]>([]);
   const [selectedProgramId, setSelectedProgramId] = useState<string>("");
   const [selectedBarangayFilter, setSelectedBarangayFilter] = useState<string>("ALL");
+  const photoScope = useRef("");
+  photoScope.current = selectedProgramId + "_" + selectedBarangayFilter;
+  const photoRequest = useRef(0);
   const [photos, setPhotos] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [photosLoading, setPhotosLoading] = useState<boolean>(true);
@@ -172,20 +176,7 @@ export default function PhotosPage() {
     }
   }, [selectedProgramId, selectedBarangayFilter]);
 
-  // Listen for sync completions to auto-update photo roster
-  useEffect(() => {
-    const handleSyncUpdate = () => {
-      if (selectedProgramId) {
-        fetchPhotos(selectedProgramId, selectedBarangayFilter);
-      }
-    };
-    window.addEventListener("tupad-offline-synced", handleSyncUpdate);
-    window.addEventListener("tupad-photos-updated", handleSyncUpdate);
-    return () => {
-      window.removeEventListener("tupad-offline-synced", handleSyncUpdate);
-      window.removeEventListener("tupad-photos-updated", handleSyncUpdate);
-    };
-  }, [selectedProgramId, selectedBarangayFilter]);
+  useMonitorRefresh(() => fetchPhotos(selectedProgramId, selectedBarangayFilter), Boolean(selectedProgramId), 30000);
 
   // Track GPS location continuously when modal is open
   useEffect(() => {
@@ -298,6 +289,7 @@ export default function PhotosPage() {
   const fetchPhotos = async (progId: string, brgyFilter?: string) => {
     const activeBrgy = brgyFilter !== undefined ? brgyFilter : selectedBarangayFilter;
     const cacheKey = `${progId}_${activeBrgy || "ALL"}`;
+    const request = ++photoRequest.current;
 
     if (photosMemoryCache.has(cacheKey)) {
       setPhotos(photosMemoryCache.get(cacheKey)!);
@@ -306,13 +298,13 @@ export default function PhotosPage() {
       setPhotosLoading(true);
     }
 
-    let serverPhotos: any[] = [];
+    let serverPhotos: any[] = (photosMemoryCache.get(cacheKey) || []).filter(p => !p.isOfflineQueue);
     try {
       let url = `/api/v1/photos?programId=${progId}`;
       if (activeBrgy && activeBrgy !== "ALL") {
         url += `&barangay=${encodeURIComponent(activeBrgy)}`;
       }
-      const res = await fetch(url);
+      const res = await fetch(url, { cache: "no-store" });
       if (res.ok) {
         const data = await res.json();
         serverPhotos = data.photos || [];
@@ -331,7 +323,8 @@ export default function PhotosPage() {
 
       const filtered = queuedItems.filter((item) => {
         const p = item.payload;
-        if (!p) return false;
+        if (!p || item.status === "SYNCED") return false;
+        if (activeBrgy && activeBrgy !== "ALL" && normalizeBarangayName(p.barangay) !== normalizeBarangayName(activeBrgy)) return false;
         if (progId && p.programId && p.programId !== progId) return false;
         if (
           (user?.role === "TUPAD_COORDINATOR" || user?.role === "TUPAD_ASSISTING_DOCUMENTOR") &&
@@ -368,6 +361,7 @@ export default function PhotosPage() {
       console.warn("Could not load offline queued photos:", err);
     }
 
+    if (photoScope.current !== cacheKey || request !== photoRequest.current) return;
     const merged = [...offlineQueuedPhotos, ...serverPhotos];
     photosMemoryCache.set(cacheKey, merged);
     setPhotos(merged);

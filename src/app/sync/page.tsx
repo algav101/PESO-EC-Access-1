@@ -26,7 +26,9 @@ import {
   OfflineTransaction,
   retryOfflineTransaction,
   retryAllFailedTransactions,
+  recoverInterruptedSync,
 } from "@/lib/dexie";
+import { useMonitorRefresh } from "@/lib/use-monitor-refresh";
 import { formatDate } from "@/lib/utils";
 
 export default function SyncCenterPage() {
@@ -74,10 +76,12 @@ export default function SyncCenterPage() {
       setCachedWpCount(wpCount);
       setCachedAttendanceCount(attCount);
 
-      const items = await offlineDb.offlineQueue.reverse().limit(50).toArray();
+      const items = await offlineDb.offlineQueue.reverse().toArray();
       setQueueItems(items);
     } catch (e) {}
   };
+
+  useMonitorRefresh(async () => { await recoverInterruptedSync(); await fetchOfflineStats(); }, true, 15000);
 
   const handleManualSync = async () => {
     await syncNow();
@@ -148,7 +152,7 @@ export default function SyncCenterPage() {
             onClick={async () => {
               if (
                 confirm(
-                  `Initiate Master Key Sync?\n\nThis will purge all local IndexedDB tables on this unit and re-align with the authoritative PESO Admin central database (scoped to ${activeScope}).`
+                  `Initiate Master Key Sync?\n\nThis will upload pending records first, then download the latest server cache. It stops if uploads fail or conflicts remain. Unsynced records are not deleted. Scope (scoped to ${activeScope}).`
                 )
               ) {
                 setActionInProgress(true);
@@ -162,7 +166,7 @@ export default function SyncCenterPage() {
             }}
             disabled={!isOnline || isSyncing || actionInProgress}
             className="px-3.5 py-2 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-slate-950 font-black text-xs rounded-xl shadow-md flex items-center space-x-1.5 transition disabled:opacity-50"
-            title="Authoritative Master Key Sync: Purge local cache and sync with PESO Admin database"
+            title="Upload queue, then safely refresh the server cache"
           >
             <Key className={`w-3.5 h-3.5 text-slate-950 ${isSyncing ? "animate-spin" : ""}`} />
             <span>Master Key Sync</span>
@@ -286,6 +290,11 @@ export default function SyncCenterPage() {
         </div>
       </div>
 
+      <div role="note" className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-xs text-amber-900 space-y-2">
+        <p><strong>{pendingCount} unresolved on this device.</strong> Pending: {pendingOnlyCount}; Failed: {failedCount}; Uploading: {queueItems.filter(q => q.status === "SYNCING").length}; Conflicts: {queueItems.filter(q => q.status === "CONFLICT").length}.</p>
+        <p>Saved locally is not a server confirmation. Interrupted uploads become retryable after 5 minutes. Conflicts require review against the selected program and server record; they are not automatically accepted. Do not clear browser data or uninstall this app while unresolved records remain.</p>
+      </div>
+
       {/* Offline Queue Items Table */}
       <div className="gov-card overflow-hidden shadow">
         <div className="p-4 bg-slate-50 border-b flex items-center justify-between">
@@ -312,7 +321,7 @@ export default function SyncCenterPage() {
 
         {queueItems.length === 0 ? (
           <div className="p-10 text-center text-xs text-slate-400">
-            No offline transactions queued. All field operations are completely synchronized with the central database.
+            No transactions are queued on this device. Other devices must upload their own offline records.
           </div>
         ) : (
           <div className="overflow-x-auto">
