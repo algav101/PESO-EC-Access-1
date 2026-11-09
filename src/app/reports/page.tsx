@@ -142,8 +142,8 @@ export default function ReportCenterPage() {
     {
       id: "ACCOMPLISHMENT",
       title: "Multi-Barangay Accomplishment Report (.XLSX)",
-      refNote: "Direct Excel Reference 3 Layout",
-      description: "Official workbook with worksheets for all 11 Dingalan barangays, enriched with assigned work areas, activities, and QR tokens.",
+      refNote: "Original TUPAD Completion Report Layout",
+      description: "Original Completion Report for all 11 barangays with daily regular/specific assignments and embedded Before, During, and After photos from the selected program. DOLE exports include approved photos only.",
       icon: Building,
       color: "text-blue-700 bg-blue-50",
       action: "Export Excel",

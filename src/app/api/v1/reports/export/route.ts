@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth";
+import { hasPermission } from "@/lib/permissions";
 import {
   generateAttendanceExcel,
   generateAccomplishmentExcel,
@@ -11,6 +12,7 @@ import {
 import prisma from "@/lib/prisma";
 
 export const dynamic = "force-dynamic";
+export const maxDuration = 60;
 
 export async function GET(request: Request) {
   try {
@@ -34,11 +36,25 @@ export async function GET(request: Request) {
         },
       });
     } else if (reportType === "ACCOMPLISHMENT") {
-      const buffer = await generateAccomplishmentExcel(programId);
-      return new Response(new Uint8Array(buffer), {
+      if (!hasPermission(user.role, "report.export")) {
+        return NextResponse.json({ error: "Your role is not allowed to export this report." }, { status: 403 });
+      }
+      const buffer = await generateAccomplishmentExcel(programId, { approvedPhotosOnly: user.role === "DOLE_COORDINATOR" });
+      // A streamed response avoids the hosting limit on buffered photo-heavy downloads.
+      let offset = 0;
+      const stream = new ReadableStream<Uint8Array>({
+        pull(controller) {
+          if (offset >= buffer.length) { controller.close(); return; }
+          const end = Math.min(offset + 256 * 1024, buffer.length);
+          controller.enqueue(new Uint8Array(buffer.subarray(offset, end)));
+          offset = end;
+        },
+      });
+      return new Response(stream, {
         headers: {
           "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
           "Content-Disposition": `attachment; filename="TUPAD_Accomplishment_Report_Dingalan_${programId.slice(0, 6)}.xlsx"`,
+          "Cache-Control": "private, no-store",
         },
       });
     } else if (reportType === "WORK_PROGRAM") {

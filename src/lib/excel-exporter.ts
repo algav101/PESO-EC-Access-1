@@ -1,7 +1,7 @@
 import ExcelJS from "exceljs";
 import prisma from "./prisma";
 import { format } from "date-fns";
-import { assignBeneficiaryWorkArea, WorkProgramItemAllocation } from "./work-assignment";
+import { populateCompletionReport } from "./completion-report-template";
 
 export async function generateAttendanceExcel(programId: string): Promise<Buffer> {
   const program = await prisma.program.findUnique({
@@ -262,205 +262,39 @@ export async function generateWorkProgramExcel(programId: string): Promise<Buffe
   return Buffer.from(buffer);
 }
 
-export async function generateAccomplishmentExcel(programId: string): Promise<Buffer> {
+export async function generateAccomplishmentExcel(programId: string, options: { approvedPhotosOnly?: boolean } = {}): Promise<Buffer> {
   const program = await prisma.program.findUnique({
     where: { id: programId },
     include: {
       programBeneficiaries: {
-        include: {
-          beneficiary: true,
-          qrCodes: true,
-        },
+        where: { participationStatus: { not: "REPLACED" } },
+        select: { id: true, beneficiary: { select: { barangay: true } } },
       },
       workDays: { orderBy: { dayNumber: "asc" } },
-      accomplishmentPhotos: true,
-      programBarangays: true,
+      accomplishmentPhotos: {
+        where: { status: options.approvedPhotosOnly ? "APPROVED" : { not: "REJECTED" } },
+        select: { id: true, workDayId: true, workProgramItemId: true, barangay: true, specificActivity: true, workArea: true, status: true, fileName: true, capturedAt: true, isPurged: true },
+        orderBy: [{ capturedAt: "asc" }, { id: "asc" }],
+      },
+      attendanceRecords: {
+        where: { activityName: { not: null } },
+        select: { workDayId: true, workProgramItemId: true, programBeneficiaryId: true, activityName: true, workArea: true },
+      },
       tupadWorkPrograms: {
-        include: {
-          items: { orderBy: [{ dayNumber: "asc" }, { orderIndex: "asc" }] },
-        },
+        include: { items: { orderBy: [{ dayNumber: "asc" }, { orderIndex: "asc" }] } },
       },
     },
   });
-
   if (!program) throw new Error("Program not found");
-
-  const workbook = new ExcelJS.Workbook();
-  workbook.creator = "LGU Dingalan - PESO TUPAD System";
-
-  const barangays = [
-    "APLAYA", "BUTAS NA BATO", "CARAGSACAN", "DAVILDAVILAN",
-    "DIKAPANIKIAN", "IBONA", "MATAWE", "PALTIC",
-    "POBLACION", "TANAWAN", "UMIRAY"
-  ];
-
-  for (const brgyName of barangays) {
-    const ws = workbook.addWorksheet(brgyName);
-    const brgyBeneficiaries = program.programBeneficiaries.filter(
-      (pb) => (pb.beneficiary.barangay || "").toUpperCase() === brgyName
-    );
-
-    const wp = program.tupadWorkPrograms.find(
-      (w) => w.barangay.toUpperCase() === brgyName
-    );
-
-    ws.mergeCells("A1:H1");
-    ws.getCell("A1").value = "DOLE - TUPAD PROGRAM ACCOMPLISHMENT REPORT";
-    ws.getCell("A1").font = { bold: true, size: 14 };
-    ws.getCell("A1").alignment = { horizontal: "center" };
-
-    ws.mergeCells("A2:H2");
-    ws.getCell("A2").value = `BARANGAY: ${brgyName} | MUNICIPALITY: DINGALAN, AURORA`;
-    ws.getCell("A2").font = { bold: true, size: 11 };
-    ws.getCell("A2").alignment = { horizontal: "center" };
-
-    ws.getCell("A4").value = "Project Location:";
-    ws.getCell("B4").value = `Barangay ${brgyName}, Dingalan, Aurora`;
-    ws.getCell("A5").value = "Nature of Work:";
-    ws.getCell("B5").value = wp?.natureOfWork || program.natureOfWork || "Environmental Cleaning & Maintenance";
-    ws.getCell("A6").value = "Number of Beneficiaries:";
-    ws.getCell("B6").value = wp?.beneficiaryCount || brgyBeneficiaries.length;
-    ws.getCell("A7").value = "Period of Work:";
-    ws.getCell("B7").value = `${program.startDate || "Day 1"} to ${program.endDate || "Day 10"} (${program.requiredWorkDays} Days)`;
-
-    // Section 1: Work Program Activities Schedule
-    ws.getCell("A9").value = "TUPAD WORK PROGRAM SCHEDULE & ACTIVITIES";
-    ws.getCell("A9").font = { bold: true, size: 10, color: { argb: "FF0C3B6D" } };
-
-    ws.getCell("A10").value = "DAY";
-    ws.getCell("B10").value = "SPECIFIC ACTIVITY";
-    ws.getCell("C10").value = "ASSIGNED WORK AREA";
-    ws.getCell("D10").value = "MALE";
-    ws.getCell("E10").value = "FEMALE";
-    ws.getCell("F10").value = "SC/PWD";
-    ws.getCell("G10").value = "TOTAL";
-
-    ws.getRow(10).font = { bold: true, size: 9, color: { argb: "FFFFFFFF" } };
-    ws.getRow(10).fill = {
-      type: "pattern",
-      pattern: "solid",
-      fgColor: { argb: "FF0C3B6D" },
-    };
-
-    let rIdx = 11;
-    const workItemsList: WorkProgramItemAllocation[] = [];
-    if (wp && wp.items.length > 0) {
-      for (const it of wp.items) {
-        workItemsList.push({
-          id: it.id,
-          dayNumber: it.dayNumber,
-          specificActivities: it.specificActivities,
-          area: it.area,
-          maleCount: it.maleCount,
-          femaleCount: it.femaleCount,
-          scPwdMaleCount: it.scPwdMaleCount,
-          scPwdFemaleCount: it.scPwdFemaleCount,
-          totalCount: it.totalCount,
-        });
-
-        const row = ws.getRow(rIdx);
-        row.getCell(1).value = `Day ${it.dayNumber}`;
-        row.getCell(2).value = it.specificActivities;
-        row.getCell(3).value = it.area;
-        row.getCell(4).value = it.maleCount || "";
-        row.getCell(5).value = it.femaleCount || "";
-        row.getCell(6).value = (it.scPwdMaleCount || 0) + (it.scPwdFemaleCount || 0) || "";
-        row.getCell(7).value = it.totalCount || it.maleCount + it.femaleCount || "";
-        row.font = { size: 9 };
-        rIdx++;
-      }
-    } else {
-      const row = ws.getRow(rIdx);
-      row.getCell(2).value = "General Community Cleaning & Greening";
-      row.getCell(3).value = "Barangay Public Areas";
-      row.getCell(7).value = brgyBeneficiaries.length;
-      rIdx++;
-    }
-
-    rIdx += 2;
-
-    // Section 2: Beneficiary Roster with Smart Work Area and Activity Assignment
-    ws.getCell(`A${rIdx}`).value = "BENEFICIARY ATTENDANCE, WORK AREA & PARTICIPATION ROSTER";
-    ws.getCell(`A${rIdx}`).font = { bold: true, size: 10, color: { argb: "FF0C3B6D" } };
-    rIdx++;
-
-    ws.getCell(`A${rIdx}`).value = "#";
-    ws.getCell(`B${rIdx}`).value = "DESIGNATED NO.";
-    ws.getCell(`C${rIdx}`).value = "BENEFICIARY NAME";
-    ws.getCell(`D${rIdx}`).value = "SEX";
-    ws.getCell(`E${rIdx}`).value = "SITIO / ADDRESS";
-    ws.getCell(`F${rIdx}`).value = "ASSIGNED WORK AREA";
-    ws.getCell(`G${rIdx}`).value = "DESIGNATED SPECIFIC ACTIVITY";
-    ws.getCell(`H${rIdx}`).value = "STATUS";
-    ws.getCell(`I${rIdx}`).value = "QR TOKEN REF";
-
-    ws.getRow(rIdx).font = { bold: true, size: 9, color: { argb: "FFFFFFFF" } };
-    ws.getRow(rIdx).fill = {
-      type: "pattern",
-      pattern: "solid",
-      fgColor: { argb: "FF1E293B" },
-    };
-
-    rIdx++;
-    brgyBeneficiaries.forEach((b, idx) => {
-      const activeQr = b.qrCodes?.find((q: any) => q.status === "ACTIVE") || b.qrCodes?.[0];
-
-      // Calculate smart work assignment for Day 1 schedule
-      const assignment = assignBeneficiaryWorkArea(
-        {
-          id: b.beneficiary.id,
-          designatedNumber: b.designatedNumber,
-          fullName: b.beneficiary.fullName,
-          sex: b.beneficiary.sex,
-          sitio: b.beneficiary.sitio,
-          barangay: b.beneficiary.barangay,
-          isSenior: b.beneficiary.isSenior,
-          isPwd: b.beneficiary.isPwd,
-        },
-        workItemsList.filter((it) => it.dayNumber === 1 || workItemsList.length <= 1),
-        1
-      );
-
-      const row = ws.getRow(rIdx);
-      row.getCell(1).value = idx + 1;
-      row.getCell(2).value = b.designatedNumber;
-      row.getCell(3).value = b.beneficiary.fullName;
-      row.getCell(4).value = b.beneficiary.sex || "UNSPECIFIED";
-      row.getCell(5).value = b.beneficiary.sitio || "";
-      row.getCell(6).value = assignment.area;
-      row.getCell(7).value = assignment.specificActivity;
-      row.getCell(8).value = b.participationStatus;
-      row.getCell(9).value = activeQr?.publicToken || `SLOT-${b.designatedNumber}`;
-      row.font = { size: 9 };
-      rIdx++;
+  return populateCompletionReport(program, async photo => {
+    // Read one image at a time instead of retaining all multi-MB base64 strings in memory.
+    if (photo.isPurged) return null;
+    const record = await prisma.accomplishmentPhoto.findFirst({
+      where: { id: photo.id, programId, isPurged: false, status: options.approvedPhotosOnly ? "APPROVED" : { not: "REJECTED" } },
+      select: { fileKey: true },
     });
-
-    // Signature section
-    rIdx += 3;
-    ws.getCell(`A${rIdx}`).value = "Prepared by:";
-    ws.getCell(`E${rIdx}`).value = "Verified by:";
-
-    rIdx += 3;
-    ws.getCell(`A${rIdx}`).value = "_________________________";
-    ws.getCell(`E${rIdx}`).value = "_________________________";
-
-    rIdx += 1;
-    ws.getCell(`A${rIdx}`).value = "TUPAD Coordinator / Focal Person";
-    ws.getCell(`E${rIdx}`).value = "PESO Manager / DOLE Coordinator";
-
-    ws.getColumn(1).width = 6;
-    ws.getColumn(2).width = 16;
-    ws.getColumn(3).width = 30;
-    ws.getColumn(4).width = 10;
-    ws.getColumn(5).width = 24;
-    ws.getColumn(6).width = 34;
-    ws.getColumn(7).width = 38;
-    ws.getColumn(8).width = 14;
-    ws.getColumn(9).width = 28;
-  }
-
-  const buffer = await workbook.xlsx.writeBuffer();
-  return Buffer.from(buffer);
+    return record?.fileKey || null;
+  });
 }
 
 /**
