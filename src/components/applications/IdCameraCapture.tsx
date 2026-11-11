@@ -2,8 +2,10 @@
 
 import React, { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { Camera, Check, RefreshCw, RotateCw, SwitchCamera, X } from "lucide-react";
+import { Camera, Check, Flashlight, RefreshCw, RotateCw, SwitchCamera, X } from "lucide-react";
 import { getCameraGuideRect, getCameraSourceCrop, getIdCameraPreset, ID_CAMERA_GUIDES, type IdCameraPreset } from "@/lib/id-camera-guide";
+import { captureBestIdPhoto, measureIdVideo, prepareIdCamera, setIdCameraLight } from "@/lib/id-camera-image";
+import type { IdPhotoQuality } from "@/lib/id-photo-quality";
 
 interface Props {
   idType: string;
@@ -33,10 +35,13 @@ export function IdCameraCapture({ idType, label, closeup = false, onCapture, onC
   const [facing, setFacing] = useState<"environment" | "user">("environment");
   const [restart, setRestart] = useState(0), [ready, setReady] = useState(false), [paused, setPaused] = useState(false);
   const [busy, setBusy] = useState(false), [error, setError] = useState("");
-  const [photo, setPhoto] = useState<{ file: File; url: string } | null>(null);
+  const [quality, setQuality] = useState<IdPhotoQuality | null>(null);
+  const [torchAvailable, setTorchAvailable] = useState(false), [torchOn, setTorchOn] = useState(false);
+  const [photo, setPhoto] = useState<{ file: File; url: string; quality: IdPhotoQuality; method: string } | null>(null);
   const hasPhoto = Boolean(photo);
   const displayIdType = idType === "VOTER'S CETIFICATE" ? "VOTER'S CERTIFICATE" : idType;
   const frame = useMemo(() => getCameraGuideRect(view.width, view.height, preset, rotated, size), [view, preset, rotated, size]);
+  const minimumLongEdge = preset === "DOCUMENT" ? 1600 : preset === "NUMBER" ? 800 : 1200;
 
   const stopCamera = useCallback(() => {
     streamRef.current?.getTracks().forEach((track) => { track.onended = null; track.stop(); });
@@ -81,7 +86,7 @@ export function IdCameraCapture({ idType, label, closeup = false, onCapture, onC
   useEffect(() => {
     if (hasPhoto || paused) return;
     let disposed = false;
-    setReady(false); setError("");
+    setReady(false); setError(""); setQuality(null); setTorchAvailable(false); setTorchOn(false);
     if (!window.isSecureContext || !navigator.mediaDevices?.getUserMedia) {
       setError("Kailangan ng HTTPS at supported browser para sa live camera. Puwede pa rin ang photo/file upload.");
       return;
@@ -89,7 +94,7 @@ export function IdCameraCapture({ idType, label, closeup = false, onCapture, onC
     const start = async () => {
       let stream: MediaStream | undefined;
       try {
-        stream = await navigator.mediaDevices.getUserMedia({ audio: false, video: { facingMode: { ideal: facing }, width: { ideal: 2560 }, height: { ideal: 1440 } } });
+        stream = await navigator.mediaDevices.getUserMedia({ audio: false, video: { facingMode: { ideal: facing }, width: { ideal: 3840 }, height: { ideal: 2160 } } });
         if (disposed || !alive.current) { stream.getTracks().forEach((track) => track.stop()); return; }
         streamRef.current = stream;
         const video = videoRef.current;
@@ -98,6 +103,11 @@ export function IdCameraCapture({ idType, label, closeup = false, onCapture, onC
         video.srcObject = stream;
         await video.play();
         if (!disposed && alive.current) setReady(video.videoWidth > 0 && video.videoHeight > 0);
+        const track = stream.getVideoTracks()[0];
+        if (track) {
+          const controls = await prepareIdCamera(track);
+          if (!disposed && alive.current) setTorchAvailable(controls.torch);
+        }
       } catch (issue) {
         stream?.getTracks().forEach((track) => track.stop());
         if (!disposed && alive.current) { stopCamera(); setError(cameraError(issue)); }
@@ -109,6 +119,24 @@ export function IdCameraCapture({ idType, label, closeup = false, onCapture, onC
 
   useEffect(() => () => { if (photo) URL.revokeObjectURL(photo.url); }, [photo]);
 
+  useEffect(() => {
+    if (!ready || hasPhoto || busy) return;
+    const inspect = () => {
+      const video = videoRef.current, stage = stageRef.current;
+      if (!video?.videoWidth || !stage) return;
+      const bounds = stage.getBoundingClientRect();
+      const guide = getCameraGuideRect(bounds.width, bounds.height, preset, rotated, size);
+      const crop = guide && getCameraSourceCrop(video.videoWidth, video.videoHeight, bounds.width, bounds.height, guide);
+      if (crop) {
+        try { setQuality(measureIdVideo(video, crop, minimumLongEdge)); }
+        catch { /* A transient frame must not stop the camera. */ }
+      }
+    };
+    inspect();
+    const timer = setInterval(inspect, 900);
+    return () => clearInterval(timer);
+  }, [ready, hasPhoto, busy, preset, rotated, size, minimumLongEdge]);
+
   const capture = async () => {
     const video = videoRef.current, stage = stageRef.current;
     if (!video || !stage || !ready || busy) return;
@@ -117,19 +145,22 @@ export function IdCameraCapture({ idType, label, closeup = false, onCapture, onC
     const crop = guide && getCameraSourceCrop(video.videoWidth, video.videoHeight, bounds.width, bounds.height, guide);
     if (!crop) { setError("Hindi pa handa ang camera. Subukan muli."); return; }
     setBusy(true);
+    let image: HTMLCanvasElement | undefined;
     try {
-      const canvas = document.createElement("canvas"), scale = Math.min(1, 2400 / Math.max(crop.width, crop.height));
-      canvas.width = Math.max(1, Math.round(crop.width * scale)); canvas.height = Math.max(1, Math.round(crop.height * scale));
-      const context = canvas.getContext("2d");
-      if (!context) throw new Error("Canvas unavailable");
-      context.drawImage(video, crop.x, crop.y, crop.width, crop.height, 0, 0, canvas.width, canvas.height);
-      const blob = await new Promise<Blob>((resolve, reject) => canvas.toBlob((value) => value ? resolve(value) : reject(new Error("Photo capture failed")), "image/jpeg", 0.94));
-      if (!alive.current) return;
+      const stream = streamRef.current, track = stream?.getVideoTracks()[0];
+      if (!track) throw new Error("Camera stopped");
+      const captured = await captureBestIdPhoto(video, track, crop, () => alive.current && streamRef.current === stream, minimumLongEdge);
+      image = captured.image;
+      const encode = (quality: number) => new Promise<Blob>((resolve, reject) => image!.toBlob(value => value ? resolve(value) : reject(new Error("Photo capture failed")), "image/jpeg", quality));
+      let blob = await encode(.97);
+      if (blob.size > 10 * 1024 * 1024) blob = await encode(.9);
+      if (blob.size > 10 * 1024 * 1024) throw new Error("Photo too large");
+      if (!alive.current || streamRef.current !== stream) return;
       const file = new File([blob], `id-${label.toLowerCase().replace(/[^a-z0-9]+/g, "-")}-${Date.now()}.jpg`, { type: "image/jpeg", lastModified: Date.now() });
-      stopCamera(); setReady(false); setPhoto({ file, url: URL.createObjectURL(file) });
+      stopCamera(); setReady(false); setPhoto({ file, url: URL.createObjectURL(file), quality: captured.quality, method: captured.method });
     } catch {
       if (alive.current) setError("Hindi nakuhanan ang photo. Subukan muli o gumamit ng file upload.");
-    } finally { if (alive.current) setBusy(false); }
+    } finally { if (image) image.width = image.height = 1; if (alive.current) setBusy(false); }
   };
 
   return createPortal(
@@ -147,11 +178,14 @@ export function IdCameraCapture({ idType, label, closeup = false, onCapture, onC
             </div>}
             {!ready && !error && !paused && <p role="status" className="absolute left-4 right-4 top-4 rounded-xl bg-slate-900/90 p-3 text-center text-sm">Binubuksan ang camera… Payagan ang camera kapag tinanong.</p>}
             {paused && !error && <p role="status" className="absolute left-4 right-4 top-4 rounded-xl bg-slate-900/90 p-3 text-center text-sm">Naka-pause ang camera matapos lumipat ng app o tab.</p>}
+            {ready && quality && !busy && <p data-testid="id-camera-quality" role="status" className={`pointer-events-none absolute bottom-3 left-3 right-3 rounded-lg border px-3 py-2 text-center text-xs ${quality.warnings.length ? "border-amber-300/60 bg-amber-950/95 text-amber-100" : "border-emerald-300/40 bg-slate-950/90 text-emerald-100"}`}>{quality.warnings[0] || "I-steady ang phone. I-check na nababasa ang lahat ng sulat bago kumuha."}</p>}
           </>}
           {error && <p role="alert" className="absolute left-4 right-4 top-4 rounded-xl border border-rose-300 bg-rose-950/95 p-3 text-sm text-rose-100">{error}</p>}
         </div>
         <footer className="flex min-h-0 flex-col justify-center gap-3 overflow-y-auto border-t border-white/10 bg-slate-950 p-4 landscape:border-l landscape:border-t-0" style={{ paddingBottom: "max(1rem, env(safe-area-inset-bottom))" }}>
           {photo ? <>
+            <p data-testid="id-photo-capture-method" className="text-center text-[11px] text-emerald-200">{photo.method === "HIGH_RES_STILL" ? "High-resolution camera photo" : "Pinili ang pinakamalinaw sa 3 camera frames"} · {photo.file.size < 1024 * 1024 ? `${Math.round(photo.file.size / 1024)} KB` : `${(photo.file.size / 1024 / 1024).toFixed(1)} MB`}</p>
+            {photo.quality.warnings.length > 0 && <div data-testid="id-photo-quality-warning" role="status" className="rounded-lg border border-amber-300/40 bg-amber-950/60 p-3 text-xs text-amber-100"><p className="mb-1 font-bold">Mas mabuting kunan muli:</p><ul className="list-disc space-y-1 pl-4">{photo.quality.warnings.map(warning => <li key={warning}>{warning}</li>)}</ul></div>}
             <p className="text-center text-xs text-slate-200">Malinaw ba ang buong ID at lahat ng sulat? Hindi pa ito ginagamit hangga't hindi kinukumpirma.</p>
             <button type="button" onClick={() => { onCapture(photo.file); onClose(); }} className="flex min-h-11 items-center justify-center gap-2 rounded-xl bg-emerald-400 px-4 py-3 text-sm font-black text-slate-950"><Check className="h-5 w-5" />Gamitin ang photo</button>
             <button type="button" onClick={() => { setPhoto(null); setError(""); setPaused(false); }} className="flex min-h-11 items-center justify-center gap-2 rounded-xl border border-slate-600 px-4 py-2 text-sm font-bold"><RefreshCw className="h-4 w-4" />Kunan muli</button>
@@ -163,6 +197,12 @@ export function IdCameraCapture({ idType, label, closeup = false, onCapture, onC
               </select></label>}
               <button type="button" aria-label="Paikutin ang border" title="Paikutin ang border" disabled={busy} onClick={() => setRotated((current) => !current)} className="grid h-11 w-11 shrink-0 place-items-center rounded-lg border border-slate-600"><RotateCw className="h-5 w-5" /></button>
               <button type="button" aria-label="Palit camera" title="Palit camera" disabled={busy || Boolean(error)} onClick={() => { setPaused(false); setFacing((current) => current === "environment" ? "user" : "environment"); }} className="grid h-11 w-11 shrink-0 place-items-center rounded-lg border border-slate-600 disabled:opacity-40"><SwitchCamera className="h-5 w-5" /></button>
+              {torchAvailable && <button type="button" aria-label="Ilaw ng camera" aria-pressed={torchOn} disabled={busy || !ready} onClick={async () => {
+                const track = streamRef.current?.getVideoTracks()[0];
+                if (!track) return;
+                try { await setIdCameraLight(track, !torchOn); if (alive.current && streamRef.current?.getVideoTracks()[0] === track) setTorchOn(!torchOn); }
+                catch { if (alive.current) setTorchAvailable(false); }
+              }} className={`grid h-11 w-11 shrink-0 place-items-center rounded-lg border ${torchOn ? "border-amber-300 bg-amber-300/20 text-amber-200" : "border-slate-600"}`}><Flashlight className="h-5 w-5" /></button>}
             </div>
             <label className="flex items-center gap-3 text-xs"><span className="shrink-0">Laki ng border</span><input aria-label="Laki ng border" disabled={busy} type="range" min="0.75" max="1.05" step="0.05" value={size} onChange={(event) => setSize(Number(event.target.value))} className="h-6 min-w-0 flex-1 accent-emerald-300" /></label>
             {error || paused ? <button type="button" onClick={() => { setPaused(false); setRestart((current) => current + 1); }} className="min-h-11 rounded-xl bg-white px-4 py-3 text-sm font-bold text-slate-950">Buksan muli ang camera</button> : <button type="button" disabled={!ready || busy} onClick={capture} className="flex min-h-11 items-center justify-center gap-2 rounded-xl bg-emerald-400 px-4 py-3 text-sm font-black text-slate-950 disabled:opacity-40"><Camera className="h-5 w-5" />{busy ? "Kinukuha ang photo…" : "Kunan ang ID"}</button>}

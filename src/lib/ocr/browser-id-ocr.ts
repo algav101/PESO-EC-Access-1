@@ -8,6 +8,7 @@ import { combineLocalReadings, fieldCrops, driverFrontFieldCrops, numberRescueCr
 import { getIdentityProfile } from "./identity-profiles";
 import { extractProfileNumber } from "./id-number-reader";
 import { lightDocumentBounds } from "./document-image";
+import { normalizeIdLighting } from "../id-photo-quality";
 
 const ASSETS = "/ocr/local-v1";
 const MAX_SIZE = 2600;
@@ -141,6 +142,15 @@ function enhance(source: HTMLCanvasElement, adaptive = false) {
     pixels.data[index * 4] = pixels.data[index * 4 + 1] = pixels.data[index * 4 + 2] = value;
   }
   ctx.putImageData(pixels, 0, 0);
+  return image;
+}
+
+function evenLighting(source: HTMLCanvasElement) {
+  const image = canvas(source.width, source.height), ctx = context(image);
+  const original = context(source).getImageData(0, 0, source.width, source.height);
+  const corrected = ctx.createImageData(source.width, source.height);
+  corrected.data.set(normalizeIdLighting(original.data, source.width, source.height));
+  ctx.putImageData(corrected, 0, 0);
   return image;
 }
 
@@ -354,6 +364,7 @@ export async function readIdentityFilesInBrowser(options: ReaderOptions) {
           }
           readings.push(best);
           const enhanced = enhance(selected);
+          let lightingView: HTMLCanvasElement | null = null;
           try {
             stage = `Enhancing and rechecking ${entry.side} ID`;
             const contrast = await scan(enhanced, PSM.SPARSE_TEXT);
@@ -361,6 +372,18 @@ export async function readIdentityFilesInBrowser(options: ReaderOptions) {
               throw new Error(`Pinili ang ${selectedIdType}, pero ${best.detectedType} ang nabasa sa picture. Pakitama ang ID selection o picture.`);
             }
             readings.push(contrast);
+            const phoneRecovery: Array<typeof best> = [];
+            const requiredIdentityFields = subject === "APPLICANT" ? 5 : 4;
+            // A non-empty field can still be truncated (e.g. a compound surname
+            // partly hidden by a shadow). Do not skip this view merely because
+            // every field has some OCR text. A complete QR can skip this pass.
+            if (entry.side !== "number" && identityScore(mapLocalIdentityText("", subject, qrValues, [], selectedIdType), subject) < requiredIdentityFields) {
+              stage = `Enhancing uneven lighting on ${entry.side} phone photo`;
+              lightingView = evenLighting(selected);
+              const recovery = await scan(lightingView, PSM.SPARSE_TEXT);
+              // Additional evidence only. Preserve original passes and normal conflict handling.
+              phoneRecovery.push(recovery); readings.push(recovery);
+            }
             const licenseReadings = selectedIdType === "DRIVER LICENSE ID" ? [await scan(selected, PSM.AUTO), await scan(enhanced, PSM.AUTO)] : [];
             readings.push(...licenseReadings);
             if (selectedIdType === "DRIVER LICENSE ID") {
@@ -382,11 +405,16 @@ export async function readIdentityFilesInBrowser(options: ReaderOptions) {
                 } finally { detail.width = detail.height = gray.width = gray.height = threshold.width = threshold.height = 1; }
               }
             }
-            const crops = fieldCrops([...licenseReadings.flatMap((reading) => reading.lines), ...contrast.lines, ...best.lines], enhanced.width, enhanced.height, selectedIdType);
+            // A shadow can hide the beginning of a label as well as the name.
+            // Use comparable-quality lighting recovery to anchor the whole field,
+            // rather than cutting at a surviving fragment such as "/ Last Name".
+            const recoveredAnchors = phoneRecovery.filter(reading => reading.confidence >= Math.max(best.confidence, contrast.confidence) - 5
+              && identityScore(reading.mapped, subject) >= identityScore(best.mapped, subject));
+            const crops = fieldCrops([...licenseReadings.flatMap((reading) => reading.lines), ...recoveredAnchors.flatMap(reading => reading.lines), ...contrast.lines, ...best.lines], enhanced.width, enhanced.height, selectedIdType);
             for (const region of crops) {
               if ((region.kind === "address" || region.kind === "choice") && subject !== "APPLICANT") continue;
               stage = `Reading ${entry.side} ${region.label.toLowerCase()} closely`;
-              const detail = crop(enhanced, region.left, region.top, region.width, region.height);
+              const detail = crop(recoveredAnchors.length && lightingView ? lightingView : enhanced, region.left, region.top, region.width, region.height);
               try {
                 const reading = await scan(detail, PSM.SINGLE_BLOCK, region.kind === "address" ? "" : region.label + "\n", region.kind);
                 if (selectedIdType === "DRIVER LICENSE ID" && region.kind === "name") {
@@ -528,6 +556,7 @@ export async function readIdentityFilesInBrowser(options: ReaderOptions) {
               }
             }
           } finally {
+            if (lightingView) lightingView.width = lightingView.height = 1;
             enhanced.width = enhanced.height = 1;
             if (selected !== source) selected.width = selected.height = 1;
             if (documentSource !== source && documentSource !== selected) documentSource.width = documentSource.height = 1;

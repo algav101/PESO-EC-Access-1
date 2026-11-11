@@ -154,7 +154,15 @@ try {
     const noBirthCtx = noBirthCertificate.getContext("2d"); noBirthCtx.drawImage(dependentCertificate, 0, 0);
     noBirthCtx.fillStyle = "#c2dee1"; noBirthCtx.fillRect(230, 570, 200, 35);
     const encoded = (canvas) => canvas.toDataURL().split(",")[1];
-    return { sidewaysLicense: encoded(sidewaysLicense), dependentCertificate: encoded(dependentCertificate), noBirthCertificate: encoded(noBirthCertificate), voter: encoded(voter), distractor: encoded(distractor), agencies: agencies.map(({ type, number, canvas }) => ({ type, number, data: encoded(canvas) })), closeup: encoded(closeup), fragments: encoded(fragments), bottom: encoded(bottom), license: encoded(license), passport: encoded(passport), noAddress: encoded(noAddress), back: encoded(back), backRotated: encoded(backRotated), multiline: encoded(multiline), normal: encoded(image), rotated: encoded(rotated), dim: encoded(dim), blank: encoded(blank), pcn: encoded(pcn), missingPcn: encoded(missingPcn) };
+    const phonePhoto = document.createElement("canvas"); phonePhoto.width=900; phonePhoto.height=573;
+    const phoneCtx=phonePhoto.getContext("2d");phoneCtx.filter="blur(0.25px)";phoneCtx.drawImage(image,0,0,900,573);phoneCtx.filter="none";
+    const phonePixels=phoneCtx.getImageData(0,0,900,573);
+    for(let y=0;y<573;y++)for(let x=0;x<900;x++) {
+      const factor=.45+.55*x/899, index=(y*900+x)*4;
+      for(let channel=0;channel<3;channel++)phonePixels.data[index+channel]*=factor;
+    }
+    phoneCtx.putImageData(phonePixels,0,0);
+    return { phonePhoto:phonePhoto.toDataURL("image/jpeg",.88).split(",")[1], sidewaysLicense: encoded(sidewaysLicense), dependentCertificate: encoded(dependentCertificate), noBirthCertificate: encoded(noBirthCertificate), voter: encoded(voter), distractor: encoded(distractor), agencies: agencies.map(({ type, number, canvas }) => ({ type, number, data: encoded(canvas) })), closeup: encoded(closeup), fragments: encoded(fragments), bottom: encoded(bottom), license: encoded(license), passport: encoded(passport), noAddress: encoded(noAddress), back: encoded(back), backRotated: encoded(backRotated), multiline: encoded(multiline), normal: encoded(image), rotated: encoded(rotated), dim: encoded(dim), blank: encoded(blank), pcn: encoded(pcn), missingPcn: encoded(missingPcn) };
   });
   const panel = (dependent = false) => page.locator("section").filter({ has: page.getByRole("heading", { name: dependent ? "Dependent ID Autofill" : "Identification & Applicant ID Autofill", exact: true }) });
   const read = async (name, mimeType, buffer, dependent = false, idType = "NATIONAL ID") => {
@@ -175,6 +183,15 @@ try {
     age: await page.locator("input[type=number][readonly]").first().inputValue(),
   });
   const expected = { given: "JUAN CARLO", middle: "SANTOS", last: "DELA CRUZ", birthday: "1982-05-05", id: "1234-5678-9012-3456", age: age("1982-05-05") };
+  if (!requested || requested === "phone-shadow") {
+    await read("synthetic-shadowed-phone-photo.jpg","image/jpeg",Buffer.from(png.phonePhoto,"base64"));
+    assert.deepEqual(await fields(),expected,"Shadowed phone JPEG must preserve names, DOB, age and number");
+    assert.equal(await page.getByLabel(/^STREET \/ PUROK \/ SITIO/).inputValue(),"PUROK 2");
+    assert.equal(await page.getByLabel(/^BARANGAY/).inputValue(),"PALTIC");
+    await page.getByRole("button",{name:"Clear",exact:true}).click();
+    await page.getByLabel(/^Email/).fill("synthetic-ocr-test@example.com");
+    console.log("Phone-sized, JPEG-compressed ID with a strong left-to-right lighting gradient passed.");
+  }
   if (!requested || requested === "sideways-license") {
     await read("synthetic-sideways-license.png", "image/png", Buffer.from(png.sidewaysLicense, "base64"), false, "DRIVER LICENSE ID");
     assert.deepEqual(await fields(), { given: "MARIA ANA", middle: "DE LA CRUZ", last: "REYES", birthday: "1994-02-17", id: "N01-23-456789", age: age("1994-02-17") });

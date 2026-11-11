@@ -17,7 +17,17 @@ import {
   FileSpreadsheet,
   Key,
   Home,
+  LayoutDashboard,
 } from "lucide-react";
+
+const ROLE_HOME_LINKS: Record<string, { href: string; label: string }> = {
+  DOMAIN_MASTER: { href: "/dashboard", label: "Back to Admin Section" },
+  PESO_ADMIN: { href: "/dashboard", label: "Back to Admin Section" },
+  PESO_STAFF: { href: "/dashboard", label: "Back to Staff Section" },
+  DOLE_COORDINATOR: { href: "/dashboard", label: "Back to DOLE Section" },
+  TUPAD_COORDINATOR: { href: "/field", label: "Back to Coordinator Section" },
+  TUPAD_ASSISTING_DOCUMENTOR: { href: "/field", label: "Back to Documentor Section" },
+};
 
 interface NavbarProps {
   onToggleSidebar?: () => void;
@@ -27,6 +37,9 @@ export function Navbar({ onToggleSidebar }: NavbarProps) {
   const pathname = usePathname();
   const { user, logout } = useAuth();
   const { isOnline, pendingCount, isSyncing, syncNow, masterSyncNow } = useOffline();
+  const roleHomeLink = user ? ROLE_HOME_LINKS[user.role] : null;
+  // Standalone public pages have no sidebar. Offer a way back without logging out.
+  const showRoleReturn = Boolean(user && roleHomeLink && !onToggleSidebar);
 
   const isLandingOrMigrantsPortal =
     !user || pathname === "/" || pathname === "/login" || pathname.startsWith("/migrants");
@@ -34,7 +47,7 @@ export function Navbar({ onToggleSidebar }: NavbarProps) {
   return (
     <header className="gov-header-gradient text-white sticky top-0 z-40 shadow-md">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between h-16">
+        <div className="flex min-h-16 flex-wrap items-center justify-between gap-x-3 gap-y-2 py-2">
           {/* Left branding */}
           <div className="flex items-center space-x-3">
             {onToggleSidebar && (
@@ -70,7 +83,7 @@ export function Navbar({ onToggleSidebar }: NavbarProps) {
           </div>
 
           {/* Right actions */}
-          <div className="flex items-center space-x-2 sm:space-x-4">
+          <div className="ml-auto flex max-w-full items-center space-x-2 sm:space-x-4">
             {/* Sync & Offline Status Indicator */}
             <div className="flex items-center space-x-1.5 sm:space-x-2">
               <a
@@ -123,6 +136,19 @@ export function Navbar({ onToggleSidebar }: NavbarProps) {
                 </button>
               )}
             </div>
+
+            {showRoleReturn && roleHomeLink && (
+              <a
+                href={roleHomeLink.href}
+                aria-label={roleHomeLink.label}
+                title={roleHomeLink.label}
+                data-testid="back-to-role-section"
+                className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-emerald-300/30 bg-emerald-400/10 p-2 text-xs font-bold text-emerald-100 transition hover:bg-emerald-400/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300"
+              >
+                <LayoutDashboard className="h-4 w-4" aria-hidden="true" />
+                <span className="hidden lg:inline">{roleHomeLink.label}</span>
+              </a>
+            )}
 
             {user && pathname !== "/" && (
               <Link

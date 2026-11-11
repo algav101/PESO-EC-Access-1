@@ -56,20 +56,21 @@ const PEOPLE = [
 type Person = (typeof PEOPLE)[number];
 
 function PersonFlipCard({ person }: { person: Person }) {
+  const compact = !person.leadership;
   const [flipped, setFlipped] = useState(false);
   const [left, top, width, height] = person.portrait;
   const detailsId = "peso-person-" + person.id + "-details";
 
   return (
-    <article className="peso-person-card flex h-full min-w-0 flex-col items-center rounded-2xl border border-cyan-300/20 bg-gradient-to-b from-[#12314c] to-[#081726] px-5 py-5 text-center shadow-lg" data-person={person.id}>
-      <span className="mb-4 inline-flex max-w-full items-center gap-1.5 rounded-full border border-emerald-300/20 bg-emerald-400/10 px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-emerald-200">
+    <article className={`peso-person-card flex h-full min-w-0 flex-col items-center rounded-2xl border border-cyan-300/20 bg-gradient-to-b from-[#12314c] to-[#081726] text-center shadow-lg ${compact ? "px-2.5 py-3" : "px-5 py-5"}`} data-person={person.id}>
+      <span className={`inline-flex max-w-full items-center rounded-full border border-emerald-300/20 bg-emerald-400/10 py-1 font-bold uppercase text-emerald-200 ${compact ? "mb-3 gap-1 px-2 text-[8px] tracking-wide" : "mb-4 gap-1.5 px-3 text-[10px] tracking-wider"}`}>
         {person.leadership ? <Building2 className="h-3 w-3 shrink-0" /> : <UserRound className="h-3 w-3 shrink-0" />}
         {person.leadership ? person.unit : "PESO Service Team"}
       </span>
 
       <button
         type="button"
-        className="peso-person-photo group relative block w-56 max-w-full shrink-0 overflow-hidden rounded-xl text-left focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-cyan-300 focus-visible:ring-offset-4 focus-visible:ring-offset-slate-950"
+        className={`peso-person-photo group relative block max-w-full shrink-0 overflow-hidden rounded-xl text-left focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-cyan-300 focus-visible:ring-offset-4 focus-visible:ring-offset-slate-950 ${compact ? "w-full max-w-[136px]" : "w-56"}`}
         style={{ aspectRatio: width + " / " + height }}
         aria-label={"I-flip ang larawan ni " + person.name}
         aria-pressed={flipped}
@@ -96,7 +97,7 @@ function PersonFlipCard({ person }: { person: Person }) {
             </span>
           </span>
 
-          <span id={detailsId} className="peso-person-face peso-person-back absolute inset-0 flex flex-col overflow-hidden rounded-xl border border-emerald-300/40 bg-gradient-to-br from-[#0f3b41] via-[#102a40] to-[#0b172a] p-3 text-white shadow-xl" aria-hidden={!flipped}>
+          <span id={detailsId} className={`peso-person-face peso-person-back absolute inset-0 flex flex-col overflow-hidden rounded-xl border border-emerald-300/40 bg-gradient-to-br from-[#0f3b41] via-[#102a40] to-[#0b172a] text-white shadow-xl ${compact ? "p-2" : "p-3"}`} aria-hidden={!flipped}>
             <span className="mb-2 flex shrink-0 items-center gap-1.5 border-b border-white/15 pb-2 text-[10px] font-black uppercase tracking-widest text-emerald-200"><UserRound className="h-3.5 w-3.5" />Detalye</span>
             <span data-person-details className="min-h-0 flex-1 overflow-y-auto overscroll-contain pr-1 text-left">
               <span className="block text-[9px] font-bold uppercase tracking-wider text-cyan-200">Posisyon / Designation</span>
@@ -112,11 +113,8 @@ function PersonFlipCard({ person }: { person: Person }) {
         </span>
       </button>
 
-      <p className="mt-4 text-base font-black leading-snug text-white sm:text-lg" data-person-name>{person.name}</p>
-      <p className="mt-1 max-w-[30ch] text-xs leading-relaxed text-slate-300" data-person-title>{person.title}</p>
-      <p className="mt-auto flex items-center gap-2 pt-4 text-[10px] font-bold text-cyan-200">
-        <RotateCw className="h-3.5 w-3.5" />I-tap ang larawan para sa detalye
-      </p>
+      <p className={`font-black leading-snug text-white ${compact ? "mt-3 text-xs" : "mt-4 text-base sm:text-lg"}`} data-person-name>{person.name}</p>
+      <p className={`mt-1 max-w-[30ch] text-slate-300 ${compact ? "min-h-16 text-[11px] leading-4" : "text-xs leading-relaxed"}`} data-person-title>{person.title}</p>
     </article>
   );
 }
@@ -137,13 +135,10 @@ export function PesoPeopleFlipDirectory() {
         {PEOPLE.filter(person => person.leadership).map(person => <PersonFlipCard key={person.id} person={person} />)}
       </div>
       <h4 className="mb-3 mt-8 text-xs font-black uppercase tracking-widest text-emerald-200">Service Units &amp; Systems Development</h4>
-      <p className="mb-2 text-[11px] text-slate-400">I-swipe o i-scroll pakaliwa/pakanan para makita ang lahat ng staff.</p>
       <div
         role="region"
-        aria-label="PESO staff — horizontal scrolling row"
-        tabIndex={0}
-        className="grid w-full min-w-0 grid-flow-col auto-cols-[260px] grid-rows-1 gap-4 overflow-x-auto overscroll-x-contain snap-x snap-proximity rounded-2xl px-1 py-2 sm:auto-cols-[280px] [&>article]:snap-start focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300"
-        style={{ scrollbarColor: "#22d3ee #0b172a" }}
+        aria-label="PESO service staff"
+        className="grid w-full min-w-0 grid-cols-1 gap-3 min-[420px]:grid-cols-2 sm:grid-cols-3 lg:grid-cols-6"
       >
         {PEOPLE.filter(person => !person.leadership).map(person => <PersonFlipCard key={person.id} person={person} />)}
       </div>

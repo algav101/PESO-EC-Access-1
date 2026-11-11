@@ -21,6 +21,8 @@ try {
   await page.goto(base + "/#org-structure", { waitUntil: "networkidle" });
   const directory = page.getByTestId("peso-people-directory");
   assert.equal(await directory.getByRole("button").count(), 8);
+  assert.equal(await directory.getByText("I-tap para sa detalye", { exact: true }).count(), 0, "Remove the repeated staff-card instruction");
+  assert.equal(await directory.getByText("I-tap ang larawan para sa detalye", { exact: true }).count(), 0, "Remove the leadership-card instruction too");
   for (const name of names) {
     const card = directory.getByRole("button", { name: `I-flip ang larawan ni ${name}`, exact: true });
     const article = card.locator("..");
@@ -54,14 +56,16 @@ try {
   await first.focus(); await page.keyboard.press("Space");
   assert.equal(await first.getAttribute("aria-pressed"), "true");
   await page.keyboard.press("Space");
-  for (const width of [1440, 768, 390, 320]) {
+  for (const width of [1440, 1280, 1024, 768, 480, 390, 320]) {
     await page.setViewportSize({ width, height: 1000 });
     assert.ok(await directory.evaluate(element => element.scrollWidth <= element.clientWidth), `Directory overflow at ${width}px`);
-    const staffRow = directory.getByRole("region", { name: "PESO staff — horizontal scrolling row" });
+    const staffRow = directory.getByRole("region", { name: "PESO service staff" });
     assert.equal(await staffRow.locator("article").count(), 6);
     const tops = await staffRow.locator("article").evaluateAll(cards => cards.map(card => Math.round(card.getBoundingClientRect().top)));
-    assert.equal(new Set(tops).size, 1, `All six staff must stay on ONE row at ${width}px`);
-    assert.ok(await staffRow.evaluate(element => element.scrollWidth > element.clientWidth), "Overflow stays inside the scrollable staff row");
+    assert.equal(new Set(tops).size, width >= 1024 ? 1 : width >= 640 ? 2 : width >= 420 ? 3 : 6, `Responsive staff row count at ${width}px`);
+    assert.ok(await staffRow.evaluate(element => element.scrollWidth <= element.clientWidth), `No staff side-scroll at ${width}px`);
+    assert.ok(await staffRow.locator("article").evaluateAll(cards => cards.every(card => card.scrollWidth <= card.clientWidth)), `No card text overflow at ${width}px`);
+    assert.ok(await staffRow.locator(".peso-person-photo").evaluateAll(photos => photos.every(photo => photo.clientWidth <= 136)), "Staff portraits stay compact");
     const fit = await directory.locator(".peso-person-face").evaluateAll(faces => faces.every(face => face.scrollHeight <= face.clientHeight + 1 && face.scrollWidth <= face.clientWidth + 1));
     assert.ok(fit, `All front/back content must fit at ${width}px`);
   }
@@ -89,5 +93,5 @@ try {
   console.log("PASS: only the 8 picture frames flip; outer cards, names and positions stay fixed");
   console.log("PASS: click/tap, Enter, Space and Escape work; details stay inside each picture frame");
   console.log("PASS: front/back content fits at desktop/tablet/mobile widths; reduced-motion preference is honored");
-  console.log("PASS: all six staff remain in a single horizontally scrollable row at every tested width");
+  console.log("PASS: all six staff fit on one desktop row, with responsive mobile rows and no horizontal scrolling");
 } finally { await context.close(); await browser.close(); }

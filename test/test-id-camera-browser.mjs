@@ -13,7 +13,19 @@ try {
   const context = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
   await context.addCookies([{ name: "peso_landing_visited", value: "1", url: base }]);
   await context.addInitScript(() => {
-    const test = window.__cameraTest = { mode: "success", requests: [], streams: [], stops: 0, resolvers: [] };
+    const test = window.__cameraTest = { mode: "success", requests: [], streams: [], stops: 0, resolvers: [], controls: [], stillMode: "unsupported", stillCalls: 0 };
+    Object.defineProperty(window,"ImageCapture",{configurable:true,value:class {
+      constructor(track) { this.track=track; }
+      async takePhoto() {
+        test.stillCalls++;
+        if(test.stillMode==="unsupported") throw new DOMException("Synthetic unsupported still capture","NotSupportedError");
+        const image=document.createElement("canvas");
+        image.width=3200; image.height=test.stillMode==="mismatch"?2400:2000;
+        const ctx=image.getContext("2d"); ctx.fillStyle="#dee8ec";ctx.fillRect(0,0,image.width,image.height);
+        ctx.fillStyle="#142638";ctx.font="bold 70px Arial";ctx.fillText("SYNTHETIC HIGH RESOLUTION TEST",150,400);
+        return new Promise(resolve=>image.toBlob(resolve,"image/png"));
+      }
+    }});
     const source = () => {
       const canvas = document.createElement("canvas"); canvas.width = 1600; canvas.height = 1000;
       const ctx = canvas.getContext("2d");
@@ -22,7 +34,11 @@ try {
       ctx.fillStyle = "#fff"; ctx.font = "bold 32px Arial"; ctx.fillText("SYNTHETIC CAMERA TEST — NOT A VALID ID", 80, 120);
       const stream = canvas.captureStream(10);
       test.streams.push(stream);
-      for (const track of stream.getTracks()) { const stop = track.stop.bind(track); track.stop = () => { test.stops++; stop(); }; }
+      for (const track of stream.getTracks()) {
+        const stop = track.stop.bind(track); track.stop = () => { test.stops++; stop(); };
+        track.getCapabilities=()=>({focusMode:["continuous"],exposureMode:["continuous"],whiteBalanceMode:["continuous"],torch:true});
+        track.applyConstraints=async constraints=>{test.controls.push(constraints);};
+      }
       return stream;
     };
     Object.defineProperty(navigator.mediaDevices, "getUserMedia", { configurable: true, value: async (constraints) => {
@@ -52,6 +68,14 @@ try {
   const shutter = dialog.getByRole("button", { name: "Kunan ang ID", exact: true });
   await shutter.waitFor();
   await page.waitForFunction(() => ![...document.querySelectorAll('button')].find((b) => b.textContent === "Kunan ang ID")?.disabled);
+  await page.getByTestId("id-camera-quality").waitFor();
+  const torch = dialog.getByRole("button",{name:"Ilaw ng camera",exact:true});
+  await torch.waitFor();
+  assert.equal(await page.evaluate(()=>window.__cameraTest.requests[0].video.width.ideal),3840);
+  assert.ok(await page.evaluate(()=>window.__cameraTest.controls.some(c=>c.advanced?.[0]?.focusMode==="continuous")));
+  assert.equal(await torch.getAttribute("aria-pressed"),"false","Do not switch the camera light on automatically");
+  await torch.click(); assert.equal(await torch.getAttribute("aria-pressed"),"true");
+  assert.ok(await page.evaluate(()=>window.__cameraTest.controls.some(c=>c.advanced?.[0]?.torch===true)));
   assert.equal(await guide.getAttribute("data-preset"), "CARD");
   let bounds = await guide.boundingBox();
   assert.ok(Math.abs(bounds.width / bounds.height - 1.586) < 0.01);
@@ -63,6 +87,7 @@ try {
   await shutter.click();
   const review = dialog.getByAltText("Review ng nakuhang ID photo", { exact: true });
   await review.waitFor();
+  assert.match(await page.getByTestId("id-photo-capture-method").textContent(),/3 camera frames/);
   const photo = await review.evaluate(async (image) => { await image.decode(); const blob = await (await fetch(image.src)).blob(); return { width: image.naturalWidth, height: image.naturalHeight, type: blob.type, size: blob.size }; });
   assert.equal(photo.type, "image/jpeg");
   assert.ok(photo.width > 500 && photo.height > 300, "capture keeps native camera pixels, not a low-resolution CSS screenshot");
@@ -71,13 +96,18 @@ try {
   await page.waitForFunction(() => window.__cameraTest.streams.every((s) => s.getTracks().every((t) => t.readyState === "ended")));
   assert.equal(await page.getByAltText(/^id-front-id-picture-/).count(), 0, "retake/review must not overwrite the uploaded file yet");
   await dialog.getByRole("button", { name: "Kunan muli", exact: true }).click();
+  await page.evaluate(()=>{window.__cameraTest.stillMode="high-res";});
   await page.waitForFunction(() => document.querySelector('video')?.videoWidth > 0);
   await shutter.click(); await review.waitFor();
+  assert.match(await page.getByTestId("id-photo-capture-method").textContent(),/High-resolution/);
+  const highResWidth = await review.evaluate(async image=>{await image.decode();return image.naturalWidth;});
+  assert.ok(highResWidth>photo.width*1.8,"Use native still pixels when the Android-style still API is supported");
   await dialog.getByRole("button", { name: "Gamitin ang photo", exact: true }).click();
   await dialog.waitFor({ state: "hidden" });
   await page.getByAltText(/^id-front-id-picture-/).waitFor();
   assert.equal(await page.getByLabel(/^GIVEN NAME/).inputValue(), "MANUAL CAMERA TEST");
   await page.getByLabel("TYPE OF ID", { exact: true }).selectOption("VOTER'S CETIFICATE");
+  await page.evaluate(()=>{window.__cameraTest.stillMode="mismatch";});
   await frontButton.click(); await guide.waitFor();
   assert.equal(await guide.getAttribute("data-preset"), "DOCUMENT");
   const documentBounds = await guide.boundingBox();
@@ -86,6 +116,7 @@ try {
   await page.screenshot({ path: "node_modules/.cache/id-camera-certificate-phone.png" });
   await page.waitForFunction(() => ![...document.querySelectorAll('button')].find((b) => b.textContent === "Kunan ang ID")?.disabled);
   await shutter.click(); await review.waitFor();
+  assert.match(await page.getByTestId("id-photo-capture-method").textContent(),/3 camera frames/,"Different-aspect native stills must fall back to preview-aligned cropping");
   const certificate = await review.evaluate(async (image) => { await image.decode(); return { width: image.naturalWidth, height: image.naturalHeight }; });
   assert.ok(certificate.height > certificate.width);
   assert.ok(Math.abs(certificate.width / certificate.height - 1 / Math.SQRT2) < 0.01);

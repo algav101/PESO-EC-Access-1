@@ -1044,9 +1044,9 @@
     "semantic_hash": ""
   },
   "src/app/layout.tsx": {
-    "mtime": 1793171874.0368226,
-    "seen": 1793172745.3784292,
-    "ast_hash": "1bb2d53c687451a780eb5ce509e79316",
+    "mtime": 1794363944.6324575,
+    "seen": 1794363968.1515355,
+    "ast_hash": "958c74cc41a3540cd146204d6258c5e0",
     "semantic_hash": ""
   },
   "src/app/loading.tsx": {
@@ -1284,9 +1284,9 @@
     "semantic_hash": ""
   },
   "src/components/layout/Navbar.tsx": {
-    "mtime": 1794123583.4312396,
-    "seen": 1794123604.5123563,
-    "ast_hash": "395e795ab0a54284addd38db2e60d04e",
+    "mtime": 1794375675.80951,
+    "seen": 1794375727.431862,
+    "ast_hash": "de760a0835dac2605afdc38a77df292a",
     "semantic_hash": ""
   },
   "src/components/layout/PesoLogo.tsx": {
@@ -1296,9 +1296,9 @@
     "semantic_hash": ""
   },
   "src/components/layout/Sidebar.tsx": {
-    "mtime": 1794217887.4889882,
-    "seen": 1794217914.0239987,
-    "ast_hash": "bd31b051229d3f962f6348595fae824f",
+    "mtime": 1794375801.8706293,
+    "seen": 1794375815.9164302,
+    "ast_hash": "46cb9506bcc3097d5347d378f9a70082",
     "semantic_hash": ""
   },
   "src/components/programs/DeleteProgramModal.tsx": {
@@ -1788,9 +1788,9 @@
     "semantic_hash": ""
   },
   "src/lib/ocr/browser-id-ocr.ts": {
-    "mtime": 1793255392.7931898,
-    "seen": 1793255688.4998322,
-    "ast_hash": "a096669cf8673a2b9219a425b1f839b6",
+    "mtime": 1794377364.346028,
+    "seen": 1794377425.105565,
+    "ast_hash": "539c08424f3c61bab157492f336ee839",
     "semantic_hash": ""
   },
   "src/lib/ocr/local-id-reader.ts": {
@@ -1806,9 +1806,9 @@
     "semantic_hash": ""
   },
   "test/test-local-ocr-browser.mjs": {
-    "mtime": 1793255556.7930574,
-    "seen": 1793255688.5008805,
-    "ast_hash": "8bd003dc74681a26b56051b368d4cf67",
+    "mtime": 1794377364.3440282,
+    "seen": 1794377425.1079664,
+    "ast_hash": "c0aec596f1d5821841e886b1c5274672",
     "semantic_hash": ""
   },
   "src/lib/ocr/identity-address.ts": {
@@ -1968,9 +1968,9 @@
     "semantic_hash": ""
   },
   "src/components/applications/IdCameraCapture.tsx": {
-    "mtime": 1793761002.9810538,
-    "seen": 1793761017.5506356,
-    "ast_hash": "8317a1b4da40daba1642023e8cb139e7",
+    "mtime": 1794376882.8576946,
+    "seen": 1794377425.1008482,
+    "ast_hash": "af1e34f0f454447a65cafda3da774496",
     "semantic_hash": ""
   },
   "src/lib/id-camera-guide.ts": {
@@ -1980,9 +1980,9 @@
     "semantic_hash": ""
   },
   "test/test-id-camera-browser.mjs": {
-    "mtime": 1793760801.7955272,
-    "seen": 1793761017.5552187,
-    "ast_hash": "c545178f73a88c17438e6d6473ecadca",
+    "mtime": 1794376882.8586948,
+    "seen": 1794377425.1076841,
+    "ast_hash": "eca5e7d9eb1ec1c74b1ec19c321164b8",
     "semantic_hash": ""
   },
   "test/test-id-camera-guide.mjs": {
@@ -2226,9 +2226,9 @@
     "semantic_hash": ""
   },
   "test/test-navbar-landing-link-browser.mjs": {
-    "mtime": 1794123583.4312396,
-    "seen": 1794123604.5174882,
-    "ast_hash": "1514ec63154caa3207b52b5408dc2fa9",
+    "mtime": 1794375712.1756725,
+    "seen": 1794375727.4376214,
+    "ast_hash": "ae7ba234ac20f2b87c7ce2c2a077badb",
     "semantic_hash": ""
   },
   "public/images/peso-eccess-chrome-emblem.png": {
@@ -2340,15 +2340,15 @@
     "semantic_hash": ""
   },
   "src/components/public/PesoPeopleFlipDirectory.tsx": {
-    "mtime": 1794212386.2658825,
-    "seen": 1794212397.0293272,
-    "ast_hash": "8217785980b9226cdb56fa0b15e4d650",
+    "mtime": 1794374793.0364707,
+    "seen": 1794374802.529551,
+    "ast_hash": "6f2eba00b191ef051c18238a13bda79b",
     "semantic_hash": ""
   },
   "test/test-org-chart-flipcards-browser.mjs": {
-    "mtime": 1794212386.2658825,
-    "seen": 1794212397.034213,
-    "ast_hash": "08e95d29b834cf9cd833261c74b780ff",
+    "mtime": 1794374793.0364707,
+    "seen": 1794374802.5347793,
+    "ast_hash": "48867e81deacfed96b0898a151551034",
     "semantic_hash": ""
   },
   "src/lib/accomplishment-work-schedule.ts": {
@@ -2379,6 +2379,42 @@
     "mtime": 1794217485.6858404,
     "seen": 1794217614.193696,
     "ast_hash": "8b010e203755f729810f510672f9e90f",
+    "semantic_hash": ""
+  },
+  "scripts/start-localhost.mjs": {
+    "mtime": 1794362484.1153927,
+    "seen": 1794362531.1128914,
+    "ast_hash": "2a4e58677b2cad2ff508cdb47f408b47",
+    "semantic_hash": ""
+  },
+  "test/test-start-localhost.mjs": {
+    "mtime": 1794362454.994113,
+    "seen": 1794362531.129093,
+    "ast_hash": "dae48dc7cdf8ca61977958d2dd769231",
+    "semantic_hash": ""
+  },
+  "test/test-site-favicon-browser.mjs": {
+    "mtime": 1794363944.6324575,
+    "seen": 1794363968.1606948,
+    "ast_hash": "96c7686e229daa019581b31f2f9af1de",
+    "semantic_hash": ""
+  },
+  "src/lib/id-camera-image.ts": {
+    "mtime": 1794376882.8576946,
+    "seen": 1794377425.1053162,
+    "ast_hash": "b7e7c3e751ccee2431716d2b669b1fc8",
+    "semantic_hash": ""
+  },
+  "src/lib/id-photo-quality.ts": {
+    "mtime": 1794376951.6910982,
+    "seen": 1794377425.1053176,
+    "ast_hash": "8b8b64545fd0524363970b4554012852",
+    "semantic_hash": ""
+  },
+  "test/test-id-photo-quality.mjs": {
+    "mtime": 1794376882.8586948,
+    "seen": 1794377425.1077409,
+    "ast_hash": "32bd7077ae5b5b2ab8901f6eee5f1543",
     "semantic_hash": ""
   }
 }

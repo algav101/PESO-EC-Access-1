@@ -14,6 +14,10 @@ export const metadata: Metadata = {
   title: "LGU Dingalan - PESO EC Access",
   description: "Official PESO EC Access portal for LGU Dingalan and DOLE programs.",
   manifest: "/manifest.json",
+  icons: {
+    icon: [{ url: "/images/peso-eccess-chrome-emblem.png?v=20261111", type: "image/png" }],
+    shortcut: "/images/peso-eccess-chrome-emblem.png?v=20261111",
+  },
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",

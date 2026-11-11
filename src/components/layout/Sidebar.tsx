@@ -100,7 +100,6 @@ export function Sidebar({ isMobile = false, onClose }: SidebarProps) {
               ...(can("report.export") ? [{ label: "Reports", href: "/reports", icon: FileSpreadsheet, permission: "report.export" }] : []),
               { label: "Beneficiaries Masterlist", href: "/beneficiaries", icon: Users, permission: "beneficiary.read" },
               { label: "QR & Stub Designer", href: "/stubs", icon: Printer, permission: "stub.configure" },
-              { label: "Online Application Portal", href: "/apply", icon: Sparkles, permission: "application.read" },
             ],
           },
         ]
