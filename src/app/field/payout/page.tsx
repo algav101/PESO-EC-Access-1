@@ -18,6 +18,7 @@ import {
   Clock,
   User,
 } from "lucide-react";
+import { ScanProgramLabel } from "@/components/scanner/ScanProgramLabel";
 import { QrScannerModal } from "@/components/scanner/QrScannerModal";
 import { FieldQrPassGeneratorModal } from "@/components/field/FieldQrPassGeneratorCard";
 import { useAuth } from "@/context/AuthContext";
@@ -288,6 +289,7 @@ export default function PayoutScannerPage() {
               Designated #{scannedBeneficiary.designatedNumber} • {scannedBeneficiary.tableNumber || "Table 1"}
             </span>
             <h2 className="text-lg font-black text-slate-900">{scannedBeneficiary.fullName}</h2>
+            <ScanProgramLabel program={programs.find((p) => p.id === (scannedBeneficiary.programId || selectedProgramId))} />
             <p className="text-xs text-slate-500">Barangay {scannedBeneficiary.barangay}, Dingalan</p>
           </div>
 
@@ -383,6 +385,7 @@ export default function PayoutScannerPage() {
             <h2 className="text-base font-black text-slate-900">
               {payoutResult.data.fullName} (#{payoutResult.data.designatedNumber})
             </h2>
+            <ScanProgramLabel program={programs.find((p) => p.id === (payoutResult.data.programId || selectedProgramId))} />
             <p className="text-xs text-slate-500">{payoutResult.message}</p>
           </div>
 

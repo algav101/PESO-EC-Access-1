@@ -27,6 +27,7 @@ import {
   Check,
   ShieldCheck,
 } from "lucide-react";
+import { ScanProgramLabel } from "@/components/scanner/ScanProgramLabel";
 import { QrScannerModal } from "@/components/scanner/QrScannerModal";
 import { FieldQrPassGeneratorModal } from "@/components/field/FieldQrPassGeneratorCard";
 import { useOffline } from "@/context/OfflineContext";
@@ -840,6 +841,7 @@ export default function DailyAttendancePage() {
             <h2 className="text-base font-black text-slate-900">
               {scanResult.data.fullName}
             </h2>
+                <ScanProgramLabel program={programs.find((p) => p.id === (scanResult.data.programId || selectedProgramId))} />
             <div className="flex items-center justify-center space-x-2 text-xs font-mono font-bold text-gov-blue">
               <span>Designated #{scanResult.data.designatedNumber}</span>
               <span>•</span>

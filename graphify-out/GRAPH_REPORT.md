@@ -1,17 +1,17 @@
 # Graph Report - PESO-EC-Access-1  (2026-11-18)
 
 ## Corpus Check
-- 378 files · ~1,444,575 words
+- 379 files · ~1,444,743 words
 - Verdict: corpus is large enough that graph structure adds value.
 - Unclassified: 33 file(s) not represented in the graph (top: .csv 26, .css 2, .example 1)
 
 ## Summary
-- 1905 nodes · 4746 edges · 116 communities (92 shown, 24 thin omitted)
+- 1908 nodes · 4760 edges · 123 communities (94 shown, 29 thin omitted)
 - Extraction: 100% EXTRACTED · 0% INFERRED · 0% AMBIGUOUS · INFERRED: 11 edges (avg confidence: 0.85)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `2269e4df`
+- Built from commit: `957d9858`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -21,9 +21,9 @@
 - dexie.ts
 - dependencies
 - test-accomplishment-work-schedule.mjs
-- logAudit
-- dashboard/page.tsx
-- application-schema.ts
+- getCurrentUser
+- dingalan-groupings.ts
+- ApplicationForm.tsx
 - stubs/page.tsx
 - stub-distribution/page.tsx
 - application-service.ts
@@ -31,7 +31,7 @@
 - test-application-workflow.mjs
 - completion-report-template.ts
 - react
-- apply/inquiry/page.tsx
+- v1/beneficiaries/import/commit/route.ts
 - identity-address.ts
 - application-id-mapper.ts
 - scripts
@@ -54,13 +54,13 @@
 - ref_fs
 - browser-id-ocr.ts
 - manifest.json
-- utils.ts
-- import-final-522-beneficiaries.mjs
+- prisma.ts
+- ref_crypto
 - master-sync-all-data.js
 - prepare-dole-template.mjs
 - v1/applications/route.ts
 - TUPAD application ID autofill and walk-in encoding
-- getCurrentUser
+- isAdminUser
 - middleware.ts
 - ApplicationInbox.tsx
 - migration.sql
@@ -68,18 +68,18 @@
 - FieldQrPassGeneratorCard.tsx
 - effects/TextCubeLoader.tsx
 - vercel.json
-- StubReplacementWizardModal.tsx
+- qr-pass/route.ts
 - flag-replacement/route.ts
 - Reports: supplied DOLE 2026 workbook
 - app/page.tsx
 - migrate-user-plain-password.js
 - replacements/page.tsx
-- test-accomplishment-export-browser.mjs
+- test-suite.mjs
 - test-program-qr-postgres.mjs
 - reseed-exact-522-beneficiaries.mjs
 - Stitch Design System & UI Screen Guide
-- application-workflow.ts
-- inspect-db.js
+- application-schema.ts
+- export/route.ts
 - Guided ID camera
 - application-storage.ts
 - inspect-flagged.js
@@ -88,21 +88,21 @@
 - test-service-worker-cache.mjs
 - update-flagged-beneficiaries.js
 - IdUploadPanel.tsx
-- inspect-db.mjs
-- getCurrentUser
+- ocr/route.ts
+- hasPermission
 - inspect-program-details.mjs
 - engines
 - local-id-reader.ts
 - tailwindcss
 - test-local-ocr-browser.mjs
 - test-masterlist-import-postgres.mjs
-- inspect-sep21-data.mjs
+- beneficiaries/[id]/page.tsx
 - normalizeBarangayName
 - ref_node_assert
 - Reusable QR slots and per-program scan history
-- test-application-inbox-browser.mjs
+- layout.tsx
 - restrictions/import/route.ts
-- test-program-qr-browser.mjs
+- test-template-parser.mjs
 - test-offline-sync-resilience.mjs
 - test-dole-reports-browser.mjs
 - @supabase/supabase-js
@@ -112,19 +112,26 @@
 - update-522-sitios.mjs
 - cleanup-and-deduplicate.js
 - identity-profiles.ts
-- fast-update-flagged.js
+- login/page.tsx
 - auth.ts
-- applications/import/route.ts
-- beneficiaries/[id]/route.ts
+- test-navbar-landing-link-browser.mjs
+- check-sep20-evening.mjs
 - heal-qr-codes.mjs
 - sync-all-password-hashes.mjs
 - Q: ayusin mo yung sa driver`s license kasi halos walang nababasa
 - test-landing-scanner.mjs
 - test-public-inquiry.mjs
+- cleanup-test-users.mjs
+- detailed-consolidated-retrieval.mjs
 - check-reference-slots.js
 - test-sorting-and-templates.mjs
-- ref_crypto
-- test-program-crud.mjs
+- inspect-all-sitios.mjs
+- list-users-by-role.mjs
+- my-assignment/inquiry/page.tsx
+- test-attendance-3hours.mjs
+- test-dedicated-qr-retention.mjs
+- test-password-view.mjs
+- test-stub-distribution-monitoring.mjs
 
 ## God Nodes (most connected - your core abstractions)
 1. `getCurrentUser()` - 159 edges
@@ -141,31 +148,31 @@
 ## Surprising Connections (you probably didn't know these)
 - `html()` --indirect_call--> `RosterRestrictionDetails()`  [INFERRED]
   test/test-roster-restriction-preview.mjs → src/components/beneficiaries/RosterRestrictionDetails.tsx
-- `run()` --indirect_call--> `selected()`  [INFERRED]
-  src/components/reports/DoleReportsPanel.tsx → test/test-local-id-reader.mjs
-- `testApi()` --calls--> `signToken()`  [EXTRACTED]
-  test/test-users-api.mjs → src/lib/auth.ts
 - `addressOf()` --calls--> `mapLocalIdentityText()`  [EXTRACTED]
   test/test-local-id-reader.mjs → src/lib/ocr/application-id-mapper.ts
 - `mapped()` --calls--> `mapLocalIdentityText()`  [EXTRACTED]
   test/test-local-id-reader.mjs → src/lib/ocr/application-id-mapper.ts
+- `main()` --calls--> `normalizeBarangayName()`  [EXTRACTED]
+  scripts/unify-all-sitios-and-puroks.mjs → src/lib/utils.ts
+- `run()` --indirect_call--> `selected()`  [INFERRED]
+  src/components/reports/DoleReportsPanel.tsx → test/test-local-id-reader.mjs
 
 ## Import Cycles
 - None detected.
 
-## Communities (116 total, 24 thin omitted)
+## Communities (123 total, 29 thin omitted)
 
 ### Community 0 - "package.json"
 Cohesion: 0.09
-Nodes (21): name, private, version, autoprefixer, clsx, dexie-react-hooks, @hookform/resolvers, html2canvas (+13 more)
+Nodes (22): name, private, version, autoprefixer, clsx, dexie, dexie-react-hooks, @hookform/resolvers (+14 more)
 
 ### Community 1 - "next"
-Cohesion: 0.06
-Nodes (29): next, dynamic, GET(), dynamic, dynamic, POST(), dynamic, dynamic (+21 more)
+Cohesion: 0.07
+Nodes (18): next, dynamic, GET(), dynamic, GET(), dynamic, dynamic, dynamic (+10 more)
 
 ### Community 2 - "dexie.ts"
-Cohesion: 0.09
-Nodes (35): dexie, metadata, RootLayout(), viewport, SyncCenterPage(), ServiceWorkerRegister(), AuthProvider(), OfflineContext (+27 more)
+Cohesion: 0.12
+Nodes (30): SyncCenterPage(), OfflineContext, OfflineContextType, OfflineProvider(), CachedBeneficiary, CachedProgram, CachedWorkDay, CachedWorkProgramItem (+22 more)
 
 ### Community 3 - "dependencies"
 Cohesion: 0.05
@@ -175,57 +182,57 @@ Nodes (41): dependencies, autoprefixer, bcryptjs, clsx, date-fns, dexie, dexie-r
 Cohesion: 0.05
 Nodes (37): book, { buildBarangayCompletionDays }, cache, chunks, db, doleBook, downloaded, ExcelJS (+29 more)
 
-### Community 5 - "logAudit"
-Cohesion: 0.06
-Nodes (33): dynamic, POST(), dynamic, POST(), dynamic, POST(), dynamic, POST() (+25 more)
+### Community 5 - "getCurrentUser"
+Cohesion: 0.07
+Nodes (41): dynamic, getVal(), POST(), PATCH(), dynamic, POST(), dynamic, POST() (+33 more)
 
-### Community 6 - "dashboard/page.tsx"
-Cohesion: 0.50
-Nodes (4): DashboardData, DashboardPage(), dynamic, getDashboardMetrics()
+### Community 6 - "dingalan-groupings.ts"
+Cohesion: 0.26
+Nodes (18): DEFAULT_10_DAY_ACTIVITIES, dynamic, POST(), FieldWorkProgramPage(), WorkProgramManagementPage(), DeploymentGroupingMatrix(), DeploymentGroupingMatrixProps, BarangayGroupingConfig (+10 more)
 
-### Community 7 - "application-schema.ts"
-Cohesion: 0.11
-Nodes (26): zod, OnlineTupadApplicationPage(), ApplicationForm(), ApplicationFormProps, DocumentField, FormErrors, MultiChoice(), Section() (+18 more)
+### Community 7 - "ApplicationForm.tsx"
+Cohesion: 0.17
+Nodes (17): WalkInEncodingPage(), OnlineTupadApplicationPage(), ApplicationForm(), ApplicationFormProps, DocumentField, FormErrors, MultiChoice(), Section() (+9 more)
 
 ### Community 8 - "stubs/page.tsx"
 Cohesion: 0.21
 Nodes (15): PrintTemplateMode, StubsContent(), StubsDesignerPage(), ETUPAD_BASE_IMAGE, ETupadCard, ETupadCardProps, Format1Stub, Format1StubProps (+7 more)
 
 ### Community 9 - "stub-distribution/page.tsx"
-Cohesion: 0.21
-Nodes (27): DailyAttendancePage(), OrientationContent(), OrientationPage(), PayoutScannerPage(), photosMemoryCache, PhotosPage(), StubDistributionContent(), StubDistributionPage() (+19 more)
+Cohesion: 0.17
+Nodes (33): DailyAttendancePage(), OrientationContent(), OrientationPage(), PayoutScannerPage(), photosMemoryCache, PhotosPage(), StubDistributionContent(), StubDistributionPage() (+25 more)
 
 ### Community 10 - "application-service.ts"
-Cohesion: 0.13
-Nodes (24): dynamic, POST(), dynamic, POST(), dynamic, POST(), ApplicationWriteAction, isIdempotentReplay() (+16 more)
+Cohesion: 0.14
+Nodes (21): dynamic, POST(), dynamic, POST(), applicationDraftSchema, applicationFinalSchema, DOCUMENT_FIELDS, formatApplicantFullName() (+13 more)
 
 ### Community 11 - "MasterlistUploadModal.tsx"
-Cohesion: 0.23
-Nodes (12): ExcelImportPage(), DEFAULT_EXEMPTION_REASONS, MasterlistUploadModal(), MasterlistUploadModalProps, displayDate(), RosterRestrictionDetails(), ImportPreviewResult, ParsedBeneficiaryRow (+4 more)
+Cohesion: 0.19
+Nodes (15): ExcelImportPage(), DEFAULT_EXEMPTION_REASONS, MasterlistUploadModal(), MasterlistUploadModalProps, displayDate(), RosterRestrictionDetails(), cleanStr(), ImportPreviewResult (+7 more)
 
 ### Community 12 - "test-application-workflow.mjs"
 Cohesion: 0.08
 Nodes (23): audits, cache, countQueries, deleted, detail, docs, encode, fakePrisma (+15 more)
 
 ### Community 13 - "completion-report-template.ts"
-Cohesion: 0.09
-Nodes (40): prisma, testExport(), dynamic, GET(), maxDuration, AttendanceActivity, buildBarangayCompletionDays(), cleanActivity() (+32 more)
+Cohesion: 0.13
+Nodes (28): AttendanceActivity, buildBarangayCompletionDays(), cleanActivity(), completionBarangay(), CompletionDay, CompletionProgram, key(), PhotoActivity (+20 more)
 
 ### Community 14 - "react"
-Cohesion: 0.11
-Nodes (24): lucide-react, react, AuditLogsPage(), DINGALAN_BARANGAYS, UserManagementPage(), BeneficiaryProfilePage(), dynamic, ProgramDetailsHub() (+16 more)
+Cohesion: 0.10
+Nodes (24): lucide-react, react, AuditLogsPage(), DINGALAN_BARANGAYS, UserManagementPage(), metadata, PublicInquiryPage(), ProgramDetailsHub() (+16 more)
 
-### Community 15 - "apply/inquiry/page.tsx"
-Cohesion: 0.48
-Nodes (4): metadata, PublicInquiryPage(), PublicInquiryMessageForm(), PublicStatusInquiryCard()
+### Community 15 - "v1/beneficiaries/import/commit/route.ts"
+Cohesion: 0.20
+Nodes (17): dynamic, ImportConflict, maxDuration, POST(), dynamic, maxDuration, POST(), saveImportedReportRows() (+9 more)
 
 ### Community 16 - "identity-address.ts"
-Cohesion: 0.28
-Nodes (16): ADDRESS_LABEL, ADDRESS_STOP, addressLike(), addressPiece(), addressStart(), barangayPattern(), escape(), IdentityAddress (+8 more)
+Cohesion: 0.34
+Nodes (14): addressLike(), addressPiece(), addressStart(), barangayPattern(), escape(), IdentityAddress, nearBarangay(), normalize() (+6 more)
 
 ### Community 17 - "application-id-mapper.ts"
-Cohesion: 0.20
-Nodes (26): calculateAge(), applyOcrAutofill(), birthDateValue(), clean(), cleanLocalValue(), cleanPersonName(), explicitLabel(), fieldValue() (+18 more)
+Cohesion: 0.26
+Nodes (21): birthDateValue(), clean(), cleanLocalValue(), cleanPersonName(), explicitLabel(), fieldValue(), identityValue(), isIdentityLabel() (+13 more)
 
 ### Community 18 - "scripts"
 Cohesion: 0.12
@@ -237,7 +244,7 @@ Nodes (13): core, output, require, root, main(), openBrowser(), portIsAvailable(
 
 ### Community 20 - "test-local-id-reader.mjs"
 Cohesion: 0.05
-Nodes (34): run(), addressCrop, addressLines, backStatusRegions, birthCrop, certificate, certificateLayout, conflict (+26 more)
+Nodes (36): run(), addressCrop, addressLines, addressOf(), backStatusRegions, birthCrop, certificate, certificateLayout (+28 more)
 
 ### Community 21 - "compilerOptions"
 Cohesion: 0.10
@@ -245,15 +252,15 @@ Nodes (20): compilerOptions, allowImportingTsExtensions, allowJs, baseUrl, esMod
 
 ### Community 22 - "v1/beneficiaries/import/commit/route.ts"
 Cohesion: 0.11
-Nodes (42): dynamic, GET(), dynamic, GET(), maxDuration, POST(), canUseDoleReports(), DOLE_REPORT_SHEETS (+34 more)
+Nodes (41): dynamic, GET(), dynamic, GET(), maxDuration, POST(), canUseDoleReports(), DOLE_REPORT_SHEETS (+33 more)
 
 ### Community 23 - "test-roster-restriction-browser.mjs"
 Cohesion: 0.29
 Nodes (6): baseRow, errors, preview, program, require, rows
 
 ### Community 24 - "test-application-id-autofill.mjs"
-Cohesion: 0.08
-Nodes (28): dynamic, isRateLimited(), maxDuration, POST(), providerMessage(), rateLimit, applicationFinalSchema, mergeOcrSides() (+20 more)
+Cohesion: 0.10
+Nodes (18): ApplicationWriteAction, isIdempotentReplay(), azurePrintedFields, clearFront, conflict, conflictingBack, dateOnly, incomplete (+10 more)
 
 ### Community 25 - "ref_path"
 Cohesion: 0.08
@@ -265,7 +272,7 @@ Nodes (13): 1. DICT GWT Utility Header, 2. Official Municipal Masthead, 3. Hero 
 
 ### Community 27 - "@prisma/client"
 Cohesion: 0.05
-Nodes (16): @prisma/client, prisma, prisma, prisma, prisma, prisma, prisma, prisma (+8 more)
+Nodes (16): @prisma/client, prisma, flaggedReference, prisma, { PrismaClient }, prisma, prisma, { PrismaClient } (+8 more)
 
 ### Community 28 - "matrix/page.tsx"
 Cohesion: 0.20
@@ -300,20 +307,20 @@ Cohesion: 0.09
 Nodes (9): pngjs, backup, fs, prisma, { PrismaClient }, downloadImage(), b64, fs (+1 more)
 
 ### Community 36 - "browser-id-ocr.ts"
-Cohesion: 0.15
-Nodes (30): tesseract.js, normalizeIdLighting(), detectIdentityDocumentType(), OcrSubject, active(), canvas(), context(), crop() (+22 more)
+Cohesion: 0.18
+Nodes (24): tesseract.js, normalizeIdLighting(), detectIdentityDocumentType(), active(), canvas(), context(), crop(), enhance() (+16 more)
 
 ### Community 37 - "manifest.json"
 Cohesion: 0.20
 Nodes (9): background_color, description, display, icons, name, orientation, short_name, start_url (+1 more)
 
-### Community 38 - "utils.ts"
-Cohesion: 0.06
-Nodes (63): date-fns, runTests(), validateDuration(), dynamic, POST(), dynamic, ImportConflict, maxDuration (+55 more)
+### Community 38 - "prisma.ts"
+Cohesion: 0.09
+Nodes (40): date-fns, dynamic, GET(), dynamic, POST(), dynamic, GET(), dynamic (+32 more)
 
-### Community 39 - "import-final-522-beneficiaries.mjs"
-Cohesion: 0.36
-Nodes (7): DINGALAN_BARANGAYS, main(), MONTH_NAME_MAP, normalizeBarangayName(), normalizeSitioName(), parseCSVLine(), prisma
+### Community 39 - "ref_crypto"
+Cohesion: 0.16
+Nodes (10): jsqr, pdfjs-dist, prisma, DINGALAN_BARANGAYS, main(), MONTH_NAME_MAP, normalizeBarangayName(), normalizeSitioName() (+2 more)
 
 ### Community 40 - "master-sync-all-data.js"
 Cohesion: 0.36
@@ -324,32 +331,32 @@ Cohesion: 0.11
 Nodes (15): jszip, cache, load(), original, output, require, review, root (+7 more)
 
 ### Community 42 - "v1/applications/route.ts"
-Cohesion: 0.25
-Nodes (9): details, dynamic, GET(), PATCH(), DELETE(), dynamic, GET(), isIntakeSource() (+1 more)
+Cohesion: 0.15
+Nodes (16): dynamic, GET(), dynamic, POST(), details, dynamic, GET(), PATCH() (+8 more)
 
 ### Community 43 - "TUPAD application ID autofill and walk-in encoding"
 Cohesion: 0.22
 Nodes (8): Database migration, Local ID reading (default; no Azure key required), Number recovery and optional close-up, Optional Azure API, Required private storage configuration, TUPAD application ID autofill and walk-in encoding, Verification, What is implemented
 
-### Community 44 - "getCurrentUser"
-Cohesion: 0.08
-Nodes (47): DELETE(), dynamic, PATCH(), dynamic, GET(), dynamic, GET(), PATCH() (+39 more)
+### Community 44 - "isAdminUser"
+Cohesion: 0.09
+Nodes (27): DELETE(), dynamic, PATCH(), dynamic, GET(), dynamic, GET(), POST() (+19 more)
 
 ### Community 46 - "ApplicationInbox.tsx"
-Cohesion: 0.17
-Nodes (22): cameraError(), IdCameraCapture(), Props, CameraRect, getCameraGuideRect(), getCameraSourceCrop(), getIdCameraPreset(), ID_CAMERA_GUIDES (+14 more)
+Cohesion: 0.11
+Nodes (31): cameraError(), IdCameraCapture(), Props, CapturedIdPayload, CaptureSlotKey, compressFileToPayload(), formatMmDdYyyyInput(), ORIGINAL_TO_REPLACEMENT_RELATIONSHIPS (+23 more)
 
 ### Community 47 - "migration.sql"
 Cohesion: 0.33
 Nodes (8): "TupadApplicationDocument", TupadApplicationDocument_applicationId_fieldName_idx, TupadApplicationDocument_uploadedById_idx, TupadApplicationRoster_applicationCode_key, TupadApplicationRoster_encodedById_idx, TupadApplicationRoster_idempotencyKey_key, TupadApplicationRoster_source_submissionStatus_idx, TupadApplicationRoster_submittedAt_idx
 
 ### Community 48 - "restrictions/route.ts"
-Cohesion: 0.47
-Nodes (5): dynamic, GET(), maskFullName(), parsePayoutDateToTimestamp(), POST()
+Cohesion: 0.38
+Nodes (6): DELETE(), dynamic, GET(), maskFullName(), parsePayoutDateToTimestamp(), POST()
 
 ### Community 49 - "FieldQrPassGeneratorCard.tsx"
-Cohesion: 0.07
-Nodes (38): AdminApplicationsPage(), AdminInquiriesPage(), FIELD_OPERATIONS, FieldScannerHubContent(), FieldScannerHubPage(), buildPresetRoleGroups(), DEFAULT_ROLE_GROUPS, LoginPage() (+30 more)
+Cohesion: 0.08
+Nodes (40): AdminApplicationsPage(), AdminInquiriesPage(), FIELD_OPERATIONS, FieldScannerHubContent(), FieldScannerHubPage(), BalikPinasElporPortalPage(), DINGALAN_BARANGAYS, SupplyItem (+32 more)
 
 ### Community 50 - "effects/TextCubeLoader.tsx"
 Cohesion: 0.43
@@ -359,13 +366,13 @@ Nodes (3): Loading(), TextCubeLoader(), TextCubeLoaderProps
 Cohesion: 0.25
 Nodes (7): buildCommand, framework, functions, src/app/api/**/*, $schema, includeFiles, maxDuration
 
-### Community 52 - "StubReplacementWizardModal.tsx"
-Cohesion: 0.20
-Nodes (11): CapturedIdPayload, CaptureSlotKey, compressFileToPayload(), formatMmDdYyyyInput(), ORIGINAL_TO_REPLACEMENT_RELATIONSHIPS, Props, REPLACEMENT_REASON_OPTIONS, StubReplacementTarget (+3 more)
+### Community 52 - "qr-pass/route.ts"
+Cohesion: 0.19
+Nodes (16): dynamic, GET(), handleQrPassSearch(), POST(), dynamic, maxDuration, POST(), formatBeneficiaryQrPayload() (+8 more)
 
 ### Community 53 - "flag-replacement/route.ts"
-Cohesion: 0.24
-Nodes (12): dynamic, POST(), dynamic, POST(), evaluatePersonTupadEligibility(), normalizeBirthdayComparison(), ParsedPersonName, parseEnteredFullName() (+4 more)
+Cohesion: 0.14
+Nodes (19): dynamic, POST(), dynamic, GET(), PATCH(), POST(), dynamic, POST() (+11 more)
 
 ### Community 54 - "Reports: supplied DOLE 2026 workbook"
 Cohesion: 0.33
@@ -380,12 +387,12 @@ Cohesion: 0.50
 Nodes (4): getPresetPassword(), main(), prisma, { PrismaClient }
 
 ### Community 57 - "replacements/page.tsx"
-Cohesion: 0.27
-Nodes (10): ReplacementsContent(), ReplacementsPage(), ReportCenterPage(), DOC_LABELS, PendingReplacementAssessmentItem, Props, ReplacementApprovalModal(), DoleReportsPanel() (+2 more)
+Cohesion: 0.25
+Nodes (11): ReplacementsContent(), ReplacementsPage(), ReportCenterPage(), DOC_LABELS, PendingReplacementAssessmentItem, Props, ReplacementApprovalModal(), StubReplacementTarget (+3 more)
 
-### Community 58 - "test-accomplishment-export-browser.mjs"
+### Community 58 - "test-suite.mjs"
 Cohesion: 0.22
-Nodes (6): exceljs, dynamic, ExcelJS, fixture, programs, require
+Nodes (6): exceljs, dynamic, generateBeneficiaryToken(), prisma, runTests(), verifyTokenHash()
 
 ### Community 59 - "test-program-qr-postgres.mjs"
 Cohesion: 0.12
@@ -399,9 +406,13 @@ Nodes (7): DINGALAN_BARANGAYS, formatBday(), main(), normalizeBarangayName(), no
 Cohesion: 0.40
 Nodes (4): 1. How to Access and Edit in Stitch, 2. Included Local Artifacts, 3. How to Upload a Modified `DESIGN.md` to Stitch in the Future, Stitch Design System & UI Screen Guide
 
-### Community 62 - "application-workflow.ts"
-Cohesion: 0.29
-Nodes (7): dynamic, GET(), WalkInEncodingPage(), downloadApplicationDocument(), canEncodeWalkIn(), canReadApplication(), INTAKE_SOURCES
+### Community 62 - "application-schema.ts"
+Cohesion: 0.13
+Nodes (13): zod, APPLICATION_SOURCES, BENEFICIARY_TYPES, CIVIL_STATUS_OPTIONS, EMPLOYMENT_INTEREST_OPTIONS, OCCUPATION_OPTIONS, optionalContact, optionalDate (+5 more)
+
+### Community 63 - "export/route.ts"
+Cohesion: 0.31
+Nodes (12): prisma, testExport(), dynamic, GET(), maxDuration, generateAccomplishmentExcel(), generateAttendanceExcel(), generateFlaggedReplacementsExcel() (+4 more)
 
 ### Community 64 - "Guided ID camera"
 Cohesion: 0.40
@@ -409,39 +420,43 @@ Nodes (4): Browser/privacy requirements, Capture flow, Guided ID camera, Verific
 
 ### Community 65 - "application-storage.ts"
 Cohesion: 0.31
-Nodes (9): ACCEPTED_APPLICATION_FILE_TYPES, isAcceptedApplicationFile(), MAX_APPLICATION_FILE_SIZE, APPLICATION_DOCUMENT_BUCKET, ensurePrivateBucket(), extensionFor(), getPrivateStorageClient(), removeApplicationDocuments() (+1 more)
+Nodes (9): ACCEPTED_APPLICATION_FILE_TYPES, MAX_APPLICATION_FILE_SIZE, APPLICATION_DOCUMENT_BUCKET, downloadApplicationDocument(), ensurePrivateBucket(), extensionFor(), getPrivateStorageClient(), removeApplicationDocuments() (+1 more)
 
 ### Community 67 - "work-program-parser.ts"
-Cohesion: 0.09
-Nodes (20): xlsx, dynamic, dynamic, POST(), dynamic, DINGALAN_BARANGAYS, normalizeBarangay(), ParsedBarangayWorkProgram (+12 more)
+Cohesion: 0.14
+Nodes (12): xlsx, dynamic, dynamic, DINGALAN_BARANGAYS, normalizeBarangay(), ParsedBarangayWorkProgram, ParsedWorkProgramItem, parseWorkProgramBuffer() (+4 more)
 
 ### Community 68 - "Online and walk-in application intake"
 Cohesion: 0.33
 Nodes (5): Admin review, Database and private storage, Online and walk-in application intake, Pages and roles, Verification
 
 ### Community 69 - "test-service-worker-cache.mjs"
-Cohesion: 0.06
-Nodes (22): typescript, exported, card, module, paper, source, blurred, clearResult (+14 more)
+Cohesion: 0.05
+Nodes (26): typescript, ExcelJS, fixture, programs, require, exported, card, module (+18 more)
 
 ### Community 70 - "update-flagged-beneficiaries.js"
 Cohesion: 0.40
 Nodes (3): flaggedReference, prisma, { PrismaClient }
 
 ### Community 71 - "IdUploadPanel.tsx"
-Cohesion: 0.36
-Nodes (8): FieldProps, FilePreview(), IdUploadPanel(), IdUploadPanelProps, OcrResponse, ApplicationFormValues, OcrAutofillStatus, OcrConflict
+Cohesion: 0.33
+Nodes (9): FieldProps, FilePreview(), IdUploadPanel(), IdUploadPanelProps, OcrResponse, ApplicationFormValues, isAcceptedApplicationFile(), OcrAutofillStatus (+1 more)
 
-### Community 73 - "getCurrentUser"
+### Community 72 - "ocr/route.ts"
+Cohesion: 0.20
+Nodes (13): dynamic, isRateLimited(), maxDuration, POST(), providerMessage(), rateLimit, mergeOcrSides(), OcrSubject (+5 more)
+
+### Community 73 - "hasPermission"
 Cohesion: 0.10
-Nodes (25): dynamic, GET(), POST(), dynamic, POST(), DELETE(), dynamic, GET() (+17 more)
+Nodes (22): dynamic, POST(), DELETE(), generateElporControlNo(), GET(), PATCH(), POST(), DELETE() (+14 more)
 
 ### Community 75 - "engines"
 Cohesion: 0.67
 Nodes (3): engines, node, npm
 
 ### Community 76 - "local-id-reader.ts"
-Cohesion: 0.18
-Nodes (17): extractPhilSysNumber(), MappedOcrSide, MergedOcrResult, NON_BIRTH_DATE_LABEL, OcrTextLine, ORDERED_NAME_LABEL, extractProfileNumber(), identityNumberRows() (+9 more)
+Cohesion: 0.14
+Nodes (23): extractPhilSysNumber(), MappedOcrSide, MergedOcrResult, NON_BIRTH_DATE_LABEL, OcrTextLine, ORDERED_NAME_LABEL, extractProfileNumber(), identityNumberRows() (+15 more)
 
 ### Community 78 - "test-local-ocr-browser.mjs"
 Cohesion: 0.40
@@ -451,29 +466,33 @@ Nodes (3): jspdf, qrcode, require
 Cohesion: 0.24
 Nodes (8): cacheRoot, dataDir, get(), listener, load(), { PrismaClient }, require, root
 
+### Community 80 - "beneficiaries/[id]/page.tsx"
+Cohesion: 0.33
+Nodes (6): BeneficiaryProfilePage(), dynamic, DeleteBeneficiaryModal(), DeleteBeneficiaryModalProps, EditBeneficiaryButton(), EditBeneficiaryButtonProps
+
 ### Community 81 - "normalizeBarangayName"
-Cohesion: 0.12
-Nodes (40): main(), prisma, POST(), BeneficiariesMasterlistContent(), loadData(), BeneficiariesMasterlistPage(), FieldWorkProgramPage(), WorkProgramManagementPage() (+32 more)
+Cohesion: 0.15
+Nodes (20): main(), prisma, BeneficiariesMasterlistContent(), loadData(), BeneficiariesMasterlistPage(), BarangaySummary, BeneficiarySummaryDropdown(), BeneficiarySummaryDropdownProps (+12 more)
 
 ### Community 82 - "ref_node_assert"
-Cohesion: 0.06
-Nodes (28): errors, require, login(), run(), errors, require, errors, require (+20 more)
+Cohesion: 0.05
+Nodes (33): errors, fixture, record, requests, require, errors, require, login() (+25 more)
 
 ### Community 83 - "Reusable QR slots and per-program scan history"
 Cohesion: 0.40
 Nodes (4): More than 522 beneficiaries, Offline devices, Program-owned QR codes and scan history, Verification
 
-### Community 84 - "test-application-inbox-browser.mjs"
-Cohesion: 0.29
-Nodes (5): errors, fixture, record, requests, require
+### Community 84 - "layout.tsx"
+Cohesion: 0.31
+Nodes (5): metadata, RootLayout(), viewport, ServiceWorkerRegister(), AuthProvider()
 
 ### Community 85 - "restrictions/import/route.ts"
 Cohesion: 0.39
 Nodes (7): addDaysToDate(), checkIsAppointive(), dynamic, maxDuration, parseDateToISO(), parseNameParts(), POST()
 
-### Community 86 - "test-program-qr-browser.mjs"
-Cohesion: 0.29
-Nodes (5): calls, errors, programs, require, roster
+### Community 86 - "test-template-parser.mjs"
+Cohesion: 0.38
+Nodes (6): DINGALAN_BARANGAYS, MONTH_NAME_MAP, normalizeBarangayName(), parseBeneficiaryExcelBuffer(), prisma, run()
 
 ### Community 88 - "test-dole-reports-browser.mjs"
 Cohesion: 0.25
@@ -492,24 +511,20 @@ Cohesion: 0.47
 Nodes (5): DINGALAN_BARANGAYS, main(), normalizeBarangayName(), normalizeSitioName(), prisma
 
 ### Community 102 - "identity-profiles.ts"
-Cohesion: 0.33
-Nodes (4): genericNumbers, IdentityDocumentType, IdentityProfile, PROFILES
+Cohesion: 0.29
+Nodes (5): ID_TYPES, genericNumbers, IdentityDocumentType, IdentityProfile, PROFILES
 
-### Community 103 - "fast-update-flagged.js"
+### Community 103 - "login/page.tsx"
 Cohesion: 0.40
-Nodes (3): flaggedReference, prisma, { PrismaClient }
+Nodes (5): buildPresetRoleGroups(), DEFAULT_ROLE_GROUPS, LoginPage(), PresetAccount, PresetRoleGroup
 
 ### Community 104 - "auth.ts"
 Cohesion: 0.12
 Nodes (19): bcryptjs, dynamic, POST(), dynamic, GET(), dynamic, generateTrackingCode(), POST() (+11 more)
 
-### Community 105 - "applications/import/route.ts"
-Cohesion: 0.67
-Nodes (3): dynamic, getVal(), POST()
-
-### Community 106 - "beneficiaries/[id]/route.ts"
-Cohesion: 0.50
-Nodes (3): DELETE(), dynamic, GET()
+### Community 105 - "test-navbar-landing-link-browser.mjs"
+Cohesion: 0.33
+Nodes (5): errors, expectedLabels, mutations, require, roles
 
 ### Community 109 - "Q: ayusin mo yung sa driver`s license kasi halos walang nababasa"
 Cohesion: 0.40
@@ -519,29 +534,29 @@ Nodes (4): Answer, Outcome, Q: ayusin mo yung sa driver`s license kasi halos wal
 Cohesion: 0.40
 Nodes (3): prisma, { PrismaClient }, referenceSlots
 
-### Community 118 - "ref_crypto"
-Cohesion: 0.21
-Nodes (6): jsqr, pdfjs-dist, prisma, metadata, WorkAreaAssignmentInquiryPage(), PublicWorkAssignmentLookupCard()
+### Community 118 - "my-assignment/inquiry/page.tsx"
+Cohesion: 0.60
+Nodes (3): metadata, WorkAreaAssignmentInquiryPage(), PublicWorkAssignmentLookupCard()
 
 ## Knowledge Gaps
 - **14 isolated node(s):** `@hookform/resolvers`, `@tesseract.js-data/eng`, `@types/bcryptjs`, `@types/jsonwebtoken`, `@types/jszip` (+9 more)
-  These have ≤1 connection - possible missing edges or undocumented components. (Counts symbols only; 868 node(s) total have ≤1 connection when file, concept and rationale nodes are included.)
-- **24 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
+  These have ≤1 connection - possible missing edges or undocumented components. (Counts symbols only; 869 node(s) total have ≤1 connection when file, concept and rationale nodes are included.)
+- **29 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `@prisma/client` connect `@prisma/client` to `package.json`, `next`, `test-program-crud.mjs`, `application-service.ts`, `completion-report-template.ts`, `v1/beneficiaries/import/commit/route.ts`, `ref_path`, `inspect-all-sources.js`, `seed.js`, `ref_fs`, `utils.ts`, `import-final-522-beneficiaries.mjs`, `master-sync-all-data.js`, `v1/applications/route.ts`, `migrate-user-plain-password.js`, `test-program-qr-postgres.mjs`, `reseed-exact-522-beneficiaries.mjs`, `inspect-db.js`, `inspect-flagged.js`, `work-program-parser.ts`, `update-flagged-beneficiaries.js`, `inspect-db.mjs`, `inspect-program-details.mjs`, `test-masterlist-import-postgres.mjs`, `inspect-sep21-data.mjs`, `normalizeBarangayName`, `test-offline-sync-resilience.mjs`, `@supabase/supabase-js`, `update-522-sitios.mjs`, `cleanup-and-deduplicate.js`, `fast-update-flagged.js`, `heal-qr-codes.mjs`, `sync-all-password-hashes.mjs`, `test-landing-scanner.mjs`, `test-public-inquiry.mjs`, `check-reference-slots.js`, `test-sorting-and-templates.mjs`, `ref_crypto`?**
-  _High betweenness centrality (0.210) - this node is a cross-community bridge._
+- **Why does `@prisma/client` connect `@prisma/client` to `package.json`, `application-service.ts`, `v1/beneficiaries/import/commit/route.ts`, `v1/beneficiaries/import/commit/route.ts`, `ref_path`, `inspect-all-sources.js`, `seed.js`, `ref_fs`, `prisma.ts`, `ref_crypto`, `master-sync-all-data.js`, `v1/applications/route.ts`, `migrate-user-plain-password.js`, `test-suite.mjs`, `test-program-qr-postgres.mjs`, `reseed-exact-522-beneficiaries.mjs`, `export/route.ts`, `inspect-flagged.js`, `work-program-parser.ts`, `update-flagged-beneficiaries.js`, `inspect-program-details.mjs`, `test-masterlist-import-postgres.mjs`, `normalizeBarangayName`, `test-template-parser.mjs`, `test-offline-sync-resilience.mjs`, `@supabase/supabase-js`, `update-522-sitios.mjs`, `cleanup-and-deduplicate.js`, `check-sep20-evening.mjs`, `heal-qr-codes.mjs`, `sync-all-password-hashes.mjs`, `test-landing-scanner.mjs`, `test-public-inquiry.mjs`, `cleanup-test-users.mjs`, `detailed-consolidated-retrieval.mjs`, `check-reference-slots.js`, `test-sorting-and-templates.mjs`, `inspect-all-sitios.mjs`, `list-users-by-role.mjs`, `test-dedicated-qr-retention.mjs`, `test-password-view.mjs`, `test-stub-distribution-monitoring.mjs`?**
+  _High betweenness centrality (0.207) - this node is a cross-community bridge._
 - **What connects `@hookform/resolvers`, `@tesseract.js-data/eng`, `@types/bcryptjs` to the rest of the system?**
   _14 weakly-connected nodes found - possible documentation gaps or missing edges._
 - **Should `package.json` be split into smaller, more focused modules?**
-  _Cohesion score 0.09090909090909091 - nodes in this community are weakly interconnected._
-- **Why does `next` connect `next` to `package.json`, `dexie.ts`, `logAudit`, `dashboard/page.tsx`, `stubs/page.tsx`, `stub-distribution/page.tsx`, `application-service.ts`, `MasterlistUploadModal.tsx`, `completion-report-template.ts`, `react`, `apply/inquiry/page.tsx`, `v1/beneficiaries/import/commit/route.ts`, `test-application-id-autofill.mjs`, `matrix/page.tsx`, `utils.ts`, `v1/applications/route.ts`, `getCurrentUser`, `middleware.ts`, `restrictions/route.ts`, `FieldQrPassGeneratorCard.tsx`, `flag-replacement/route.ts`, `app/page.tsx`, `replacements/page.tsx`, `test-accomplishment-export-browser.mjs`, `application-workflow.ts`, `work-program-parser.ts`, `getCurrentUser`, `normalizeBarangayName`, `restrictions/import/route.ts`, `auth.ts`, `applications/import/route.ts`, `beneficiaries/[id]/route.ts`, `ref_crypto`?**
-  _High betweenness centrality (0.132) - this node is a cross-community bridge._
+  _Cohesion score 0.08695652173913043 - nodes in this community are weakly interconnected._
+- **Why does `next` connect `next` to `package.json`, `getCurrentUser`, `dingalan-groupings.ts`, `stubs/page.tsx`, `stub-distribution/page.tsx`, `application-service.ts`, `MasterlistUploadModal.tsx`, `react`, `v1/beneficiaries/import/commit/route.ts`, `v1/beneficiaries/import/commit/route.ts`, `matrix/page.tsx`, `prisma.ts`, `v1/applications/route.ts`, `isAdminUser`, `middleware.ts`, `restrictions/route.ts`, `FieldQrPassGeneratorCard.tsx`, `qr-pass/route.ts`, `flag-replacement/route.ts`, `app/page.tsx`, `replacements/page.tsx`, `test-suite.mjs`, `export/route.ts`, `work-program-parser.ts`, `ocr/route.ts`, `hasPermission`, `beneficiaries/[id]/page.tsx`, `normalizeBarangayName`, `layout.tsx`, `restrictions/import/route.ts`, `login/page.tsx`, `auth.ts`, `my-assignment/inquiry/page.tsx`?**
+  _High betweenness centrality (0.137) - this node is a cross-community bridge._
 - **Should `next` be split into smaller, more focused modules?**
-  _Cohesion score 0.06285714285714286 - nodes in this community are weakly interconnected._
-- **Why does `react` connect `react` to `package.json`, `dexie.ts`, `dashboard/page.tsx`, `application-schema.ts`, `stubs/page.tsx`, `stub-distribution/page.tsx`, `MasterlistUploadModal.tsx`, `apply/inquiry/page.tsx`, `v1/beneficiaries/import/commit/route.ts`, `matrix/page.tsx`, `test-roster-restriction-preview.mjs`, `ApplicationInbox.tsx`, `getCurrentUser`, `ApplicationInbox.tsx`, `FieldQrPassGeneratorCard.tsx`, `effects/TextCubeLoader.tsx`, `StubReplacementWizardModal.tsx`, `app/page.tsx`, `replacements/page.tsx`, `IdUploadPanel.tsx`, `normalizeBarangayName`, `ref_crypto`?**
-  _High betweenness centrality (0.117) - this node is a cross-community bridge._
+  _Cohesion score 0.07226890756302522 - nodes in this community are weakly interconnected._
+- **Why does `react` connect `react` to `package.json`, `dexie.ts`, `dingalan-groupings.ts`, `ApplicationForm.tsx`, `stubs/page.tsx`, `stub-distribution/page.tsx`, `MasterlistUploadModal.tsx`, `v1/beneficiaries/import/commit/route.ts`, `matrix/page.tsx`, `test-roster-restriction-preview.mjs`, `ApplicationInbox.tsx`, `isAdminUser`, `ApplicationInbox.tsx`, `FieldQrPassGeneratorCard.tsx`, `effects/TextCubeLoader.tsx`, `app/page.tsx`, `replacements/page.tsx`, `IdUploadPanel.tsx`, `beneficiaries/[id]/page.tsx`, `normalizeBarangayName`, `layout.tsx`, `login/page.tsx`, `my-assignment/inquiry/page.tsx`?**
+  _High betweenness centrality (0.111) - this node is a cross-community bridge._
 - **Should `dexie.ts` be split into smaller, more focused modules?**
-  _Cohesion score 0.08879492600422834 - nodes in this community are weakly interconnected._
+  _Cohesion score 0.11764705882352941 - nodes in this community are weakly interconnected._

@@ -32,6 +32,7 @@ import {
   Clock,
   ArrowRight,
 } from "lucide-react";
+import { ScanProgramLabel } from "@/components/scanner/ScanProgramLabel";
 import { QrScannerModal } from "@/components/scanner/QrScannerModal";
 import { FieldQrPassGeneratorModal } from "@/components/field/FieldQrPassGeneratorCard";
 import {
@@ -620,6 +621,7 @@ function StubDistributionContent() {
                 <h2 className="text-lg font-black text-slate-900">
                   {scannedData.fullName}
                 </h2>
+                <ScanProgramLabel program={programs.find((p) => p.id === (scannedData.programId || selectedProgramId))} />
                 <p className="text-xs text-slate-500">
                   Barangay {scannedData.barangay}, Municipality of Dingalan
                 </p>
@@ -778,6 +780,7 @@ function StubDistributionContent() {
                   {successResult.data?.fullName} (#
                   {successResult.data?.designatedNumber})
                 </h2>
+                <ScanProgramLabel program={programs.find((p) => p.id === (successResult.data?.programId || selectedProgramId))} />
                 {successResult.data?.candidateFullName && (
                   <p className="text-[11px] font-bold text-amber-800 bg-amber-50 px-2.5 py-1 rounded-lg border border-amber-200 inline-block">
                     Candidate: {successResult.data.candidateFullName} •

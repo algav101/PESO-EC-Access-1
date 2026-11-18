@@ -74,6 +74,7 @@ try {
     await page.getByPlaceholder("e.g. TUPAD-DGL-ABC123-1-XYZ").fill("TUPAD-DGL-NEWNEW-113-12345678");
     await page.getByRole("button", { name: "Submit Token" }).click();
     await page.getByText("NEW ROSTER PERSON", { exact: true }).waitFor();
+    assert.match(await page.getByTestId("scan-work-program").innerText(), /TEST-NEW.*new synthetic program/);
   }
   await page.goto(base + "/field/attendance", { waitUntil: "networkidle" });
   await modalScan(/SCAN QR FOR DAY/);
@@ -123,6 +124,7 @@ try {
     await page.getByPlaceholder("e.g. TUPAD-DGL-ABC123-1-XYZ").fill("TUPAD-DGL-OLDOLD-1-12345678");
     await page.getByRole("button", { name: "Submit Token" }).click();
     await page.getByText("OLD MASTERLIST PERSON ONE", { exact: true }).waitFor();
+    assert.match(await page.getByTestId("scan-work-program").innerText(), /TEST-OLD.*old synthetic program/, "scan must show its work program alongside the masterlist name");
   }
   await page.goto(base + "/stubs", { waitUntil: "networkidle" });
   assert.equal(await selector().inputValue(), "old", "printing must follow the masterlist");

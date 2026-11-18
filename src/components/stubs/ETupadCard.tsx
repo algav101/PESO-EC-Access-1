@@ -7,7 +7,6 @@ interface ETupadCardProps {
   qrDataUrl?: string;
   token?: string;
   tableNumber?: string;
-  beneficiaryName?: string;
   barangay?: string;
   programCode?: string;
 }
@@ -24,7 +23,6 @@ export const ETupadCard = memo(function ETupadCard({
   qrDataUrl,
   token,
   tableNumber,
-  beneficiaryName,
   barangay,
   programCode,
 }: ETupadCardProps) {
@@ -38,6 +36,7 @@ export const ETupadCard = memo(function ETupadCard({
         width: "100%",
         maxWidth: "480px",
         aspectRatio: "640 / 404",
+        containerType: "inline-size",
       }}
     >
       {/* 1. Official Base Template Image (Contains all 3 top seals, e-TUPAD CARD logo, e-PESO access logo, and outer borders) */}
@@ -46,6 +45,19 @@ export const ETupadCard = memo(function ETupadCard({
         alt="e-TUPAD Card Base"
         className="w-full h-full object-contain pointer-events-none block"
       />
+
+      {programCode && (
+        <div
+          className="absolute text-center"
+          style={{
+            top: "54%", left: "51%", width: "46%",
+            fontFamily: "Arial, sans-serif", fontSize: "2cqw", fontWeight: 800,
+            lineHeight: 1.25, color: "#192759", background: "white",
+          }}
+        >
+          {programCode}
+        </div>
+      )}
 
       {/* 2. Dynamic Unique QR Code Positioned in the Left Box */}
       <div
@@ -100,6 +112,7 @@ export const ETupadCard = memo(function ETupadCard({
           #{numStr}
         </span>
       </div>
+
     </div>
   );
 });

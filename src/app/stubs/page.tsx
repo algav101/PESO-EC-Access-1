@@ -1563,7 +1563,6 @@ function StubsContent() {
                     qrDataUrl={qrImg}
                     token={activeQr?.publicToken}
                     tableNumber={pb.tableNumber}
-                    beneficiaryName={pb.beneficiary?.fullName}
                     barangay={pb.beneficiary?.barangay}
                     programCode={currentProgram?.programCode}
                   />
@@ -1685,7 +1684,6 @@ function StubsContent() {
                     qrDataUrl={qrImg}
                     token={activeQr?.publicToken}
                     tableNumber={pb.tableNumber}
-                    beneficiaryName={pb.beneficiary?.fullName}
                     barangay={pb.beneficiary?.barangay}
                     programCode={currentProgram?.programCode}
                   />
