@@ -9,7 +9,7 @@ const browser = await chromium.launch({ channel: "chrome", headless: true });
 let previewMode = "text", commitMode = "timeout", writes = 0, commitRequests = 0;
 const pageErrors = [], alerts = [];
 const rows = Array.from({ length: 500 }, (_, i) => ({ rowNumber: i + 1, fullName: `SYNTHETIC IMPORT ${i}`, birthday: "1990-01-02", designatedNumber: String(i + 1), barangay: "Aplaya", status: i >= 497 ? "EXEMPTED" : "VALID", isExempted: i >= 497, exemptionReason: i >= 497 ? "Synthetic exemption" : undefined, isExistingInDb: i < 290 }));
-const preview = { totalRows: 500, validCount: 500, restrictedCount: 0, duplicateCount: 0, invalidCount: 0, existingInDbCount: 290, existingInProgramCount: 0, newBeneficiaryCount: 210, rows, barangaySummary: { Aplaya: 500 } };
+const preview = { slotReplacements: [{ designatedNumber: "1", previousFullName: "SYNTHETIC ORIGINAL PERSON", fullName: rows[0].fullName }], totalRows: 500, validCount: 500, restrictedCount: 0, duplicateCount: 0, invalidCount: 0, existingInDbCount: 290, existingInProgramCount: 0, newBeneficiaryCount: 210, rows, barangaySummary: { Aplaya: 500 } };
 try {
   const context = await browser.newContext({ viewport: { width: 1440, height: 1100 } });
   await context.addCookies([{ name: "peso_landing_visited", value: "1", url: base }, { name: "tupad_auth_token", value: "synthetic-test-only", url: base }]);
@@ -20,12 +20,17 @@ try {
   await page.route("**/api/**", async (route) => {
     const request = route.request(), url = new URL(request.url());
     const reply = (body, status = 200) => route.fulfill({ status, contentType: "application/json", body: JSON.stringify(body) });
-    if (url.pathname.endsWith("/beneficiaries/import/preview")) return previewMode === "text"
+    if (url.pathname.endsWith("/beneficiaries/import/preview")) {
+      assert.ok(request.postData().includes("synthetic-program"), "preview must use the chosen masterlist batch");
+      if (previewMode === "wrong-program") return reply({ success: true, resolvedProgramId: "skilled", preview });
+      return previewMode === "text"
       ? route.fulfill({ status: 502, contentType: "text/plain", body: "An error occurred while processing your request" })
       : reply({ success: true, resolvedProgramId: "synthetic-program", preview });
+    }
     if (url.pathname.endsWith("/beneficiaries/import/commit")) {
       commitRequests++;
       assert.equal(request.postDataJSON().programId, "synthetic-program");
+      assert.equal(request.postDataJSON().previewProgramId, "synthetic-program");
       if (commitMode === "timeout") return route.fulfill({ status: 504, contentType: "text/plain", body: "An error occurred while processing your request" });
       if (commitMode === "empty") return route.fulfill({ status: 200, body: "" });
       if (commitMode === "rollback") return reply({ code: "IMPORT_ROLLED_BACK", error: "The import was not saved. Roster changes were rolled back." }, 503);
@@ -34,17 +39,27 @@ try {
     }
     if (!["GET", "HEAD", "OPTIONS"].includes(request.method())) { writes++; return route.abort(); }
     if (url.pathname === "/api/v1/auth/me") return reply({ authenticated: true, user: { id: "synthetic-admin", role: "PESO_ADMIN", username: "synthetic", fullName: "Synthetic Admin" } });
-    if (url.pathname === "/api/v1/programs") return reply({ programs: [{ id: "synthetic-program", programCode: "TEST", programName: "Synthetic program", status: "ACTIVE" }] });
+    if (url.pathname === "/api/v1/programs") return reply({ programs: [{ id: "skilled", programCode: "SKILLED", programName: "Synthetic skilled program", status: "ACTIVE" }, { id: "synthetic-program", programCode: "TEST", programName: "Synthetic program", status: "ACTIVE" }] });
     return reply({ beneficiaries: [] });
   });
   await page.goto(base + "/beneficiaries", { waitUntil: "networkidle" });
+  const masterlistProgram = () => page.locator("select").filter({ has: page.locator('option[value="synthetic-program"]') }).first();
+  await masterlistProgram().selectOption("synthetic-program");
   await page.getByRole("button", { name: /Upload CSV \/ Excel Masterlist/ }).click();
+  assert.equal(await page.getByLabel("1. Target TUPAD Program Batch *").inputValue(), "synthetic-program", "upload modal must follow the chosen masterlist, even after its default props loaded");
+  assert.equal(await page.locator('option[value="AUTO"]').count(), 0);
   await page.locator('input[type="file"]').setInputFiles({ name: "synthetic.csv", mimeType: "text/csv", buffer: Buffer.from("synthetic test data only") });
   await page.getByRole("button", { name: "Parse & Preview", exact: true }).click();
   await page.getByText(/unreadable response \(HTTP 502\)/).waitFor();
   assert.ok(!(await page.locator("body").innerText()).includes("Unexpected token"));
+  previewMode = "wrong-program";
+  await page.getByRole("button", { name: "Parse & Preview", exact: true }).click();
+  await page.getByText(/Hindi tugma ang preview/).waitFor();
+  assert.equal(await page.getByRole("button", { name: /Commit & Implement/ }).count(), 0);
   previewMode = "json";
   await page.getByRole("button", { name: "Parse & Preview", exact: true }).click();
+  await page.getByText(/Mag-iiba ang pangalan sa 1 existing stub numbers/).waitFor();
+  await page.getByText(/#1: SYNTHETIC ORIGINAL PERSON/).waitFor();
   const commit = page.getByRole("button", { name: /Commit & Implement \(500\)/ });
   for (const [mode, expected] of [["timeout", /server timed out \(HTTP 504\)/], ["empty", /unreadable response \(HTTP 200\)/], ["rollback", /Roster changes were rolled back/], ["network", /connection was interrupted/]]) {
     commitMode = mode;
@@ -63,6 +78,11 @@ try {
   assert.equal(alerts.length, 1);
   assert.ok(alerts[0].includes("500 beneficiaries"));
   assert.equal(commitRequests, 5);
+  await masterlistProgram().selectOption("skilled");
+  await page.getByRole("button", { name: /Upload CSV \/ Excel Masterlist/ }).click();
+  assert.equal(await page.getByLabel("1. Target TUPAD Program Batch *").inputValue(), "skilled", "reopening must reset the modal to the current masterlist");
+  assert.ok(await page.getByRole("button", { name: "Parse & Preview", exact: true }).isDisabled());
+  assert.equal(await page.getByRole("button", { name: /Commit & Implement/ }).count(), 0, "another batch must never inherit the previous file preview");
   assert.equal(writes, 0); assert.deepEqual(pageErrors, []);
   console.log("Masterlist browser error tests passed: text gateway errors, empty responses, rollback JSON, disconnected network, retained 500-row preview, no auto-retry, confirmed success only. No live writes.");
 } finally { await browser.close(); }

@@ -4,6 +4,8 @@ Select the correct **TUPAD Program** before scanning. A registered printed QR is
 
 The masterlist, work-program page, stub printing and all four field scanners remember the selected program on the device. Moving from a masterlist to attendance keeps that program instead of silently opening the newest program. An explicit `?programId=...` link overrides the remembered choice; unavailable programs fall back to the available list. Results from a previous program are cleared, and delayed scan responses cannot restore them after a switch. Stub #1 therefore displays the #1 beneficiary from the selected program's masterlist, with that program's own orientation and attendance history.
 
+Masterlist imports require an explicit batch. The upload dialog follows the current masterlist each time it opens and clears the previous file/preview. Preview and commit must target the same batch; neither endpoint silently selects the newest active program. The preview names the target batch and shows existing stub numbers whose names would change. Import audit records retain the previous enrolments and QR bindings, and source snapshots include designated numbers for recovery. Changing a work schedule or scanning/uploading a QR image does not restore an overwritten beneficiary roster.
+
 - New program + uploaded roster: new enrolment IDs and QR records; stub distribution, orientation, daily attendance and payout start pending/zero.
 - Existing program + another upload or QR generation: existing scans are **preserved**, not erased. Create a genuinely new program for a new work cycle.
 - Archived programs retain their original beneficiaries, scans, dates and payout/restriction history. Reusing a printed card never transfers that history.

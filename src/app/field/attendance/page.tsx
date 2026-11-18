@@ -291,6 +291,7 @@ export default function DailyAttendancePage() {
   };
 
   const selectedWorkDay = workDays.find((w) => w.id === selectedWorkDayId) || workDays[0];
+  const selectedProgram = programs.find((p) => p.id === selectedProgramId);
   const currentDayNum = selectedWorkDay?.dayNumber || 1;
   const isSelectedDayToday = selectedWorkDay?.workDate === pht.dateStr;
 
@@ -729,6 +730,7 @@ export default function DailyAttendancePage() {
           </div>
 
           <div className="space-y-2">
+            <p className="text-xs font-bold text-gov-blue">Program: {selectedProgram?.programCode} — {selectedProgram?.programName}</p>
             <div className="inline-flex flex-wrap items-center justify-center gap-1.5 px-3 py-1.5 rounded-xl bg-blue-50 text-gov-blue border border-blue-200 font-mono text-xs font-black shadow-xs">
               <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping" />
               <span>TARGET: DAY {currentDayNum}</span>

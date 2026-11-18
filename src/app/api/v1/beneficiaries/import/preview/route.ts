@@ -4,6 +4,7 @@ import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getCurrentUser, hasPermission } from "@/lib/auth";
 import { parseBeneficiaryExcelBuffer } from "@/lib/excel-importer";
+import { normalizeQrSlot } from "@/lib/program-qr-slot";
 
 export async function POST(request: Request) {
   try {
@@ -14,32 +15,32 @@ export async function POST(request: Request) {
 
     const formData = await request.formData();
     const file = formData.get("file") as File | null;
-    let programId = formData.get("programId") as string | null;
+    const programId = formData.get("programId");
 
     if (!file) {
       return NextResponse.json({ error: "No Excel or CSV file provided" }, { status: 400 });
     }
 
-    // If no programId provided, resolve to the most recent active program or fallback
-    if (!programId || programId === "AUTO" || programId === "undefined") {
-      const activeProg = await prisma.program.findFirst({
-        where: { status: "ACTIVE" },
-        orderBy: { createdAt: "desc" },
-      });
-      if (activeProg) {
-        programId = activeProg.id;
-      } else {
-        const anyProg = await prisma.program.findFirst({
-          orderBy: { createdAt: "desc" },
-        });
-        programId = anyProg?.id || "temp-program-id";
-      }
+    if (typeof programId !== "string" || !programId.trim() || ["AUTO", "undefined"].includes(programId)) {
+      return NextResponse.json({ error: "Select the exact program batch before previewing a masterlist." }, { status: 400 });
     }
+    const program = await prisma.program.findUnique({ where: { id: programId }, select: { id: true } });
+    if (!program) return NextResponse.json({ error: "Selected program not found." }, { status: 404 });
 
     const arrayBuffer = await file.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
 
     const preview = await parseBeneficiaryExcelBuffer(buffer, file.name, programId);
+    const roster = await prisma.programBeneficiary.findMany({
+      where: { programId, participationStatus: { in: ["ACTIVE", "ENROLLED", "FLAGGED_FOR_REPLACEMENT"] } },
+      select: { designatedNumber: true, beneficiary: { select: { fullName: true } } },
+    });
+    const slots = new Map(roster.map((pb) => [normalizeQrSlot(pb.designatedNumber), pb.beneficiary.fullName]));
+    preview.slotReplacements = preview.rows.flatMap((row) => {
+      const previousFullName = slots.get(normalizeQrSlot(row.designatedNumber));
+      return previousFullName && previousFullName.trim().toUpperCase() !== row.fullName.trim().toUpperCase()
+        ? [{ designatedNumber: row.designatedNumber, previousFullName, fullName: row.fullName }] : [];
+    });
 
     return NextResponse.json({ success: true, preview, resolvedProgramId: programId });
   } catch (error: any) {

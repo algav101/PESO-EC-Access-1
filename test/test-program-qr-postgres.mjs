@@ -68,7 +68,16 @@ try {
   assert.equal(created.status, 201);
   const program = (await created.json()).program;
   const commit = load("src/app/api/v1/beneficiaries/import/commit/route.ts");
-  const imported = await commit.POST(request({ programId: program.id, rows }));
+  for (const programId of [undefined, "AUTO", "undefined", ""]) {
+    assert.equal((await commit.POST(request({ programId, rows }))).status, 400, "imports must never silently choose the newest batch");
+    const form = new FormData(); form.append("file", new Blob(["synthetic"], { type: "text/csv" }), "synthetic.csv");
+    if (programId !== undefined) form.append("programId", programId);
+    assert.equal((await load("src/app/api/v1/beneficiaries/import/preview/route.ts").POST(new Request("http://synthetic.test", { method: "POST", body: form }))).status, 400);
+  }
+  assert.equal((await commit.POST(request({ programId: program.id, previewProgramId: old.id, rows }))).status, 409);
+  assert.equal((await commit.POST(request({ programId: "missing-program", rows }))).status, 404);
+  assert.equal(await db.programBeneficiary.count({ where: { programId: program.id } }), 0);
+  const imported = await commit.POST(request({ programId: program.id, previewProgramId: program.id, rows }));
   assert.equal(imported.status, 200, JSON.stringify(await imported.clone().json()));
   assert.equal(await db.qrCode.count({ where: { programId: program.id } }), 600);
   assert.equal(await db.orientationAttendance.count({ where: { programId: program.id } }), 0);
@@ -163,6 +172,14 @@ try {
     assert.equal(blocked.data.fullName, expectedName, "even sequence errors must name the selected masterlist's #1");
     assert.equal(blocked.data.designatedNumber, "1");
   }
+  const replacementPreview = new FormData();
+  replacementPreview.append("programId", old.id);
+  replacementPreview.append("file", new Blob(["No.,Full Name,Birthday,Barangay\n1,DIFFERENT MASTERLIST PERSON ONE,1990-01-02,Aplaya\n"], { type: "text/csv" }), "other-batch.csv");
+  const previewResponse = await load("src/app/api/v1/beneficiaries/import/preview/route.ts").POST(new Request("http://synthetic.test", { method: "POST", body: replacementPreview }));
+  assert.equal(previewResponse.status, 200);
+  const previewDetails = await previewResponse.json();
+  assert.equal(previewDetails.resolvedProgramId, old.id);
+  assert.deepEqual(previewDetails.preview.slotReplacements, [{ designatedNumber: "1", previousFullName: rows[0].fullName, fullName: "DIFFERENT MASTERLIST PERSON ONE" }]);
   assert.equal(await db.attendanceRecord.count({ where: { programId: otherProgram.id } }), 0);
   assert.equal(await oldHistory(), snapshot);
   authorized = false;

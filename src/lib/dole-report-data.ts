@@ -37,7 +37,7 @@ const ageAt = (birth: string, date: string) => {
 export function importedReportRow(row: any) {
   const result: Record<string, string> = {};
   for (const [field] of REPORT_ROW_FIELDS) if (row[field] !== undefined && row[field] !== null) result[field] = text(row[field]);
-  for (const field of ["fullName", "age", "dependentFullName"]) if (row[field] != null) result[field] = text(row[field]);
+  for (const field of ["fullName", "age", "dependentFullName", "designatedNumber"]) if (row[field] != null) result[field] = text(row[field]);
   if (row.isPwd !== undefined) result.pwd = row.isPwd ? "Y" : "";
   if (row.is4Ps !== undefined) result.fourPs = row.is4Ps ? "Y" : "N";
   if (row.isIp !== undefined) result.ip = row.isIp ? "Y" : "N";

@@ -35,8 +35,11 @@ export async function POST(request: Request) {
     if (rows.length > 2000 || !["MERGE_AND_REPLACE", "SKIP"].includes(duplicateStrategy)) {
       return NextResponse.json({ error: "Use a roster of at most 2,000 rows and a valid duplicate strategy." }, { status: 400 });
     }
-    if (requestedProgramId != null && typeof requestedProgramId !== "string") {
-      return NextResponse.json({ error: "Invalid program ID." }, { status: 400 });
+    if (typeof requestedProgramId !== "string" || !requestedProgramId.trim() || ["AUTO", "undefined"].includes(requestedProgramId)) {
+      return NextResponse.json({ error: "Select the exact program batch before importing a masterlist." }, { status: 400 });
+    }
+    if (body.previewProgramId !== undefined && body.previewProgramId !== requestedProgramId) {
+      return NextResponse.json({ error: "The preview belongs to another program. Preview the file again for the selected batch." }, { status: 409 });
     }
 
     // Filter valid and exempted rows
@@ -61,35 +64,9 @@ export async function POST(request: Request) {
 
     // All roster, dependent, QR, replacement, exemption and audit writes are atomic.
     return await prisma.$transaction(async (tx) => {
-      // Resolve or create program
-      let targetProgramId = requestedProgramId;
-      if (!targetProgramId || targetProgramId === "AUTO") {
-        let prog = await tx.program.findFirst({
-          where: { status: "ACTIVE" },
-          orderBy: { createdAt: "desc" },
-        });
-        if (!prog) {
-          prog = await tx.program.findFirst({
-            orderBy: { createdAt: "desc" },
-          });
-        }
-        if (!prog) {
-          // Create initial default program for 2026
-          prog = await tx.program.create({
-            data: {
-              programCode: `TUPAD-DINGALAN-${new Date().getFullYear()}-B1`,
-              programName: `DOLE-TUPAD Community Employment Program ${new Date().getFullYear()}`,
-              municipality: "Dingalan",
-              province: "Aurora",
-              requiredWorkDays: 10,
-              dailyHours: 8.0,
-              status: "ACTIVE",
-              createdById: user.id,
-            },
-          });
-        }
-        targetProgramId = prog.id;
-      }
+      const targetProgramId = requestedProgramId;
+      const program = await tx.program.findUnique({ where: { id: targetProgramId }, select: { id: true } });
+      if (!program) return NextResponse.json({ error: "Selected program not found." }, { status: 404 });
 
       // One importer per program at a time; release automatically on commit/rollback.
       const [lock] = await tx.$queryRaw<{ locked: boolean }[]>`
@@ -431,6 +408,8 @@ export async function POST(request: Request) {
           action: "FINAL_BENEFICIARIES_MASTERLIST_IMPORTED",
           entityType: "PROGRAM",
           entityId: targetProgramId,
+          oldData: JSON.stringify({ version: 1, enrollments: existingPbs }),
+          newData: JSON.stringify({ version: 1, enrollments: await tx.programBeneficiary.findMany({ where: { programId: targetProgramId }, select: { id: true, beneficiaryId: true, designatedNumber: true, participationStatus: true } }) }),
           metadata: JSON.stringify({ count: importedCount, newCount, updatedCount, skippedCount, exemptedCount, duplicateStrategy }),
       } });
       await saveImportedReportRows(tx, targetProgramId, validRows, beneMap, user.id, duplicateStrategy);

@@ -100,9 +100,19 @@ try {
     await page.goto(base + "/field/" + path, { waitUntil: "networkidle" });
     assert.equal(await selector().inputValue(), "old", path + " must follow the masterlist");
     await page.getByRole("button", { name: button }).click();
-    await page.getByRole("button", { name: "Manual Token Entry" }).click();
-    await page.getByPlaceholder("e.g. TUPAD-DGL-ABC123-1-XYZ").fill("1");
-    await page.getByRole("button", { name: "Submit Token" }).click();
+    if (path === "attendance") {
+      // Decode an actual uploaded PNG from another program; the selected roster wins.
+      const payload = "https://synthetic.test/my-assignment?token=TUPAD-DGL-NEWNEW-1-12345678";
+      const buffer = await require("qrcode").toBuffer(payload, { width: 512, margin: 4 });
+      await page.locator('input[type="file"][accept="image/*"]:not([capture])').setInputFiles({ name: "other-program-stub-1.png", mimeType: "image/png", buffer });
+      await page.getByText("OLD MASTERLIST PERSON ONE", { exact: true }).waitFor();
+      assert.equal(calls.at(-1).body.qrToken, payload);
+      assert.equal(calls.at(-1).body.programId, "old");
+    } else {
+      await page.getByRole("button", { name: "Manual Token Entry" }).click();
+      await page.getByPlaceholder("e.g. TUPAD-DGL-ABC123-1-XYZ").fill("1");
+      await page.getByRole("button", { name: "Submit Token" }).click();
+    }
     await page.getByText("OLD MASTERLIST PERSON ONE", { exact: true }).waitFor();
   }
   await page.goto(base + "/stubs", { waitUntil: "networkidle" });

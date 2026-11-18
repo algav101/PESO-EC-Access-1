@@ -80,6 +80,7 @@ export interface ParsedBeneficiaryRow {
 }
 
 export interface ImportPreviewResult {
+  slotReplacements?: { designatedNumber: string; previousFullName: string; fullName: string }[];
   sourceSheetName?: string;
   fileName: string;
   totalRows: number;

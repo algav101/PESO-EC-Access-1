@@ -1591,7 +1591,7 @@ function BeneficiariesMasterlistContent() {
         onClose={() => setIsUploadModalOpen(false)}
         programs={programs}
         defaultProgramId={selectedProgram}
-        onSuccess={() => fetchBeneficiaries(selectedProgram)}
+        onSuccess={(programId) => handleProgramChange(programId)}
       />
     </div>
   );

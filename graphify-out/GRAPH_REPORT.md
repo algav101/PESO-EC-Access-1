@@ -1,17 +1,17 @@
 # Graph Report - PESO-EC-Access-1  (2026-11-18)
 
 ## Corpus Check
-- 378 files · ~1,443,009 words
+- 378 files · ~1,443,766 words
 - Verdict: corpus is large enough that graph structure adds value.
 - Unclassified: 33 file(s) not represented in the graph (top: .csv 26, .css 2, .example 1)
 
 ## Summary
-- 1904 nodes · 4728 edges · 114 communities (85 shown, 29 thin omitted)
+- 1904 nodes · 4736 edges · 113 communities (84 shown, 29 thin omitted)
 - Extraction: 100% EXTRACTED · 0% INFERRED · 0% AMBIGUOUS · INFERRED: 11 edges (avg confidence: 0.85)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `fae9e118`
+- Built from commit: `1b98b143`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -58,7 +58,7 @@
 - import-final-522-beneficiaries.mjs
 - master-sync-all-data.js
 - prepare-dole-template.mjs
-- restrictions/import/route.ts
+- v1/applications/route.ts
 - TUPAD application ID autofill and walk-in encoding
 - getCurrentUser
 - middleware.ts
@@ -68,7 +68,6 @@
 - FieldQrPassGeneratorCard.tsx
 - effects/TextCubeLoader.tsx
 - vercel.json
-- hasPermission
 - flag-replacement/route.ts
 - Reports: supplied DOLE 2026 workbook
 - app/page.tsx
@@ -151,19 +150,19 @@
 ## Import Cycles
 - None detected.
 
-## Communities (114 total, 29 thin omitted)
+## Communities (113 total, 29 thin omitted)
 
 ### Community 0 - "package.json"
 Cohesion: 0.09
 Nodes (22): name, private, version, autoprefixer, clsx, dexie, dexie-react-hooks, @hookform/resolvers (+14 more)
 
 ### Community 1 - "next"
-Cohesion: 0.06
-Nodes (24): next, dynamic, GET(), dynamic, dynamic, POST(), dynamic, dynamic (+16 more)
+Cohesion: 0.07
+Nodes (31): next, dynamic, getVal(), POST(), dynamic, GET(), dynamic, GET() (+23 more)
 
 ### Community 2 - "dexie.ts"
 Cohesion: 0.12
-Nodes (29): SyncCenterPage(), OfflineContext, OfflineContextType, OfflineProvider(), CachedBeneficiary, CachedProgram, CachedWorkDay, CachedWorkProgramItem (+21 more)
+Nodes (30): SyncCenterPage(), OfflineContext, OfflineContextType, OfflineProvider(), CachedBeneficiary, CachedProgram, CachedWorkDay, CachedWorkProgramItem (+22 more)
 
 ### Community 3 - "dependencies"
 Cohesion: 0.05
@@ -174,8 +173,8 @@ Cohesion: 0.05
 Nodes (33): book, { buildBarangayCompletionDays }, cache, chunks, db, doleBook, downloaded, ExcelJS (+25 more)
 
 ### Community 5 - "logAudit"
-Cohesion: 0.07
-Nodes (27): dynamic, getVal(), POST(), dynamic, POST(), dynamic, POST(), DELETE() (+19 more)
+Cohesion: 0.08
+Nodes (24): dynamic, POST(), dynamic, POST(), DELETE(), dynamic, GET(), PATCH() (+16 more)
 
 ### Community 6 - "dashboard/page.tsx"
 Cohesion: 0.50
@@ -198,8 +197,8 @@ Cohesion: 0.06
 Nodes (49): OnlineApplicationsPage(), WalkInSubmissionsPage(), dynamic, GET(), dynamic, POST(), dynamic, POST() (+41 more)
 
 ### Community 11 - "MasterlistUploadModal.tsx"
-Cohesion: 0.26
-Nodes (10): ExcelImportPage(), DEFAULT_EXEMPTION_REASONS, MasterlistUploadModal(), MasterlistUploadModalProps, displayDate(), RosterRestrictionDetails(), ImportPreviewResult, ParsedBeneficiaryRow (+2 more)
+Cohesion: 0.25
+Nodes (11): ExcelImportPage(), DEFAULT_EXEMPTION_REASONS, MasterlistUploadModal(), MasterlistUploadModalProps, displayDate(), RosterRestrictionDetails(), ImportPreviewResult, ParsedBeneficiaryRow (+3 more)
 
 ### Community 12 - "test-application-workflow.mjs"
 Cohesion: 0.08
@@ -306,8 +305,8 @@ Cohesion: 0.20
 Nodes (9): background_color, description, display, icons, name, orientation, short_name, start_url (+1 more)
 
 ### Community 38 - "qr-pass/route.ts"
-Cohesion: 0.10
-Nodes (34): dynamic, GET(), handleQrPassSearch(), POST(), dynamic, POST(), DELETE(), dynamic (+26 more)
+Cohesion: 0.08
+Nodes (38): dynamic, POST(), dynamic, GET(), handleQrPassSearch(), POST(), dynamic, POST() (+30 more)
 
 ### Community 39 - "import-final-522-beneficiaries.mjs"
 Cohesion: 0.36
@@ -321,17 +320,17 @@ Nodes (7): chunkArray(), fs, main(), path, { PrismaClient }, toBool(), toDate()
 Cohesion: 0.20
 Nodes (9): jszip, cache, load(), original, output, require, review, root (+1 more)
 
-### Community 42 - "restrictions/import/route.ts"
-Cohesion: 0.39
-Nodes (7): addDaysToDate(), checkIsAppointive(), dynamic, maxDuration, parseDateToISO(), parseNameParts(), POST()
+### Community 42 - "v1/applications/route.ts"
+Cohesion: 0.25
+Nodes (9): details, dynamic, GET(), PATCH(), DELETE(), dynamic, GET(), isIntakeSource() (+1 more)
 
 ### Community 43 - "TUPAD application ID autofill and walk-in encoding"
 Cohesion: 0.22
 Nodes (8): Database migration, Local ID reading (default; no Azure key required), Number recovery and optional close-up, Optional Azure API, Required private storage configuration, TUPAD application ID autofill and walk-in encoding, Verification, What is implemented
 
 ### Community 44 - "getCurrentUser"
-Cohesion: 0.08
-Nodes (44): DELETE(), dynamic, PATCH(), dynamic, GET(), dynamic, GET(), POST() (+36 more)
+Cohesion: 0.06
+Nodes (65): DELETE(), dynamic, PATCH(), dynamic, GET(), dynamic, GET(), POST() (+57 more)
 
 ### Community 46 - "ApplicationInbox.tsx"
 Cohesion: 0.10
@@ -356,10 +355,6 @@ Nodes (3): Loading(), TextCubeLoader(), TextCubeLoaderProps
 ### Community 51 - "vercel.json"
 Cohesion: 0.25
 Nodes (7): buildCommand, framework, functions, src/app/api/**/*, $schema, includeFiles, maxDuration
-
-### Community 52 - "hasPermission"
-Cohesion: 0.10
-Nodes (30): DELETE(), generateElporControlNo(), GET(), PATCH(), POST(), DELETE(), generateCaseTrackingCode(), GET() (+22 more)
 
 ### Community 53 - "flag-replacement/route.ts"
 Cohesion: 0.24
@@ -422,8 +417,8 @@ Cohesion: 0.40
 Nodes (3): flaggedReference, prisma, { PrismaClient }
 
 ### Community 73 - "normalizeBarangayName"
-Cohesion: 0.10
-Nodes (29): date-fns, dynamic, POST(), dynamic, POST(), dynamic, POST(), dynamic (+21 more)
+Cohesion: 0.07
+Nodes (36): date-fns, dynamic, POST(), dynamic, dynamic, dynamic, POST(), dynamic (+28 more)
 
 ### Community 75 - "engines"
 Cohesion: 0.67
@@ -443,7 +438,7 @@ Nodes (8): cacheRoot, dataDir, get(), listener, load(), { PrismaClient }, requir
 
 ### Community 81 - "normalizeBarangayName"
 Cohesion: 0.10
-Nodes (50): main(), prisma, POST(), AttendanceMatrixContent(), AttendanceMatrixPage(), BeneficiariesMasterlistContent(), BeneficiariesMasterlistPage(), FieldWorkProgramPage() (+42 more)
+Nodes (48): main(), prisma, POST(), AttendanceMatrixContent(), AttendanceMatrixPage(), BeneficiariesMasterlistContent(), BeneficiariesMasterlistPage(), FieldWorkProgramPage() (+40 more)
 
 ### Community 82 - "ref_node_assert"
 Cohesion: 0.05
@@ -474,8 +469,8 @@ Cohesion: 0.38
 Nodes (4): generateBeneficiaryToken(), prisma, runTests(), verifyTokenHash()
 
 ### Community 104 - "auth.ts"
-Cohesion: 0.12
-Nodes (19): bcryptjs, dynamic, POST(), dynamic, GET(), dynamic, generateTrackingCode(), POST() (+11 more)
+Cohesion: 0.18
+Nodes (11): bcryptjs, dynamic, POST(), DINGALAN_BARANGAYS, dynamic, normalizeBarangay(), normalizeRole(), parseCSVLines() (+3 more)
 
 ### Community 107 - "export-pg-to-files.js"
 Cohesion: 0.40
@@ -501,17 +496,17 @@ Nodes (11): jsqr, pdfjs-dist, prisma, DINGALAN_BARANGAYS, main(), normalizeBaran
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `@prisma/client` connect `@prisma/client` to `package.json`, `test-program-crud.mjs`, `application-service.ts`, `completion-report-template.ts`, `v1/beneficiaries/import/commit/route.ts`, `ref_path`, `inspect-all-sources.js`, `seed.js`, `ref_fs`, `qr-pass/route.ts`, `import-final-522-beneficiaries.mjs`, `master-sync-all-data.js`, `getCurrentUser`, `migrate-user-plain-password.js`, `test-program-qr-postgres.mjs`, `reseed-exact-522-beneficiaries.mjs`, `inspect-db.js`, `inspect-flagged.js`, `work-program-parser.ts`, `update-flagged-beneficiaries.js`, `check-sep20-evening.mjs`, `inspect-db.mjs`, `normalizeBarangayName`, `inspect-program-details.mjs`, `test-masterlist-import-postgres.mjs`, `inspect-sep21-data.mjs`, `normalizeBarangayName`, `test-dedicated-qr-retention.mjs`, `test-offline-sync-resilience.mjs`, `@supabase/supabase-js`, `test-stub-distribution-monitoring.mjs`, `cleanup-and-deduplicate.js`, `test-suite.mjs`, `export-pg-to-files.js`, `test-matrix-and-sync.mjs`, `check-reference-slots.js`, `test-sorting-and-templates.mjs`, `ref_crypto`, `check-demographics.mjs`?**
+- **Why does `@prisma/client` connect `@prisma/client` to `package.json`, `test-program-crud.mjs`, `application-service.ts`, `completion-report-template.ts`, `v1/beneficiaries/import/commit/route.ts`, `ref_path`, `inspect-all-sources.js`, `seed.js`, `ref_fs`, `qr-pass/route.ts`, `import-final-522-beneficiaries.mjs`, `master-sync-all-data.js`, `v1/applications/route.ts`, `migrate-user-plain-password.js`, `test-program-qr-postgres.mjs`, `reseed-exact-522-beneficiaries.mjs`, `inspect-db.js`, `inspect-flagged.js`, `work-program-parser.ts`, `update-flagged-beneficiaries.js`, `check-sep20-evening.mjs`, `inspect-db.mjs`, `normalizeBarangayName`, `inspect-program-details.mjs`, `test-masterlist-import-postgres.mjs`, `inspect-sep21-data.mjs`, `normalizeBarangayName`, `test-dedicated-qr-retention.mjs`, `test-offline-sync-resilience.mjs`, `@supabase/supabase-js`, `test-stub-distribution-monitoring.mjs`, `cleanup-and-deduplicate.js`, `test-suite.mjs`, `export-pg-to-files.js`, `test-matrix-and-sync.mjs`, `check-reference-slots.js`, `test-sorting-and-templates.mjs`, `ref_crypto`, `check-demographics.mjs`?**
   _High betweenness centrality (0.204) - this node is a cross-community bridge._
 - **What connects `@hookform/resolvers`, `@tesseract.js-data/eng`, `@types/bcryptjs` to the rest of the system?**
   _14 weakly-connected nodes found - possible documentation gaps or missing edges._
 - **Should `package.json` be split into smaller, more focused modules?**
   _Cohesion score 0.08695652173913043 - nodes in this community are weakly interconnected._
-- **Why does `next` connect `next` to `package.json`, `logAudit`, `dashboard/page.tsx`, `stubs/page.tsx`, `stub-distribution/page.tsx`, `application-service.ts`, `MasterlistUploadModal.tsx`, `completion-report-template.ts`, `react`, `apply/inquiry/page.tsx`, `v1/beneficiaries/import/commit/route.ts`, `test-application-id-autofill.mjs`, `qr-pass/route.ts`, `restrictions/import/route.ts`, `getCurrentUser`, `middleware.ts`, `restrictions/route.ts`, `FieldQrPassGeneratorCard.tsx`, `hasPermission`, `flag-replacement/route.ts`, `app/page.tsx`, `replacements/page.tsx`, `exceljs`, `work-program-parser.ts`, `normalizeBarangayName`, `normalizeBarangayName`, `auth.ts`, `ref_crypto`?**
+- **Why does `next` connect `next` to `package.json`, `logAudit`, `dashboard/page.tsx`, `stubs/page.tsx`, `stub-distribution/page.tsx`, `application-service.ts`, `MasterlistUploadModal.tsx`, `completion-report-template.ts`, `react`, `apply/inquiry/page.tsx`, `v1/beneficiaries/import/commit/route.ts`, `test-application-id-autofill.mjs`, `qr-pass/route.ts`, `v1/applications/route.ts`, `getCurrentUser`, `middleware.ts`, `restrictions/route.ts`, `FieldQrPassGeneratorCard.tsx`, `flag-replacement/route.ts`, `app/page.tsx`, `replacements/page.tsx`, `exceljs`, `work-program-parser.ts`, `normalizeBarangayName`, `normalizeBarangayName`, `auth.ts`, `ref_crypto`?**
   _High betweenness centrality (0.134) - this node is a cross-community bridge._
 - **Should `next` be split into smaller, more focused modules?**
-  _Cohesion score 0.059800664451827246 - nodes in this community are weakly interconnected._
-- **Why does `react` connect `react` to `package.json`, `dexie.ts`, `dashboard/page.tsx`, `application-schema.ts`, `stubs/page.tsx`, `stub-distribution/page.tsx`, `application-service.ts`, `MasterlistUploadModal.tsx`, `apply/inquiry/page.tsx`, `v1/beneficiaries/import/commit/route.ts`, `test-roster-restriction-preview.mjs`, `ApplicationInbox.tsx`, `FieldQrPassGeneratorCard.tsx`, `effects/TextCubeLoader.tsx`, `hasPermission`, `app/page.tsx`, `replacements/page.tsx`, `normalizeBarangayName`, `ref_crypto`?**
+  _Cohesion score 0.06659619450317125 - nodes in this community are weakly interconnected._
+- **Why does `react` connect `react` to `package.json`, `dexie.ts`, `dashboard/page.tsx`, `application-schema.ts`, `stubs/page.tsx`, `stub-distribution/page.tsx`, `application-service.ts`, `MasterlistUploadModal.tsx`, `apply/inquiry/page.tsx`, `v1/beneficiaries/import/commit/route.ts`, `test-roster-restriction-preview.mjs`, `getCurrentUser`, `ApplicationInbox.tsx`, `FieldQrPassGeneratorCard.tsx`, `effects/TextCubeLoader.tsx`, `app/page.tsx`, `replacements/page.tsx`, `normalizeBarangayName`, `ref_crypto`?**
   _High betweenness centrality (0.115) - this node is a cross-community bridge._
 - **Should `dexie.ts` be split into smaller, more focused modules?**
-  _Cohesion score 0.11942959001782531 - nodes in this community are weakly interconnected._
+  _Cohesion score 0.11764705882352941 - nodes in this community are weakly interconnected._

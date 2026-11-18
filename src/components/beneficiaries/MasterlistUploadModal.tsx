@@ -1,6 +1,7 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
+import { rememberProgramSelection, resolveProgramSelection } from "@/lib/use-program-selection";
 import {
   FileSpreadsheet,
   UploadCloud,
@@ -31,7 +32,7 @@ interface MasterlistUploadModalProps {
   onClose: () => void;
   programs: any[];
   defaultProgramId?: string;
-  onSuccess: () => void;
+  onSuccess: (programId: string) => void;
 }
 
 const DEFAULT_EXEMPTION_REASONS = [
@@ -48,9 +49,9 @@ export function MasterlistUploadModal({
   defaultProgramId,
   onSuccess,
 }: MasterlistUploadModalProps) {
-  const [selectedProgramId, setSelectedProgramId] = useState<string>(
-    defaultProgramId || (programs.length > 0 ? programs[0].id : "AUTO")
-  );
+  const [selectedProgramId, setSelectedProgramId] = useState("");
+  const [previewProgramId, setPreviewProgramId] = useState("");
+  const requestVersion = useRef(0);
   const [duplicateStrategy, setDuplicateStrategy] = useState<"MERGE_AND_REPLACE" | "SKIP">("MERGE_AND_REPLACE");
   const [file, setFile] = useState<File | null>(null);
   const [parsing, setParsing] = useState(false);
@@ -65,12 +66,27 @@ export function MasterlistUploadModal({
   const [selectedReason, setSelectedReason] = useState<string>(DEFAULT_EXEMPTION_REASONS[0]);
   const [customReasonText, setCustomReasonText] = useState<string>("");
 
+  // This modal stays mounted while closed; its initial props can be empty.
+  useEffect(() => {
+    requestVersion.current++;
+    if (!isOpen) return;
+    setSelectedProgramId(resolveProgramSelection(programs, defaultProgramId));
+    setPreviewProgramId("");
+    setPreview(null);
+    setFile(null);
+    setError(null);
+    setParsing(false);
+    setActiveTab("ALL");
+  }, [isOpen, defaultProgramId, programs]);
+
   if (!isOpen) return null;
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       setFile(e.target.files[0]);
       setPreview(null);
+      setPreviewProgramId("");
+      requestVersion.current++;
       setError(null);
     }
   };
@@ -81,13 +97,19 @@ export function MasterlistUploadModal({
       return;
     }
 
+    if (!programs.some((p) => p.id === selectedProgramId)) {
+      setError("Pumili muna ng eksaktong program batch para sa masterlist.");
+      return;
+    }
+    const version = ++requestVersion.current;
+    const targetProgramId = selectedProgramId;
     setParsing(true);
     setError(null);
 
     try {
       const formData = new FormData();
       formData.append("file", file);
-      formData.append("programId", selectedProgramId);
+      formData.append("programId", targetProgramId);
 
       const res = await fetch("/api/v1/beneficiaries/import/preview", {
         method: "POST",
@@ -96,12 +118,16 @@ export function MasterlistUploadModal({
 
       const data = await readImportResponse(res, "preview");
 
+      if (version !== requestVersion.current) return;
+      if (data.resolvedProgramId !== targetProgramId) {
+        throw new Error("Hindi tugma ang preview sa napiling batch. Piliin muli ang program at i-preview ang file.");
+      }
       setPreview(data.preview);
-      if (typeof data.resolvedProgramId === "string" && data.resolvedProgramId !== "temp-program-id") setSelectedProgramId(data.resolvedProgramId);
+      setPreviewProgramId(targetProgramId);
     } catch (err: any) {
-      setError(err.message || "Failed to preview file");
+      if (version === requestVersion.current) setError(err.message || "Failed to preview file");
     } finally {
-      setParsing(false);
+      if (version === requestVersion.current) setParsing(false);
     }
   };
 
@@ -129,6 +155,7 @@ export function MasterlistUploadModal({
     }
 
     return {
+      slotReplacements: preview?.slotReplacements,
       fileName: preview?.fileName || "masterlist.csv",
       totalRows: rows.length,
       validCount,
@@ -209,6 +236,10 @@ export function MasterlistUploadModal({
 
   const handleCommitMasterlist = async () => {
     if (!preview || preview.validCount === 0) return;
+    if (!selectedProgramId || previewProgramId !== selectedProgramId) {
+      setError("I-preview muna ang file para sa napiling program batch bago mag-commit.");
+      return;
+    }
 
     setCommitting(true);
     setError(null);
@@ -220,6 +251,7 @@ export function MasterlistUploadModal({
         body: JSON.stringify({
           rows: preview.rows,
           programId: selectedProgramId,
+          previewProgramId,
           duplicateStrategy,
         }),
       });
@@ -232,7 +264,8 @@ export function MasterlistUploadModal({
       alert(
         `Successfully committed ${data.importedCount} beneficiaries${mergeMsg}${exemptMsg} into the Final Masterlist for Implementation!`
       );
-      onSuccess();
+      rememberProgramSelection(selectedProgramId);
+      onSuccess(selectedProgramId);
       onClose();
     } catch (err: any) {
       setError(err instanceof TypeError ? "The connection was interrupted. The import result is unknown. Check the program roster before retrying; do not repeatedly click Commit." : err.message || "Failed to commit masterlist");
@@ -293,13 +326,14 @@ export function MasterlistUploadModal({
         {/* Step 1 & 2: Target Program & Masterlist File */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div className="space-y-1">
-            <label className="block text-xs font-bold text-slate-700 uppercase">
+            <label htmlFor="masterlist-target-program" className="block text-xs font-bold text-slate-700 uppercase">
               1. Target TUPAD Program Batch *
             </label>
             <select
+              id="masterlist-target-program"
               value={selectedProgramId}
               disabled={committing || parsing}
-              onChange={(e) => { setSelectedProgramId(e.target.value); setPreview(null); setError(null); }}
+              onChange={(e) => { requestVersion.current++; setSelectedProgramId(e.target.value); setPreview(null); setPreviewProgramId(""); setError(null); }}
               className="w-full px-3 py-2 text-xs border rounded-xl bg-slate-50 font-bold text-slate-800"
             >
               {programs.map((p) => (
@@ -307,7 +341,6 @@ export function MasterlistUploadModal({
                   {p.programCode} - {p.programName} ({p.status})
                 </option>
               ))}
-              <option value="AUTO">+ Create / Use Default Active Program</option>
             </select>
           </div>
 
@@ -434,6 +467,18 @@ export function MasterlistUploadModal({
         {/* Live Preview Section */}
         {preview && (
           <div className="space-y-4 pt-2 border-t">
+            <div role="status" className="p-3 bg-blue-50 border border-blue-200 rounded-xl text-xs text-blue-950 space-y-1">
+              <p className="font-black">Target masterlist: {programs.find((p) => p.id === previewProgramId)?.programCode} — {programs.find((p) => p.id === previewProgramId)?.programName}</p>
+              <p>File: {file?.name} · {preview.validCount} valid rows. Merge &amp; Replace can change the names assigned to existing stub numbers in this batch.</p>
+            </div>
+            {duplicateStrategy === "MERGE_AND_REPLACE" && Boolean(preview.slotReplacements?.length) && (
+              <div role="alert" className="p-3 bg-amber-50 border border-amber-300 rounded-xl text-xs text-amber-950 space-y-1">
+                <p className="font-black">Mag-iiba ang pangalan sa {preview.slotReplacements!.length} existing stub numbers sa batch na ito.</p>
+                {preview.slotReplacements!.slice(0, 3).map((row) => (
+                  <p key={row.designatedNumber}>#{row.designatedNumber}: {row.previousFullName} → {row.fullName}</p>
+                ))}
+              </div>
+            )}
             {/* Summary KPI Cards */}
             <div className="grid grid-cols-2 sm:grid-cols-5 gap-2.5 text-center">
               <div className="p-3 bg-blue-50/70 border border-blue-200 rounded-xl">
