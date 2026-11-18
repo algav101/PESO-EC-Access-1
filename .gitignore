@@ -6,6 +6,7 @@
 
 # Testing
 /coverage
+/tmp/pdfs/
 
 # Next.js build output
 /.next/

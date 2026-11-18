@@ -474,6 +474,24 @@ function StubsContent() {
 
   // Virtual Sheet Pagination calculations
   const sheetCapacity = Math.max(1, columnsPerPage * rowsPerPage);
+  const printSheets = useMemo(() => {
+    const sheets: typeof filteredBeneficiaries[] = [];
+    for (let start = 0; start < filteredBeneficiaries.length; start += sheetCapacity) {
+      sheets.push(filteredBeneficiaries.slice(start, start + sheetCapacity));
+    }
+    return sheets;
+  }, [filteredBeneficiaries, sheetCapacity]);
+  const paperDimensions = { A4: [210, 297], Letter: [215.9, 279.4], Legal: [215.9, 355.6] } as const;
+  const [paperWidthMm, paperHeightMm] = paperDimensions[paperSize as keyof typeof paperDimensions] || paperDimensions.A4;
+  const printMarginMm = 8;
+  const printGapMm = 2;
+  const printWidthMm = paperWidthMm - printMarginMm * 2;
+  // Leave 1 mm for browser pagination rounding so a sheet never creates a blank overflow page.
+  const printHeightMm = paperHeightMm - printMarginMm * 2 - 1;
+  const printCellWidthMm = (printWidthMm - printGapMm * (columnsPerPage - 1)) / columnsPerPage;
+  const printCellHeightMm = (printHeightMm - printGapMm * (rowsPerPage - 1)) / rowsPerPage;
+  const cardAspectRatio = templateMode === "FULL_STUB" ? 1.52 : 640 / 404;
+  const printCardWidthMm = Math.min(printCellWidthMm, printCellHeightMm * cardAspectRatio);
   const totalSheets = Math.max(1, Math.ceil(filteredBeneficiaries.length / sheetCapacity));
   const safeCurrentSheet = Math.min(Math.max(1, previewSheetPage), totalSheets);
 
@@ -586,6 +604,85 @@ function StubsContent() {
 
   return (
     <div className="space-y-6">
+      <style jsx global>{`
+        @page {
+          size: ${paperWidthMm}mm ${paperHeightMm}mm;
+          margin: ${printMarginMm}mm;
+        }
+        @media print {
+          html:has(.stub-print-document), body:has(.stub-print-document) {
+            display: block !important;
+            height: auto !important;
+            min-height: 0 !important;
+            margin: 0 !important;
+            padding: 0 !important;
+          }
+          body:has(.stub-print-document) *:has(.stub-print-document) {
+            display: block !important;
+            background: white !important;
+            position: static !important;
+            width: auto !important;
+            max-width: none !important;
+            height: auto !important;
+            min-height: 0 !important;
+            overflow: visible !important;
+            margin: 0 !important;
+            padding: 0 !important;
+          }
+          body:has(.stub-print-document) > :not(:has(.stub-print-document)) {
+            display: none !important;
+          }
+          .stub-print-document {
+            margin: 0 !important;
+            padding: 0 !important;
+            width: ${printWidthMm}mm;
+            print-color-adjust: exact;
+            -webkit-print-color-adjust: exact;
+          }
+          .stub-print-sheet {
+            display: grid !important;
+            box-sizing: border-box;
+            margin: 0 !important;
+            padding: 0 !important;
+            break-inside: avoid;
+            page-break-inside: avoid;
+            break-after: page;
+            page-break-after: always;
+          }
+          .stub-print-sheet:last-child {
+            break-after: auto;
+            page-break-after: auto;
+          }
+          .stub-print-sheet > * {
+            min-width: 0;
+            min-height: 0;
+            break-inside: avoid;
+            page-break-inside: avoid;
+            align-self: center;
+            justify-self: center;
+          }
+          .stub-print-sheet > :not(.stub-card) {
+            width: 100%;
+            height: 100%;
+            padding: 0 !important;
+          }
+          .stub-print-sheet .etupad-card-wrapper,
+          .stub-print-sheet .format1-stub-card {
+            width: ${printCardWidthMm}mm !important;
+            max-width: 100% !important;
+            max-height: 100%;
+            flex-shrink: 0;
+            box-shadow: none !important;
+          }
+          .stub-print-sheet .format4-schedule-pass,
+          .stub-print-sheet .stub-card {
+            width: 100%;
+            min-height: 0 !important;
+            max-height: 100%;
+            box-shadow: none !important;
+          }
+        }
+      `}</style>
       {/* Control Panel (Hidden during physical browser printing) */}
       <div className="no-print space-y-5">
         {/* Header Title & Top Buttons */}
@@ -1668,14 +1765,21 @@ function StubsContent() {
       </div>
 
       {/* Dedicated Print Container (Hidden on Screen, Visible only in @media print) */}
-      <div className="print-only hidden">
+      <div className="print-only hidden stub-print-document">
+        {printSheets.map((sheet, sheetIndex) => (
         <div
-          className="grid gap-1.5"
+          key={sheetIndex}
+          className="stub-print-sheet"
+          data-sheet-number={sheetIndex + 1}
           style={{
+            width: `${printWidthMm}mm`,
+            height: `${printHeightMm}mm`,
+            gap: `${printGapMm}mm`,
             gridTemplateColumns: `repeat(${columnsPerPage}, minmax(0, 1fr))`,
+            gridTemplateRows: `repeat(${rowsPerPage}, minmax(0, 1fr))`,
           }}
         >
-          {filteredBeneficiaries.map((pb) => {
+          {sheet.map((pb) => {
             const activeQr = pb.qrCodes?.find((q: any) => q.status === "ACTIVE");
             const qrImg = qrImages[pb.id];
 
@@ -1784,6 +1888,7 @@ function StubsContent() {
             );
           })}
         </div>
+        ))}
       </div>
 
       {/* Batch Designated QR Generator Modal */}

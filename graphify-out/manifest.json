@@ -1158,9 +1158,9 @@
     "semantic_hash": ""
   },
   "src/app/stubs/page.tsx": {
-    "mtime": 1794971564.0642514,
-    "seen": 1794971808.14019,
-    "ast_hash": "4ff7a7589da9aaaeb6ce516408fb7b8a",
+    "mtime": 1794981947.4655056,
+    "seen": 1794982007.372261,
+    "ast_hash": "c2b65c5e806c9a88cac143225bd5f7ad",
     "semantic_hash": ""
   },
   "src/app/sync/page.tsx": {
@@ -2439,6 +2439,12 @@
     "mtime": 1794971524.2399397,
     "seen": 1794971808.145258,
     "ast_hash": "4458223181f4e88fd03773521e19342d",
+    "semantic_hash": ""
+  },
+  "test/test-stub-print-pagination.mjs": {
+    "mtime": 1794981701.416646,
+    "seen": 1794981870.3015332,
+    "ast_hash": "e2ff70745aa5edbd3bbce4853663dfb6",
     "semantic_hash": ""
   }
 }
