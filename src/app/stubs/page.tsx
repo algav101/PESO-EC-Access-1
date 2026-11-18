@@ -1,6 +1,8 @@
 "use client";
 
 import { useProgramSelection, resolveProgramSelection } from "@/lib/use-program-selection";
+import { readScanResponse } from "@/lib/program-qr-slot";
+import { QrScannerModal } from "@/components/scanner/QrScannerModal";
 
 import React, { useEffect, useState, useMemo, Suspense } from "react";
 import { useRouter } from "next/navigation";
@@ -64,7 +66,7 @@ type PrintTemplateMode = "FULL_STUB" | "QR_CARD_ONLY" | "STICKER_LABEL" | "SCHED
 
 function StubsContent() {
   const router = useRouter();
-  const { user } = useAuth();
+  const { user, can } = useAuth();
 
   // Redirect coordinators to field hub
   useEffect(() => {
@@ -79,6 +81,10 @@ function StubsContent() {
   const [qrImages, setQrImages] = useState<Record<string, string>>({});
   const [qrProgress, setQrProgress] = useState<{ done: number; total: number }>({ done: 0, total: 0 });
   const [loading, setLoading] = useState(true);
+  const [printedQrOpen, setPrintedQrOpen] = useState(false);
+  const [registeringPrintedQr, setRegisteringPrintedQr] = useState(false);
+  const [printedQrNotice, setPrintedQrNotice] = useState<{ error: boolean; text: string } | null>(null);
+  useEffect(() => { setPrintedQrOpen(false); setPrintedQrNotice(null); }, [selectedProgramId]);
 
   // Print Mode
   const [templateMode, setTemplateMode] = useState<PrintTemplateMode>("FULL_STUB");
@@ -217,6 +223,23 @@ function StubsContent() {
   };
 
   const currentProgram = programs.find((p) => p.id === selectedProgramId);
+
+  const handleRegisterPrintedQr = async (qrToken: string) => {
+    const programId = programRef.current;
+    setPrintedQrOpen(false);
+    if (!programId || registeringPrintedQr) return;
+    setRegisteringPrintedQr(true);
+    setPrintedQrNotice(null);
+    try {
+      const response = await fetch(`/api/v1/programs/${programId}/qr/register-printed`, {
+        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ qrToken }),
+      });
+      const data = await readScanResponse(response, "Hindi na-register ang printed QR.");
+      if (programRef.current === programId) setPrintedQrNotice({ error: false, text: data.message + " Run Master Key Sync on offline scanners." });
+    } catch (error: any) {
+      if (programRef.current === programId) setPrintedQrNotice({ error: true, text: error.message });
+    } finally { setRegisteringPrintedQr(false); }
+  };
 
   // Update default orientation text when program loads
   useEffect(() => {
@@ -578,6 +601,12 @@ function StubsContent() {
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
+            {can("qr.generate") && (
+              <button type="button" disabled={!selectedProgramId || registeringPrintedQr} onClick={() => setPrintedQrOpen(true)}
+                className="px-4 py-2 bg-gov-blue text-white font-bold text-xs rounded-xl disabled:opacity-50">
+                {registeringPrintedQr ? "Registering Printed QR..." : "Register Existing Printed QR"}
+              </button>
+            )}
             <button
               type="button"
               onClick={() => {
@@ -623,6 +652,11 @@ function StubsContent() {
           </div>
         </div>
 
+        {printedQrNotice && (
+          <div role="status" className={`p-3 rounded-xl border text-xs font-semibold ${printedQrNotice.error ? "bg-red-50 border-red-300 text-red-900" : "bg-emerald-50 border-emerald-300 text-emerald-900"}`}>
+            {printedQrNotice.text}
+          </div>
+        )}
         {/* Designated QR Generation Notification Alert */}
         {designatedSuccessMsg && (
           <div className="p-4 bg-emerald-950/80 border-2 border-emerald-500/80 rounded-2xl flex items-start space-x-3 text-emerald-200 text-xs shadow-lg animate-fadeIn">
@@ -1956,6 +1990,9 @@ function StubsContent() {
         </div>
       )}
 
+      <QrScannerModal isOpen={printedQrOpen} title="Register Printed QR to This Program"
+        subtitle={`Iuugnay ang card sa ${currentProgram?.programCode || "napiling program"}. Para sa cards mula sa closed/completed batch.`}
+        onScan={handleRegisterPrintedQr} onClose={() => setPrintedQrOpen(false)} />
       {/* Table Assignment Modal */}
       {currentProgram && (
         <TableAssignmentModal

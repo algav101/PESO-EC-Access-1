@@ -202,7 +202,37 @@ try {
   assert.deepEqual(previewDetails.preview.slotReplacements, [{ designatedNumber: "1", previousFullName: rows[0].fullName, fullName: "DIFFERENT MASTERLIST PERSON ONE" }]);
   assert.equal(await db.attendanceRecord.count({ where: { programId: otherProgram.id } }), 0);
   assert.equal(await oldHistory(), snapshot);
+  // An explicitly reissued printed card from a closed cycle can serve a new cycle.
+  // Its immutable QR row and the old person's field records remain byte-for-byte intact.
+  const registerRoute = load("src/app/api/v1/programs/[id]/qr/register-printed/route.ts");
+  assert.equal((await registerRoute.POST(request({ qrToken: currentPrinted.publicToken }), { params: { id: otherProgram.id } })).status, 409, "cannot take a card away from an open program");
+  await db.stubDistribution.create({ data: { qrId: firstCard.id, programBeneficiaryId: "old-pb-1", verificationMethod: "BIRTHDAY_PIN", status: "DISTRIBUTED", distributedAt: new Date("2026-09-20") } });
+  await db.orientationAttendance.create({ data: { programId: old.id, programBeneficiaryId: "old-pb-1", scannedAt: new Date("2026-09-20") } });
+  await db.attendanceRecord.create({ data: { programId: old.id, programBeneficiaryId: "old-pb-1", workDayId: oldDay.id, attendanceDate: "2026-09-20", morningTimeIn: new Date("2026-09-20") } });
+  const archivedCard = async () => JSON.stringify(await db.qrCode.findUnique({ where: { id: firstCard.id }, include: { stubDistributions: true, printLogs: true, programBeneficiary: { include: { orientationAttendance: true, attendanceRecords: true, payouts: true } } } }));
+  const archivedBefore = await archivedCard();
+  const registered = await registerRoute.POST(request({ qrToken: `https://synthetic.test/my-assignment?token=${firstCard.publicToken.toLowerCase()}` }), { params: { id: otherProgram.id } });
+  assert.equal(registered.status, 200);
+  assert.equal((await registered.json()).data.fullName, "DIFFERENT MASTERLIST PERSON ONE");
+  const repeatedRegistration = await registerRoute.POST(request({ qrToken: firstCard.publicToken }), { params: { id: otherProgram.id } });
+  assert.equal((await repeatedRegistration.json()).data.alreadyRegistered, true);
+  assert.equal(await db.auditLog.count({ where: { entityType: "QR_PROGRAM_BINDING", entityId: firstCard.id } }), 1);
+  const reissuedLookup = await route("stub-distribution").POST(request({ qrToken: firstCard.publicToken, programId: otherProgram.id }));
+  assert.equal(reissuedLookup.status, 200);
+  assert.equal((await reissuedLookup.json()).data.fullName, "DIFFERENT MASTERLIST PERSON ONE");
+  for (const stage of ["stub-distribution", "orientation", "attendance", "payout"]) {
+    for (const programId of [old.id, program.id]) assert.equal((await route(stage).POST(request({ qrToken: firstCard.publicToken, programId }))).status, 409);
+  }
+  const reissuedSlots = await load("src/app/api/v1/qr/slots/route.ts").GET();
+  assert.equal((await reissuedSlots.json()).slots.find(qr => qr.publicToken === firstCard.publicToken).programId, otherProgram.id);
+  const reissuedCameraLink = await assignmentRoute.GET(new Request(`http://synthetic.test?token=${firstCard.publicToken}`));
+  assert.equal(reissuedCameraLink.status, 200); assert.match(JSON.stringify(await reissuedCameraLink.json()), /DIFFERENT MASTERLIST PERSON ONE/);
+  assert.equal(await archivedCard(), archivedBefore, "reissuing must not move, rename or delete archived QR/field records");
+  assert.equal((await registerRoute.POST(request({ qrToken: firstCard.publicToken }), { params: { id: program.id } })).status, 409);
+  assert.equal((await registerRoute.POST(request({ qrToken: "1" }), { params: { id: otherProgram.id } })).status, 400);
+  assert.equal((await registerRoute.POST(request({ qrToken: "UNREGISTERED-CARD" }), { params: { id: otherProgram.id } })).status, 404);
   authorized = false;
+  assert.equal((await registerRoute.POST(request({ qrToken: firstCard.publicToken }), { params: { id: otherProgram.id } })).status, 403);
   assert.equal((await generate.POST(request({}), { params: { id: program.id } })).status, 403);
   assert.equal((await load("src/app/api/v1/qr/slots/route.ts").GET()).status, 401);
   console.log("Program QR PostgreSQL integration passed: new 600-person roster starts at zero, program-owned QR tokens, wrong-program rejection in both directions across four scanner stages, duplicate protection, no old-history mutation, #523–#600 extension, idempotent generation, invalid QR rejection, public routing and cross-program offline sync guards. Shared database untouched.");

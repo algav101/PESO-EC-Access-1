@@ -10,7 +10,7 @@ const calls = [], errors = [];
 const programs = ["new", "old"].map((id) => ({ id, programCode: `TEST-${id.toUpperCase()}`, programName: `${id} synthetic program`, status: "ACTIVE", requiredWorkDays: 1, workDays: [{ id: `${id}-day`, programId: id, dayNumber: 1, workDate: "2026-11-04" }] }));
 const roster = Array.from({ length: 600 }, (_, i) => ({ id: `new-pb-${i + 1}`, programId: "new", designatedNumber: String(i + 1), participationStatus: "ACTIVE", beneficiary: { id: `person-${i}`, fullName: `SYNTHETIC ${i + 1}`, barangay: "Aplaya", birthday: "1990-01-02" }, qrCodes: [] }));
 let mode = "success", expectedProgram = "new", releaseScan;
-let delayedScanStarted;
+let delayedScanStarted, registeredPrintedProgram;
 try {
   const context = await browser.newContext({ viewport: { width: 1440, height: 1100 }, serviceWorkers: "block" });
   await context.addCookies([{ name: "peso_landing_visited", value: "1", url: base }, { name: "tupad_auth_token", value: "synthetic-test-only", url: base }]);
@@ -28,11 +28,17 @@ try {
       assert.ok(url.pathname.includes("/new/")); assert.equal(request.postDataJSON().forceRegenerate, false);
       return reply({ success: true, generatedCount: 78, message: "Added 78 missing QR codes: #523–#600. Existing QR codes and scan history were preserved." });
     }
+    if (url.pathname.endsWith("/qr/register-printed")) {
+      const body = request.postDataJSON(); calls.push({ path: url.pathname, body });
+      assert.equal(body.qrToken, "TUPAD-DGL-OLDOLD-1-12345678");
+      assert.ok(url.pathname.includes("/new/")); registeredPrintedProgram = "new";
+      return reply({ success: true, message: "Registered printed QR #1 to TEST-NEW. Historical scans were preserved." });
+    }
     if (url.pathname.endsWith("/scan")) {
       const body = request.postDataJSON(); calls.push({ path: url.pathname, body });
       assert.equal(body.programId, expectedProgram, "every scanner must send the selected masterlist program");
       if (mode === "delayed") { delayedScanStarted(); await new Promise((resolve) => { releaseScan = resolve; }); }
-      const source = body.qrToken.includes("TUPAD-DGL-NEWNEW") ? "new" : body.qrToken.includes("TUPAD-DGL-OLDOLD") ? "old" : null;
+      const source = body.qrToken.includes("TUPAD-DGL-OLDOLD-1-12345678") && registeredPrintedProgram ? registeredPrintedProgram : body.qrToken.includes("TUPAD-DGL-NEWNEW") ? "new" : body.qrToken.includes("TUPAD-DGL-OLDOLD") ? "old" : null;
       if (source && source !== body.programId) return reply({ error: "WRONG WORK PROGRAM: QR belongs to " + source + ". Selected program: " + body.programId + ". Walang na-record." }, 409);
       if (mode === "denied") return reply({ error: "Synthetic denied scan; no offline replay" }, 404);
       return reply({ success: true, message: "Synthetic scan complete", data: { programId: body.programId, programBeneficiaryId: `${body.programId}-pb-113`, qrId: "new-qr", designatedNumber: "113", fullName: body.programId === "old" ? "OLD MASTERLIST PERSON ONE" : "NEW ROSTER PERSON", barangay: "Aplaya", tableNumber: "Table 2", programName: "New synthetic program", status: "PRESENT", morningTimeIn: "2026-11-04T00:00:00Z", isDistributed: false } });
@@ -150,6 +156,21 @@ try {
   await page.evaluate(() => localStorage.setItem("tupad_selected_program_id", "removed-program"));
   await page.goto(base + "/field/attendance", { waitUntil: "networkidle" });
   assert.equal(await selector().inputValue(), "new");
+  mode = "success"; expectedProgram = "new";
+  await page.goto(base + "/stubs?programId=new", { waitUntil: "networkidle" });
+  await page.getByRole("button", { name: "Register Existing Printed QR", exact: true }).click();
+  await page.getByText(/Iuugnay ang card sa TEST-NEW/).waitFor();
+  await page.getByRole("button", { name: "Manual Token Entry" }).click();
+  await page.getByPlaceholder("e.g. TUPAD-DGL-ABC123-1-XYZ").fill("TUPAD-DGL-OLDOLD-1-12345678");
+  await page.getByRole("button", { name: "Submit Token" }).click();
+  await page.getByRole("status").filter({ hasText: "Registered printed QR #1 to TEST-NEW" }).waitFor();
+  await page.goto(base + "/field/attendance", { waitUntil: "networkidle" });
+  await page.getByRole("button", { name: /SCAN QR FOR DAY/ }).click();
+  await page.getByRole("button", { name: "Manual Token Entry" }).click();
+  await page.getByPlaceholder("e.g. TUPAD-DGL-ABC123-1-XYZ").fill("TUPAD-DGL-OLDOLD-1-12345678");
+  await page.getByRole("button", { name: "Submit Token" }).click();
+  await page.getByText("NEW ROSTER PERSON", { exact: true }).waitFor();
+  assert.match(await page.getByTestId("scan-work-program").innerText(), /TEST-NEW/);
   assert.deepEqual(errors, []);
   console.log("Program QR UI passed: 600-row missing-code action, selected program sent by all four scanners, current work day, wrong-program QR image and token rejections across all four scanners, stale results cleared and HTTP denial surfaced. All APIs mocked.");
 } finally { await browser.close(); }

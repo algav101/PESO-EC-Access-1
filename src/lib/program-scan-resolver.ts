@@ -1,6 +1,7 @@
 import prisma from "@/lib/prisma";
 import { extractCleanQrToken } from "@/lib/utils";
-import { normalizeQrSlot, registeredQrSlot, wrongProgramQrMessage } from "@/lib/program-qr-slot";
+import { normalizeQrSlot, wrongProgramQrMessage } from "@/lib/program-qr-slot";
+import { readPrintedQrBinding } from "@/lib/printed-qr-registration";
 
 export class ProgramScanError extends Error {
   constructor(message: string, public status = 400) { super(message); }
@@ -20,14 +21,17 @@ export async function resolveProgramScan(rawToken: string, programId: unknown, i
       where: { publicToken: { equals: clean, mode: "insensitive" }, status: { not: "INVALIDATED" } },
       include: { programBeneficiary: { select: { designatedNumber: true } }, program: { select: { programCode: true, programName: true } } },
     });
-    if (reference && reference.programId !== targetProgramId) {
+    const binding = reference ? await readPrintedQrBinding(prisma, reference) : null;
+    if (reference && binding && binding.programId !== targetProgramId) {
       const selected = await prisma.program.findUnique({ where: { id: targetProgramId }, select: { programCode: true, programName: true } });
+      const owner = binding.programId === reference.programId ? reference.program
+        : await prisma.program.findUnique({ where: { id: binding.programId }, select: { programCode: true, programName: true } });
       throw new ProgramScanError(wrongProgramQrMessage(
-        `${reference.program.programCode} (${reference.program.programName})`,
+        owner ? `${owner.programCode} (${owner.programName})` : "registered work program",
         selected ? `${selected.programCode} (${selected.programName})` : "napiling work program",
       ), 409);
     }
-    if (reference) slot = registeredQrSlot(reference.publicToken, reference.programBeneficiary.designatedNumber);
+    if (binding) slot = binding.designatedNumber;
   }
   const matches = await prisma.programBeneficiary.findMany({
     where: {

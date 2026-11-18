@@ -1,6 +1,12 @@
 # Program-owned QR codes and scan history
 
-Select the correct **TUPAD Program** before scanning. Each registered QR belongs to one program. A 3rd Batch QR scanned under Skilled Workers (or vice versa) returns **WRONG WORK PROGRAM** before beneficiary lookup, sequence checks or writes. Identical stub numbers in different programs require different QR tokens. A replacement within the same program may retain that program's slot QR.
+Select the correct **TUPAD Program** before scanning. Each registered QR belongs to one current program. A 3rd Batch QR scanned under Skilled Workers (or vice versa) returns **WRONG WORK PROGRAM** before beneficiary lookup, sequence checks or writes. Identical stub numbers in different open programs require different QR tokens. A replacement within the same program may retain that program's slot QR; a closed-cycle physical card may be explicitly reissued as described below.
+
+### Reusing an existing physical card
+
+In **Stub / QR Creation**, select the new program and choose **Register Existing Printed QR**. Scan/upload the complete card QR. An admin with `qr.generate` can reissue a card from a **CLOSED/COMPLETED** program to an **ACTIVE/DRAFT** program whose masterlist contains exactly one active beneficiary at that printed number. Cards still assigned to an open program cannot be taken by another program. Registering again to the same program is idempotent.
+
+The registration is a versioned `QR_PROGRAM_BINDING` audit event, not a change to the original QR row or old attendance/orientation/stub/payout records. Scanners and camera links use the latest explicit registration, rather than guessing from the token's old program prefix. Other programs still receive **WRONG WORK PROGRAM**. Run **Master Key Sync** on offline devices after a registration so the QR→current-program reference is updated. Simply selecting another program never reissues a card.
 
 The masterlist, work-program page, stub printing and all four field scanners remember the selected program on the device. Moving from a masterlist to attendance keeps that program instead of silently opening the newest program. An explicit `?programId=...` link overrides the remembered choice; unavailable programs fall back to the available list. Results from a previous program are cleared, and delayed scan responses cannot restore them after a switch. Stub #1 therefore displays the #1 beneficiary from the selected program's masterlist, with that program's own orientation and attendance history.
 
@@ -8,7 +14,7 @@ Masterlist imports require an explicit batch. The upload dialog follows the curr
 
 - New program + uploaded roster: new enrolment IDs and QR records; stub distribution, orientation, daily attendance and payout start pending/zero.
 - Existing program + another upload or QR generation: existing scans are **preserved**, not erased. Create a genuinely new program for a new work cycle.
-- Archived programs retain their original beneficiaries, scans, dates and payout/restriction history. Their QR codes cannot record scans in another program.
+- Archived programs retain their original beneficiaries, scans, dates and payout/restriction history. Their physical cards can serve a new cycle only after explicit registration; historical records stay in the original program.
 - A slot missing from the selected roster is rejected. Duplicate active slots are rejected for review. Numeric entries are exact slots, never QR-token substrings. Partial/unregistered and explicitly invalidated tokens are rejected.
 - Without a selected program, scanner write requests are rejected. Built-in phone camera links open the QR's registered program. An explicit mismatched program is rejected; these assignment lookups do not record attendance or payout. Numeric manual entries remain exact slots within the selected program.
 

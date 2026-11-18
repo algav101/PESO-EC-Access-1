@@ -77,6 +77,11 @@ try {
     check((await db.offlineQueue.toArray()).filter((q) => q.payload.programId === "new").length === 1, "only one current-program queued scan");
     check(JSON.stringify(await db.cachedBeneficiaries.get(old.id)) === JSON.stringify(old), "old person flags unchanged");
     check((await db.offlineAttendanceRecords.where("programBeneficiaryId").equals(old.id).first()).morningTimeIn === "2026-11-04T00:00:00Z", "old attendance unchanged");
+    // Master Sync carries an explicit reissue registration; historical cached owners stay intact.
+    await db.cachedQrSlots.put({ publicToken: token, designatedNumber: "113", programId: "new" });
+    check((await find(token, "new")).id === current.id, "explicitly reissued printed card must resolve the new program's masterlist");
+    await wrongProgram(token, "old");
+    check(JSON.stringify(await db.cachedBeneficiaries.get(old.id)) === JSON.stringify(old), "reissue must not change the old person's cached history");
     await db.cachedQrSlots.delete(token);
     check(await find(token, "new") === null, "authoritative cache removal must invalidate stale legacy aliases");
     for (const status of [400, 401, 403, 404, 409, 503]) {
