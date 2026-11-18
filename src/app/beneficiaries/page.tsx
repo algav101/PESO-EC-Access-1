@@ -1,5 +1,7 @@
 "use client";
 
+import { useProgramSelection, resolveProgramSelection } from "@/lib/use-program-selection";
+
 import React, { useEffect, useState, useMemo } from "react";
 import {
   Users,
@@ -67,7 +69,7 @@ function BeneficiariesMasterlistContent() {
   const isAdmin = isAdminUser(user);
   const [beneficiaries, setBeneficiaries] = useState<any[]>([]);
   const [programs, setPrograms] = useState<any[]>([]);
-  const [selectedProgram, setSelectedProgram] = useState<string>("");
+  const [selectedProgram, setSelectedProgram, programRef] = useProgramSelection();
   const [selectedBarangays, setSelectedBarangays] = useState<string[]>(["ALL"]);
   const [selectedSitios, setSelectedSitios] = useState<string[]>(["ALL"]);
   const [selectedStubStatus, setSelectedStubStatus] = useState<string>("ALL");
@@ -141,12 +143,13 @@ function BeneficiariesMasterlistContent() {
           const cachedProgs = await offlineDb.cachedPrograms.toArray();
           if (cachedProgs && cachedProgs.length > 0) {
             setPrograms(cachedProgs);
-            const activeProgId = selectedProgram || cachedProgs[0].id;
+            const activeProgId = resolveProgramSelection(cachedProgs, selectedProgram);
             setSelectedProgram(activeProgId);
             const cachedBenes = await offlineDb.cachedBeneficiaries
               .where("programId")
               .equals(activeProgId)
               .toArray();
+            if (programRef.current !== activeProgId) return;
             if (cachedBenes && cachedBenes.length > 0) {
               const mapped = cachedBenes.map((c) => ({
                 id: c.id,
@@ -193,7 +196,7 @@ function BeneficiariesMasterlistContent() {
         const progs = pData.programs || [];
         setPrograms(progs);
         if (progs.length > 0) {
-          const activeProgId = selectedProgram || progs[0].id;
+          const activeProgId = resolveProgramSelection(progs, selectedProgram);
           setSelectedProgram(activeProgId);
           await fetchBeneficiaries(activeProgId);
         } else {
@@ -211,6 +214,7 @@ function BeneficiariesMasterlistContent() {
       const res = await fetch(`/api/v1/programs/${programId}/beneficiaries`);
       if (res.ok) {
         const data = await res.json();
+        if (programRef.current !== programId) return;
         const serverBenes = data.beneficiaries || [];
         setBeneficiaries(serverBenes);
 
@@ -276,6 +280,8 @@ function BeneficiariesMasterlistContent() {
 
   const handleProgramChange = (progId: string) => {
     setSelectedProgram(progId);
+    setBeneficiaries([]);
+    setSelectedPbIds([]);
     setSelectedSitios(["ALL"]);
     setLoading(true);
     fetchBeneficiaries(progId);

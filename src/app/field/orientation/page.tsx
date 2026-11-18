@@ -1,5 +1,7 @@
 "use client";
 
+import { useProgramSelection, resolveProgramSelection } from "@/lib/use-program-selection";
+
 import { getCachedMonitoring, includeLocalPending } from "@/lib/offline-monitoring";
 import { useMonitorRefresh } from "@/lib/use-monitor-refresh";
 import { ScanRequestError, readScanResponse } from "@/lib/program-qr-slot";
@@ -56,9 +58,7 @@ function OrientationContent() {
 
   const [activeTab, setActiveTab] = useState<"scanner" | "monitoring">(initialTab);
   const [programs, setPrograms] = useState<any[]>([]);
-  const [selectedProgramId, setSelectedProgramId] = useState<string>("");
-  const programRef = useRef(selectedProgramId);
-  programRef.current = selectedProgramId;
+  const [selectedProgramId, setSelectedProgramId, programRef] = useProgramSelection();
   const monitoringRequest = useRef(0);
 
   // Scanner States
@@ -101,7 +101,7 @@ function OrientationContent() {
           if (progs.length > 0) {
             setPrograms(progs);
             if (!selectedProgramId) {
-              setSelectedProgramId(progs[0].id);
+              setSelectedProgramId(resolveProgramSelection(progs));
             }
             return;
           }
@@ -117,7 +117,7 @@ function OrientationContent() {
       if (cachedProgs.length > 0) {
         setPrograms(cachedProgs);
         if (!selectedProgramId) {
-          setSelectedProgramId(cachedProgs[0].id);
+          setSelectedProgramId(resolveProgramSelection(cachedProgs));
         }
       }
     } catch (err) {
@@ -158,7 +158,7 @@ function OrientationContent() {
     }
   };
 
-  useEffect(() => { setScanResult(null); setError(null); setManualSlot(""); setMonitoringData(null); setScannerOpen(false); }, [selectedProgramId]);
+  useEffect(() => { setLoading(false); setScanResult(null); setError(null); setManualSlot(""); setMonitoringData(null); setScannerOpen(false); }, [selectedProgramId]);
 
   const handleScan = async (tokenOrSlot: string) => {
     setScannerOpen(false);
@@ -180,8 +180,10 @@ function OrientationContent() {
             }),
           });
 
+          if (programRef.current !== selectedProgramId) return;
           const data = await readScanResponse(res, "Scan rejected for the selected program.");
 
+          if (programRef.current !== selectedProgramId) return;
           setScanResult({
             alreadyRecorded: data.alreadyScanned,
             message: data.message,
@@ -195,6 +197,7 @@ function OrientationContent() {
           }
           return;
         } catch (onlineErr: any) {
+          if (programRef.current !== selectedProgramId) return;
           if (onlineErr instanceof ScanRequestError) throw onlineErr;
           if (
             onlineErr.message &&
@@ -208,8 +211,11 @@ function OrientationContent() {
         }
       }
 
+      if (programRef.current !== selectedProgramId) return;
+
       // Offline mode check with universal token resolution
       const bene = await findBeneficiaryOffline(tokenOrSlot, selectedProgramId);
+      if (programRef.current !== selectedProgramId) return;
       if (!bene) throw new Error(`Beneficiary or QR Token "${tokenOrSlot}" not found in offline database.`);
 
       if (bene.orientationStatus === "PRESENT") throw new Error("ALREADY SCANNED: Orientation was already recorded in this program.");
@@ -223,6 +229,7 @@ function OrientationContent() {
         status: "PRESENT",
       });
 
+      if (programRef.current !== selectedProgramId) return;
       setScanResult({
         alreadyRecorded: false,
         message: "✓ Orientation Attendance Stored to Installed Unit (Queued for Sync)",
@@ -241,9 +248,9 @@ function OrientationContent() {
         fetchMonitoringData(selectedProgramId, true);
       }
     } catch (err: any) {
-      setError(err.message);
+      if (programRef.current === selectedProgramId) setError(err.message);
     } finally {
-      setLoading(false);
+      if (programRef.current === selectedProgramId) setLoading(false);
     }
   };
 

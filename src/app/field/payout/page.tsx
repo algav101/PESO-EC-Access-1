@@ -1,5 +1,7 @@
 "use client";
 
+import { useProgramSelection, resolveProgramSelection } from "@/lib/use-program-selection";
+
 import { ScanRequestError, readScanResponse } from "@/lib/program-qr-slot";
 
 import React, { useState, useEffect } from "react";
@@ -27,7 +29,7 @@ export default function PayoutScannerPage() {
   const { user, can } = useAuth();
   const { isOnline } = useOffline();
   const [programs, setPrograms] = useState<any[]>([]);
-  const [selectedProgramId, setSelectedProgramId] = useState("");
+  const [selectedProgramId, setSelectedProgramId, programRef] = useProgramSelection();
 
   const [scannerOpen, setScannerOpen] = useState(false);
   const [qrGeneratorOpen, setQrGeneratorOpen] = useState(false);
@@ -49,13 +51,13 @@ export default function PayoutScannerPage() {
         }
       } catch {}
       if (!list.length) list = await offlineDb.cachedPrograms.toArray();
-      if (!cancelled) { setPrograms(list); setSelectedProgramId(list[0]?.id || ""); }
+      if (!cancelled) { setPrograms(list); setSelectedProgramId(resolveProgramSelection(list)); }
     })();
     return () => { cancelled = true; };
   }, []);
 
   useEffect(() => {
-    setScannedBeneficiary(null); setPayoutResult(null); setError(null); setRemarks(""); setScannerOpen(false);
+    setLoading(false); setScannedBeneficiary(null); setPayoutResult(null); setError(null); setRemarks(""); setScannerOpen(false);
   }, [selectedProgramId]);
 
   const handleScan = async (token: string) => {
@@ -75,14 +77,17 @@ export default function PayoutScannerPage() {
             body: JSON.stringify({ qrToken: token, programId: selectedProgramId, isLookupOnly: true }),
           });
 
+          if (programRef.current !== selectedProgramId) return;
           const data = await readScanResponse(res, "Scan rejected for the selected program.");
 
+          if (programRef.current !== selectedProgramId) return;
           setScannedBeneficiary({
             ...data.data,
             qrToken: token,
           });
           return;
         } catch (onlineErr: any) {
+          if (programRef.current !== selectedProgramId) return;
           if (onlineErr instanceof ScanRequestError) throw onlineErr;
           if (
             onlineErr.message &&
@@ -96,8 +101,11 @@ export default function PayoutScannerPage() {
         }
       }
 
+      if (programRef.current !== selectedProgramId) return;
+
       // Offline lookup with universal token resolution
       const bene = await findBeneficiaryOffline(token, selectedProgramId);
+      if (programRef.current !== selectedProgramId) return;
       if (!bene) throw new Error(`QR Token or Beneficiary "${token}" not found in offline database cache.`);
       if (bene.payoutStatus === "PAID") throw new Error("ALREADY PAID: Payout was already recorded in this program.");
 
@@ -111,9 +119,9 @@ export default function PayoutScannerPage() {
         programId: bene.programId,
       });
     } catch (err: any) {
-      setError(err.message);
+      if (programRef.current === selectedProgramId) setError(err.message);
     } finally {
-      setLoading(false);
+      if (programRef.current === selectedProgramId) setLoading(false);
     }
   };
 

@@ -1,5 +1,7 @@
 "use client";
 
+import { rememberProgramSelection } from "@/lib/use-program-selection";
+
 import React, { useEffect, useState, useMemo } from "react";
 import { useParams, useRouter } from "next/navigation";
 import {
@@ -209,6 +211,7 @@ export default function WorkProgramManagementPage() {
       if (resProg.ok) {
         const data = await resProg.json();
         setProgram(data.program);
+        if (data.program?.id) rememberProgramSelection(data.program.id);
         try {
           sessionStorage.setItem(`tupad_cache_prog_${params.id}`, JSON.stringify(data.program));
         } catch (_) {}

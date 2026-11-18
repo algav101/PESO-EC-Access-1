@@ -9,7 +9,8 @@ const browser = await chromium.launch({ channel: "chrome", headless: true });
 const calls = [], errors = [];
 const programs = ["new", "old"].map((id) => ({ id, programCode: `TEST-${id.toUpperCase()}`, programName: `${id} synthetic program`, status: "ACTIVE", requiredWorkDays: 1, workDays: [{ id: `${id}-day`, programId: id, dayNumber: 1, workDate: "2026-11-04" }] }));
 const roster = Array.from({ length: 600 }, (_, i) => ({ id: `new-pb-${i + 1}`, programId: "new", designatedNumber: String(i + 1), participationStatus: "ACTIVE", beneficiary: { id: `person-${i}`, fullName: `SYNTHETIC ${i + 1}`, barangay: "Aplaya", birthday: "1990-01-02" }, qrCodes: [] }));
-let mode = "success";
+let mode = "success", expectedProgram = "new", releaseScan;
+let delayedScanStarted;
 try {
   const context = await browser.newContext({ viewport: { width: 1440, height: 1100 }, serviceWorkers: "block" });
   await context.addCookies([{ name: "peso_landing_visited", value: "1", url: base }, { name: "tupad_auth_token", value: "synthetic-test-only", url: base }]);
@@ -29,13 +30,14 @@ try {
     }
     if (url.pathname.endsWith("/scan")) {
       const body = request.postDataJSON(); calls.push({ path: url.pathname, body });
-      assert.equal(body.programId, "new", "every scanner must send the selected program");
+      assert.equal(body.programId, expectedProgram, "every scanner must send the selected masterlist program");
+      if (mode === "delayed") { delayedScanStarted(); await new Promise((resolve) => { releaseScan = resolve; }); }
       if (mode === "denied") return reply({ error: "Synthetic denied scan; no offline replay" }, 404);
-      return reply({ success: true, message: "Synthetic scan complete", data: { programId: "new", programBeneficiaryId: "new-pb-113", qrId: "new-qr", designatedNumber: "113", fullName: "NEW ROSTER PERSON", barangay: "Aplaya", tableNumber: "Table 2", programName: "New synthetic program", status: "PRESENT", morningTimeIn: "2026-11-04T00:00:00Z", isDistributed: false } });
+      return reply({ success: true, message: "Synthetic scan complete", data: { programId: body.programId, programBeneficiaryId: `${body.programId}-pb-113`, qrId: "new-qr", designatedNumber: "113", fullName: body.programId === "old" ? "OLD MASTERLIST PERSON ONE" : "NEW ROSTER PERSON", barangay: "Aplaya", tableNumber: "Table 2", programName: "New synthetic program", status: "PRESENT", morningTimeIn: "2026-11-04T00:00:00Z", isDistributed: false } });
     }
     if (!["GET", "HEAD", "OPTIONS"].includes(request.method())) throw new Error("Unexpected mocked write: " + url.pathname);
     if (url.pathname.endsWith("/monitoring")) return reply({ summary: { totalBeneficiaries: 600, totalOrientationScanned: 0, totalOrientationPending: 600, totalStubsAffirmed: 600, attendanceRate: 0 }, beneficiaries: [], barangays: [] });
-    if (url.pathname.endsWith("/beneficiaries")) return reply({ beneficiaries: url.pathname.includes("/new/") ? roster : [] });
+    if (url.pathname.endsWith("/beneficiaries")) return reply({ beneficiaries: url.pathname.includes("/new/") ? roster : [{ ...roster[0], id: "old-pb-1", programId: "old", beneficiary: { ...roster[0].beneficiary, fullName: "OLD MASTERLIST PERSON ONE" } }] });
     if (url.pathname.match(/\/programs\/(new|old)$/)) return reply({ program: programs.find((p) => url.pathname.endsWith(p.id)) });
     if (url.pathname.endsWith("/work-program")) return reply({ workPrograms: [] });
     return reply({ beneficiaries: [], settings: [] });
@@ -78,6 +80,7 @@ try {
   await modalScan("SCAN FORMAT 1 STUB QR");
   await selector().selectOption("old");
   await page.getByText("NEW ROSTER PERSON", { exact: true }).waitFor({ state: "hidden" });
+  await selector().selectOption("new");
   await page.goto(base + "/field/payout", { waitUntil: "networkidle" });
   assert.equal(await page.getByLabel("TUPAD Program").inputValue(), "new");
   await modalScan("SCAN PAYOUT QR");
@@ -86,5 +89,43 @@ try {
   assert.deepEqual(errors, []);
   assert.equal(calls.filter((c) => c.path.endsWith("/qr/generate")).length, 1);
   assert.equal(calls.filter((c) => c.path.endsWith("/scan")).length, 5);
+  // A non-default masterlist program follows the user through every scanner and printing.
+  await page.goto(base + "/beneficiaries", { waitUntil: "networkidle" });
+  assert.equal(await selector().inputValue(), "old", "masterlist must retain the selected program");
+  await page.getByText("OLD MASTERLIST PERSON ONE", { exact: true }).waitFor();
+  await selector().selectOption("new");
+  await selector().selectOption("old");
+  expectedProgram = "old";
+  for (const [path, button] of [["attendance", /SCAN QR FOR DAY/], ["stub-distribution", "SCAN FORMAT 1 STUB QR"], ["payout", "SCAN PAYOUT QR"]]) {
+    await page.goto(base + "/field/" + path, { waitUntil: "networkidle" });
+    assert.equal(await selector().inputValue(), "old", path + " must follow the masterlist");
+    await page.getByRole("button", { name: button }).click();
+    await page.getByRole("button", { name: "Manual Token Entry" }).click();
+    await page.getByPlaceholder("e.g. TUPAD-DGL-ABC123-1-XYZ").fill("1");
+    await page.getByRole("button", { name: "Submit Token" }).click();
+    await page.getByText("OLD MASTERLIST PERSON ONE", { exact: true }).waitFor();
+  }
+  await page.goto(base + "/stubs", { waitUntil: "networkidle" });
+  assert.equal(await selector().inputValue(), "old", "printing must follow the masterlist");
+  await page.goto(base + "/field/orientation?programId=new", { waitUntil: "networkidle" });
+  assert.equal(await selector().inputValue(), "new", "explicit program links override the remembered program");
+  expectedProgram = "new";
+  mode = "delayed";
+  const started = new Promise((resolve) => { delayedScanStarted = resolve; });
+  await page.getByPlaceholder("e.g. 1, 45, or DGL-TUPAD-...").fill("1");
+  await page.getByRole("button", { name: "Verify", exact: true }).click();
+  await started;
+  // Simulate a switch while a slow scan is still returning.
+  await selector().evaluate((el) => { el.disabled = false; });
+  await selector().selectOption("old");
+  const completed = page.waitForResponse((res) => res.url().endsWith("/orientation/scan"));
+  releaseScan(); await completed;
+  await page.waitForLoadState("networkidle");
+  assert.equal(await page.getByText("NEW ROSTER PERSON", { exact: true }).count(), 0, "late response must not restore another program's beneficiary");
+  // A removed program in storage cannot select a nonexistent roster.
+  await page.evaluate(() => localStorage.setItem("tupad_selected_program_id", "removed-program"));
+  await page.goto(base + "/field/attendance", { waitUntil: "networkidle" });
+  assert.equal(await selector().inputValue(), "new");
+  assert.deepEqual(errors, []);
   console.log("Program QR UI passed: 600-row missing-code action, selected program sent by all four scanners, current work day, payout program selector, stale results cleared and HTTP denial surfaced. All APIs mocked.");
 } finally { await browser.close(); }

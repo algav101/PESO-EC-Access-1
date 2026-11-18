@@ -150,6 +150,21 @@ try {
   const sync = await queued.json(); assert.equal(sync.accepted.length, 0); assert.equal(sync.failed.length, 4); assert.equal(await oldHistory(), snapshot);
   const assignment = await load("src/app/api/v1/work-assignment/lookup/route.ts").GET(new Request(`http://synthetic.test?token=${printed.publicToken}`));
   assert.equal(assignment.status, 200); assert.match(JSON.stringify(await assignment.json()), /0600/);
+  // The same printed #1 must resolve independently in two actually imported masterlists.
+  const firstCard = await db.qrCode.findFirst({ where: { programBeneficiaryId: "old-pb-1" } });
+  const otherProgram = await db.program.create({ data: { programCode: "SYNTHETIC-OTHER", programName: "Different #1 masterlist", createdById: admin.id } });
+  const otherImport = await commit.POST(request({ programId: otherProgram.id, rows: [{ ...rows[0], fullName: "DIFFERENT MASTERLIST PERSON ONE" }] }));
+  assert.equal(otherImport.status, 200, JSON.stringify(await otherImport.clone().json()));
+  for (const [programId, expectedName] of [[old.id, rows[0].fullName], [otherProgram.id, "DIFFERENT MASTERLIST PERSON ONE"]]) {
+    const response = await route("attendance").POST(request({ qrToken: firstCard.publicToken, programId }));
+    assert.equal(response.status, 400);
+    const blocked = await response.json();
+    assert.equal(blocked.stepBlocked, "ORIENTATION_REQUIRED");
+    assert.equal(blocked.data.fullName, expectedName, "even sequence errors must name the selected masterlist's #1");
+    assert.equal(blocked.data.designatedNumber, "1");
+  }
+  assert.equal(await db.attendanceRecord.count({ where: { programId: otherProgram.id } }), 0);
+  assert.equal(await oldHistory(), snapshot);
   authorized = false;
   assert.equal((await generate.POST(request({}), { params: { id: program.id } })).status, 403);
   assert.equal((await load("src/app/api/v1/qr/slots/route.ts").GET()).status, 401);

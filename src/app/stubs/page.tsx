@@ -1,7 +1,9 @@
 "use client";
 
+import { useProgramSelection, resolveProgramSelection } from "@/lib/use-program-selection";
+
 import React, { useEffect, useState, useMemo, Suspense } from "react";
-import { useSearchParams, useRouter } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 import { isFieldCoordinator } from "@/lib/permissions";
 import {
@@ -61,10 +63,8 @@ import {
 type PrintTemplateMode = "FULL_STUB" | "QR_CARD_ONLY" | "STICKER_LABEL" | "SCHEDULE_PASS";
 
 function StubsContent() {
-  const searchParams = useSearchParams();
   const router = useRouter();
   const { user } = useAuth();
-  const urlProgramId = searchParams.get("programId");
 
   // Redirect coordinators to field hub
   useEffect(() => {
@@ -74,7 +74,7 @@ function StubsContent() {
   }, [user, router]);
 
   const [programs, setPrograms] = useState<any[]>([]);
-  const [selectedProgramId, setSelectedProgramId] = useState<string>(urlProgramId || "");
+  const [selectedProgramId, setSelectedProgramId, programRef] = useProgramSelection();
   const [beneficiaries, setBeneficiaries] = useState<any[]>([]);
   const [qrImages, setQrImages] = useState<Record<string, string>>({});
   const [qrProgress, setQrProgress] = useState<{ done: number; total: number }>({ done: 0, total: 0 });
@@ -157,6 +157,8 @@ function StubsContent() {
   }, []);
 
   useEffect(() => {
+    setBeneficiaries([]);
+    setQrImages({});
     if (selectedProgramId) {
       fetchBeneficiaries(selectedProgramId);
     }
@@ -236,8 +238,8 @@ function StubsContent() {
       if (res.ok) {
         const data = await res.json();
         setPrograms(data.programs || []);
-        if (!selectedProgramId && data.programs?.length > 0) {
-          setSelectedProgramId(data.programs[0].id);
+        if (data.programs?.length > 0) {
+          setSelectedProgramId((prev) => resolveProgramSelection(data.programs, prev));
         }
       }
     } catch (e) {
@@ -253,6 +255,7 @@ function StubsContent() {
       const res = await fetch(`/api/v1/programs/${programId}/beneficiaries?withSchedule=true`);
       if (res.ok) {
         const data = await res.json();
+        if (programRef.current !== programId) return;
         const benelist = data.beneficiaries || [];
 
         // Natural numeric sort by designatedNumber

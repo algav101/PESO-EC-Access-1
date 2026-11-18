@@ -1,8 +1,10 @@
 "use client";
 
+import { useProgramSelection, resolveProgramSelection } from "@/lib/use-program-selection";
+
 import { ScanRequestError, readScanResponse } from "@/lib/program-qr-slot";
 
-import React, { useEffect, useState, useRef } from "react";
+import React, { useEffect, useState } from "react";
 import {
   Clock,
   QrCode,
@@ -44,9 +46,7 @@ export default function DailyAttendancePage() {
   const isUserAdmin = isAdminUser(user);
 
   const [programs, setPrograms] = useState<any[]>([]);
-  const [selectedProgramId, setSelectedProgramId] = useState<string>("");
-  const programRef = useRef(selectedProgramId);
-  programRef.current = selectedProgramId;
+  const [selectedProgramId, setSelectedProgramId, programRef] = useProgramSelection();
   const [workDays, setWorkDays] = useState<any[]>([]);
   const [selectedWorkDayId, setSelectedWorkDayId] = useState<string>("");
   const [shiftMode, setShiftMode] = useState<string>("AUTO");
@@ -220,7 +220,7 @@ export default function DailyAttendancePage() {
           const progs = data.programs || [];
           if (progs.length > 0) {
             setPrograms(progs);
-            setSelectedProgramId((prev) => prev || progs[0].id);
+            setSelectedProgramId((prev) => resolveProgramSelection(progs, prev));
             return;
           }
         }
@@ -243,7 +243,7 @@ export default function DailyAttendancePage() {
 
       if (progsWithDays.length > 0) {
         setPrograms(progsWithDays);
-        setSelectedProgramId((prev) => prev || progsWithDays[0].id);
+        setSelectedProgramId((prev) => resolveProgramSelection(progsWithDays, prev));
       }
     } catch (err) {
       console.error("Failed to load offline programs from IndexedDB:", err);
@@ -307,7 +307,7 @@ export default function DailyAttendancePage() {
       }))
   );
 
-  useEffect(() => { setScanResult(null); setError(null); setSelectedAreaItemId("AUTO"); setScannerOpen(false); }, [selectedProgramId]);
+  useEffect(() => { setLoading(false); setScanResult(null); setError(null); setSelectedAreaItemId("AUTO"); setScannerOpen(false); }, [selectedProgramId]);
 
   const handleScan = async (token: string) => {
     setScannerOpen(false);
@@ -334,8 +334,10 @@ export default function DailyAttendancePage() {
             }),
           });
 
+          if (programRef.current !== selectedProgramId) return;
           const data = await readScanResponse(res, "Scan rejected for the selected program.");
 
+          if (programRef.current !== selectedProgramId) return;
           setScanResult({
             isDuplicate: data.isDuplicate,
             slotRecorded: data.slotRecorded,
@@ -345,6 +347,7 @@ export default function DailyAttendancePage() {
           });
           return;
         } catch (onlineErr: any) {
+          if (programRef.current !== selectedProgramId) return;
           if (onlineErr instanceof ScanRequestError) throw onlineErr;
           if (
             onlineErr.message &&
@@ -359,6 +362,8 @@ export default function DailyAttendancePage() {
         }
       }
 
+      if (programRef.current !== selectedProgramId) return;
+
       // Offline Attendance Engine (Stored to Installed Unit)
       const offlineResult = await recordOfflineAttendance({
         rawToken: token,
@@ -370,11 +375,12 @@ export default function DailyAttendancePage() {
         bypass3HourRule: true,
       });
 
+      if (programRef.current !== selectedProgramId) return;
       setScanResult(offlineResult);
     } catch (err: any) {
-      setError(err.message);
+      if (programRef.current === selectedProgramId) setError(err.message);
     } finally {
-      setLoading(false);
+      if (programRef.current === selectedProgramId) setLoading(false);
     }
   };
 
@@ -484,6 +490,9 @@ export default function DailyAttendancePage() {
               </option>
             ))}
           </select>
+          <p className="mt-1.5 text-[11px] text-slate-500">
+            Ang pangalan sa scan ay mula sa masterlist ng napiling program. Puwedeng gamitin ang parehong stub number sa ibang program.
+          </p>
         </div>
 
         {/* 1. Day Selector (Day 1 to 10 Interactive Buttons) */}
