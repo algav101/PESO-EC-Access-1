@@ -224,6 +224,7 @@ function OrientationContent() {
       await offlineDb.cachedBeneficiaries.update(bene.id, { orientationStatus: "PRESENT" });
 
       await queueOfflineTransaction("ORIENTATION", "CREATE", {
+        qrToken: tokenOrSlot,
         programId: bene.programId || selectedProgramId,
         programBeneficiaryId: bene.id,
         status: "PRESENT",

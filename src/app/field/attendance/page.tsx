@@ -492,7 +492,7 @@ export default function DailyAttendancePage() {
             ))}
           </select>
           <p className="mt-1.5 text-[11px] text-slate-500">
-            Ang pangalan sa scan ay mula sa masterlist ng napiling program. Puwedeng gamitin ang parehong stub number sa ibang program.
+            QR code lang ng napiling program ang tatanggapin. Magkaibang QR ang kailangan kahit pareho ang stub number sa ibang program.
           </p>
         </div>
 

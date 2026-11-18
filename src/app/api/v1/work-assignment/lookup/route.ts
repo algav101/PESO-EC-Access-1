@@ -4,6 +4,7 @@ import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { resolveProgramScan, ProgramScanError } from "@/lib/program-scan-resolver";
 import { format } from "date-fns";
+import { extractCleanQrToken } from "@/lib/utils";
 import { assignBeneficiaryWorkArea, WorkProgramItemAllocation } from "@/lib/work-assignment";
 import { getCurrentUser } from "@/lib/auth";
 
@@ -141,19 +142,7 @@ async function handleLookup(params: any) {
   const sessionUser = await getCurrentUser();
   const isStaffSession = Boolean(sessionUser);
 
-  // Clean token if URL
-  let cleanToken = rawQrToken;
-  try {
-    if (rawQrToken.startsWith("http://") || rawQrToken.startsWith("https://")) {
-      const parsedUrl = new URL(rawQrToken);
-      cleanToken =
-        parsedUrl.searchParams.get("token") ||
-        parsedUrl.searchParams.get("qrToken") ||
-        parsedUrl.pathname.split("/").pop() ||
-        rawQrToken;
-    }
-  } catch {}
-  cleanToken = cleanToken.trim();
+  const cleanToken = extractCleanQrToken(rawQrToken);
 
   const pbIncludes = {
     beneficiary: true,
@@ -179,7 +168,7 @@ async function handleLookup(params: any) {
   let pb: any = null;
 
   // 1. Search in ProgramBeneficiary by structured Full Name (Last Name, First Name, Barangay)
-  if (hasNameInput) {
+  if (hasNameInput && !cleanToken) {
     const andConditions: any[] = [];
 
     // Match Last Name
@@ -240,7 +229,7 @@ async function handleLookup(params: any) {
   }
 
   // 1.5. Fallback: Search in Masterlist Beneficiaries if not found in ProgramBeneficiary
-  if (!pb && hasNameInput) {
+  if (!pb && hasNameInput && !cleanToken) {
     const andConditions: any[] = [];
     andConditions.push({
       OR: [
@@ -303,13 +292,17 @@ async function handleLookup(params: any) {
     }
   }
 
-  // A camera-scanned printed card refers to the same slot in the selected/latest program.
+  // Camera links without a selected program open the QR's registered program.
   if (!pb && (cleanToken || designatedNumber)) {
-    const targetProgramId = programIdParam || (await prisma.program.findFirst({
+    const registeredQr = cleanToken && !programIdParam ? await prisma.qrCode.findFirst({
+      where: { publicToken: { equals: cleanToken, mode: "insensitive" }, status: { not: "INVALIDATED" } },
+      select: { programId: true },
+    }) : null;
+    const targetProgramId = programIdParam || registeredQr?.programId || (await prisma.program.findFirst({
       where: { status: { in: ["ACTIVE", "DRAFT"] } }, orderBy: { createdAt: "desc" }, select: { id: true },
     }))?.id;
     try {
-      const resolved = await resolveProgramScan(designatedNumber || cleanToken, targetProgramId, pbIncludes);
+      const resolved = await resolveProgramScan(cleanToken || designatedNumber || "", targetProgramId, pbIncludes);
       pb = resolved.pb; qr = resolved.qr;
     } catch (error) {
       if (error instanceof ProgramScanError) return NextResponse.json({ error: error.message }, { status: error.status });

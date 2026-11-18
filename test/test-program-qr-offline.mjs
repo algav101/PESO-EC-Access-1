@@ -39,12 +39,25 @@ try {
     const current = { ...old, id: "new-pb", programId: "new", beneficiaryId: "NEW PERSON", fullName: "NEW PERSON", qrToken: "TUPAD-DGL-NEWWWW-113-87654321", orientationStatus: "ABSENT", stubDistributed: false, payoutStatus: "PENDING" };
     await db.cachedBeneficiaries.put(current);
     await db.cachedWorkDays.bulkPut([{ id: "old-day", programId: "old", dayNumber: 1, workDate: "2026-11-04" }, { id: "new-day", programId: "new", dayNumber: 1, workDate: "2026-11-04" }]);
-    check((await find(token, "new")).id === current.id, "legacy cache alias must resolve new-program slot");
-    await db.cachedQrSlots.bulkPut([{ publicToken: "__SYNCED__", designatedNumber: "" }, { publicToken: token, designatedNumber: "113" }]);
-    check((await find("https://test/my-assignment?token=" + token.toLowerCase(), "new")).id === current.id, "URL/lowercase alias must resolve current-program enrollee");
+    const wrongProgram = async (raw, programId) => {
+      let error;
+      try { await find(raw, programId); } catch (caught) { error = caught; }
+      check(error instanceof slot.exports.ScanRequestError && error.message.includes("WRONG WORK PROGRAM"), "must show a program mismatch, not resolve a same-number beneficiary");
+    };
+    await wrongProgram(token, "new");
+    check((await find(token, "old")).id === old.id, "legacy cache must preserve the exact QR owner");
+    check((await find(current.qrToken, "new")).id === current.id, "legacy exact cached QR works in its own program");
+    await db.cachedQrSlots.bulkPut([{ publicToken: "__SYNCED__", designatedNumber: "" }, { publicToken: token, designatedNumber: "113", programId: "old" }, { publicToken: current.qrToken, designatedNumber: "113", programId: "new" }]);
+    await wrongProgram("https://test/my-assignment?token=" + token.toLowerCase(), "new");
+    await wrongProgram(current.qrToken, "old");
+    check((await find("https://test/my-assignment?token=" + current.qrToken.toLowerCase(), "new")).id === current.id, "own-program URL/lowercase QR works");
+    await db.cachedQrSlots.put({ publicToken: "LEGACY-UNKNOWN-OWNER", designatedNumber: "113" });
+    let missingOwner;
+    try { await find("LEGACY-UNKNOWN-OWNER", "new"); } catch (error) { missingOwner = error; }
+    check(missingOwner?.message.includes("Master Key Sync"), "old cache without ownership must be refreshed, never guessed by slot");
     check((await find("00113", "new")).id === current.id, "leading zeros");
     check((await find("#113", "new")).id === current.id, "manual #slot");
-    check(await find(token, "empty") === null, "must not fall back to the old program");
+    await wrongProgram(token, "empty");
     check(await find(token) === null, "must require a selected program");
     check(await find(token.slice(0, -1), "new") === null, "partial tokens must not match");
     check(await find("600", "new") === null, "unassigned slot must not match");
@@ -53,9 +66,14 @@ try {
     let blocked = false;
     try { await record({ rawToken: token, programId: "new", workDayId: "old-day", shiftMode: "MORNING_IN" }); } catch { blocked = true; }
     check(blocked, "cross-program work day must fail");
-    const first = await record({ rawToken: token, programId: "new", workDayId: "new-day", shiftMode: "MORNING_IN" });
+    const queueBeforeWrong = JSON.stringify(await db.offlineQueue.toArray());
+    let wrongRecorded = false;
+    try { await record({ rawToken: token, programId: "new", workDayId: "new-day", shiftMode: "MORNING_IN" }); } catch (error) { wrongRecorded = error.message.includes("WRONG WORK PROGRAM"); }
+    check(wrongRecorded, "wrong QR must block before recording attendance");
+    check(JSON.stringify(await db.offlineQueue.toArray()) === queueBeforeWrong, "wrong QR must not queue a transaction");
+    const first = await record({ rawToken: current.qrToken, programId: "new", workDayId: "new-day", shiftMode: "MORNING_IN" });
     check(!first.isDuplicate && first.data.fullName === "NEW PERSON", "new-program scan must not inherit old attendance");
-    check((await record({ rawToken: token, programId: "new", workDayId: "new-day", shiftMode: "MORNING_IN" })).isDuplicate, "same-program duplicate remains blocked");
+    check((await record({ rawToken: current.qrToken, programId: "new", workDayId: "new-day", shiftMode: "MORNING_IN" })).isDuplicate, "same-program duplicate remains blocked");
     check((await db.offlineQueue.toArray()).filter((q) => q.payload.programId === "new").length === 1, "only one current-program queued scan");
     check(JSON.stringify(await db.cachedBeneficiaries.get(old.id)) === JSON.stringify(old), "old person flags unchanged");
     check((await db.offlineAttendanceRecords.where("programBeneficiaryId").equals(old.id).first()).morningTimeIn === "2026-11-04T00:00:00Z", "old attendance unchanged");
@@ -67,7 +85,7 @@ try {
       check(rejected, "HTTP rejections must not become offline scans: " + status);
     }
     db.close();
-    return "Offline QR tests passed: real IndexedDB v2→v3 upgrade, reusable aliases, current roster identity, separate pending flags/history/queue, duplicate protection, invalidated aliases and HTTP rejection handling.";
+    return "Offline QR tests passed: real IndexedDB v2→v3 upgrade, QR program ownership, legacy cache rejection, current roster identity, separate pending flags/history/queue, duplicate protection, invalidated aliases and HTTP rejection handling.";
   }, { slotJs: compile("src/lib/program-qr-slot.ts"), dbJs: compile("src/lib/dexie.ts") });
   console.log(result); assert.match(result, /passed/);
 } finally { await browser.close(); }

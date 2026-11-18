@@ -1,29 +1,37 @@
 import prisma from "@/lib/prisma";
 import { extractCleanQrToken } from "@/lib/utils";
-import { normalizeQrSlot, registeredQrSlot } from "@/lib/program-qr-slot";
+import { normalizeQrSlot, registeredQrSlot, wrongProgramQrMessage } from "@/lib/program-qr-slot";
 
 export class ProgramScanError extends Error {
   constructor(message: string, public status = 400) { super(message); }
 }
 
-/** All scanner stages resolve the selected program's enrollee, not the old QR owner. */
+/** Verify the registered QR's program before resolving any roster slot or scan history. */
 export async function resolveProgramScan(rawToken: string, programId: unknown, include: any) {
   if (typeof programId !== "string" || !programId.trim()) {
     throw new ProgramScanError("CANNOT SCAN: Pumili muna ng TUPAD program.");
   }
   const clean = extractCleanQrToken(rawToken);
+  const targetProgramId = programId.trim();
   let slot = normalizeQrSlot(clean);
   if (!slot) {
     // Exact registered tokens only. Never substring-match a slot or unregistered QR.
     const reference = await prisma.qrCode.findFirst({
       where: { publicToken: { equals: clean, mode: "insensitive" }, status: { not: "INVALIDATED" } },
-      include: { programBeneficiary: { select: { designatedNumber: true } } },
+      include: { programBeneficiary: { select: { designatedNumber: true } }, program: { select: { programCode: true, programName: true } } },
     });
+    if (reference && reference.programId !== targetProgramId) {
+      const selected = await prisma.program.findUnique({ where: { id: targetProgramId }, select: { programCode: true, programName: true } });
+      throw new ProgramScanError(wrongProgramQrMessage(
+        `${reference.program.programCode} (${reference.program.programName})`,
+        selected ? `${selected.programCode} (${selected.programName})` : "napiling work program",
+      ), 409);
+    }
     if (reference) slot = registeredQrSlot(reference.publicToken, reference.programBeneficiary.designatedNumber);
   }
   const matches = await prisma.programBeneficiary.findMany({
     where: {
-      programId: programId.trim(),
+      programId: targetProgramId,
       participationStatus: { in: ["ACTIVE", "ENROLLED", "FLAGGED_FOR_REPLACEMENT"] },
       ...(slot ? { designatedNumber: slot } : { OR: [
         { beneficiary: { beneficiaryNumber: clean } },

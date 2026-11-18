@@ -1,4 +1,4 @@
-/** A printed QR is a reusable slot reference, never a scan-history identity. */
+/** Slot numbers are scoped to a program; QR tokens also retain their program owner. */
 export function normalizeQrSlot(value: unknown): string | null {
   const text = String(value ?? "").trim().replace(/^#/, "");
   if (!/^\d+$/.test(text)) return null;
@@ -13,6 +13,10 @@ export function registeredQrSlot(token: string, designatedNumber: string): strin
 }
 
 export class ScanRequestError extends Error {}
+
+export function wrongProgramQrMessage(source: string, selected: string): string {
+  return `WRONG WORK PROGRAM: Ang QR code na ito ay para sa ${source}. Napiling program: ${selected}. Piliin ang tamang work program o gamitin ang QR code ng napiling program. Walang na-record.`;
+}
 
 /** HTTP rejections must not be replayed as offline scans (including 401/403/404). */
 export async function readScanResponse(response: Response, fallback: string) {

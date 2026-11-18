@@ -32,6 +32,8 @@ try {
       const body = request.postDataJSON(); calls.push({ path: url.pathname, body });
       assert.equal(body.programId, expectedProgram, "every scanner must send the selected masterlist program");
       if (mode === "delayed") { delayedScanStarted(); await new Promise((resolve) => { releaseScan = resolve; }); }
+      const source = body.qrToken.includes("TUPAD-DGL-NEWNEW") ? "new" : body.qrToken.includes("TUPAD-DGL-OLDOLD") ? "old" : null;
+      if (source && source !== body.programId) return reply({ error: "WRONG WORK PROGRAM: QR belongs to " + source + ". Selected program: " + body.programId + ". Walang na-record." }, 409);
       if (mode === "denied") return reply({ error: "Synthetic denied scan; no offline replay" }, 404);
       return reply({ success: true, message: "Synthetic scan complete", data: { programId: body.programId, programBeneficiaryId: `${body.programId}-pb-113`, qrId: "new-qr", designatedNumber: "113", fullName: body.programId === "old" ? "OLD MASTERLIST PERSON ONE" : "NEW ROSTER PERSON", barangay: "Aplaya", tableNumber: "Table 2", programName: "New synthetic program", status: "PRESENT", morningTimeIn: "2026-11-04T00:00:00Z", isDistributed: false } });
     }
@@ -69,7 +71,7 @@ try {
   async function modalScan(button) {
     await page.getByRole("button", { name: button }).click();
     await page.getByRole("button", { name: "Manual Token Entry" }).click();
-    await page.getByPlaceholder("e.g. TUPAD-DGL-ABC123-1-XYZ").fill("TUPAD-DGL-OLDOLD-113-12345678");
+    await page.getByPlaceholder("e.g. TUPAD-DGL-ABC123-1-XYZ").fill("TUPAD-DGL-NEWNEW-113-12345678");
     await page.getByRole("button", { name: "Submit Token" }).click();
     await page.getByText("NEW ROSTER PERSON", { exact: true }).waitFor();
   }
@@ -101,18 +103,25 @@ try {
     assert.equal(await selector().inputValue(), "old", path + " must follow the masterlist");
     await page.getByRole("button", { name: button }).click();
     if (path === "attendance") {
-      // Decode an actual uploaded PNG from another program; the selected roster wins.
+      // An actual uploaded PNG from another program must display an error.
       const payload = "https://synthetic.test/my-assignment?token=TUPAD-DGL-NEWNEW-1-12345678";
       const buffer = await require("qrcode").toBuffer(payload, { width: 512, margin: 4 });
       await page.locator('input[type="file"][accept="image/*"]:not([capture])').setInputFiles({ name: "other-program-stub-1.png", mimeType: "image/png", buffer });
-      await page.getByText("OLD MASTERLIST PERSON ONE", { exact: true }).waitFor();
+      await page.getByText("WRONG WORK PROGRAM: QR belongs to new. Selected program: old. Walang na-record.", { exact: true }).waitFor();
       assert.equal(calls.at(-1).body.qrToken, payload);
       assert.equal(calls.at(-1).body.programId, "old");
     } else {
       await page.getByRole("button", { name: "Manual Token Entry" }).click();
-      await page.getByPlaceholder("e.g. TUPAD-DGL-ABC123-1-XYZ").fill("1");
+      await page.getByPlaceholder("e.g. TUPAD-DGL-ABC123-1-XYZ").fill("TUPAD-DGL-NEWNEW-1-12345678");
       await page.getByRole("button", { name: "Submit Token" }).click();
+      await page.getByText("WRONG WORK PROGRAM: QR belongs to new. Selected program: old. Walang na-record.", { exact: true }).waitFor();
     }
+    assert.equal(await page.getByText("OLD MASTERLIST PERSON ONE", { exact: true }).count(), 0);
+    assert.equal(await page.getByText("NEW ROSTER PERSON", { exact: true }).count(), 0);
+    await page.getByRole("button", { name: button }).click();
+    await page.getByRole("button", { name: "Manual Token Entry" }).click();
+    await page.getByPlaceholder("e.g. TUPAD-DGL-ABC123-1-XYZ").fill("TUPAD-DGL-OLDOLD-1-12345678");
+    await page.getByRole("button", { name: "Submit Token" }).click();
     await page.getByText("OLD MASTERLIST PERSON ONE", { exact: true }).waitFor();
   }
   await page.goto(base + "/stubs", { waitUntil: "networkidle" });
@@ -120,6 +129,9 @@ try {
   await page.goto(base + "/field/orientation?programId=new", { waitUntil: "networkidle" });
   assert.equal(await selector().inputValue(), "new", "explicit program links override the remembered program");
   expectedProgram = "new";
+  await page.getByPlaceholder("e.g. 1, 45, or DGL-TUPAD-...").fill("TUPAD-DGL-OLDOLD-1-12345678");
+  await page.getByRole("button", { name: "Verify", exact: true }).click();
+  await page.getByText("WRONG WORK PROGRAM: QR belongs to old. Selected program: new. Walang na-record.", { exact: true }).waitFor();
   mode = "delayed";
   const started = new Promise((resolve) => { delayedScanStarted = resolve; });
   await page.getByPlaceholder("e.g. 1, 45, or DGL-TUPAD-...").fill("1");
@@ -137,5 +149,5 @@ try {
   await page.goto(base + "/field/attendance", { waitUntil: "networkidle" });
   assert.equal(await selector().inputValue(), "new");
   assert.deepEqual(errors, []);
-  console.log("Program QR UI passed: 600-row missing-code action, selected program sent by all four scanners, current work day, payout program selector, stale results cleared and HTTP denial surfaced. All APIs mocked.");
+  console.log("Program QR UI passed: 600-row missing-code action, selected program sent by all four scanners, current work day, wrong-program QR image and token rejections across all four scanners, stale results cleared and HTTP denial surfaced. All APIs mocked.");
 } finally { await browser.close(); }

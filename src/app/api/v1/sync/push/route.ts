@@ -67,6 +67,12 @@ export async function POST(request: Request) {
         if (reqPerm && !hasPermission(user.role, reqPerm)) {
           throw new Error(`Forbidden: role ${user.role} lacks ${reqPerm} permission`);
         }
+        if (["ATTENDANCE", "ORIENTATION", "STUB_DISTRIBUTION", "PAYOUT"].includes(entityType) && (payload?.qrToken || payload?.rawToken)) {
+          const resolved = await resolveProgramScan(String(payload.qrToken || payload.rawToken), payload.programId, {});
+          if (payload.programBeneficiaryId && payload.programBeneficiaryId !== resolved.pb.id) {
+            throw new Error("CANNOT SYNC: QR does not match the queued program beneficiary.");
+          }
+        }
         // Queued scans retain their original program; never migrate them to a new roster.
         if (["ATTENDANCE", "ORIENTATION", "STUB_DISTRIBUTION", "PAYOUT"].includes(entityType) && payload?.programBeneficiaryId) {
           const owner = await prisma.programBeneficiary.findUnique({ where: { id: payload.programBeneficiaryId }, select: { programId: true } });

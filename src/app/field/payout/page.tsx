@@ -115,7 +115,7 @@ export default function PayoutScannerPage() {
         fullName: bene.fullName,
         barangay: bene.barangay,
         tableNumber: bene.tableNumber || "Table 1",
-        qrToken: bene.qrToken || token,
+        qrToken: token,
         programId: bene.programId,
       });
     } catch (err: any) {
@@ -157,6 +157,7 @@ export default function PayoutScannerPage() {
       } else {
         // Offline Payout Queue
         await queueOfflineTransaction("PAYOUT", "CREATE", {
+          qrToken: scannedBeneficiary.qrToken,
           programId: scannedBeneficiary.programId,
           programBeneficiaryId: scannedBeneficiary.programBeneficiaryId,
           status: payoutStatus,

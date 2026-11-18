@@ -1,5 +1,5 @@
 import Dexie, { type Table } from "dexie";
-import { normalizeQrSlot, registeredQrSlot } from "@/lib/program-qr-slot";
+import { normalizeQrSlot, registeredQrSlot, ScanRequestError, wrongProgramQrMessage } from "@/lib/program-qr-slot";
 import { format } from "date-fns";
 import {
   getPhilippineTime,
@@ -112,7 +112,7 @@ export class TupadOfflineDatabase extends Dexie {
   cachedWorkProgramItems!: Table<CachedWorkProgramItem, string>;
   offlineAttendanceRecords!: Table<OfflineAttendanceRecord, number>;
   offlineQueue!: Table<OfflineTransaction, number>;
-  cachedQrSlots!: Table<{ publicToken: string; designatedNumber: string }, string>;
+  cachedQrSlots!: Table<{ publicToken: string; designatedNumber: string; programId?: string }, string>;
 
   constructor() {
     super("TupadOfflineDB_Dingalan");
@@ -158,8 +158,7 @@ export function extractCleanQrToken(raw: string): string {
 }
 
 /**
- * Intelligent offline beneficiary finder
- * Resolves by exact QR token, token substring, designated number (#1, 001), full name, or ID
+ * Resolve registered QR tokens only in their own program. Manual slots/names stay scoped.
  */
 export async function findBeneficiaryOffline(
   tokenOrQuery: string,
@@ -177,11 +176,20 @@ export async function findBeneficiaryOffline(
     let slot = normalizeQrSlot(clean);
     if (!slot) {
       const reference = await offlineDb.cachedQrSlots.get(upperClean);
-      if (reference) slot = reference.designatedNumber;
-      // Compatibility with an existing cache before the new reference list was downloaded.
-      if (!slot && !(await offlineDb.cachedQrSlots.get("__SYNCED__"))) {
-        const known = (await offlineDb.cachedBeneficiaries.toArray()).find((b) => b.qrToken?.toUpperCase() === upperClean);
-        if (known?.qrToken) slot = registeredQrSlot(known.qrToken, known.designatedNumber);
+      // Old reference rows lack ownership. Use an exact cached QR owner only;
+      // never infer a program from a slot number or a shortened program prefix.
+      const canUseLegacy = reference || !(await offlineDb.cachedQrSlots.get("__SYNCED__"));
+      const known = !reference?.programId && canUseLegacy
+        ? (await offlineDb.cachedBeneficiaries.toArray()).find((b) => b.qrToken?.toUpperCase() === upperClean) : undefined;
+      if (reference || known) {
+        const ownerProgramId = reference?.programId || known?.programId;
+        if (!ownerProgramId) throw new ScanRequestError("CANNOT SCAN: Hindi makumpirma ang work program ng QR sa lumang cache. Mag-Master Key Sync habang online bago mag-scan.");
+        if (ownerProgramId !== targetProgramId) {
+          const source = await offlineDb.cachedPrograms.get(ownerProgramId);
+          const selected = await offlineDb.cachedPrograms.get(targetProgramId);
+          throw new ScanRequestError(wrongProgramQrMessage(source?.programCode || source?.programName || ownerProgramId, selected?.programCode || selected?.programName || targetProgramId));
+        }
+        slot = registeredQrSlot(reference?.publicToken || known!.qrToken!, reference?.designatedNumber || known!.designatedNumber);
       }
     }
     const matches = roster.filter((b) => slot
@@ -190,6 +198,7 @@ export async function findBeneficiaryOffline(
     // Never choose an arbitrary person when a slot is duplicated.
     return matches.length === 1 ? matches[0] : null;
   } catch (err) {
+    if (err instanceof ScanRequestError) throw err;
     console.error("Error finding beneficiary offline:", err);
     return null;
   }
@@ -485,7 +494,7 @@ export async function recordOfflineAttendance(params: {
     dayNumber,
     programBeneficiaryId: bene.id,
     designatedNumber: bene.designatedNumber,
-    qrToken: bene.qrToken || rawToken,
+    qrToken: rawToken,
     attendanceDate,
     morningTimeIn: targetSlot === "MORNING_IN" ? nowIso : undefined,
     morningTimeOut: targetSlot === "MORNING_OUT" ? nowIso : undefined,

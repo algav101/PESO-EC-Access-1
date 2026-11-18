@@ -254,6 +254,7 @@ function StubDistributionContent() {
       }
 
       setScannedData({
+        qrToken: token,
         programId: bene.programId,
         qrId: bene.qrToken || "offline_qr",
         programBeneficiaryId: bene.id,
@@ -326,6 +327,7 @@ function StubDistributionContent() {
         }
 
         await queueOfflineTransaction("STUB_DISTRIBUTION", "CREATE", {
+          qrToken: scannedData.qrToken,
           programId: selectedProgramId,
           qrId: scannedData.qrId,
           programBeneficiaryId: scannedData.programBeneficiaryId,

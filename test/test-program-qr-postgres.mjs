@@ -88,7 +88,17 @@ try {
   const pb = newPbs.find((p) => p.designatedNumber === "113");
   // Reassign the slot to a DIFFERENT beneficiary; the printed card must follow the slot, not the old person.
   await db.programBeneficiary.update({ where: { id: pb.id }, data: { beneficiaryId: newPbs.find((p) => p.designatedNumber === "600").beneficiaryId } });
-  const raw = `https://synthetic.test/my-assignment?token=${printed.publicToken}`;
+  const currentPrinted = await db.qrCode.findFirst({ where: { programBeneficiaryId: pb.id } });
+  const beforeRejectedScans = JSON.stringify(await db.programBeneficiary.findMany({ orderBy: { id: "asc" }, include: { stubDistributions: true, orientationAttendance: true, attendanceRecords: true, payouts: true } }));
+  for (const stage of ["orientation", "attendance", "payout", "stub-distribution"]) {
+    for (const [qrToken, programId] of [[printed.publicToken, program.id], [currentPrinted.publicToken, old.id]]) {
+      const rejected = await route(stage).POST(request({ qrToken: `https://synthetic.test/my-assignment?token=${qrToken.toLowerCase()}`, programId }));
+      assert.equal(rejected.status, 409, stage + " must reject another program's QR even if its slot exists locally");
+      assert.match((await rejected.json()).error, /WRONG WORK PROGRAM/);
+    }
+  }
+  assert.equal(JSON.stringify(await db.programBeneficiary.findMany({ orderBy: { id: "asc" }, include: { stubDistributions: true, orientationAttendance: true, attendanceRecords: true, payouts: true } })), beforeRejectedScans, "wrong-program scans must write nothing");
+  const raw = `https://synthetic.test/my-assignment?token=${currentPrinted.publicToken}`;
   const scanBody = { qrToken: raw, programId: program.id };
   assert.equal((await route("orientation").POST(request(scanBody))).status, 400, "new enrollee must complete THIS program's stub first");
   const lookup = await route("stub-distribution").POST(request(scanBody));
@@ -116,9 +126,9 @@ try {
     assert.equal((await route(stage).POST(request({ programId: program.id, qrToken: "601" }))).status, 404);
     assert.equal((await route(stage).POST(request({ programId: program.id, qrToken: printed.publicToken.slice(0, -1) }))).status, 404);
   }
-  await db.qrCode.update({ where: { id: printed.id }, data: { status: "INVALIDATED" } });
+  await db.qrCode.update({ where: { id: currentPrinted.id }, data: { status: "INVALIDATED" } });
   assert.equal((await route("stub-distribution").POST(request(scanBody))).status, 404);
-  await db.qrCode.update({ where: { id: printed.id }, data: { status: "ACTIVE" } });
+  await db.qrCode.update({ where: { id: currentPrinted.id }, data: { status: "ACTIVE" } });
   // Test repairing a legacy 522-only generation without reprinting/resetting #1–#522.
   const extraIds = newPbs.filter((p) => Number(p.designatedNumber) > 522).map((p) => p.id);
   await db.qrCode.deleteMany({ where: { programId: program.id, programBeneficiaryId: { in: extraIds } } });
@@ -153,19 +163,29 @@ try {
   assert.equal(await oldHistory(), snapshot);
   assert.equal(await db.orientationAttendance.count({ where: { programId: program.id } }), 1, "generation must not reset current-program scans either");
   const slots = await load("src/app/api/v1/qr/slots/route.ts").GET();
-  assert.equal(slots.status, 200); assert.ok((await slots.json()).slots.some((q) => q.publicToken === printed.publicToken && q.designatedNumber === "113"));
+  assert.equal(slots.status, 200); assert.ok((await slots.json()).slots.some((q) => q.publicToken === printed.publicToken && q.designatedNumber === "113" && q.programId === old.id));
   const push = load("src/app/api/v1/sync/push/route.ts");
   const queued = await push.POST(request({ transactions: ["ORIENTATION", "ATTENDANCE", "PAYOUT", "STUB_DISTRIBUTION"].map((entityType) => ({ entityType, clientTransactionId: `wrong-program-${entityType}`, payload: { programId: program.id, programBeneficiaryId: "old-pb-113", status: "PRESENT" } })) }));
   const sync = await queued.json(); assert.equal(sync.accepted.length, 0); assert.equal(sync.failed.length, 4); assert.equal(await oldHistory(), snapshot);
-  const assignment = await load("src/app/api/v1/work-assignment/lookup/route.ts").GET(new Request(`http://synthetic.test?token=${printed.publicToken}`));
-  assert.equal(assignment.status, 200); assert.match(JSON.stringify(await assignment.json()), /0600/);
-  // The same printed #1 must resolve independently in two actually imported masterlists.
+  const assignmentRoute = load("src/app/api/v1/work-assignment/lookup/route.ts");
+  const assignment = await assignmentRoute.GET(new Request(`http://synthetic.test?token=${printed.publicToken}`));
+  assert.equal(assignment.status, 200); assert.match(JSON.stringify(await assignment.json()), /0113/);
+  const currentAssignment = await assignmentRoute.GET(new Request(`http://synthetic.test?token=${currentPrinted.publicToken}`));
+  assert.equal(currentAssignment.status, 200); assert.match(JSON.stringify(await currentAssignment.json()), /0600/);
+  assert.equal((await assignmentRoute.GET(new Request(`http://synthetic.test?token=${printed.publicToken}&programId=${program.id}`))).status, 409);
+  const wrongTokenSync = await push.POST(request({ transactions: ["ORIENTATION", "ATTENDANCE", "PAYOUT", "STUB_DISTRIBUTION"].map((entityType) => ({ entityType, clientTransactionId: `wrong-qr-${entityType}`, payload: { programId: program.id, programBeneficiaryId: pb.id, qrToken: printed.publicToken, status: "PRESENT" } })) }));
+  const wrongTokenSyncResult = await wrongTokenSync.json();
+  assert.equal(wrongTokenSyncResult.accepted.length, 0); assert.equal(wrongTokenSyncResult.failed.length, 4);
+  assert.ok(Object.values(wrongTokenSyncResult.errors).every(message => message.includes("WRONG WORK PROGRAM")));
+  // Identical slot numbers have separate program-owned QR tokens.
   const firstCard = await db.qrCode.findFirst({ where: { programBeneficiaryId: "old-pb-1" } });
   const otherProgram = await db.program.create({ data: { programCode: "SYNTHETIC-OTHER", programName: "Different #1 masterlist", createdById: admin.id } });
   const otherImport = await commit.POST(request({ programId: otherProgram.id, rows: [{ ...rows[0], fullName: "DIFFERENT MASTERLIST PERSON ONE" }] }));
   assert.equal(otherImport.status, 200, JSON.stringify(await otherImport.clone().json()));
   for (const [programId, expectedName] of [[old.id, rows[0].fullName], [otherProgram.id, "DIFFERENT MASTERLIST PERSON ONE"]]) {
-    const response = await route("attendance").POST(request({ qrToken: firstCard.publicToken, programId }));
+    const ownQr = programId === old.id ? firstCard : await db.qrCode.findFirst({ where: { programId } });
+    assert.equal((await route("attendance").POST(request({ qrToken: ownQr.publicToken, programId: programId === old.id ? otherProgram.id : old.id }))).status, 409);
+    const response = await route("attendance").POST(request({ qrToken: ownQr.publicToken, programId }));
     assert.equal(response.status, 400);
     const blocked = await response.json();
     assert.equal(blocked.stepBlocked, "ORIENTATION_REQUIRED");
@@ -185,7 +205,7 @@ try {
   authorized = false;
   assert.equal((await generate.POST(request({}), { params: { id: program.id } })).status, 403);
   assert.equal((await load("src/app/api/v1/qr/slots/route.ts").GET()).status, 401);
-  console.log("Program QR PostgreSQL integration passed: new 600-person roster starts at zero, reusable printed slots, four scanner stages, duplicate protection, no old-history mutation, #523–#600 extension, idempotent generation, invalid QR rejection, public routing and cross-program offline sync guards. Shared database untouched.");
+  console.log("Program QR PostgreSQL integration passed: new 600-person roster starts at zero, program-owned QR tokens, wrong-program rejection in both directions across four scanner stages, duplicate protection, no old-history mutation, #523–#600 extension, idempotent generation, invalid QR rejection, public routing and cross-program offline sync guards. Shared database untouched.");
 } finally {
   if (db) await db.$disconnect();
   if (started) run(path.join(pgBin, "pg_ctl" + suffix), ["-D", dataDir, "-m", "immediate", "-w", "stop"]);
