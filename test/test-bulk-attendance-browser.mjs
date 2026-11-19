@@ -28,8 +28,9 @@ try {
       const body = req.postDataJSON(); calls.push(body);
       assert.deepEqual(body.programBeneficiaryIds, ["bulk-ui-1", "bulk-ui-3", "bulk-ui-5"]);
       assert.equal(body.workDayId, days[1].id); assert.equal(body.targetDate, days[1].workDate); assert.equal(body.shiftMode, "AFTERNOON_IN");
-      for (const id of ["bulk-ui-1", "bulk-ui-5"]) roster.find((pb) => pb.id === id).attendanceRecords = [{ workDayId: days[1].id, attendanceDate: days[1].workDate, afternoonTimeIn: "2026-11-20T05:00:00Z", status: "PRESENT" }];
-      return reply({ success: true, updatedCount: 2, skippedCount: 1, slotLabel: "Afternoon Time-In (PM IN)", fixedTimeLabel: "1:00 PM", workDay: days[1], results: body.programBeneficiaryIds.map((id) => ({ programBeneficiaryId: id, designatedNumber: id.slice(-1), fullName: roster.find((pb) => pb.id === id).beneficiary.fullName, status: id === "bulk-ui-3" ? "SKIPPED" : "RECORDED", reason: id === "bulk-ui-3" ? "Orientation attendance must be verified first." : "" })) });
+      const times = { "bulk-ui-1": "2026-11-20T04:37:12Z", "bulk-ui-5": "2026-11-20T04:58:00Z" };
+      for (const id of ["bulk-ui-1", "bulk-ui-5"]) roster.find((pb) => pb.id === id).attendanceRecords = [{ workDayId: days[1].id, attendanceDate: days[1].workDate, afternoonTimeIn: times[id], status: "PRESENT" }];
+      return reply({ success: true, updatedCount: 2, skippedCount: 1, slotLabel: "Afternoon Time-In (PM IN)", timeRangeLabel: "12:30–1:00 PM", workDay: days[1], results: body.programBeneficiaryIds.map((id) => ({ programBeneficiaryId: id, designatedNumber: id.slice(-1), fullName: roster.find((pb) => pb.id === id).beneficiary.fullName, status: id === "bulk-ui-3" ? "SKIPPED" : "RECORDED", attendanceTime: times[id] || null, reason: id === "bulk-ui-3" ? "Orientation attendance must be verified first." : "" })) });
     }
     if (!["GET", "HEAD", "OPTIONS"].includes(req.method())) throw new Error("Unexpected mocked mutation " + url.pathname);
     if (url.pathname.endsWith("/qr/slots")) return reply({ slots: [] });
@@ -46,7 +47,7 @@ try {
   await page.getByRole("button", { name: "Attendance (3)", exact: true }).last().click();
   modal = page.getByRole("dialog", { name: "Attendance for Selected Beneficiaries" });
   await modal.getByLabel("Attendance Day").selectOption(days[1].id);
-  for (const [slot, label] of [["MORNING_IN", "7:00 AM"], ["MORNING_OUT", "11:00 AM"], ["AFTERNOON_IN", "1:00 PM"], ["AFTERNOON_OUT", "5:00 PM"]]) {
+  for (const [slot, label] of [["MORNING_IN", "6:30–7:00 AM"], ["MORNING_OUT", "10:30–11:00 AM"], ["AFTERNOON_IN", "12:30–1:00 PM"], ["AFTERNOON_OUT", "4:30–5:00 PM"]]) {
     await modal.getByLabel("Attendance Shift").selectOption(slot);
     assert.match(await modal.getByTestId("masterlist-attendance-time").innerText(), new RegExp(`2026-11-20.*${label}`));
   }
@@ -59,6 +60,8 @@ try {
   await modal.getByRole("button", { name: "Record Attendance (3)", exact: true }).click();
   await modal.getByRole("status").filter({ hasText: "2 recorded · 1 skipped" }).waitFor();
   await modal.getByText("Orientation attendance must be verified first.", { exact: true }).waitFor();
+  await modal.getByText("Attendance recorded · 12:37:12 PM (Philippine time)", { exact: true }).waitFor();
+  await modal.getByText("Attendance recorded · 12:58:00 PM (Philippine time)", { exact: true }).waitFor();
   assert.equal(calls.length, 1); assert.equal(calls[0].remarks, "Synthetic multi-selection test");
   await modal.getByRole("button", { name: "Done", exact: true }).click();
   assert.equal(await row(1).locator('input[type="checkbox"]').isChecked(), false);

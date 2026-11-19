@@ -3,11 +3,11 @@
 import { useEffect, useState } from "react";
 import { CalendarCheck, Loader2, X } from "lucide-react";
 import { getPhilippineTime, ATTENDANCE_SLOT_LABELS } from "@/lib/utils";
-import { MASTERLIST_ATTENDANCE_TIMES } from "@/lib/masterlist-attendance-time";
+import { MASTERLIST_ATTENDANCE_RANGES } from "@/lib/masterlist-attendance-time";
 
 type Day = { id: string; dayNumber: number; workDate: string; status: string };
-type Result = { updatedCount: number; skippedCount: number; slotLabel: string; fixedTimeLabel?: string; workDay: Day;
-  results: { programBeneficiaryId: string; designatedNumber: string; fullName: string; status: string; reason: string }[] };
+type Result = { updatedCount: number; skippedCount: number; slotLabel: string; timeRangeLabel: string; workDay: Day;
+  results: { programBeneficiaryId: string; designatedNumber: string; fullName: string; status: string; reason: string; attendanceTime: string | null }[] };
 
 export function BulkAttendanceModal({ programId, programName, selectedIds, onClose, onRecorded }: {
   programId: string; programName: string; selectedIds: string[];
@@ -41,7 +41,7 @@ export function BulkAttendanceModal({ programId, programName, selectedIds, onClo
     return () => { cancelled = true; };
   }, [programId]);
   const day = days.find((day) => day.id === workDayId);
-  const fixedTime = MASTERLIST_ATTENDANCE_TIMES[shiftMode as keyof typeof MASTERLIST_ATTENDANCE_TIMES];
+  const timeRange = MASTERLIST_ATTENDANCE_RANGES[shiftMode as keyof typeof MASTERLIST_ATTENDANCE_RANGES];
   const submit = async (event: React.FormEvent) => {
     event.preventDefault();
     if (!day || saving || result) return;
@@ -74,11 +74,11 @@ export function BulkAttendanceModal({ programId, programName, selectedIds, onClo
         {loading ? <p className="text-xs flex items-center gap-2"><Loader2 className="w-4 h-4 animate-spin" />Loading attendance days…</p> : result ? (
           <div className="space-y-3">
             <p role="status" className="p-3 bg-blue-50 rounded-xl font-bold text-sm text-gov-blue">{result.updatedCount} recorded · {result.skippedCount} skipped</p>
-            <p className="text-xs">Day {result.workDay.dayNumber} · {result.workDay.workDate} · {result.slotLabel} — {result.fixedTimeLabel || fixedTime.label}</p>
+            <p className="text-xs">Day {result.workDay.dayNumber} · {result.workDay.workDate} · {result.slotLabel} — {result.timeRangeLabel}</p>
             <ul className="max-h-64 overflow-y-auto divide-y border rounded-lg text-xs">
               {result.results.map((row) => <li key={row.programBeneficiaryId} className="p-2.5 space-y-1">
                 <p className="font-semibold">#{row.designatedNumber} — {row.fullName}</p>
-                <p className={row.status === "RECORDED" ? "text-emerald-700" : "text-amber-800"}>{row.status === "RECORDED" ? "Attendance recorded" : row.reason}</p>
+                <p className={row.status === "RECORDED" ? "text-emerald-700" : "text-amber-800"}>{row.status === "RECORDED" ? `Attendance recorded · ${row.attendanceTime ? new Date(row.attendanceTime).toLocaleTimeString("en-US", { timeZone: "Asia/Manila", hour: "numeric", minute: "2-digit", second: "2-digit" }) : ""} (Philippine time)` : row.reason}</p>
               </li>)}
             </ul>
             <button type="button" onClick={onClose} className="w-full bg-gov-blue text-white rounded-xl py-2.5 text-xs font-bold">Done</button>
@@ -93,14 +93,14 @@ export function BulkAttendanceModal({ programId, programName, selectedIds, onClo
             </label>
             <label className="block text-xs font-bold text-slate-700">Attendance Shift
               <select value={shiftMode} onChange={(event) => setShiftMode(event.target.value)} disabled={saving} className="w-full mt-1 px-3 py-2.5 border border-slate-300 rounded-lg bg-white text-xs font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-gov-blue disabled:opacity-50">
-                {Object.entries(ATTENDANCE_SLOT_LABELS).map(([slot, label]) => <option key={slot} value={slot}>{label} — {MASTERLIST_ATTENDANCE_TIMES[slot as keyof typeof MASTERLIST_ATTENDANCE_TIMES].label}</option>)}
+                {Object.entries(ATTENDANCE_SLOT_LABELS).map(([slot, label]) => <option key={slot} value={slot}>{label} — {MASTERLIST_ATTENDANCE_RANGES[slot as keyof typeof MASTERLIST_ATTENDANCE_RANGES].label}</option>)}
               </select>
             </label>
             <label className="block text-xs font-bold text-slate-700">Remarks (Optional)
               <input value={remarks} onChange={(event) => setRemarks(event.target.value)} maxLength={1000} disabled={saving} className="w-full mt-1 px-3 py-2.5 border border-slate-300 rounded-lg bg-white text-xs font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-gov-blue disabled:opacity-50" />
             </label>
-            <p data-testid="masterlist-attendance-time" className="p-3 rounded-lg bg-blue-50 border border-blue-100 text-xs text-gov-blue font-semibold">Oras na ire-record: {day?.workDate || "—"} · {fixedTime.label} (Philippine time)</p>
-            <p className="text-xs text-slate-500">Fixed ang oras ayon sa napiling shift at attendance date, kahit anong oras mo ito i-save. Ang may attendance na o kulang sa orientation ay isi-skip.</p>
+            <p data-testid="masterlist-attendance-time" className="p-3 rounded-lg bg-blue-50 border border-blue-100 text-xs text-gov-blue font-semibold">Random time range: {day?.workDate || "—"} · {timeRange.label} (Philippine time)</p>
+            <p className="text-xs text-slate-500">Bawat beneficiary ay bibigyan ng random na oras sa range ng napiling shift at attendance date, kahit anong oras mo ito i-save. Makikita ang na-record na oras pagkatapos i-save. Ang may attendance na o kulang sa orientation ay isi-skip.</p>
             <div className="flex gap-2 justify-end border-t pt-3">
               <button type="button" onClick={onClose} disabled={saving} className="px-4 py-2 text-xs font-bold rounded-lg border">Cancel</button>
               <button type="submit" disabled={saving || !day} className="px-4 py-2 text-xs font-bold rounded-lg bg-gov-blue text-white disabled:opacity-50 flex items-center gap-2">

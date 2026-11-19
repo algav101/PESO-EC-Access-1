@@ -1,11 +1,12 @@
 export const dynamic = "force-dynamic";
 import { NextResponse } from "next/server";
+import { randomInt } from "crypto";
 import prisma from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth";
 import { canRecordMasterlistAttendance } from "@/lib/permissions";
 import { getPhilippineTime, ATTENDANCE_SLOT_LABELS } from "@/lib/utils";
 import { ATTENDANCE_FIELDS, writeAttendanceSlot, type AttendanceSlot } from "@/lib/attendance-slot-write";
-import { getMasterlistAttendanceTimestamp, MASTERLIST_ATTENDANCE_TIMES } from "@/lib/masterlist-attendance-time";
+import { getMasterlistAttendanceRange, MASTERLIST_ATTENDANCE_RANGES } from "@/lib/masterlist-attendance-time";
 
 class BulkAttendanceError extends Error {
   constructor(message: string, public status = 400) { super(message); }
@@ -38,7 +39,8 @@ export async function POST(request: Request, { params }: { params: { id: string 
       const day = program.workDays[0];
       if (!day || day.status === "CANCELLED") throw new BulkAttendanceError("The selected attendance day is unavailable in this program.", 409);
       if (day.workDate !== body.targetDate) throw new BulkAttendanceError("Work schedule changed. Reopen Attendance and choose the updated day.", 409);
-      const slotTime = getMasterlistAttendanceTimestamp(day.workDate, slot);
+      const timeRange = getMasterlistAttendanceRange(day.workDate, slot);
+      const assignedTimes = new Map<string, Date>();
       const people = await tx.programBeneficiary.findMany({ where: { programId: params.id, id: { in: ids } }, include: {
         beneficiary: { select: { fullName: true, barangay: true, sitio: true } },
         orientationAttendance: { where: { programId: params.id, status: "PRESENT" }, select: { id: true }, take: 1 },
@@ -49,6 +51,10 @@ export async function POST(request: Request, { params }: { params: { id: string 
       const enforceDuration = ["enforce_3hr", "true_enforce"].includes(bypassSetting?.value || "");
       const results = people.map((pb) => {
         const existing = pb.attendanceRecords[0];
+        // Each person receives an independent, server-assigned second within
+        // the selected day's range, including both endpoints.
+        const slotTime = new Date(randomInt(timeRange.start.getTime() / 1000, timeRange.end.getTime() / 1000 + 1) * 1000);
+        assignedTimes.set(pb.id, slotTime);
         let reason = "";
         if (!["ACTIVE", "ENROLLED", "FLAGGED_FOR_REPLACEMENT"].includes(pb.participationStatus)) reason = "Inactive or replaced beneficiary.";
         else if (pb.originalBeneficiary && !pb.orientationAttendance.length) reason = "Orientation attendance must be verified first.";
@@ -58,32 +64,35 @@ export async function POST(request: Request, { params }: { params: { id: string 
           const timeIn = slot === "MORNING_OUT" ? existing.morningTimeIn : slot === "AFTERNOON_OUT" ? existing.afternoonTimeIn : null;
           if (timeIn && slotTime.getTime() - timeIn.getTime() < 3 * 60 * 60 * 1000) reason = "Time-out requires at least 3 hours after time-in.";
         }
-        return { programBeneficiaryId: pb.id, designatedNumber: pb.designatedNumber, fullName: pb.beneficiary.fullName, status: reason ? "SKIPPED" : "PENDING", reason };
+        return { programBeneficiaryId: pb.id, designatedNumber: pb.designatedNumber, fullName: pb.beneficiary.fullName, status: reason ? "SKIPPED" : "PENDING", reason, attendanceTime: null as string | null };
       });
       const eligible = new Set(results.filter((row) => row.status === "PENDING").map((row) => row.programBeneficiaryId));
       const records = await writeAttendanceSlot(tx, {
-        programId: program.id, workDayId: day.id, attendanceDate: day.workDate, slot, now, slotTime,
+        programId: program.id, workDayId: day.id, attendanceDate: day.workDate, slot, now,
         userId: user.id, source: "MASTERLIST_BULK", deviceId: "ADMIN_WEB_ROSTER",
         rows: people.filter((pb) => eligible.has(pb.id)).map((pb) => {
           const brgy = (pb.beneficiary.barangay || "").toUpperCase(), sitio = (pb.beneficiary.sitio || "").toUpperCase();
           const wp = program.tupadWorkPrograms.find((wp) => wp.barangay.toUpperCase() === brgy || wp.projectLocation?.toUpperCase() === brgy);
           const items = wp?.items.filter((item) => item.dayNumber === day.dayNumber) || [];
           const item = (sitio ? items.find((item) => item.area.toUpperCase().includes(sitio)) : undefined) || items[0];
-          return { programBeneficiaryId: pb.id, workProgramItemId: item?.id, workArea: item?.area, activityName: item?.specificActivities };
+          return { programBeneficiaryId: pb.id, slotTime: assignedTimes.get(pb.id), workProgramItemId: item?.id, workArea: item?.area, activityName: item?.specificActivities };
         }),
       });
-      const recordedIds = new Set(records.map((record) => record.programBeneficiaryId));
+      const recordedTimes = new Map(records.map((record) => [record.programBeneficiaryId, record[field]!.toISOString()]));
       for (const row of results) if (row.status === "PENDING") {
-        row.status = recordedIds.has(row.programBeneficiaryId) ? "RECORDED" : "SKIPPED";
+        row.status = recordedTimes.has(row.programBeneficiaryId) ? "RECORDED" : "SKIPPED";
+        row.attendanceTime = recordedTimes.get(row.programBeneficiaryId) || null;
         if (row.status === "SKIPPED") row.reason = "Already recorded by another request or the schedule changed; original data was kept.";
       }
       if (records.length) await tx.auditLog.createMany({ data: records.map((record) => ({
         userId: user.id, action: "ATTENDANCE_RECORDED_FROM_MASTERLIST", entityType: "ATTENDANCE_RECORD", entityId: record.id,
         metadata: JSON.stringify({ programId: program.id, programBeneficiaryId: record.programBeneficiaryId, workDayId: day.id,
-          dayNumber: day.dayNumber, attendanceDate: day.workDate, slot, attendanceTime: slotTime.toISOString(), recordedAt: now.toISOString(), timePolicy: "FIXED_PHILIPPINE_SCHEDULE", source: "MASTERLIST_BULK", remarks: body.remarks || null }),
+          dayNumber: day.dayNumber, attendanceDate: day.workDate, slot, attendanceTime: record[field]!.toISOString(), recordedAt: now.toISOString(),
+          timePolicy: "RANDOM_WITHIN_PHILIPPINE_TIME_RANGE", timeRange: { start: timeRange.start.toISOString(), end: timeRange.end.toISOString() },
+          source: "MASTERLIST_BULK", remarks: body.remarks || null }),
       })) });
       return { success: true, updatedCount: records.length, skippedCount: ids.length - records.length,
-        workDay: { id: day.id, dayNumber: day.dayNumber, workDate: day.workDate }, slot, slotLabel: ATTENDANCE_SLOT_LABELS[slot], attendanceTime: slotTime.toISOString(), fixedTimeLabel: MASTERLIST_ATTENDANCE_TIMES[slot].label, results };
+        workDay: { id: day.id, dayNumber: day.dayNumber, workDate: day.workDate }, slot, slotLabel: ATTENDANCE_SLOT_LABELS[slot], timeRangeLabel: MASTERLIST_ATTENDANCE_RANGES[slot].label, results };
     }, { timeout: 30000, maxWait: 5000 });
     return NextResponse.json(result);
   } catch (error: any) {

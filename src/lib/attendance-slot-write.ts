@@ -6,7 +6,7 @@ export const ATTENDANCE_FIELDS = {
   AFTERNOON_IN: "afternoonTimeIn", AFTERNOON_OUT: "afternoonTimeOut",
 } as const;
 export type AttendanceSlot = keyof typeof ATTENDANCE_FIELDS;
-type Row = { programBeneficiaryId: string; workProgramItemId?: string | null; workArea?: string | null; activityName?: string | null };
+type Row = { programBeneficiaryId: string; slotTime?: Date; workProgramItemId?: string | null; workArea?: string | null; activityName?: string | null };
 
 /** One conditional write for scanner and roster batches. Concurrent requests must
  * never overwrite an already recorded timestamp or merge a rescheduled old date.
@@ -30,10 +30,11 @@ export async function writeAttendanceSlot(client: Pick<Prisma.TransactionClient,
       id, "programId", "workDayId", "programBeneficiaryId", "attendanceDate", ${column},
       status, source, "scannedById", "deviceId", "workProgramItemId", "workArea", "activityName", "createdAt", "updatedAt"
     )
-    SELECT row.id, ${input.programId}, ${input.workDayId}, row."programBeneficiaryId", ${input.attendanceDate}, ${slotTimestamp},
+    SELECT row.id, ${input.programId}, ${input.workDayId}, row."programBeneficiaryId", ${input.attendanceDate},
+      COALESCE(row."slotTime"::timestamptz AT TIME ZONE 'UTC', ${slotTimestamp}),
       'PRESENT', ${input.source}, ${input.userId}, ${input.deviceId}, row."workProgramItemId", row."workArea", row."activityName", ${processedTimestamp}, ${processedTimestamp}
     FROM jsonb_to_recordset(${JSON.stringify(rows)}::jsonb) AS row(
-      id text, "programBeneficiaryId" text, "workProgramItemId" text, "workArea" text, "activityName" text
+      id text, "programBeneficiaryId" text, "slotTime" text, "workProgramItemId" text, "workArea" text, "activityName" text
     )
     ON CONFLICT ("programId", "workDayId", "programBeneficiaryId") DO UPDATE SET
       ${column} = EXCLUDED.${column}, status = 'PRESENT', "updatedAt" = EXCLUDED."updatedAt",
