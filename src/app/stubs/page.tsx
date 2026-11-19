@@ -84,7 +84,8 @@ function StubsContent() {
   const [printedQrOpen, setPrintedQrOpen] = useState(false);
   const [registeringPrintedQr, setRegisteringPrintedQr] = useState(false);
   const [printedQrNotice, setPrintedQrNotice] = useState<{ error: boolean; text: string } | null>(null);
-  useEffect(() => { setPrintedQrOpen(false); setPrintedQrNotice(null); }, [selectedProgramId]);
+  const [printedQrSourceId, setPrintedQrSourceId] = useState("");
+  useEffect(() => { setPrintedQrOpen(false); setPrintedQrNotice(null); setPrintedQrSourceId(""); }, [selectedProgramId]);
 
   // Print Mode
   const [templateMode, setTemplateMode] = useState<PrintTemplateMode>("FULL_STUB");
@@ -235,6 +236,23 @@ function StubsContent() {
         method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ qrToken }),
       });
       const data = await readScanResponse(response, "Hindi na-register ang printed QR.");
+      if (programRef.current === programId) setPrintedQrNotice({ error: false, text: data.message + " Run Master Key Sync on offline scanners." });
+    } catch (error: any) {
+      if (programRef.current === programId) setPrintedQrNotice({ error: true, text: error.message });
+    } finally { setRegisteringPrintedQr(false); }
+  };
+
+  const handleRegisterPrintedBatch = async () => {
+    const programId = programRef.current;
+    if (!programId || !printedQrSourceId || registeringPrintedQr) return;
+    setRegisteringPrintedQr(true);
+    setPrintedQrNotice(null);
+    try {
+      const response = await fetch(`/api/v1/programs/${programId}/qr/register-printed`, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ sourceProgramId: printedQrSourceId }),
+      });
+      const data = await readScanResponse(response, "Hindi na-register ang printed QR batch.");
       if (programRef.current === programId) setPrintedQrNotice({ error: false, text: data.message + " Run Master Key Sync on offline scanners." });
     } catch (error: any) {
       if (programRef.current === programId) setPrintedQrNotice({ error: true, text: error.message });
@@ -749,6 +767,24 @@ function StubsContent() {
           </div>
         </div>
 
+        {can("qr.generate") && currentProgram && ["ACTIVE", "DRAFT"].includes(currentProgram.status) && (
+          <div className="p-3 rounded-xl border border-blue-200 bg-blue-50 space-y-2">
+            <p className="text-xs text-blue-950">Gagamit muli ng buong set ng lumang printed cards? Piliin ang closed program na pinanggalingan. Lahat ng katumbas na active number ay iuugnay sa <strong>{currentProgram.programCode}</strong>; hindi na ito tatanggapin sa ibang work program.</p>
+            <div className="flex flex-wrap gap-2 items-center">
+              <select aria-label="Printed cards source program" value={printedQrSourceId} onChange={(e) => setPrintedQrSourceId(e.target.value)} disabled={registeringPrintedQr}
+                className="text-xs rounded-lg border border-blue-200 p-2 max-w-full">
+                <option value="">Select closed source program</option>
+                {programs.filter((p) => p.id !== selectedProgramId && ["CLOSED", "COMPLETED"].includes(p.status)).map((p) => (
+                  <option key={p.id} value={p.id}>{p.programCode} — {p.programName}</option>
+                ))}
+              </select>
+              <button type="button" disabled={!printedQrSourceId || registeringPrintedQr} onClick={handleRegisterPrintedBatch}
+                className="px-4 py-2 bg-gov-blue text-white font-bold text-xs rounded-xl disabled:opacity-50">
+                {registeringPrintedQr ? "Registering Printed QRs..." : "Register All Matching Printed QRs"}
+              </button>
+            </div>
+          </div>
+        )}
         {printedQrNotice && (
           <div role="status" className={`p-3 rounded-xl border text-xs font-semibold ${printedQrNotice.error ? "bg-red-50 border-red-300 text-red-900" : "bg-emerald-50 border-emerald-300 text-emerald-900"}`}>
             {printedQrNotice.text}

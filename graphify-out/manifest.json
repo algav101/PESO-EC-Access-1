@@ -1158,9 +1158,9 @@
     "semantic_hash": ""
   },
   "src/app/stubs/page.tsx": {
-    "mtime": 1794981947.4655056,
-    "seen": 1794982007.372261,
-    "ast_hash": "c2b65c5e806c9a88cac143225bd5f7ad",
+    "mtime": 1795047878.1910295,
+    "seen": 1795048106.7283566,
+    "ast_hash": "736b5c3298b0e1586eb3d95e0fe67e2c",
     "semantic_hash": ""
   },
   "src/app/sync/page.tsx": {
@@ -2022,9 +2022,9 @@
     "semantic_hash": ""
   },
   "test/test-program-qr-browser.mjs": {
-    "mtime": 1794971906.8117213,
-    "seen": 1794971972.3030312,
-    "ast_hash": "703c1a763421af48eb28cd2574e139e5",
+    "mtime": 1795047955.054564,
+    "seen": 1795048106.7365344,
+    "ast_hash": "fdf72f9a1c47501337d1eec7e7e19d5f",
     "semantic_hash": ""
   },
   "test/test-program-qr-offline.mjs": {
@@ -2034,15 +2034,15 @@
     "semantic_hash": ""
   },
   "test/test-program-qr-postgres.mjs": {
-    "mtime": 1794971524.7446122,
-    "seen": 1794971808.1492085,
-    "ast_hash": "24ed83304c501b3755ec1bce33345fa4",
+    "mtime": 1795047912.5800598,
+    "seen": 1795048106.7365887,
+    "ast_hash": "ce287b37eb977a2953f41b22ae26aab7",
     "semantic_hash": ""
   },
   "docs/program-qr-lifecycle.md": {
-    "mtime": 1794971870.358176,
-    "seen": 1794971972.3045013,
-    "ast_hash": "9bcc910f2bbc38b9de1700ab1907687a",
+    "mtime": 1795047912.5800598,
+    "seen": 1795048106.7380602,
+    "ast_hash": "60d01000b25b10c0affc93be2c278477",
     "semantic_hash": ""
   },
   "scripts/prepare-dole-template.mjs": {
@@ -2430,15 +2430,15 @@
     "semantic_hash": ""
   },
   "src/app/api/v1/programs/[id]/qr/register-printed/route.ts": {
-    "mtime": 1794971417.3233118,
-    "seen": 1794971808.1357982,
-    "ast_hash": "9e17af4b359cf09da13e0ebefebdf35e",
+    "mtime": 1795047855.4029071,
+    "seen": 1795048106.7240808,
+    "ast_hash": "baa3459b8cc231d6bff584f8f38b558b",
     "semantic_hash": ""
   },
   "src/lib/printed-qr-registration.ts": {
-    "mtime": 1794971524.2399397,
-    "seen": 1794971808.145258,
-    "ast_hash": "4458223181f4e88fd03773521e19342d",
+    "mtime": 1795047855.4019022,
+    "seen": 1795048106.7337484,
+    "ast_hash": "8299e5e5ad543e9cffe7eebea4a37fc0",
     "semantic_hash": ""
   },
   "test/test-stub-print-pagination.mjs": {

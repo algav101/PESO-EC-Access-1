@@ -231,7 +231,40 @@ try {
   assert.equal((await registerRoute.POST(request({ qrToken: firstCard.publicToken }), { params: { id: program.id } })).status, 409);
   assert.equal((await registerRoute.POST(request({ qrToken: "1" }), { params: { id: otherProgram.id } })).status, 400);
   assert.equal((await registerRoute.POST(request({ qrToken: "UNREGISTERED-CARD" }), { params: { id: otherProgram.id } })).status, 404);
+  // Regression: registering #1 must not leave the rest of a reused printed set behind.
+  for (const number of [2, 321, 500, 522]) {
+    const person = await db.beneficiary.create({ data: { beneficiaryNumber: `BATCH-PERSON-${number}`, fullName: `NEW BATCH PERSON ${number}`, birthday: "1990-01-02" } });
+    await db.programBeneficiary.create({ data: { programId: otherProgram.id, beneficiaryId: person.id, designatedNumber: String(number) } });
+  }
+  // Missing/inactive target numbers must remain assigned to the original program.
+  await db.programBeneficiary.create({ data: { programId: otherProgram.id, beneficiaryId: "bene-113", designatedNumber: "113", participationStatus: "REPLACED" } });
+  const batchRequest = () => registerRoute.POST(request({ sourceProgramId: old.id }), { params: { id: otherProgram.id } });
+  assert.equal((await registerRoute.POST(request({ sourceProgramId: program.id }), { params: { id: otherProgram.id } })).status, 409, "batch cannot take cards from an open source");
+  const batch = await batchRequest();
+  assert.equal(batch.status, 200, JSON.stringify(await batch.clone().json()));
+  const batchData = (await batch.json()).data;
+  assert.equal(batchData.registeredCount, 4); assert.equal(batchData.alreadyRegisteredCount, 1); assert.equal(batchData.skippedCount, 517);
+  assert.equal((await (await batchRequest()).json()).data.registeredCount, 0, "repeating a batch must not duplicate binding events");
+  const resolver = load("src/lib/program-scan-resolver.ts");
+  for (const number of [2, 321, 500, 522]) {
+    const card = await db.qrCode.findFirst({ where: { programBeneficiaryId: `old-pb-${number}` } });
+    const resolved = await resolver.resolveProgramScan(card.publicToken, otherProgram.id, { beneficiary: true });
+    assert.equal(resolved.pb.beneficiary.fullName, `NEW BATCH PERSON ${number}`);
+    for (const stage of ["stub-distribution", "orientation", "attendance", "payout"]) {
+      for (const programId of [old.id, program.id]) assert.equal((await route(stage).POST(request({ qrToken: card.publicToken, programId }))).status, 409, `batch card #${number} must reject another program`);
+    }
+  }
+  assert.equal(await archivedCard(), archivedBefore);
+  assert.equal(await oldHistory(), snapshot);
+  const bindingsBeforeConflict = await db.auditLog.count({ where: { entityType: "QR_PROGRAM_BINDING" } });
+  assert.equal((await registerRoute.POST(request({ sourceProgramId: old.id }), { params: { id: program.id } })).status, 409, "batch must reject an already reissued card in another open program atomically");
+  assert.equal(await db.auditLog.count({ where: { entityType: "QR_PROGRAM_BINDING" } }), bindingsBeforeConflict);
+  const duplicate = await db.programBeneficiary.create({ data: { programId: otherProgram.id, beneficiaryId: "bene-321", designatedNumber: "321" } });
+  assert.equal((await batchRequest()).status, 409, "batch must reject duplicate active target slots");
+  assert.equal(await db.auditLog.count({ where: { entityType: "QR_PROGRAM_BINDING" } }), bindingsBeforeConflict);
+  await db.programBeneficiary.delete({ where: { id: duplicate.id } });
   authorized = false;
+  assert.equal((await batchRequest()).status, 403);
   assert.equal((await registerRoute.POST(request({ qrToken: firstCard.publicToken }), { params: { id: otherProgram.id } })).status, 403);
   assert.equal((await generate.POST(request({}), { params: { id: program.id } })).status, 403);
   assert.equal((await load("src/app/api/v1/qr/slots/route.ts").GET()).status, 401);

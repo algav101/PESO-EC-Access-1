@@ -44,6 +44,72 @@ export async function readPrintedQrBindings(client: AuditReader, references: QrR
   return new Map(valid.map((qr) => [qr.id, bindingFromEvent(qr, latest.get(qr.id))]));
 }
 
+/** Explicitly reissue a closed cycle's whole printed set, only for active target slots.
+ * Call inside a transaction. Never infer a transfer from the selected scan program.
+ */
+export async function registerPrintedQrBatch(tx: Prisma.TransactionClient, input: { sourceProgramId: string; programId: string; userId?: string | null }) {
+  if (input.sourceProgramId === input.programId) throw new PrintedQrRegistrationError("Choose a different closed source program.");
+  const programs = await tx.program.findMany({
+    where: { id: { in: [input.sourceProgramId, input.programId] } },
+    select: { id: true, programCode: true, status: true },
+  });
+  const source = programs.find((p) => p.id === input.sourceProgramId);
+  const target = programs.find((p) => p.id === input.programId);
+  if (!source || !target) throw new PrintedQrRegistrationError("Source or selected program not found.", 404);
+  if (!["CLOSED", "COMPLETED"].includes(source.status)) throw new PrintedQrRegistrationError("The source program must be closed before reissuing its printed cards.", 409);
+  if (!["ACTIVE", "DRAFT"].includes(target.status)) throw new PrintedQrRegistrationError("Register printed cards to an active or draft program.");
+  const references = await tx.qrCode.findMany({
+    where: { programId: source.id, status: { not: "INVALIDATED" } },
+    include: { programBeneficiary: { select: { designatedNumber: true } } },
+  });
+  // Use the same QR and roster locks as single-card registration and masterlist imports.
+  const keys = [source.id, target.id, ...references.map((qr) => `qr-registration:${qr.id}`)].sort();
+  const [lock] = await tx.$queryRaw<{ locked: boolean }[]>`
+    SELECT bool_and(pg_try_advisory_xact_lock(hashtextextended(key, 0))) AS locked
+    FROM unnest(${keys}::text[]) AS key
+  `;
+  if (!lock?.locked) throw new PrintedQrRegistrationError("Another QR registration or roster import is running. Retry after it finishes.", 409);
+  const roster = await tx.programBeneficiary.findMany({
+    where: { programId: target.id, participationStatus: { in: ["ACTIVE", "ENROLLED", "FLAGGED_FOR_REPLACEMENT"] } },
+    select: { id: true, designatedNumber: true },
+  });
+  const slots = new Map<string, string>();
+  for (const pb of roster) {
+    const slot = normalizeQrSlot(pb.designatedNumber);
+    if (!slot) continue;
+    if (slots.has(slot)) throw new PrintedQrRegistrationError(`Duplicate active masterlist slot #${slot}. Fix the roster before registering cards.`, 409);
+    slots.set(slot, pb.id);
+  }
+  const bindings = await readPrintedQrBindings(tx, references);
+  const eligible = references.filter((qr) => {
+    const binding = bindings.get(qr.id);
+    return binding && slots.has(binding.designatedNumber);
+  });
+  if (!eligible.length) throw new PrintedQrRegistrationError("No printed QR numbers match an active slot in the selected masterlist.", 409);
+  const ownerIds = [...new Set(eligible.map((qr) => bindings.get(qr.id)!.programId))];
+  const owners = await tx.program.findMany({ where: { id: { in: ownerIds } }, select: { id: true, status: true } });
+  const changes = eligible.filter((qr) => bindings.get(qr.id)!.programId !== target.id);
+  for (const qr of changes) {
+    const previous = bindings.get(qr.id)!;
+    const owner = owners.find((p) => p.id === previous.programId);
+    if (!owner || !["CLOSED", "COMPLETED"].includes(owner.status)) {
+      throw new PrintedQrRegistrationError(`Card #${previous.designatedNumber} is assigned to another open program. No cards were registered.`, 409);
+    }
+  }
+  if (changes.length) await tx.auditLog.createMany({ data: changes.map((qr) => {
+    const previous = bindings.get(qr.id)!;
+    return {
+      userId: input.userId || null, action: "PRINTED_QR_REGISTERED_TO_PROGRAM", entityType: ENTITY_TYPE, entityId: qr.id,
+      oldData: JSON.stringify(previous),
+      newData: JSON.stringify({ version: 1, qrId: qr.id, publicToken: qr.publicToken, programId: target.id, designatedNumber: previous.designatedNumber }),
+      metadata: JSON.stringify({ originalProgramId: qr.programId, programBeneficiaryId: slots.get(previous.designatedNumber), scanHistoryPreserved: true, batchRegistration: true }),
+    };
+  }) });
+  return { programId: target.id, programCode: target.programCode, sourceProgramId: source.id,
+    registeredCount: changes.length, alreadyRegisteredCount: eligible.length - changes.length,
+    skippedCount: references.length - eligible.length };
+}
+
 /** Call inside a transaction. Only cards from a closed/completed cycle can be reissued. */
 export async function registerPrintedQr(tx: Prisma.TransactionClient, input: { rawToken: string; programId: string; userId?: string | null }) {
   const clean = extractCleanQrToken(input.rawToken);

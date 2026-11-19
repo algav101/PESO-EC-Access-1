@@ -8,6 +8,7 @@ const base = process.env.OCR_TEST_URL || "http://127.0.0.1:3000";
 const browser = await chromium.launch({ channel: "chrome", headless: true });
 const calls = [], errors = [];
 const programs = ["new", "old"].map((id) => ({ id, programCode: `TEST-${id.toUpperCase()}`, programName: `${id} synthetic program`, status: "ACTIVE", requiredWorkDays: 1, workDays: [{ id: `${id}-day`, programId: id, dayNumber: 1, workDate: "2026-11-04" }] }));
+programs.push({ id: "archived", programCode: "TEST-CLOSED", programName: "Closed printed set", status: "CLOSED", requiredWorkDays: 1, workDays: [] });
 const roster = Array.from({ length: 600 }, (_, i) => ({ id: `new-pb-${i + 1}`, programId: "new", designatedNumber: String(i + 1), participationStatus: "ACTIVE", beneficiary: { id: `person-${i}`, fullName: `SYNTHETIC ${i + 1}`, barangay: "Aplaya", birthday: "1990-01-02" }, qrCodes: [] }));
 let mode = "success", expectedProgram = "new", releaseScan;
 let delayedScanStarted, registeredPrintedProgram;
@@ -30,6 +31,11 @@ try {
     }
     if (url.pathname.endsWith("/qr/register-printed")) {
       const body = request.postDataJSON(); calls.push({ path: url.pathname, body });
+      if (body.sourceProgramId) {
+        assert.equal(body.sourceProgramId, "archived"); assert.equal(body.qrToken, undefined);
+        assert.ok(url.pathname.includes("/new/"));
+        return reply({ success: true, message: "Registered 599 printed QR codes to TEST-NEW; 1 already registered; 0 skipped without an active masterlist slot. Historical scans were preserved." });
+      }
       assert.equal(body.qrToken, "TUPAD-DGL-OLDOLD-1-12345678");
       assert.ok(url.pathname.includes("/new/")); registeredPrintedProgram = "new";
       return reply({ success: true, message: "Registered printed QR #1 to TEST-NEW. Historical scans were preserved." });
@@ -164,6 +170,11 @@ try {
   await page.getByPlaceholder("e.g. TUPAD-DGL-ABC123-1-XYZ").fill("TUPAD-DGL-OLDOLD-1-12345678");
   await page.getByRole("button", { name: "Submit Token" }).click();
   await page.getByRole("status").filter({ hasText: "Registered printed QR #1 to TEST-NEW" }).waitFor();
+  assert.equal(await page.getByRole("button", { name: "Register All Matching Printed QRs", exact: true }).isDisabled(), true);
+  assert.equal(await page.getByLabel("Printed cards source program").locator("option").count(), 2, "only the closed source program may be selected");
+  await page.getByLabel("Printed cards source program").selectOption("archived");
+  await page.getByRole("button", { name: "Register All Matching Printed QRs", exact: true }).click();
+  await page.getByRole("status").filter({ hasText: "Registered 599 printed QR codes to TEST-NEW" }).waitFor();
   await page.goto(base + "/field/attendance", { waitUntil: "networkidle" });
   await page.getByRole("button", { name: /SCAN QR FOR DAY/ }).click();
   await page.getByRole("button", { name: "Manual Token Entry" }).click();
