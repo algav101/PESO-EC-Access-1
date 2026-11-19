@@ -606,9 +606,9 @@
     "semantic_hash": ""
   },
   "src/app/api/v1/attendance/scan/route.ts": {
-    "mtime": 1795052367.48294,
-    "seen": 1795052680.9487584,
-    "ast_hash": "c0676a1aa672d522f6a54c3e6e2fc39b",
+    "mtime": 1795055214.4993532,
+    "seen": 1795055514.0223117,
+    "ast_hash": "3912114561967b079c7d3a860f73747f",
     "semantic_hash": ""
   },
   "src/app/api/v1/audit/route.ts": {
@@ -990,9 +990,9 @@
     "semantic_hash": ""
   },
   "src/app/beneficiaries/page.tsx": {
-    "mtime": 1794967784.5456636,
-    "seen": 1794968187.0075548,
-    "ast_hash": "a8136e95b08fdba5063b692c619721f8",
+    "mtime": 1795055807.867375,
+    "seen": 1795055865.2546778,
+    "ast_hash": "fc1bdb0e05f56c985b14c2674f501ae5",
     "semantic_hash": ""
   },
   "src/app/dashboard/page.tsx": {
@@ -1476,9 +1476,9 @@
     "semantic_hash": ""
   },
   "src/lib/permissions.ts": {
-    "mtime": 1793261585.859453,
-    "seen": 1793261602.1017323,
-    "ast_hash": "da868fed35585de4250dfa485de57372",
+    "mtime": 1795055807.867375,
+    "seen": 1795055865.2616484,
+    "ast_hash": "7089b25291d6edfc170c1939f8038e92",
     "semantic_hash": ""
   },
   "src/lib/prisma.ts": {
@@ -2034,9 +2034,9 @@
     "semantic_hash": ""
   },
   "test/test-program-qr-postgres.mjs": {
-    "mtime": 1795052487.5000067,
-    "seen": 1795052680.9736302,
-    "ast_hash": "4eed6a5d14645234b6689359a3ee10ae",
+    "mtime": 1795055328.0003943,
+    "seen": 1795055514.036879,
+    "ast_hash": "d22b9932880ad4e3d4ec191f2dd2626c",
     "semantic_hash": ""
   },
   "docs/program-qr-lifecycle.md": {
@@ -2487,6 +2487,36 @@
     "mtime": 1795052720.6974125,
     "seen": 1795052750.7023017,
     "ast_hash": "46331f6af3ab4261fa8b927bf6d39716",
+    "semantic_hash": ""
+  },
+  "src/app/api/v1/programs/[id]/attendance/bulk/route.ts": {
+    "mtime": 1795055807.867375,
+    "seen": 1795055865.251469,
+    "ast_hash": "e023b37ff1c62e9dbc72dd1328d2c2a2",
+    "semantic_hash": ""
+  },
+  "src/components/beneficiaries/BulkAttendanceModal.tsx": {
+    "mtime": 1795055501.407354,
+    "seen": 1795055514.0289273,
+    "ast_hash": "b2fb58398900dd2cdda401d7c61e4bd8",
+    "semantic_hash": ""
+  },
+  "src/lib/attendance-slot-write.ts": {
+    "mtime": 1795055147.819129,
+    "seen": 1795055514.0319753,
+    "ast_hash": "794ab428818469c9d10c0c59baede1ec",
+    "semantic_hash": ""
+  },
+  "test/bulk-attendance-scenarios.mjs": {
+    "mtime": 1795055833.5084405,
+    "seen": 1795055865.2626069,
+    "ast_hash": "979506eee4b243208a5a3f7be73e8eb0",
+    "semantic_hash": ""
+  },
+  "test/test-bulk-attendance-browser.mjs": {
+    "mtime": 1795055833.5084405,
+    "seen": 1795055865.2631698,
+    "ast_hash": "c655e29bf6d730b063c8ffd945669be8",
     "semantic_hash": ""
   }
 }

@@ -5,6 +5,7 @@ export const dynamic = "force-dynamic";
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getCurrentUser, hasPermission } from "@/lib/auth";
+import { writeAttendanceSlot } from "@/lib/attendance-slot-write";
 import { logAudit } from "@/lib/audit";
 import { format } from "date-fns";
 import {
@@ -379,43 +380,13 @@ export async function POST(request: Request) {
     // Record or update attendance atomically via upsert to prevent P2002 race conditions
     const slotRecorded = slotLabels[targetSlot];
 
-    const updateData: any = {};
-    if (resolvedItemId && !record?.workProgramItemId) updateData.workProgramItemId = resolvedItemId;
-    if (resolvedArea && !record?.workArea) updateData.workArea = resolvedArea;
-    if (resolvedActivity && !record?.activityName) updateData.activityName = resolvedActivity;
-
-    if (targetSlot === "MORNING_IN") updateData.morningTimeIn = now;
-    else if (targetSlot === "MORNING_OUT") updateData.morningTimeOut = now;
-    else if (targetSlot === "AFTERNOON_IN") updateData.afternoonTimeIn = now;
-    else if (targetSlot === "AFTERNOON_OUT") updateData.afternoonTimeOut = now;
-
-    record = await prisma.attendanceRecord.upsert({
-      where: {
-        programId_workDayId_programBeneficiaryId: {
-          programId: program.id,
-          workDayId: workDay.id,
-          programBeneficiaryId: pb.id,
-        },
-      },
-      update: updateData,
-      create: {
-        programId: program.id,
-        workDayId: workDay.id,
-        programBeneficiaryId: pb.id,
-        attendanceDate: workDay.workDate,
-        morningTimeIn: targetSlot === "MORNING_IN" ? now : null,
-        morningTimeOut: targetSlot === "MORNING_OUT" ? now : null,
-        afternoonTimeIn: targetSlot === "AFTERNOON_IN" ? now : null,
-        afternoonTimeOut: targetSlot === "AFTERNOON_OUT" ? now : null,
-        status: "PRESENT",
-        source: "QR_SCAN",
-        scannedById: user.id,
-        deviceId: deviceId || "BROWSER",
-        workProgramItemId: resolvedItemId,
-        workArea: resolvedArea,
-        activityName: resolvedActivity,
-      },
+    const written = await writeAttendanceSlot(prisma, {
+      programId: program.id, workDayId: workDay.id, attendanceDate: workDay.workDate,
+      slot: targetSlot, now, userId: user.id, source: "QR_SCAN", deviceId: deviceId || "BROWSER",
+      rows: [{ programBeneficiaryId: pb.id, workProgramItemId: resolvedItemId, workArea: resolvedArea, activityName: resolvedActivity }],
     });
+    record = written[0];
+    if (!record) throw new ProgramScanError("ALREADY SCANNED OR SCHEDULE CHANGED: Existing attendance was kept. Refresh the attendance view before scanning again.", 409);
 
     await logAudit({
       userId: user.id,

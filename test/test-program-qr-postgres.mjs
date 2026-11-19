@@ -42,7 +42,7 @@ try {
     const code = ts.transpileModule(fs.readFileSync(resolved, "utf8"), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, esModuleInterop: true } }).outputText;
     const localRequire = (name) => {
       if (name === "@/lib/prisma" || (name === "./prisma" && resolved.endsWith(path.join("lib", "audit.ts")))) return { __esModule: true, default: db };
-      if (name === "@/lib/auth") return { getCurrentUser: async () => authorized ? admin : null, hasPermission: () => authorized };
+      if (name === "@/lib/auth") return { getCurrentUser: async () => authorized ? admin : null, hasPermission: (role, permission) => authorized && load("src/lib/permissions.ts").hasPermission(role, permission) };
       if (name.startsWith("@/")) return load(path.join("src", name.slice(2)) + ".ts");
       return require(name);
     };
@@ -267,7 +267,9 @@ try {
   assert.equal(await db.auditLog.count({ where: { entityType: "QR_PROGRAM_BINDING" } }), bindingsBeforeConflict);
   await (await import("./qr-auto-scenarios.mjs")).testAutomaticQrDetection({ db, load, admin, request, route });
   await (await import("./program-work-date-scenarios.mjs")).testProgramWorkDateChanges({ db, load, admin, request, route });
+  await (await import("./bulk-attendance-scenarios.mjs")).testBulkAttendance({ db, load, admin, request, route });
   authorized = false;
+  assert.equal((await load("src/app/api/v1/programs/[id]/attendance/bulk/route.ts").POST(request({}), { params: { id: program.id } })).status, 403);
   assert.equal((await batchRequest()).status, 403);
   assert.equal((await registerRoute.POST(request({ qrToken: firstCard.publicToken }), { params: { id: otherProgram.id } })).status, 403);
   assert.equal((await generate.POST(request({}), { params: { id: program.id } })).status, 403);

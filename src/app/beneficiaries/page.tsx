@@ -5,6 +5,7 @@ import { useProgramSelection, resolveProgramSelection } from "@/lib/use-program-
 import React, { useEffect, useState, useMemo } from "react";
 import {
   Users,
+  CalendarCheck,
   Search,
   Filter,
   ShieldAlert,
@@ -36,6 +37,7 @@ import {
 import { StatusBadge } from "@/components/common/StatusBadge";
 import { formatDate } from "@/lib/utils";
 import { EditBeneficiaryModal } from "@/components/beneficiaries/EditBeneficiaryModal";
+import { BulkAttendanceModal } from "@/components/beneficiaries/BulkAttendanceModal";
 import { AdminStubOverrideModal } from "@/components/beneficiaries/AdminStubOverrideModal";
 import { MasterlistUploadModal } from "@/components/beneficiaries/MasterlistUploadModal";
 import { DeploymentGroupingMatrix } from "@/components/beneficiaries/DeploymentGroupingMatrix";
@@ -43,7 +45,7 @@ import { BeneficiarySummaryDropdown } from "@/components/beneficiaries/Beneficia
 import { TableScrollWrapper } from "@/components/common/TableScrollWrapper";
 import { useAuth } from "@/context/AuthContext";
 import { offlineDb } from "@/lib/dexie";
-import { isAdminUser, isFieldCoordinator } from "@/lib/permissions";
+import { isAdminUser, isFieldCoordinator, canRecordMasterlistAttendance } from "@/lib/permissions";
 import {
   normalizeBarangayName,
   normalizeSitioName,
@@ -67,6 +69,7 @@ function BeneficiariesMasterlistContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const isAdmin = isAdminUser(user);
+  const canRecordBulkAttendance = canRecordMasterlistAttendance(user);
   const [beneficiaries, setBeneficiaries] = useState<any[]>([]);
   const [programs, setPrograms] = useState<any[]>([]);
   const [selectedProgram, setSelectedProgram, programRef] = useProgramSelection();
@@ -78,6 +81,13 @@ function BeneficiariesMasterlistContent() {
 
   // Manual Selection & Batch Action State
   const [selectedPbIds, setSelectedPbIds] = useState<string[]>([]);
+  const [attendanceSelection, setAttendanceSelection] = useState<{ programId: string; programName: string; ids: string[] } | null>(null);
+  useEffect(() => { setAttendanceSelection(null); }, [selectedProgram, user?.role]);
+  const openBulkAttendance = () => {
+    const program = programs.find((p) => p.id === selectedProgram);
+    if (!canRecordBulkAttendance || !selectedProgram || !selectedPbIds.length) return;
+    setAttendanceSelection({ programId: selectedProgram, programName: [program?.programCode, program?.programName].filter(Boolean).join(" ? "), ids: [...selectedPbIds] });
+  };
   const [batchLoading, setBatchLoading] = useState(false);
   const [confirmModalAction, setConfirmModalAction] = useState<string | null>(null);
   const [batchRemarks, setBatchRemarks] = useState<string>("");
@@ -967,6 +977,12 @@ function BeneficiariesMasterlistContent() {
                     <span>Approve Both ({selectedPbIds.length})</span>
                   </button>
 
+                  {canRecordBulkAttendance && (
+                    <button type="button" onClick={openBulkAttendance} className="px-3 py-1.5 bg-sky-700 hover:bg-sky-800 text-white font-bold text-[11px] rounded-lg flex items-center gap-1.5">
+                      <CalendarCheck className="w-3.5 h-3.5" /><span>Attendance ({selectedPbIds.length})</span>
+                    </button>
+                  )}
+
                   {(isAdmin || can("beneficiary.delete") || can("beneficiary.update")) && (
                     <button
                       type="button"
@@ -1208,7 +1224,7 @@ function BeneficiariesMasterlistContent() {
 
       {/* Floating Sticky Bulk Actions Bar (When 1+ beneficiaries selected) */}
       {selectedPbIds.length > 0 && (isAdmin || can("stub.override") || can("orientation.correct")) && (
-        <div className="fixed bottom-6 inset-x-0 mx-auto max-w-4xl z-40 px-4 animate-in slide-in-from-bottom-5 duration-200">
+        <div className="fixed bottom-24 sm:bottom-6 inset-x-0 mx-auto max-w-5xl z-40 px-4 animate-in slide-in-from-bottom-5 duration-200">
           <div className="bg-slate-900/95 backdrop-blur-md text-white rounded-2xl shadow-2xl p-3 sm:p-4 border border-slate-700 flex flex-col sm:flex-row items-center justify-between gap-3">
             <div className="flex items-center space-x-3 w-full sm:w-auto justify-between sm:justify-start">
               <div className="flex items-center space-x-2">
@@ -1267,6 +1283,12 @@ function BeneficiariesMasterlistContent() {
                 <span>Approve Both</span>
               </button>
 
+              {canRecordBulkAttendance && (
+                <button type="button" onClick={openBulkAttendance} className="px-3 py-2 bg-sky-600 hover:bg-sky-500 text-white font-bold text-xs rounded-xl flex items-center gap-1.5">
+                  <CalendarCheck className="w-3.5 h-3.5" /><span>Attendance ({selectedPbIds.length})</span>
+                </button>
+              )}
+
               {/* Reset Dropdown Trigger */}
               <button
                 type="button"
@@ -1280,6 +1302,16 @@ function BeneficiariesMasterlistContent() {
             </div>
           </div>
         </div>
+      )}
+
+      {attendanceSelection && canRecordBulkAttendance && (
+        <BulkAttendanceModal programId={attendanceSelection.programId} programName={attendanceSelection.programName}
+          selectedIds={attendanceSelection.ids} onClose={() => setAttendanceSelection(null)}
+          onRecorded={(recordedIds) => {
+            if (programRef.current !== attendanceSelection.programId) return;
+            setSelectedPbIds((current) => current.filter((id) => !recordedIds.includes(id)));
+            void fetchBeneficiaries(attendanceSelection.programId);
+          }} />
       )}
 
       {/* Batch Action Confirmation Modal */}
