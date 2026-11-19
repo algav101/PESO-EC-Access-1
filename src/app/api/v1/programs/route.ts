@@ -4,7 +4,8 @@ import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getCurrentUser, hasPermission } from "@/lib/auth";
 import { logAudit } from "@/lib/audit";
-import { addDays, format, parseISO } from "date-fns";
+import { getPhilippineTime } from "@/lib/utils";
+import { buildProgramWorkDays, ProgramScheduleError } from "@/lib/program-work-days";
 
 export async function GET(request: Request) {
   try {
@@ -83,26 +84,9 @@ export async function POST(request: Request) {
     const targetBarangays = Array.isArray(barangays) && barangays.length > 0 ? barangays : defaultBarangays;
 
     // Auto-generate Work Days (Day 1 to N)
-    const daysCount = Number(requiredWorkDays) || 10;
-    let startD = startDate ? parseISO(startDate) : new Date();
-
-    let currentD = startD;
-    let scheduledDays = 0;
-    const workDaysData: { dayNumber: number; workDate: string; description: string; status: string }[] = [];
-    while (scheduledDays < daysCount) {
-      // Skip Sundays if standard 6-day work week
-      const dayOfWeek = currentD.getDay();
-      if (dayOfWeek !== 0) { // 0 is Sunday
-        scheduledDays++;
-        workDaysData.push({
-          dayNumber: scheduledDays,
-          workDate: format(currentD, "yyyy-MM-dd"),
-          description: `Day ${scheduledDays} Community Work Activities`,
-          status: "SCHEDULED",
-        });
-      }
-      currentD = addDays(currentD, 1);
-    }
+    const daysCount = Number(requiredWorkDays);
+    const effectiveStartDate = startDate || getPhilippineTime().dateStr;
+    const workDaysData = buildProgramWorkDays(effectiveStartDate, daysCount);
 
     // Create program transactionally using nested relational write in a single atomic query
     const program = await prisma.$transaction(
@@ -130,7 +114,7 @@ export async function POST(request: Request) {
             payoutDate,
             payoutTime,
             payoutVenue,
-            startDate,
+            startDate: effectiveStartDate,
             endDate,
             status: "DRAFT",
             createdById: user.id,
@@ -173,6 +157,7 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ success: true, program }, { status: 201 });
   } catch (error: any) {
+    if (error instanceof ProgramScheduleError) return NextResponse.json({ error: error.message }, { status: error.status });
     console.error("POST /programs error:", error);
     if (error.code === "P2002") {
       return NextResponse.json({ error: "A program with this code already exists" }, { status: 400 });

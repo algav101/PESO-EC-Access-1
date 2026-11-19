@@ -17,13 +17,16 @@ export function useMonitorRefresh(refresh: () => Promise<unknown>, enabled: bool
       finally { running = false; }
     };
     const timer = setInterval(run, intervalMs);
-    const events = ["focus", "online", "tupad-offline-synced", "tupad-cache-updated", "tupad-queue-updated", "tupad-photos-updated"];
+    const events = ["focus", "online", "tupad-offline-synced", "tupad-cache-updated", "tupad-queue-updated", "tupad-photos-updated", "tupad-program-updated"];
     events.forEach(name => window.addEventListener(name, run));
+    const onStorage = (event: StorageEvent) => { if (event.key === "tupad_program_schedule_updated") void run(); };
+    window.addEventListener("storage", onStorage);
     document.addEventListener("visibilitychange", run);
     return () => {
       stopped = true;
       clearInterval(timer);
       events.forEach(name => window.removeEventListener(name, run));
+      window.removeEventListener("storage", onStorage);
       document.removeEventListener("visibilitychange", run);
     };
   }, [enabled, intervalMs]);

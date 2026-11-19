@@ -4,6 +4,7 @@ import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getCurrentUser, hasPermission } from "@/lib/auth";
 import { logAudit } from "@/lib/audit";
+import { buildProgramWorkDays, rescheduleProgramWorkDays, ProgramScheduleError } from "@/lib/program-work-days";
 
 export async function GET(request: Request, { params }: { params: { id: string } }) {
   try {
@@ -58,7 +59,7 @@ export async function PATCH(request: Request, { params }: { params: { id: string
     const body = await request.json();
     const oldProgram = await prisma.program.findUnique({
       where: { id: params.id },
-      include: { programBarangays: true },
+      include: { programBarangays: true, workDays: { orderBy: { dayNumber: "asc" } } },
     });
     if (!oldProgram) return NextResponse.json({ error: "Program not found" }, { status: 404 });
 
@@ -113,13 +114,21 @@ export async function PATCH(request: Request, { params }: { params: { id: string
     if (payoutDate !== undefined) updateData.payoutDate = payoutDate;
     if (payoutTime !== undefined) updateData.payoutTime = payoutTime;
     if (payoutVenue !== undefined) updateData.payoutVenue = payoutVenue;
+    const reschedule = startDate !== undefined && startDate !== null && startDate !== "";
+    if (startDate !== undefined && !reschedule && oldProgram.startDate) throw new ProgramScheduleError("Work Start Date cannot be empty. Enter the new Day 1 date.");
+    if (reschedule) buildProgramWorkDays(startDate, updateData.requiredWorkDays ?? oldProgram.requiredWorkDays);
 
     const updated = await prisma.$transaction(
       async (tx) => {
+        const [lock] = await tx.$queryRaw<{ locked: boolean }[]>`SELECT pg_try_advisory_xact_lock(hashtextextended(${params.id}, 0)) AS locked`;
+        if (!lock?.locked) throw new ProgramScheduleError("Another program update is running. Please retry after it finishes.", 409);
         const prog = await tx.program.update({
           where: { id: params.id },
           data: updateData,
         });
+        const workDays = reschedule
+          ? await rescheduleProgramWorkDays(tx, { id: prog.id, startDate: prog.startDate!, requiredWorkDays: prog.requiredWorkDays })
+          : await tx.workDay.findMany({ where: { programId: prog.id }, orderBy: { dayNumber: "asc" } });
 
         // Update participating barangays if array provided
         if (Array.isArray(participatingBarangays)) {
@@ -147,7 +156,7 @@ export async function PATCH(request: Request, { params }: { params: { id: string
           }
         }
 
-        return prog;
+        return { ...prog, workDays };
       },
       {
         maxWait: 15000,
@@ -166,6 +175,7 @@ export async function PATCH(request: Request, { params }: { params: { id: string
 
     return NextResponse.json({ success: true, program: updated });
   } catch (error: any) {
+    if (error instanceof ProgramScheduleError) return NextResponse.json({ error: error.message }, { status: error.status });
     console.error("PATCH /programs/[id] error:", error);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }

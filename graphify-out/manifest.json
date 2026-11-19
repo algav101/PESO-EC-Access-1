@@ -606,9 +606,9 @@
     "semantic_hash": ""
   },
   "src/app/api/v1/attendance/scan/route.ts": {
-    "mtime": 1795049483.0293362,
-    "seen": 1795050215.2073267,
-    "ast_hash": "5a4732beed0222c15db1e32118e20f6b",
+    "mtime": 1795052367.48294,
+    "seen": 1795052680.9487584,
+    "ast_hash": "c0676a1aa672d522f6a54c3e6e2fc39b",
     "semantic_hash": ""
   },
   "src/app/api/v1/audit/route.ts": {
@@ -774,9 +774,9 @@
     "semantic_hash": ""
   },
   "src/app/api/v1/programs/[id]/route.ts": {
-    "mtime": 1793171874.0089054,
-    "seen": 1793172745.3784049,
-    "ast_hash": "1a10621224caa09c2a8a846f8090ee95",
+    "mtime": 1795052367.4819233,
+    "seen": 1795052680.9520159,
+    "ast_hash": "1841a233594ace700671489c6da28528",
     "semantic_hash": ""
   },
   "src/app/api/v1/programs/[id]/stubs/route.ts": {
@@ -834,9 +834,9 @@
     "semantic_hash": ""
   },
   "src/app/api/v1/programs/route.ts": {
-    "mtime": 1793171874.0089054,
-    "seen": 1793172745.3784096,
-    "ast_hash": "a1ec0fc9d0fb21e4b2446ad6a350a0df",
+    "mtime": 1795052367.48294,
+    "seen": 1795052680.953012,
+    "ast_hash": "1e406ee45abb5079af77d0e27570537a",
     "semantic_hash": ""
   },
   "src/app/api/v1/public/applications/duplicates/route.ts": {
@@ -948,9 +948,9 @@
     "semantic_hash": ""
   },
   "src/app/api/v1/sync/push/route.ts": {
-    "mtime": 1794969042.4312148,
-    "seen": 1794969277.507048,
-    "ast_hash": "a9a4448a63ba1203254407adb4b58458",
+    "mtime": 1795052367.4839468,
+    "seen": 1795052680.955356,
+    "ast_hash": "ba83676df872b8c0ed659b69b5fdffa5",
     "semantic_hash": ""
   },
   "src/app/api/v1/users/import/route.ts": {
@@ -1002,9 +1002,9 @@
     "semantic_hash": ""
   },
   "src/app/field/attendance/page.tsx": {
-    "mtime": 1795050026.8867464,
-    "seen": 1795050215.2114613,
-    "ast_hash": "704b993139a06e53910a01df720b0bec",
+    "mtime": 1795052406.932927,
+    "seen": 1795052680.9564636,
+    "ast_hash": "85ee660fa9261e1f59d1c837a807fad8",
     "semantic_hash": ""
   },
   "src/app/field/orientation/page.tsx": {
@@ -1308,9 +1308,9 @@
     "semantic_hash": ""
   },
   "src/components/programs/EditProgramModal.tsx": {
-    "mtime": 1793171874.0520966,
-    "seen": 1793172745.3784513,
-    "ast_hash": "f332a0487449b802bf82ad58211ee1bb",
+    "mtime": 1795052406.964316,
+    "seen": 1795052680.9623392,
+    "ast_hash": "89e5342c3199bd2fe3a37b005b087ab2",
     "semantic_hash": ""
   },
   "src/components/public/MigrantsCornerLandingSection.tsx": {
@@ -1440,9 +1440,9 @@
     "semantic_hash": ""
   },
   "src/lib/dexie.ts": {
-    "mtime": 1795049629.9971156,
-    "seen": 1795050215.2165706,
-    "ast_hash": "caaa62387151d0b33c1bae5849d34474",
+    "mtime": 1795052367.4839468,
+    "seen": 1795052680.96571,
+    "ast_hash": "2d72645157da070d63f27fe716f09244",
     "semantic_hash": ""
   },
   "src/lib/dingalan-groupings.ts": {
@@ -2034,9 +2034,9 @@
     "semantic_hash": ""
   },
   "test/test-program-qr-postgres.mjs": {
-    "mtime": 1795049780.2483299,
-    "seen": 1795050215.2207046,
-    "ast_hash": "0d8a47f74b17dfb191a8c3bc5d243b35",
+    "mtime": 1795052487.5000067,
+    "seen": 1795052680.9736302,
+    "ast_hash": "4eed6a5d14645234b6689359a3ee10ae",
     "semantic_hash": ""
   },
   "docs/program-qr-lifecycle.md": {
@@ -2304,9 +2304,9 @@
     "semantic_hash": ""
   },
   "src/lib/use-monitor-refresh.ts": {
-    "mtime": 1794195632.0801365,
-    "seen": 1794195679.0813506,
-    "ast_hash": "efaf3f117e2a9bf12beb309d93c0fc88",
+    "mtime": 1795052406.964316,
+    "seen": 1795052680.969034,
+    "ast_hash": "a88d3002222b514224e7ebd2903276d5",
     "semantic_hash": ""
   },
   "test/test-monitor-refresh-browser.mjs": {
@@ -2469,6 +2469,24 @@
     "mtime": 1795049856.0303617,
     "seen": 1795050215.2189043,
     "ast_hash": "0cdb57c69cb0a7556a11079a2b47369c",
+    "semantic_hash": ""
+  },
+  "src/lib/program-work-days.ts": {
+    "mtime": 1795052327.4839692,
+    "seen": 1795052680.9686284,
+    "ast_hash": "ac80ff47fabff5a1362dfd58372117da",
+    "semantic_hash": ""
+  },
+  "test/program-work-date-scenarios.mjs": {
+    "mtime": 1795052487.5000067,
+    "seen": 1795052680.9696314,
+    "ast_hash": "468fd5deab07a0bd057a891a2266c21f",
+    "semantic_hash": ""
+  },
+  "test/test-program-work-date-browser.mjs": {
+    "mtime": 1795052720.6974125,
+    "seen": 1795052750.7023017,
+    "ast_hash": "46331f6af3ab4261fa8b927bf6d39716",
     "semantic_hash": ""
   }
 }

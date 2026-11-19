@@ -103,6 +103,7 @@ export async function POST(request: Request) {
     if (!workDay) {
       return respond({ error: "No active work day found for this program" }, { status: 400 });
     }
+    if (requestedWorkDayId && targetDate && workDay.workDate !== targetDate) return respond({ error: "Work schedule changed. Refresh the attendance days and scan again. Walang na-record." }, { status: 409 });
 
     // Resolve Work Program Item / Area
     const beneBrgy = (pb.beneficiary.barangay || "").toUpperCase();

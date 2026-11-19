@@ -182,6 +182,7 @@ export async function POST(request: Request) {
           }
 
           const resolvedWorkDayId = wd.id;
+          if (attendanceDate && wd.workDate !== attendanceDate) throw new Error("CANNOT SYNC: Work schedule changed after this offline scan. The original queued date was retained; review the scan before retrying.");
           const resolvedAttendanceDate = wd.workDate || targetDate;
 
           // 3. Resolve WorkProgramItem

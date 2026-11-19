@@ -115,6 +115,8 @@ export function EditProgramModal({
 
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed to update program");
+      window.dispatchEvent(new CustomEvent("tupad-program-updated", { detail: { programId: program.id } }));
+      try { localStorage.setItem("tupad_program_schedule_updated", JSON.stringify({ programId: program.id, at: Date.now() })); } catch {}
 
       setSuccessMsg("Program details successfully updated!");
       onProgramUpdated();

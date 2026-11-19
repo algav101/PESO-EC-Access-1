@@ -263,6 +263,7 @@ export async function recordOfflineAttendance(params: {
     workDay = progDays.find((d) => d.workDate === (params.targetDate || todayStr)) || (!params.autoDetect ? progDays[0] : null) || null;
   }
   if (params.autoDetect && !workDay) throw new ScanRequestError("No work day exists for this date in the detected program. Walang na-record.");
+  if (workDay && params.targetDate && workDay.workDate !== params.targetDate) throw new ScanRequestError("Work schedule changed. Refresh the attendance days and scan again.");
 
   const attendanceDate = workDay?.workDate || todayStr;
   const dayNumber = workDay?.dayNumber || 1;

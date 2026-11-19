@@ -266,6 +266,7 @@ try {
   await assert.rejects(() => db.programBeneficiary.create({ data: { programId: otherProgram.id, beneficiaryId: "bene-321", designatedNumber: "0321" } }), e => e.code === "P2002", "database must reject duplicate active target slots including leading zero variants");
   assert.equal(await db.auditLog.count({ where: { entityType: "QR_PROGRAM_BINDING" } }), bindingsBeforeConflict);
   await (await import("./qr-auto-scenarios.mjs")).testAutomaticQrDetection({ db, load, admin, request, route });
+  await (await import("./program-work-date-scenarios.mjs")).testProgramWorkDateChanges({ db, load, admin, request, route });
   authorized = false;
   assert.equal((await batchRequest()).status, 403);
   assert.equal((await registerRoute.POST(request({ qrToken: firstCard.publicToken }), { params: { id: otherProgram.id } })).status, 403);

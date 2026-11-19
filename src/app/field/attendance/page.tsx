@@ -4,7 +4,7 @@ import { useProgramSelection, resolveProgramSelection } from "@/lib/use-program-
 
 import { ScanRequestError, readScanResponse, type DetectedQrIdentity } from "@/lib/program-qr-slot";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   Clock,
   QrCode,
@@ -28,6 +28,7 @@ import {
   ShieldCheck,
 } from "lucide-react";
 import { DetectedQrPanel } from "@/components/scanner/DetectedQrPanel";
+import { useMonitorRefresh } from "@/lib/use-monitor-refresh";
 import { ScanProgramLabel } from "@/components/scanner/ScanProgramLabel";
 import { QrScannerModal } from "@/components/scanner/QrScannerModal";
 import { FieldQrPassGeneratorModal } from "@/components/field/FieldQrPassGeneratorCard";
@@ -52,6 +53,7 @@ export default function DailyAttendancePage() {
   const [detectedIdentity, setDetectedIdentity] = useState<DetectedQrIdentity | null>(null);
   useEffect(() => { setDetectedIdentity(null); }, [selectedProgramId]);
   const [workDays, setWorkDays] = useState<any[]>([]);
+  const scheduleSignature = useRef("");
   const [selectedWorkDayId, setSelectedWorkDayId] = useState<string>("");
   const [shiftMode, setShiftMode] = useState<string>("AUTO");
 
@@ -148,27 +150,30 @@ export default function DailyAttendancePage() {
     }
   };
 
+  const applyWorkDays = (progId: string, days: any[]) => {
+    if (programRef.current !== progId) return;
+    const sorted = [...days].sort((a, b) => a.dayNumber - b.dayNumber);
+    const signature = JSON.stringify([progId, ...sorted.map((day) => [day.id, day.workDate])]);
+    const changed = signature !== scheduleSignature.current;
+    scheduleSignature.current = signature;
+    setWorkDays(sorted);
+    const today = sorted.find((day) => day.workDate === getPhilippineTime().dateStr);
+    setSelectedWorkDayId((previous) => !changed && sorted.some((day) => day.id === previous)
+      ? previous : today?.id || sorted[0]?.id || "");
+    if (changed) setSelectedAreaItemId("AUTO");
+  };
+
   useEffect(() => {
     if (selectedProgramId) {
+      const prog = programs.find((p) => p.id === selectedProgramId);
+      if (prog?.workDays?.length) applyWorkDays(selectedProgramId, prog.workDays);
+      else fetchProgramDetail(selectedProgramId);
+      fetchWorkPrograms(selectedProgramId);
+    } else {
+      scheduleSignature.current = "";
       setWorkDays([]);
       setSelectedWorkDayId("");
       setWorkPrograms([]);
-      const prog = programs.find((p) => p.id === selectedProgramId);
-      if (prog && prog.workDays && prog.workDays.length > 0) {
-        const sortedDays = [...prog.workDays].sort((a, b) => a.dayNumber - b.dayNumber);
-        setWorkDays(sortedDays);
-        const todayStr = pht.dateStr;
-        const todayWd = sortedDays.find((w: any) => w.workDate === todayStr);
-        setSelectedWorkDayId((prev) => {
-          if (prev && sortedDays.some((w: any) => w.id === prev)) {
-            return prev;
-          }
-          return todayWd ? todayWd.id : sortedDays[0].id;
-        });
-      } else {
-        fetchProgramDetail(selectedProgramId);
-      }
-      fetchWorkPrograms(selectedProgramId);
     }
   }, [selectedProgramId, programs]);
 
@@ -180,14 +185,7 @@ export default function DailyAttendancePage() {
           const data = await res.json();
           if (programRef.current !== progId) return;
           if (data.program?.workDays?.length > 0) {
-            const sortedDays = [...data.program.workDays].sort((a, b) => a.dayNumber - b.dayNumber);
-            setWorkDays(sortedDays);
-            const todayStr = pht.dateStr;
-            const todayWd = sortedDays.find((w: any) => w.workDate === todayStr);
-            setSelectedWorkDayId((prev) => {
-              if (prev && sortedDays.some((w: any) => w.id === prev)) return prev;
-              return todayWd ? todayWd.id : sortedDays[0].id;
-            });
+            applyWorkDays(progId, data.program.workDays);
             return;
           }
         }
@@ -201,21 +199,14 @@ export default function DailyAttendancePage() {
       const cachedDays = await offlineDb.cachedWorkDays.where("programId").equals(progId).toArray();
       if (programRef.current !== progId) return;
       if (cachedDays && cachedDays.length > 0) {
-        const sortedDays = cachedDays.sort((a, b) => a.dayNumber - b.dayNumber);
-        setWorkDays(sortedDays);
-        const todayStr = pht.dateStr;
-        const todayWd = sortedDays.find((w: any) => w.workDate === todayStr);
-        setSelectedWorkDayId((prev) => {
-          if (prev && sortedDays.some((w: any) => w.id === prev)) return prev;
-          return todayWd ? todayWd.id : sortedDays[0].id;
-        });
+        applyWorkDays(progId, cachedDays);
       }
     } catch (err) {
       console.warn("Offline cached work days fetch error:", err);
     }
   };
 
-  const fetchPrograms = async () => {
+  const fetchPrograms = async (background = false) => {
     try {
       if (typeof navigator === "undefined" || navigator.onLine) {
         const res = await fetch("/api/v1/programs");
@@ -224,7 +215,9 @@ export default function DailyAttendancePage() {
           const progs = data.programs || [];
           if (progs.length > 0) {
             setPrograms(progs);
-            setSelectedProgramId((prev) => resolveProgramSelection(progs, prev));
+            if (!background || (programRef.current && !progs.some((p: any) => p.id === programRef.current))) {
+              setSelectedProgramId((prev) => resolveProgramSelection(progs, prev));
+            }
             return;
           }
         }
@@ -232,6 +225,8 @@ export default function DailyAttendancePage() {
     } catch (e) {
       console.warn("Online programs fetch failed, falling back to offline storage:", e);
     }
+
+    if (background) return; // Keep the current schedule on a transient online refresh failure.
 
     // Offline fallback from IndexedDB on installed unit
     try {
@@ -293,6 +288,8 @@ export default function DailyAttendancePage() {
       console.error("Failed to load offline work programs:", err);
     }
   };
+
+  useMonitorRefresh(() => fetchPrograms(true), isOnline && !loading);
 
   const selectedWorkDay = workDays.find((w) => w.id === selectedWorkDayId) || workDays[0];
   const selectedProgram = programs.find((p) => p.id === selectedProgramId);
