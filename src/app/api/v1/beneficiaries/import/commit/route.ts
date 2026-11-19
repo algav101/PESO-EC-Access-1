@@ -55,7 +55,8 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: "Every import row needs a name, birth date and numeric designated number. Preview the file again." }, { status: 400 });
       }
       const person = `${row.fullName.trim().toUpperCase()}_${row.birthday}`;
-      const slot = String(row.designatedNumber).trim();
+      const slot = normalizeQrSlot(row.designatedNumber);
+      if (!slot) return NextResponse.json({ error: "Use a positive numeric designated number." }, { status: 400 });
       if (seenPeople.has(person) || seenSlots.has(slot)) {
         return NextResponse.json({ error: "Duplicate beneficiary or designated number in the import. Preview and correct the file first." }, { status: 400 });
       }
@@ -374,7 +375,9 @@ export async function POST(request: Request) {
         }
       }
 
-      // Step 5: Execute Program Beneficiary bulk insertions first to satisfy FK constraints
+      // Vacate replaced/moving slots before inserting their new active occupants.
+      await updateImportedEnrollments(tx, targetProgramId, pbUpdateOps);
+      // Parent enrolments must exist before inserting their QR/dependent records.
       if (progBeneficiariesToInsert.length > 0) {
         await tx.programBeneficiary.createMany({
           data: progBeneficiariesToInsert,
@@ -383,7 +386,6 @@ export async function POST(request: Request) {
 
       // Bulk updates avoid hundreds of sequential UPDATE round trips for a 500-row roster.
       await updateImportedBeneficiaries(tx, beneUpdateOps);
-      await updateImportedEnrollments(tx, targetProgramId, pbUpdateOps);
       await updateImportedQrBindings(tx, targetProgramId, qrRebindOps);
       if (qrCodesToInsert.length) await tx.qrCode.createMany({ data: qrCodesToInsert });
       if (replacementLogsToInsert.length) await tx.beneficiaryReplacement.createMany({ data: replacementLogsToInsert });

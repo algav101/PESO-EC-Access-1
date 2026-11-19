@@ -2,7 +2,7 @@
 
 import { useProgramSelection, resolveProgramSelection } from "@/lib/use-program-selection";
 
-import { ScanRequestError, readScanResponse } from "@/lib/program-qr-slot";
+import { ScanRequestError, readScanResponse, type DetectedQrIdentity } from "@/lib/program-qr-slot";
 
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
@@ -18,12 +18,13 @@ import {
   Clock,
   User,
 } from "lucide-react";
+import { DetectedQrPanel } from "@/components/scanner/DetectedQrPanel";
 import { ScanProgramLabel } from "@/components/scanner/ScanProgramLabel";
 import { QrScannerModal } from "@/components/scanner/QrScannerModal";
 import { FieldQrPassGeneratorModal } from "@/components/field/FieldQrPassGeneratorCard";
 import { useAuth } from "@/context/AuthContext";
 import { useOffline } from "@/context/OfflineContext";
-import { offlineDb, queueOfflineTransaction, findBeneficiaryOffline, extractCleanQrToken } from "@/lib/dexie";
+import { offlineDb, queueOfflineTransaction, findBeneficiaryOffline, getOfflineQrIdentity, extractCleanQrToken } from "@/lib/dexie";
 import { format } from "date-fns";
 
 export default function PayoutScannerPage() {
@@ -31,6 +32,8 @@ export default function PayoutScannerPage() {
   const { isOnline } = useOffline();
   const [programs, setPrograms] = useState<any[]>([]);
   const [selectedProgramId, setSelectedProgramId, programRef] = useProgramSelection();
+  const [detectedIdentity, setDetectedIdentity] = useState<DetectedQrIdentity | null>(null);
+  useEffect(() => { setDetectedIdentity(null); }, [selectedProgramId]);
 
   const [scannerOpen, setScannerOpen] = useState(false);
   const [qrGeneratorOpen, setQrGeneratorOpen] = useState(false);
@@ -62,26 +65,28 @@ export default function PayoutScannerPage() {
   }, [selectedProgramId]);
 
   const handleScan = async (token: string) => {
+    setScannedBeneficiary(null);
     setScannerOpen(false);
     setLoading(true);
     setError(null);
+    setDetectedIdentity(null);
     setPayoutResult(null);
 
     try {
-      if (!selectedProgramId) throw new ScanRequestError("Pumili muna ng TUPAD program.");
       if (isOnline) {
         try {
           // Look up beneficiary details and validate sequence + anti-double payout checks
           const res = await fetch("/api/v1/payout/scan", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ qrToken: token, programId: selectedProgramId, isLookupOnly: true }),
+            body: JSON.stringify({ qrToken: token, programId: selectedProgramId, autoDetect: true, isLookupOnly: true }),
           });
 
           if (programRef.current !== selectedProgramId) return;
           const data = await readScanResponse(res, "Scan rejected for the selected program.");
 
           if (programRef.current !== selectedProgramId) return;
+          setDetectedIdentity(data.detected || null);
           setScannedBeneficiary({
             ...data.data,
             qrToken: token,
@@ -105,9 +110,12 @@ export default function PayoutScannerPage() {
       if (programRef.current !== selectedProgramId) return;
 
       // Offline lookup with universal token resolution
-      const bene = await findBeneficiaryOffline(token, selectedProgramId);
+      const bene = await findBeneficiaryOffline(token, selectedProgramId, { autoDetect: true });
       if (programRef.current !== selectedProgramId) return;
       if (!bene) throw new Error(`QR Token or Beneficiary "${token}" not found in offline database cache.`);
+      setDetectedIdentity(await getOfflineQrIdentity(bene, token));
+
+      if (bene.originalBeneficiary !== false && (!bene.stubDistributed || bene.orientationStatus !== "PRESENT")) throw new ScanRequestError("SEQUENCE BLOCKED: Complete stub distribution and orientation in the detected program first.");
       if (bene.payoutStatus === "PAID") throw new Error("ALREADY PAID: Payout was already recorded in this program.");
 
       setScannedBeneficiary({
@@ -120,7 +128,10 @@ export default function PayoutScannerPage() {
         programId: bene.programId,
       });
     } catch (err: any) {
-      if (programRef.current === selectedProgramId) setError(err.message);
+      if (programRef.current === selectedProgramId) {
+        if (err.detected) setDetectedIdentity(err.detected);
+        setError(err.message);
+      }
     } finally {
       if (programRef.current === selectedProgramId) setLoading(false);
     }
@@ -140,7 +151,9 @@ export default function PayoutScannerPage() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             qrToken: scannedBeneficiary.qrToken,
-            programId: selectedProgramId,
+            programId: scannedBeneficiary.programId,
+            programBeneficiaryId: scannedBeneficiary.programBeneficiaryId,
+            autoDetect: false,
             status: payoutStatus,
             remarks,
             payoutDate: format(new Date(), "yyyy-MM-dd"),
@@ -243,10 +256,10 @@ export default function PayoutScannerPage() {
       <div className="gov-card p-4 space-y-2">
         <label htmlFor="payout-program" className="block text-xs font-bold">TUPAD Program</label>
         <select id="payout-program" className="gov-input w-full" value={selectedProgramId} disabled={loading} onChange={(e) => setSelectedProgramId(e.target.value)}>
-          <option value="">Pumili ng program</option>
+          <option value="">Auto-detect QR program</option>
           {programs.map((p) => <option key={p.id} value={p.id}>{p.programCode} — {p.programName}</option>)}
         </select>
-        <p className="text-xs text-slate-500">Reusable ang printed QR ayon sa slot. Sa napiling program lamang ise-save ang payout.</p>
+        <p className="text-xs text-slate-500">Automatic ang work program detection mula sa registered QR. Sa detected program lamang ise-save ang payout.</p>
       </div>
       {!scannedBeneficiary && !payoutResult && (
         <div className="gov-card p-8 text-center space-y-6 shadow-xl border-t-4 border-t-emerald-600">
@@ -271,6 +284,8 @@ export default function PayoutScannerPage() {
         </div>
       )}
 
+      <p className="text-xs text-slate-500">Automatic QR detection: hindi kailangang pumili muna ng work program. Ang scan ay para lamang sa registered program ng QR.</p>
+      <DetectedQrPanel identity={detectedIdentity} displayedProgramId={selectedProgramId} />
       {error && (
         <div className="p-4 bg-red-50 border border-red-200 rounded-xl flex items-start space-x-3 text-xs text-red-700 shadow">
           <AlertCircle className="w-5 h-5 flex-shrink-0 mt-0.5 text-red-600" />
@@ -289,7 +304,7 @@ export default function PayoutScannerPage() {
               Designated #{scannedBeneficiary.designatedNumber} • {scannedBeneficiary.tableNumber || "Table 1"}
             </span>
             <h2 className="text-lg font-black text-slate-900">{scannedBeneficiary.fullName}</h2>
-            <ScanProgramLabel program={programs.find((p) => p.id === (scannedBeneficiary.programId || selectedProgramId))} />
+            <ScanProgramLabel program={programs.find((p) => p.id === (scannedBeneficiary.programId || selectedProgramId)) || detectedIdentity || undefined} />
             <p className="text-xs text-slate-500">Barangay {scannedBeneficiary.barangay}, Dingalan</p>
           </div>
 
@@ -385,7 +400,7 @@ export default function PayoutScannerPage() {
             <h2 className="text-base font-black text-slate-900">
               {payoutResult.data.fullName} (#{payoutResult.data.designatedNumber})
             </h2>
-            <ScanProgramLabel program={programs.find((p) => p.id === (payoutResult.data.programId || selectedProgramId))} />
+            <ScanProgramLabel program={programs.find((p) => p.id === (payoutResult.data.programId || selectedProgramId)) || detectedIdentity || undefined} />
             <p className="text-xs text-slate-500">{payoutResult.message}</p>
           </div>
 

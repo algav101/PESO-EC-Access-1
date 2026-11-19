@@ -83,7 +83,16 @@ export async function updateImportedBeneficiaries(tx: Prisma.TransactionClient, 
 
 export async function updateImportedEnrollments(tx: Prisma.TransactionClient, programId: string, updates: ProgramImportUpdate[]) {
   if (!updates.length) return;
-  const data = [...new Map(updates.map((row) => [row.id, row])).values()];
+  const unique = [...new Map(updates.map((row) => [row.id, row])).values()];
+  const current = await tx.programBeneficiary.findMany({ where: { programId, id: { in: unique.map((row) => row.id) } }, select: { id: true, designatedNumber: true } });
+  const original = new Map(current.map((row) => [row.id, row.designatedNumber]));
+  const data = unique.map((row) => ({ ...row, designatedNumber: row.designatedNumber ?? original.get(row.id) }));
+  // Vacate all affected slots inside the import transaction so swaps and approved
+  // replacements satisfy the active-slot unique index in either update order.
+  await tx.$executeRaw`
+    UPDATE "ProgramBeneficiary" SET "designatedNumber" = '__IMPORT__' || id
+    WHERE "programId" = ${programId} AND id IN (SELECT value FROM jsonb_array_elements_text(${JSON.stringify(data.map((row) => row.id))}::jsonb))
+  `;
   const count = await tx.$executeRaw`
     UPDATE "ProgramBeneficiary" AS p SET
       "designatedNumber" = COALESCE(v."designatedNumber", p."designatedNumber"),

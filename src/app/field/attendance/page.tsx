@@ -2,7 +2,7 @@
 
 import { useProgramSelection, resolveProgramSelection } from "@/lib/use-program-selection";
 
-import { ScanRequestError, readScanResponse } from "@/lib/program-qr-slot";
+import { ScanRequestError, readScanResponse, type DetectedQrIdentity } from "@/lib/program-qr-slot";
 
 import React, { useEffect, useState } from "react";
 import {
@@ -27,13 +27,14 @@ import {
   Check,
   ShieldCheck,
 } from "lucide-react";
+import { DetectedQrPanel } from "@/components/scanner/DetectedQrPanel";
 import { ScanProgramLabel } from "@/components/scanner/ScanProgramLabel";
 import { QrScannerModal } from "@/components/scanner/QrScannerModal";
 import { FieldQrPassGeneratorModal } from "@/components/field/FieldQrPassGeneratorCard";
 import { useOffline } from "@/context/OfflineContext";
 import { useAuth } from "@/context/AuthContext";
 import { isAdminUser } from "@/lib/permissions";
-import { offlineDb, queueOfflineTransaction, recordOfflineAttendance } from "@/lib/dexie";
+import { offlineDb, queueOfflineTransaction, recordOfflineAttendance, findBeneficiaryOffline, getOfflineQrIdentity } from "@/lib/dexie";
 import { format } from "date-fns";
 import {
   getPhilippineTime,
@@ -48,6 +49,8 @@ export default function DailyAttendancePage() {
 
   const [programs, setPrograms] = useState<any[]>([]);
   const [selectedProgramId, setSelectedProgramId, programRef] = useProgramSelection();
+  const [detectedIdentity, setDetectedIdentity] = useState<DetectedQrIdentity | null>(null);
+  useEffect(() => { setDetectedIdentity(null); }, [selectedProgramId]);
   const [workDays, setWorkDays] = useState<any[]>([]);
   const [selectedWorkDayId, setSelectedWorkDayId] = useState<string>("");
   const [shiftMode, setShiftMode] = useState<string>("AUTO");
@@ -315,10 +318,10 @@ export default function DailyAttendancePage() {
     setScannerOpen(false);
     setLoading(true);
     setError(null);
+    setDetectedIdentity(null);
     setScanResult(null);
 
     try {
-      if (!selectedProgramId) throw new ScanRequestError("Pumili muna ng TUPAD program.");
       if (isOnline) {
         try {
           const res = await fetch("/api/v1/attendance/scan", {
@@ -326,7 +329,7 @@ export default function DailyAttendancePage() {
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
               qrToken: token,
-              programId: selectedProgramId,
+              programId: selectedProgramId, autoDetect: true,
               workDayId: selectedWorkDayId,
               targetDate: selectedWorkDay?.workDate,
               shiftMode,
@@ -340,6 +343,7 @@ export default function DailyAttendancePage() {
           const data = await readScanResponse(res, "Scan rejected for the selected program.");
 
           if (programRef.current !== selectedProgramId) return;
+          setDetectedIdentity(data.detected || null);
           setScanResult({
             isDuplicate: data.isDuplicate,
             slotRecorded: data.slotRecorded,
@@ -366,12 +370,18 @@ export default function DailyAttendancePage() {
 
       if (programRef.current !== selectedProgramId) return;
 
+      const bene = await findBeneficiaryOffline(token, selectedProgramId, { autoDetect: true });
+      if (programRef.current !== selectedProgramId) return;
+      if (!bene) throw new ScanRequestError("QR not found in the device masterlist. Run Master Key Sync.");
+      setDetectedIdentity(await getOfflineQrIdentity(bene, token));
+
       // Offline Attendance Engine (Stored to Installed Unit)
       const offlineResult = await recordOfflineAttendance({
         rawToken: token,
-        programId: selectedProgramId,
+        programId: selectedProgramId, autoDetect: true,
         workDayId: selectedWorkDayId,
         shiftMode,
+        targetDate: selectedWorkDay?.workDate,
         workProgramItemId: selectedAreaItemId !== "AUTO" ? selectedAreaItemId : undefined,
         deviceId: localStorage.getItem("tupad_device_id") || "MOBILE_SCANNER",
         bypass3HourRule: true,
@@ -380,7 +390,10 @@ export default function DailyAttendancePage() {
       if (programRef.current !== selectedProgramId) return;
       setScanResult(offlineResult);
     } catch (err: any) {
-      if (programRef.current === selectedProgramId) setError(err.message);
+      if (programRef.current === selectedProgramId) {
+        if (err.detected) setDetectedIdentity(err.detected);
+        setError(err.message);
+      }
     } finally {
       if (programRef.current === selectedProgramId) setLoading(false);
     }
@@ -486,7 +499,8 @@ export default function DailyAttendancePage() {
             onChange={(e) => setSelectedProgramId(e.target.value)}
             className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg bg-slate-50 font-bold text-slate-900 focus:outline-none focus:border-gov-blue"
           >
-            {programs.map((p) => (
+            <option value="">Auto-detect QR program</option>
+              {programs.map((p) => (
               <option key={p.id} value={p.id}>
                 {p.programCode} - {p.programName}
               </option>
@@ -771,6 +785,8 @@ export default function DailyAttendancePage() {
       )}
 
       {/* Error Alert Display */}
+      <p className="text-xs text-slate-500">Automatic QR detection: hindi kailangang pumili muna ng work program. Ang scan ay para lamang sa registered program ng QR.</p>
+      <DetectedQrPanel identity={detectedIdentity} displayedProgramId={selectedProgramId} />
       {error && (
         <div className="p-4 bg-red-50 border border-red-200 rounded-xl flex items-start space-x-3 text-xs text-red-700 shadow">
           <AlertCircle className="w-5 h-5 flex-shrink-0 mt-0.5 text-red-600" />
@@ -841,7 +857,7 @@ export default function DailyAttendancePage() {
             <h2 className="text-base font-black text-slate-900">
               {scanResult.data.fullName}
             </h2>
-                <ScanProgramLabel program={programs.find((p) => p.id === (scanResult.data.programId || selectedProgramId))} />
+                <ScanProgramLabel program={programs.find((p) => p.id === (scanResult.data.programId || selectedProgramId)) || detectedIdentity || undefined} />
             <div className="flex items-center justify-center space-x-2 text-xs font-mono font-bold text-gov-blue">
               <span>Designated #{scanResult.data.designatedNumber}</span>
               <span>•</span>

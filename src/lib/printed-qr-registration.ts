@@ -133,10 +133,10 @@ export async function registerPrintedQr(tx: Prisma.TransactionClient, input: { r
       throw new PrintedQrRegistrationError(`CANNOT REGISTER: This QR is assigned to ${source?.programCode || "another program"}, which is still open. Its current program must be closed before reissuing the card.`, 409);
     }
   }
-  const matches = await tx.programBeneficiary.findMany({
-    where: { programId: target.id, designatedNumber: previous.designatedNumber, participationStatus: { in: ["ACTIVE", "ENROLLED", "FLAGGED_FOR_REPLACEMENT"] } },
-    select: { id: true, designatedNumber: true, beneficiary: { select: { fullName: true } } }, take: 2,
-  });
+  const matches = (await tx.programBeneficiary.findMany({
+    where: { programId: target.id, participationStatus: { in: ["ACTIVE", "ENROLLED", "FLAGGED_FOR_REPLACEMENT"] } },
+    select: { id: true, designatedNumber: true, beneficiary: { select: { fullName: true } } },
+  })).filter((pb) => normalizeQrSlot(pb.designatedNumber) === previous.designatedNumber).slice(0, 2);
   if (matches.length !== 1) throw new PrintedQrRegistrationError("The selected masterlist must have exactly one active beneficiary for this printed number.", 409);
   const alreadyRegistered = previous.programId === target.id;
   if (!alreadyRegistered) await tx.auditLog.create({ data: {

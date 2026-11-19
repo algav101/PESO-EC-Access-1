@@ -4,7 +4,7 @@ import { useProgramSelection, resolveProgramSelection } from "@/lib/use-program-
 
 import { getCachedMonitoring, includeLocalPending } from "@/lib/offline-monitoring";
 import { useMonitorRefresh } from "@/lib/use-monitor-refresh";
-import { ScanRequestError, readScanResponse } from "@/lib/program-qr-slot";
+import { ScanRequestError, readScanResponse, type DetectedQrIdentity } from "@/lib/program-qr-slot";
 
 import React, { useState, useEffect, useRef } from "react";
 import { useSearchParams } from "next/navigation";
@@ -32,6 +32,7 @@ import {
   Clock,
   ArrowRight,
 } from "lucide-react";
+import { DetectedQrPanel } from "@/components/scanner/DetectedQrPanel";
 import { ScanProgramLabel } from "@/components/scanner/ScanProgramLabel";
 import { QrScannerModal } from "@/components/scanner/QrScannerModal";
 import { FieldQrPassGeneratorModal } from "@/components/field/FieldQrPassGeneratorCard";
@@ -48,6 +49,7 @@ import { useOffline } from "@/context/OfflineContext";
 import {
   offlineDb,
   queueOfflineTransaction,
+  getOfflineQrIdentity,
   findBeneficiaryOffline,
   extractCleanQrToken,
 } from "@/lib/dexie";
@@ -79,6 +81,8 @@ function StubDistributionContent() {
   );
   const [programs, setPrograms] = useState<any[]>([]);
   const [selectedProgramId, setSelectedProgramId, programRef] = useProgramSelection();
+  const [detectedIdentity, setDetectedIdentity] = useState<DetectedQrIdentity | null>(null);
+  useEffect(() => { setDetectedIdentity(null); }, [selectedProgramId]);
   const monitoringRequest = useRef(0);
 
   // Scanner States
@@ -200,14 +204,15 @@ function StubDistributionContent() {
   }, [selectedProgramId]);
 
   const handleScan = async (token: string) => {
+    setScannedData(null);
+    setBirthdayPin("");
     setScannerOpen(false);
     setLoading(true);
     setError(null);
+    setDetectedIdentity(null);
     setSuccessResult(null);
 
     try {
-      if (!selectedProgramId)
-        throw new ScanRequestError("Pumili muna ng TUPAD program.");
       if (isOnline) {
         try {
           const res = await fetch("/api/v1/stub-distribution/scan", {
@@ -215,7 +220,7 @@ function StubDistributionContent() {
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
               qrToken: token,
-              programId: selectedProgramId,
+              programId: selectedProgramId, autoDetect: true,
             }),
           });
 
@@ -226,7 +231,8 @@ function StubDistributionContent() {
           );
 
           if (programRef.current !== selectedProgramId) return;
-          setScannedData(data.data);
+          setDetectedIdentity(data.detected || null);
+          setScannedData({ ...data.data, qrToken: token });
           return;
         } catch (onlineErr: any) {
           if (programRef.current !== selectedProgramId) return;
@@ -241,12 +247,14 @@ function StubDistributionContent() {
       if (programRef.current !== selectedProgramId) return;
 
       // Offline mode check with universal token resolution
-      const bene = await findBeneficiaryOffline(token, selectedProgramId);
+      const bene = await findBeneficiaryOffline(token, selectedProgramId, { autoDetect: true });
       if (programRef.current !== selectedProgramId) return;
       if (!bene)
         throw new Error(
           `QR Stub or Beneficiary "${token}" not found in offline database cache.`
         );
+
+      setDetectedIdentity(await getOfflineQrIdentity(bene, token));
 
       if (bene.stubDistributed) {
         throw new Error(
@@ -269,7 +277,10 @@ function StubDistributionContent() {
         offlineExpectedPin: bene.birthdayPin,
       });
     } catch (err: any) {
-      if (programRef.current === selectedProgramId) setError(err.message);
+      if (programRef.current === selectedProgramId) {
+        if (err.detected) setDetectedIdentity(err.detected);
+        setError(err.message);
+      }
     } finally {
       if (programRef.current === selectedProgramId) setLoading(false);
     }
@@ -301,7 +312,8 @@ function StubDistributionContent() {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            programId: selectedProgramId,
+            programId: scannedData.programId,
+            qrToken: scannedData.qrToken,
             qrId: scannedData.qrId,
             programBeneficiaryId: scannedData.programBeneficiaryId,
             birthdayPin: birthdayPin.trim(),
@@ -329,7 +341,7 @@ function StubDistributionContent() {
 
         await queueOfflineTransaction("STUB_DISTRIBUTION", "CREATE", {
           qrToken: scannedData.qrToken,
-          programId: selectedProgramId,
+          programId: scannedData.programId,
           qrId: scannedData.qrId,
           programBeneficiaryId: scannedData.programBeneficiaryId,
           birthdayPin: cleanedEntered,
@@ -521,7 +533,7 @@ function StubDistributionContent() {
             onChange={(e) => setSelectedProgramId(e.target.value)}
             className="gov-input max-w-xs text-xs"
           >
-            <option value="">Pumili ng program</option>
+            <option value="">Auto-detect QR program</option>
             {programs.map((p) => (
               <option key={p.id} value={p.id}>
                 {p.programCode} — {p.programName}
@@ -597,6 +609,8 @@ function StubDistributionContent() {
             </div>
           )}
 
+          <p className="text-xs text-slate-500">Automatic QR detection: hindi kailangang pumili muna ng work program. Ang scan ay para lamang sa registered program ng QR.</p>
+          <DetectedQrPanel identity={detectedIdentity} displayedProgramId={selectedProgramId} />
           {error && (
             <div className="p-4 bg-red-50 border border-red-200 rounded-xl flex items-start space-x-3 text-xs text-red-700 shadow">
               <AlertCircle className="w-5 h-5 flex-shrink-0 mt-0.5 text-red-600" />
@@ -621,7 +635,7 @@ function StubDistributionContent() {
                 <h2 className="text-lg font-black text-slate-900">
                   {scannedData.fullName}
                 </h2>
-                <ScanProgramLabel program={programs.find((p) => p.id === (scannedData.programId || selectedProgramId))} />
+                <ScanProgramLabel program={programs.find((p) => p.id === (scannedData.programId || selectedProgramId)) || detectedIdentity || undefined} />
                 <p className="text-xs text-slate-500">
                   Barangay {scannedData.barangay}, Municipality of Dingalan
                 </p>
@@ -780,7 +794,7 @@ function StubDistributionContent() {
                   {successResult.data?.fullName} (#
                   {successResult.data?.designatedNumber})
                 </h2>
-                <ScanProgramLabel program={programs.find((p) => p.id === (successResult.data?.programId || selectedProgramId))} />
+                <ScanProgramLabel program={programs.find((p) => p.id === (successResult.data?.programId || selectedProgramId)) || detectedIdentity || undefined} />
                 {successResult.data?.candidateFullName && (
                   <p className="text-[11px] font-bold text-amber-800 bg-amber-50 px-2.5 py-1 rounded-lg border border-amber-200 inline-block">
                     Candidate: {successResult.data.candidateFullName} •

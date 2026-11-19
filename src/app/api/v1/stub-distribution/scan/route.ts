@@ -1,18 +1,22 @@
+import type { DetectedQrIdentity } from "@/lib/program-qr-slot";
 import { resolveProgramScan, ProgramScanError } from "@/lib/program-scan-resolver";
 export const dynamic = "force-dynamic";
 
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getCurrentUser, hasPermission } from "@/lib/auth";
+import { logAudit } from "@/lib/audit";
 import { generateBeneficiaryToken } from "@/lib/qr";
 import { normalizeBarangayName } from "@/lib/utils";
 
 export async function POST(request: Request) {
+  let detected: DetectedQrIdentity | undefined;
+  const respond = (body: any, init?: ResponseInit) => NextResponse.json({ ...body, detected, ...(body.data && detected ? { data: { ...detected, ...body.data } } : {}) }, init);
   try {
     const user = await getCurrentUser();
-    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    if (!user) return respond({ error: "Unauthorized" }, { status: 401 });
     if (!hasPermission(user.role, "stub.distribution.scan") && !hasPermission(user.role, "stub.distribution.distribute")) {
-      return NextResponse.json({ error: "Forbidden: insufficient permissions for stub distribution" }, { status: 403 });
+      return respond({ error: "Forbidden: insufficient permissions for stub distribution" }, { status: 403 });
     }
 
     const body = await request.json();
@@ -20,13 +24,14 @@ export async function POST(request: Request) {
     const programIdParam = body.programId;
 
     if (!rawQrToken) {
-      return NextResponse.json({ error: "QR Token or Beneficiary number is required" }, { status: 400 });
+      return respond({ error: "QR Token or Beneficiary number is required" }, { status: 400 });
     }
 
     const resolved = await resolveProgramScan(rawQrToken, programIdParam, {
       beneficiary: true, program: true, qrCodes: true,
       stubDistributions: { include: { distributedBy: { select: { fullName: true } } }, orderBy: { distributedAt: "desc" } },
-    });
+    }, { autoDetect: body.autoDetect !== false, requireActive: true });
+    detected = resolved.detected;
     const pb = resolved.pb;
     let qr = resolved.qr;
 
@@ -57,7 +62,7 @@ export async function POST(request: Request) {
         : "a previous session";
       const officer = existingDistribution.distributedBy?.fullName || "Assigned Coordinator";
 
-      return NextResponse.json(
+      return respond(
         {
           error: `ALREADY DISTRIBUTED & AFFIRMED: Stub #${pb.designatedNumber} (${pb.beneficiary.fullName}) was already verified and distributed on ${distTime} by ${officer}. Double scanning is not allowed.`,
           alreadyDistributed: true,
@@ -87,7 +92,8 @@ export async function POST(request: Request) {
       pb.participationStatus === "FLAGGED_FOR_REPLACEMENT" || Boolean(flaggedDistribution);
     const flagRemarks = flaggedDistribution?.remarks || (isFlagged ? "Flagged for onsite replacement" : null);
 
-    return NextResponse.json({
+    await logAudit({ userId: user.id, action: "STUB_QR_IDENTIFIED", entityType: "PROGRAM_BENEFICIARY", entityId: pb.id, metadata: { ...detected, scanResult: "IDENTIFIED" } });
+    return respond({
       success: true,
       data: {
         qrId: qr.id,
@@ -107,8 +113,8 @@ export async function POST(request: Request) {
       },
     });
   } catch (error: any) {
-    if (error instanceof ProgramScanError) return NextResponse.json({ error: error.message }, { status: error.status });
+    if (error instanceof ProgramScanError) return respond({ error: error.message }, { status: error.status });
     console.error("Stub scan error:", error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return respond({ error: error.message }, { status: 500 });
   }
 }

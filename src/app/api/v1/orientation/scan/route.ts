@@ -1,3 +1,4 @@
+import type { DetectedQrIdentity } from "@/lib/program-qr-slot";
 import { resolveProgramScan, ProgramScanError } from "@/lib/program-scan-resolver";
 export const dynamic = "force-dynamic";
 
@@ -8,11 +9,13 @@ import { logAudit } from "@/lib/audit";
 import { normalizeBarangayName } from "@/lib/utils";
 
 export async function POST(request: Request) {
+  let detected: DetectedQrIdentity | undefined;
+  const respond = (body: any, init?: ResponseInit) => NextResponse.json({ ...body, detected, ...(body.data && detected ? { data: { ...detected, ...body.data } } : {}) }, init);
   try {
     const user = await getCurrentUser();
-    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    if (!user) return respond({ error: "Unauthorized" }, { status: 401 });
     if (!hasPermission(user.role, "orientation.scan")) {
-      return NextResponse.json({ error: "Forbidden: insufficient permissions for orientation scanning" }, { status: 403 });
+      return respond({ error: "Forbidden: insufficient permissions for orientation scanning" }, { status: 403 });
     }
 
     const body = await request.json();
@@ -21,21 +24,23 @@ export async function POST(request: Request) {
     const programIdParam = body.programId;
 
     if (!rawQrToken) {
-      return NextResponse.json({ error: "QR Token or Beneficiary number is required" }, { status: 400 });
+      return respond({ error: "QR Token or Beneficiary number is required" }, { status: 400 });
     }
 
-    const { pb, qr } = await resolveProgramScan(rawQrToken, programIdParam, {
+    const resolved = await resolveProgramScan(rawQrToken, programIdParam, {
       beneficiary: true, program: true, qrCodes: true,
-      orientationAttendance: { where: { programId: programIdParam }, include: { scannedBy: { select: { fullName: true } } }, orderBy: { scannedAt: "desc" } },
+      orientationAttendance: { include: { scannedBy: { select: { fullName: true } } }, orderBy: { scannedAt: "desc" } },
       stubDistributions: { where: { status: "DISTRIBUTED" } },
-    });
+    }, { autoDetect: body.autoDetect !== false, requireActive: true });
+    const { pb, qr } = resolved;
+    detected = resolved.detected;
 
     // =========================================================================
     // STEP SEQUENCE VALIDATION: Step 1 (Stub Distribution) must be completed!
     // =========================================================================
     const hasCompletedStubDistribution = (pb.stubDistributions && pb.stubDistributions.length > 0) || !pb.originalBeneficiary;
     if (!hasCompletedStubDistribution) {
-      return NextResponse.json(
+      return respond(
         {
           error: `SEQUENCE BLOCKED: Stub for #${pb.designatedNumber} (${pb.beneficiary.fullName}) has NOT yet been distributed/affirmed in Step 1 (Stub Distribution). Please complete Step 1 first before Orientation.`,
           stepBlocked: "STUB_DISTRIBUTION_REQUIRED",
@@ -57,7 +62,7 @@ export async function POST(request: Request) {
       const scanTime = existing.scannedAt ? new Date(existing.scannedAt).toLocaleString() : "a previous session";
       const officer = existing.scannedBy?.fullName || "Assigned Officer";
 
-      return NextResponse.json(
+      return respond(
         {
           error: `ALREADY SCANNED: Orientation Attendance for #${pb.designatedNumber} (${pb.beneficiary.fullName}) was already recorded as ${existing.status} on ${scanTime} by ${officer}. Double scanning is not allowed.`,
           alreadyScanned: true,
@@ -90,10 +95,10 @@ export async function POST(request: Request) {
       action: "ORIENTATION_SCANNED",
       entityType: "PROGRAM_BENEFICIARY",
       entityId: pb.id,
-      metadata: { designatedNumber: pb.designatedNumber, status: "PRESENT" },
+      metadata: { ...detected, scanResult: "RECORDED", designatedNumber: pb.designatedNumber, status: "PRESENT" },
     });
 
-    return NextResponse.json({
+    return respond({
       success: true,
       message: "✓ Orientation Attendance successfully recorded!",
       data: {
@@ -106,8 +111,8 @@ export async function POST(request: Request) {
       },
     });
   } catch (error: any) {
-    if (error instanceof ProgramScanError) return NextResponse.json({ error: error.message }, { status: error.status });
+    if (error instanceof ProgramScanError) return respond({ error: error.message }, { status: error.status });
     console.error("Orientation scan error:", error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return respond({ error: error.message }, { status: 500 });
   }
 }

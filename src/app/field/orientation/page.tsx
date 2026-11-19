@@ -4,7 +4,7 @@ import { useProgramSelection, resolveProgramSelection } from "@/lib/use-program-
 
 import { getCachedMonitoring, includeLocalPending } from "@/lib/offline-monitoring";
 import { useMonitorRefresh } from "@/lib/use-monitor-refresh";
-import { ScanRequestError, readScanResponse } from "@/lib/program-qr-slot";
+import { ScanRequestError, readScanResponse, type DetectedQrIdentity } from "@/lib/program-qr-slot";
 
 import React, { useState, useEffect, useRef } from "react";
 import { useSearchParams } from "next/navigation";
@@ -35,12 +35,13 @@ import {
   Calendar,
   XCircle,
 } from "lucide-react";
+import { DetectedQrPanel } from "@/components/scanner/DetectedQrPanel";
 import { ScanProgramLabel } from "@/components/scanner/ScanProgramLabel";
 import { QrScannerModal } from "@/components/scanner/QrScannerModal";
 import { FieldQrPassGeneratorModal } from "@/components/field/FieldQrPassGeneratorCard";
 import { useAuth } from "@/context/AuthContext";
 import { useOffline } from "@/context/OfflineContext";
-import { offlineDb, queueOfflineTransaction, findBeneficiaryOffline, extractCleanQrToken } from "@/lib/dexie";
+import { offlineDb, queueOfflineTransaction, findBeneficiaryOffline, getOfflineQrIdentity, extractCleanQrToken } from "@/lib/dexie";
 import { formatDate, normalizeBarangayName } from "@/lib/utils";
 
 export default function OrientationPage() {
@@ -60,6 +61,8 @@ function OrientationContent() {
   const [activeTab, setActiveTab] = useState<"scanner" | "monitoring">(initialTab);
   const [programs, setPrograms] = useState<any[]>([]);
   const [selectedProgramId, setSelectedProgramId, programRef] = useProgramSelection();
+  const [detectedIdentity, setDetectedIdentity] = useState<DetectedQrIdentity | null>(null);
+  useEffect(() => { setDetectedIdentity(null); }, [selectedProgramId]);
   const monitoringRequest = useRef(0);
 
   // Scanner States
@@ -165,10 +168,10 @@ function OrientationContent() {
     setScannerOpen(false);
     setLoading(true);
     setError(null);
+    setDetectedIdentity(null);
     setScanResult(null);
 
     try {
-      if (!selectedProgramId) throw new ScanRequestError("Pumili muna ng TUPAD program.");
       if (isOnline) {
         try {
           const res = await fetch("/api/v1/orientation/scan", {
@@ -176,7 +179,7 @@ function OrientationContent() {
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
               qrToken: tokenOrSlot,
-              programId: selectedProgramId,
+              programId: selectedProgramId, autoDetect: true,
               deviceId: localStorage.getItem("tupad_device_id") || "MOBILE_BROWSER",
             }),
           });
@@ -185,6 +188,7 @@ function OrientationContent() {
           const data = await readScanResponse(res, "Scan rejected for the selected program.");
 
           if (programRef.current !== selectedProgramId) return;
+          setDetectedIdentity(data.detected || null);
           setScanResult({
             alreadyRecorded: data.alreadyScanned,
             message: data.message,
@@ -215,10 +219,13 @@ function OrientationContent() {
       if (programRef.current !== selectedProgramId) return;
 
       // Offline mode check with universal token resolution
-      const bene = await findBeneficiaryOffline(tokenOrSlot, selectedProgramId);
+      const bene = await findBeneficiaryOffline(tokenOrSlot, selectedProgramId, { autoDetect: true });
       if (programRef.current !== selectedProgramId) return;
       if (!bene) throw new Error(`Beneficiary or QR Token "${tokenOrSlot}" not found in offline database.`);
 
+      setDetectedIdentity(await getOfflineQrIdentity(bene, tokenOrSlot));
+
+      if (bene.originalBeneficiary !== false && !bene.stubDistributed) throw new ScanRequestError("SEQUENCE BLOCKED: Complete stub distribution in the detected program first.");
       if (bene.orientationStatus === "PRESENT") throw new Error("ALREADY SCANNED: Orientation was already recorded in this program.");
 
       // Update orientation status in local cache
@@ -236,6 +243,7 @@ function OrientationContent() {
         alreadyRecorded: false,
         message: "✓ Orientation Attendance Stored to Installed Unit (Queued for Sync)",
         data: {
+          programId: bene.programId, programBeneficiaryId: bene.id,
           designatedNumber: bene.designatedNumber,
           fullName: bene.fullName,
           barangay: normalizeBarangayName(bene.barangay),
@@ -250,7 +258,10 @@ function OrientationContent() {
         fetchMonitoringData(selectedProgramId, true);
       }
     } catch (err: any) {
-      if (programRef.current === selectedProgramId) setError(err.message);
+      if (programRef.current === selectedProgramId) {
+        if (err.detected) setDetectedIdentity(err.detected);
+        setError(err.message);
+      }
     } finally {
       if (programRef.current === selectedProgramId) setLoading(false);
     }
@@ -413,7 +424,8 @@ function OrientationContent() {
             onChange={(e) => setSelectedProgramId(e.target.value)}
             className="text-xs font-bold bg-white border border-slate-300 rounded-xl px-3 py-2 text-slate-800 shadow-xs focus:ring-2 focus:ring-gov-blue focus:border-gov-blue"
           >
-            {programs.map((p) => (
+            <option value="">Auto-detect QR program</option>
+              {programs.map((p) => (
               <option key={p.id} value={p.id}>
                 {p.programCode} - {p.programName}
               </option>
@@ -508,6 +520,8 @@ function OrientationContent() {
           </div>
 
           {/* Scanning Alert Notice */}
+          <p className="text-xs text-slate-500">Automatic QR detection: hindi kailangang pumili muna ng work program. Ang scan ay para lamang sa registered program ng QR.</p>
+          <DetectedQrPanel identity={detectedIdentity} displayedProgramId={selectedProgramId} />
           {error && (
             <div className="p-4 bg-red-50 border border-red-200 rounded-2xl flex items-start space-x-3 text-xs text-red-700 shadow-sm animate-fade-in">
               <AlertCircle className="w-5 h-5 flex-shrink-0 mt-0.5 text-red-600" />
@@ -555,7 +569,7 @@ function OrientationContent() {
                 <h2 className="text-lg font-black text-slate-900">
                   {scanResult.data.fullName}
                 </h2>
-                <ScanProgramLabel program={programs.find((p) => p.id === (scanResult.data.programId || selectedProgramId))} />
+                <ScanProgramLabel program={programs.find((p) => p.id === (scanResult.data.programId || selectedProgramId)) || detectedIdentity || undefined} />
 
                 <div className="flex items-center justify-center space-x-2 text-xs font-mono font-bold text-gov-blue">
                   <span>Slot #{scanResult.data.designatedNumber}</span>

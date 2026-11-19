@@ -1,3 +1,4 @@
+import type { DetectedQrIdentity } from "@/lib/program-qr-slot";
 import { resolveProgramScan, ProgramScanError } from "@/lib/program-scan-resolver";
 export const dynamic = "force-dynamic";
 
@@ -9,11 +10,13 @@ import { addDays, format, parseISO } from "date-fns";
 import { normalizeBarangayName } from "@/lib/utils";
 
 export async function POST(request: Request) {
+  let detected: DetectedQrIdentity | undefined;
+  const respond = (body: any, init?: ResponseInit) => NextResponse.json({ ...body, detected, ...(body.data && detected ? { data: { ...detected, ...body.data } } : {}) }, init);
   try {
     const user = await getCurrentUser();
-    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    if (!user) return respond({ error: "Unauthorized" }, { status: 401 });
     if (!hasPermission(user.role, "payout.scan")) {
-      return NextResponse.json({ error: "Forbidden: insufficient permissions for payout scanning" }, { status: 403 });
+      return respond({ error: "Forbidden: insufficient permissions for payout scanning" }, { status: 403 });
     }
 
     const body = await request.json();
@@ -21,7 +24,7 @@ export async function POST(request: Request) {
     const { status = "PAID", remarks, payoutDate, isLookupOnly = false, programId: programIdParam } = body;
 
     if (!rawQrToken) {
-      return NextResponse.json({ error: "QR Token or Beneficiary number is required" }, { status: 400 });
+      return respond({ error: "QR Token or Beneficiary number is required" }, { status: 400 });
     }
 
     const pbIncludes = {
@@ -40,7 +43,10 @@ export async function POST(request: Request) {
       qrCodes: true,
     };
 
-    const { pb, qr } = await resolveProgramScan(rawQrToken, programIdParam, pbIncludes);
+    const resolved = await resolveProgramScan(rawQrToken, programIdParam, pbIncludes, { autoDetect: body.autoDetect !== false, requireActive: true });
+    const { pb, qr } = resolved;
+    detected = resolved.detected;
+    if (body.programBeneficiaryId && body.programBeneficiaryId !== pb.id) return respond({ error: "QR identity changed after payout preview. Scan again before confirming." }, { status: 409 });
 
     // =========================================================================
     // STEP SEQUENCE VALIDATION: Steps 1, 2, and 3 must be completed!
@@ -50,7 +56,7 @@ export async function POST(request: Request) {
     const totalDaysPresent = (pb.attendanceRecords || []).filter((a: any) => a.morningTimeIn || a.afternoonTimeIn).length;
 
     if (!hasDistributedStub) {
-      return NextResponse.json(
+      return respond(
         {
           error: `SEQUENCE BLOCKED: Beneficiary #${pb.designatedNumber} (${pb.beneficiary.fullName}) has NOT completed Step 1 (Stub Distribution & Affirmation). Cannot proceed to Payout.`,
           stepBlocked: "STUB_DISTRIBUTION_REQUIRED",
@@ -60,7 +66,7 @@ export async function POST(request: Request) {
     }
 
     if (!hasOrientation) {
-      return NextResponse.json(
+      return respond(
         {
           error: `SEQUENCE BLOCKED: Beneficiary #${pb.designatedNumber} (${pb.beneficiary.fullName}) has NOT completed Step 2 (Orientation Attendance). Cannot proceed to Payout.`,
           stepBlocked: "ORIENTATION_REQUIRED",
@@ -77,7 +83,7 @@ export async function POST(request: Request) {
       const paidDateStr = existingPayout.payoutDate || (existingPayout.verifiedAt ? new Date(existingPayout.verifiedAt).toLocaleDateString() : "a previous date");
       const disbursingOfficer = existingPayout.verifiedBy?.fullName || "PESO Disbursing Officer";
 
-      return NextResponse.json(
+      return respond(
         {
           error: `ALREADY PAID: Payout for #${pb.designatedNumber} (${pb.beneficiary.fullName}) was already verified and claimed on ${paidDateStr} by ${disbursingOfficer}. Double payout scanning is strictly prohibited.`,
           alreadyPaid: true,
@@ -97,7 +103,8 @@ export async function POST(request: Request) {
 
     // If request was just for lookup/preview before claiming
     if (isLookupOnly) {
-      return NextResponse.json({
+      await logAudit({ userId: user.id, action: "PAYOUT_QR_IDENTIFIED", entityType: "PROGRAM_BENEFICIARY", entityId: pb.id, metadata: { ...detected, scanResult: "IDENTIFIED" } });
+      return respond({
         success: true,
         lookupOnly: true,
         data: {
@@ -197,6 +204,7 @@ export async function POST(request: Request) {
       entityType: "PAYOUT",
       entityId: result.payout.id,
       metadata: {
+        ...detected, scanResult: "RECORDED",
         designatedNumber: pb.designatedNumber,
         beneficiaryName: pb.beneficiary.fullName,
         status,
@@ -204,7 +212,7 @@ export async function POST(request: Request) {
       },
     });
 
-    return NextResponse.json({
+    return respond({
       success: true,
       message: `✓ Payout successfully verified as ${status}!${result.restriction ? " 365-day restriction is now active." : ""}`,
       data: {
@@ -218,8 +226,8 @@ export async function POST(request: Request) {
       },
     });
   } catch (error: any) {
-    if (error instanceof ProgramScanError) return NextResponse.json({ error: error.message }, { status: error.status });
+    if (error instanceof ProgramScanError) return respond({ error: error.message }, { status: error.status });
     console.error("Payout scan error:", error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return respond({ error: error.message }, { status: 500 });
   }
 }

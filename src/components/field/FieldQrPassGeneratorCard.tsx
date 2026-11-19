@@ -137,6 +137,9 @@ export function FieldQrPassGeneratorCard({
         );
       }
 
+      const missingRegisteredQr = cached.some((b) => !b.qrToken);
+      cached = cached.filter((b) => Boolean(b.qrToken) && ["ACTIVE", "ENROLLED", "FLAGGED_FOR_REPLACEMENT"].includes(b.status));
+      if (missingRegisteredQr) setError("May record na walang registered QR sa cache. Mag-online, generate missing QR codes, at Master Key Sync bago i-print ang mga iyon.");
       if (cached.length === 0) {
         setError("Walang nahanap na benepisyaryo sa offline database cache.");
         setBeneficiariesList([]);
@@ -147,9 +150,7 @@ export function FieldQrPassGeneratorCard({
       const origin = typeof window !== "undefined" ? window.location.origin : "";
       const formatted = await Promise.all(
         cached.map(async (b) => {
-          const qrPayload = b.qrToken
-            ? formatBeneficiaryQrPayload(b.qrToken, origin)
-            : `${origin}/my-assignment?token=${b.designatedNumber}`;
+          const qrPayload = formatBeneficiaryQrPayload(b.qrToken!, origin);
           let qrDataUrl = "";
           try {
             qrDataUrl = await QRCode.toDataURL(qrPayload, {
@@ -171,7 +172,7 @@ export function FieldQrPassGeneratorCard({
               birthday: b.birthday,
             },
             qr: {
-              publicToken: b.qrToken || `TUPAD-DGL-OFFLINE-${b.designatedNumber}`,
+              publicToken: b.qrToken!,
               qrDataUrl,
               qrPayloadUrl: qrPayload,
             },

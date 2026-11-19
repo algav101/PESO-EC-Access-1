@@ -1,5 +1,5 @@
 import Dexie, { type Table } from "dexie";
-import { normalizeQrSlot, registeredQrSlot, ScanRequestError, wrongProgramQrMessage } from "@/lib/program-qr-slot";
+import { normalizeQrSlot, registeredQrSlot, ScanRequestError, wrongProgramQrMessage, type DetectedQrIdentity } from "@/lib/program-qr-slot";
 import { format } from "date-fns";
 import {
   getPhilippineTime,
@@ -45,6 +45,7 @@ export interface CachedBeneficiary {
   orientationStatus?: "PRESENT" | "ABSENT";
   stubDistributed?: boolean;
   payoutStatus?: string;
+  originalBeneficiary?: boolean;
   serverStubDistributed?: boolean;
   serverOrientationStatus?: "PRESENT" | "ABSENT";
 }
@@ -162,7 +163,8 @@ export function extractCleanQrToken(raw: string): string {
  */
 export async function findBeneficiaryOffline(
   tokenOrQuery: string,
-  targetProgramId?: string
+  targetProgramId?: string,
+  options: { autoDetect?: boolean } = {}
 ): Promise<CachedBeneficiary | null> {
   if (typeof window === "undefined" || !tokenOrQuery) return null;
   const clean = extractCleanQrToken(tokenOrQuery);
@@ -170,9 +172,8 @@ export async function findBeneficiaryOffline(
   const upperClean = clean.toUpperCase();
 
   try {
-    if (!targetProgramId) throw new Error("Pumili muna ng TUPAD program.");
-    const roster = (await offlineDb.cachedBeneficiaries.where("programId").equals(targetProgramId).toArray())
-      .filter((b) => ["ACTIVE", "ENROLLED", "FLAGGED_FOR_REPLACEMENT"].includes(b.status));
+    const auto = options.autoDetect === true;
+    if (!auto && !targetProgramId) throw new Error("Pumili muna ng TUPAD program.");
     let slot = normalizeQrSlot(clean);
     if (!slot) {
       const reference = await offlineDb.cachedQrSlots.get(upperClean);
@@ -184,17 +185,28 @@ export async function findBeneficiaryOffline(
       if (reference || known) {
         const ownerProgramId = reference?.programId || known?.programId;
         if (!ownerProgramId) throw new ScanRequestError("CANNOT SCAN: Hindi makumpirma ang work program ng QR sa lumang cache. Mag-Master Key Sync habang online bago mag-scan.");
-        if (ownerProgramId !== targetProgramId) {
+        if (!auto && ownerProgramId !== targetProgramId) {
           const source = await offlineDb.cachedPrograms.get(ownerProgramId);
-          const selected = await offlineDb.cachedPrograms.get(targetProgramId);
-          throw new ScanRequestError(wrongProgramQrMessage(source?.programCode || source?.programName || ownerProgramId, selected?.programCode || selected?.programName || targetProgramId));
+          const selected = targetProgramId ? await offlineDb.cachedPrograms.get(targetProgramId) : undefined;
+          throw new ScanRequestError(wrongProgramQrMessage(source?.programCode || source?.programName || ownerProgramId, selected?.programCode || selected?.programName || targetProgramId || "selected program"));
         }
+        if (auto) targetProgramId = ownerProgramId;
         slot = registeredQrSlot(reference?.publicToken || known!.qrToken!, reference?.designatedNumber || known!.designatedNumber);
-      }
-    }
+      } else if (auto) throw new ScanRequestError("UNKNOWN QR: Hindi registered sa device cache. Mag-Master Key Sync habang online.");
+    } else if (auto) targetProgramId = undefined;
+    const roster = (targetProgramId
+      ? await offlineDb.cachedBeneficiaries.where("programId").equals(targetProgramId).toArray()
+      : await offlineDb.cachedBeneficiaries.toArray())
+      .filter((b) => ["ACTIVE", "ENROLLED", "FLAGGED_FOR_REPLACEMENT"].includes(b.status));
     const matches = roster.filter((b) => slot
       ? normalizeQrSlot(b.designatedNumber) === slot
       : b.fullName?.toUpperCase() === upperClean || b.id === clean || b.beneficiaryId === clean);
+    if (auto && matches.length > 1) throw new ScanRequestError("AMBIGUOUS QR: Ang number-only QR ay ginagamit sa maraming masterlist. Gamitin ang registered program-specific QR.");
+    if (auto && matches.length === 1) {
+      const program = await offlineDb.cachedPrograms.get(matches[0].programId);
+      if (!program) throw new ScanRequestError("Program missing from cache. Mag-Master Key Sync habang online.");
+      if (program.status !== "ACTIVE") throw new ScanRequestError("INACTIVE WORK PROGRAM: Walang na-record. I-check ang registered program.");
+    }
     // Never choose an arbitrary person when a slot is duplicated.
     return matches.length === 1 ? matches[0] : null;
   } catch (err) {
@@ -202,6 +214,15 @@ export async function findBeneficiaryOffline(
     console.error("Error finding beneficiary offline:", err);
     return null;
   }
+}
+
+export async function getOfflineQrIdentity(bene: CachedBeneficiary, rawToken: string): Promise<DetectedQrIdentity> {
+  const program = await offlineDb.cachedPrograms.get(bene.programId);
+  const token = extractCleanQrToken(rawToken).toUpperCase();
+  return { qrId: null, version: token.startsWith("TUPAD-V2-") ? 2 : normalizeQrSlot(token) ? 0 : 1,
+    programId: bene.programId, programCode: program?.programCode || bene.programId, programName: program?.programName || "Cached program",
+    programBeneficiaryId: bene.id, beneficiaryId: bene.beneficiaryId, designatedNumber: bene.designatedNumber,
+    fullName: bene.fullName, verifiedAt: new Date().toISOString(), verificationStatus: "CACHED" };
 }
 
 /**
@@ -218,25 +239,30 @@ export async function recordOfflineAttendance(params: {
   activityName?: string;
   deviceId?: string;
   bypass3HourRule?: boolean;
+  autoDetect?: boolean;
+  targetDate?: string;
 }) {
   const { rawToken, programId, workDayId, shiftMode, workProgramItemId, workArea, activityName, deviceId, bypass3HourRule } = params;
 
-  const bene = await findBeneficiaryOffline(rawToken, programId);
+  const bene = await findBeneficiaryOffline(rawToken, programId, { autoDetect: params.autoDetect });
   if (!bene) {
     throw new Error(`QR Token or Beneficiary identifier "${rawToken}" not found in offline database cache.`);
   }
+  if (params.autoDetect && bene.originalBeneficiary !== false && bene.orientationStatus !== "PRESENT") throw new ScanRequestError("SEQUENCE BLOCKED: Complete orientation in the detected program first.");
 
   const pht = getPhilippineTime();
   const now = pht.now;
   const todayStr = pht.dateStr;
 
   // Resolve work day
-  let workDay = workDayId ? await offlineDb.cachedWorkDays.get(workDayId) : null;
+  const changedProgram = params.autoDetect && programId !== bene.programId;
+  let workDay = !changedProgram && workDayId ? await offlineDb.cachedWorkDays.get(workDayId) : null;
   if (workDay && workDay.programId !== bene.programId) throw new Error("CANNOT SCAN: Work day belongs to a different program.");
-  if (!workDay && programId) {
-    const progDays = await offlineDb.cachedWorkDays.where("programId").equals(programId).toArray();
-    workDay = progDays.find((d) => d.workDate === todayStr) || progDays[0] || null;
+  if (!workDay && bene.programId) {
+    const progDays = await offlineDb.cachedWorkDays.where("programId").equals(bene.programId).toArray();
+    workDay = progDays.find((d) => d.workDate === (params.targetDate || todayStr)) || (!params.autoDetect ? progDays[0] : null) || null;
   }
+  if (params.autoDetect && !workDay) throw new ScanRequestError("No work day exists for this date in the detected program. Walang na-record.");
 
   const attendanceDate = workDay?.workDate || todayStr;
   const dayNumber = workDay?.dayNumber || 1;
@@ -276,6 +302,7 @@ export async function recordOfflineAttendance(params: {
       slotRecorded: slotLabels[targetSlot],
       message: `ALREADY SCANNED: Morning Time-In (AM IN) for #${bene.designatedNumber} (${bene.fullName}) was already recorded today at ${loggedTime}${scannerInfo}. Double scanning is blocked.`,
       data: {
+        programId: resolvedProgramId, programBeneficiaryId: bene.id,
         designatedNumber: bene.designatedNumber,
         fullName: bene.fullName,
         barangay: bene.barangay,
@@ -296,6 +323,7 @@ export async function recordOfflineAttendance(params: {
       slotRecorded: slotLabels[targetSlot],
       message: `ALREADY SCANNED: Morning Time-Out (AM OUT) for #${bene.designatedNumber} (${bene.fullName}) was already recorded today at ${loggedTime}${scannerInfo}. Double scanning is blocked.`,
       data: {
+        programId: resolvedProgramId, programBeneficiaryId: bene.id,
         designatedNumber: bene.designatedNumber,
         fullName: bene.fullName,
         barangay: bene.barangay,
@@ -316,6 +344,7 @@ export async function recordOfflineAttendance(params: {
       slotRecorded: slotLabels[targetSlot],
       message: `ALREADY SCANNED: Afternoon Time-In (PM IN) for #${bene.designatedNumber} (${bene.fullName}) was already recorded today at ${loggedTime}${scannerInfo}. Double scanning is blocked.`,
       data: {
+        programId: resolvedProgramId, programBeneficiaryId: bene.id,
         designatedNumber: bene.designatedNumber,
         fullName: bene.fullName,
         barangay: bene.barangay,
@@ -336,6 +365,7 @@ export async function recordOfflineAttendance(params: {
       slotRecorded: slotLabels[targetSlot],
       message: `ALREADY SCANNED: Afternoon Time-Out (PM OUT) for #${bene.designatedNumber} (${bene.fullName}) was already recorded today at ${loggedTime}${scannerInfo}. Double scanning is blocked.`,
       data: {
+        programId: resolvedProgramId, programBeneficiaryId: bene.id,
         designatedNumber: bene.designatedNumber,
         fullName: bene.fullName,
         barangay: bene.barangay,
@@ -420,9 +450,9 @@ export async function recordOfflineAttendance(params: {
   }
 
   // Work Area Matching from Offline Work Program Items
-  let resolvedArea = workArea;
-  let resolvedActivity = activityName;
-  let resolvedItemId = workProgramItemId;
+  let resolvedArea = changedProgram ? undefined : workArea;
+  let resolvedActivity = changedProgram ? undefined : activityName;
+  let resolvedItemId = changedProgram ? undefined : workProgramItemId;
 
   if (!resolvedArea || resolvedItemId === "AUTO" || !resolvedItemId) {
     const cachedItems = await offlineDb.cachedWorkProgramItems
@@ -525,6 +555,7 @@ export async function recordOfflineAttendance(params: {
     slotRecorded: slotLabels[targetSlot],
     message: `✓ Stored to Installed Unit & Queued for Sync (${slotLabels[targetSlot]})`,
     data: {
+      programId: resolvedProgramId, programBeneficiaryId: bene.id,
       designatedNumber: bene.designatedNumber,
       fullName: bene.fullName,
       barangay: bene.barangay,
@@ -769,7 +800,7 @@ async function downloadOfflineSnapshot(user?: CacheUser) {
         birthday, birthdayPin: parts.length === 3 ? parts[1] + "-" + parts[2] + "-" + parts[0] : "",
         barangay: brgy, sitio: normalizeSitioName(pb.beneficiary?.sitio, brgy), tableNumber: pb.tableNumber || "",
         qrToken: (pb.qrCodes?.find((q: any) => q.status === "ACTIVE") || pb.qrCodes?.[0])?.publicToken || "",
-        status: pb.participationStatus || "ACTIVE",
+        status: pb.participationStatus || "ACTIVE", originalBeneficiary: pb.originalBeneficiary,
         stubDistributed: stub, serverStubDistributed: stub,
         orientationStatus: orientation, serverOrientationStatus: orientation,
         payoutStatus: pb.payouts?.find((p: any) => p.status === "PAID")?.status || "PENDING",

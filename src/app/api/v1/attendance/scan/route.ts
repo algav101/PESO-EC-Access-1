@@ -1,3 +1,4 @@
+import type { DetectedQrIdentity } from "@/lib/program-qr-slot";
 import { resolveProgramScan, ProgramScanError } from "@/lib/program-scan-resolver";
 export const dynamic = "force-dynamic";
 
@@ -14,11 +15,13 @@ import {
 } from "@/lib/utils";
 
 export async function POST(request: Request) {
+  let detected: DetectedQrIdentity | undefined;
+  const respond = (body: any, init?: ResponseInit) => NextResponse.json({ ...body, detected, ...(body.data && detected ? { data: { ...detected, ...body.data } } : {}) }, init);
   try {
     const user = await getCurrentUser();
-    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    if (!user) return respond({ error: "Unauthorized" }, { status: 401 });
     if (!hasPermission(user.role, "attendance.scan")) {
-      return NextResponse.json({ error: "Forbidden: insufficient permissions for attendance scanning" }, { status: 403 });
+      return respond({ error: "Forbidden: insufficient permissions for attendance scanning" }, { status: 403 });
     }
 
     const body = await request.json();
@@ -35,7 +38,7 @@ export async function POST(request: Request) {
     } = body;
 
     if (!rawQrToken) {
-      return NextResponse.json({ error: "QR Token or Beneficiary number is required" }, { status: 400 });
+      return respond({ error: "QR Token or Beneficiary number is required" }, { status: 400 });
     }
 
     const pbIncludes = {
@@ -59,7 +62,9 @@ export async function POST(request: Request) {
       qrCodes: true,
     };
 
-    const { pb, qr } = await resolveProgramScan(rawQrToken, programIdParam, pbIncludes);
+    const resolved = await resolveProgramScan(rawQrToken, programIdParam, pbIncludes, { autoDetect: body.autoDetect !== false, requireActive: true });
+    const { pb, qr } = resolved;
+    detected = resolved.detected;
 
     // =========================================================================
     // STEP SEQUENCE VALIDATION: Step 2 (Orientation Attendance) must be completed!
@@ -68,7 +73,7 @@ export async function POST(request: Request) {
       (pb.orientationAttendance && pb.orientationAttendance.length > 0) || !pb.originalBeneficiary;
 
     if (!hasCompletedOrientation) {
-      return NextResponse.json(
+      return respond(
         {
           error: `SEQUENCE BLOCKED: Beneficiary #${pb.designatedNumber} (${pb.beneficiary.fullName}) has NOT completed Step 2 (Orientation Attendance). Daily attendance scanning requires prior Orientation verification.`,
           stepBlocked: "ORIENTATION_REQUIRED",
@@ -83,18 +88,20 @@ export async function POST(request: Request) {
     }
 
     const program = pb.program;
+    const changedProgram = body.autoDetect !== false && programIdParam !== pb.programId;
 
     // Resolve WorkDay using Philippine Standard Time date
     const pht = getPhilippineTime();
     const now = pht.now;
     const dateStr = targetDate || pht.dateStr;
-    if (workDayId && !program.workDays.some((w: any) => w.id === workDayId)) return NextResponse.json({ error: "CANNOT SCAN: Work day belongs to a different program or no longer exists." }, { status: 400 });
-    let workDay = workDayId
-      ? program.workDays.find((w: any) => w.id === workDayId)
-      : program.workDays.find((w: any) => w.workDate === dateStr) || program.workDays[0];
+    const requestedWorkDayId = changedProgram ? undefined : workDayId;
+    if (requestedWorkDayId && !program.workDays.some((w: any) => w.id === requestedWorkDayId)) return respond({ error: "CANNOT SCAN: Work day belongs to a different program or no longer exists." }, { status: 400 });
+    let workDay = requestedWorkDayId
+      ? program.workDays.find((w: any) => w.id === requestedWorkDayId)
+      : program.workDays.find((w: any) => w.workDate === dateStr);
 
     if (!workDay) {
-      return NextResponse.json({ error: "No active work day found for this program" }, { status: 400 });
+      return respond({ error: "No active work day found for this program" }, { status: 400 });
     }
 
     // Resolve Work Program Item / Area
@@ -109,11 +116,11 @@ export async function POST(request: Request) {
       ? matchingWorkProgram.items.filter((it: any) => it.dayNumber === workDay.dayNumber)
       : [];
 
-    let resolvedItemId = workProgramItemId || null;
-    let resolvedArea = workArea || null;
-    let resolvedActivity = activityName || null;
+    let resolvedItemId = changedProgram ? null : workProgramItemId || null;
+    let resolvedArea = changedProgram ? null : workArea || null;
+    let resolvedActivity = changedProgram ? null : activityName || null;
     let targetItem = null;
-    if (resolvedItemId && !program.tupadWorkPrograms?.some((wp: any) => wp.items.some((it: any) => it.id === resolvedItemId))) return NextResponse.json({ error: "CANNOT SCAN: Work area belongs to a different program." }, { status: 400 });
+    if (resolvedItemId && !program.tupadWorkPrograms?.some((wp: any) => wp.items.some((it: any) => it.id === resolvedItemId))) return respond({ error: "CANNOT SCAN: Work area belongs to a different program." }, { status: 400 });
 
     if (resolvedItemId) {
       targetItem = dayItems.find((it: any) => it.id === resolvedItemId);
@@ -164,7 +171,7 @@ export async function POST(request: Request) {
     // =========================================================================
     if (targetSlot === "MORNING_IN" && record?.morningTimeIn) {
       const loggedTime = format(new Date(record.morningTimeIn), "hh:mm a");
-      return NextResponse.json(
+      return respond(
         {
           error: `ALREADY SCANNED: Morning Time-In (AM IN) for #${pb.designatedNumber} (${pb.beneficiary.fullName}) was already recorded today at ${loggedTime}. Double scanning is blocked.`,
           alreadyScanned: true,
@@ -188,7 +195,7 @@ export async function POST(request: Request) {
 
     if (targetSlot === "MORNING_OUT" && record?.morningTimeOut) {
       const loggedTime = format(new Date(record.morningTimeOut), "hh:mm a");
-      return NextResponse.json(
+      return respond(
         {
           error: `ALREADY SCANNED: Morning Time-Out (AM OUT) for #${pb.designatedNumber} (${pb.beneficiary.fullName}) was already recorded today at ${loggedTime}. Double scanning is blocked.`,
           alreadyScanned: true,
@@ -212,7 +219,7 @@ export async function POST(request: Request) {
 
     if (targetSlot === "AFTERNOON_IN" && record?.afternoonTimeIn) {
       const loggedTime = format(new Date(record.afternoonTimeIn), "hh:mm a");
-      return NextResponse.json(
+      return respond(
         {
           error: `ALREADY SCANNED: Afternoon Time-In (PM IN) for #${pb.designatedNumber} (${pb.beneficiary.fullName}) was already recorded today at ${loggedTime}. Double scanning is blocked.`,
           alreadyScanned: true,
@@ -236,7 +243,7 @@ export async function POST(request: Request) {
 
     if (targetSlot === "AFTERNOON_OUT" && record?.afternoonTimeOut) {
       const loggedTime = format(new Date(record.afternoonTimeOut), "hh:mm a");
-      return NextResponse.json(
+      return respond(
         {
           error: `ALREADY SCANNED: Afternoon Time-Out (PM OUT) for #${pb.designatedNumber} (${pb.beneficiary.fullName}) was already recorded today at ${loggedTime}. Double scanning is blocked.`,
           alreadyScanned: true,
@@ -297,7 +304,7 @@ export async function POST(request: Request) {
               ? `${Math.floor(elapsedMinutes / 60)} hr ${elapsedMinutes % 60} mins`
               : `${elapsedMinutes} mins`;
 
-          return NextResponse.json(
+          return respond(
             {
               error: `TIME-OUT BLOCKED: Morning Time-Out (AM OUT) requires at least 3 hours of active work duration. AM IN was recorded at ${amInTimeFormatted} (elapsed: ${elapsedText}). Re-scanning AM OUT is allowed at or after ${unlockTimeFormatted} (${remainingText} remaining).`,
               stepBlocked: "MINIMUM_DURATION_NOT_MET",
@@ -342,7 +349,7 @@ export async function POST(request: Request) {
               ? `${Math.floor(elapsedMinutes / 60)} hr ${elapsedMinutes % 60} mins`
               : `${elapsedMinutes} mins`;
 
-          return NextResponse.json(
+          return respond(
             {
               error: `TIME-OUT BLOCKED: Afternoon Time-Out (PM OUT) requires at least 3 hours of active work duration. PM IN was recorded at ${pmInTimeFormatted} (elapsed: ${elapsedText}). Re-scanning PM OUT is allowed at or after ${unlockTimeFormatted} (${remainingText} remaining).`,
               stepBlocked: "MINIMUM_DURATION_NOT_MET",
@@ -415,6 +422,7 @@ export async function POST(request: Request) {
       entityType: "ATTENDANCE_RECORD",
       entityId: record.id,
       metadata: {
+        ...detected, scanResult: "RECORDED",
         designatedNumber: pb.designatedNumber,
         workDayNumber: workDay.dayNumber,
         slotRecorded,
@@ -423,7 +431,7 @@ export async function POST(request: Request) {
       },
     });
 
-    return NextResponse.json({
+    return respond({
       success: true,
       slotRecorded,
       message: `✓ Successfully recorded ${slotRecorded}!`,
@@ -444,8 +452,8 @@ export async function POST(request: Request) {
       },
     });
   } catch (error: any) {
-    if (error instanceof ProgramScanError) return NextResponse.json({ error: error.message }, { status: error.status });
+    if (error instanceof ProgramScanError) return respond({ error: error.message }, { status: error.status });
     console.error("Attendance scan error:", error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return respond({ error: error.message }, { status: 500 });
   }
 }

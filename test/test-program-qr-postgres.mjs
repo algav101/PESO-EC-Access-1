@@ -31,6 +31,7 @@ try {
   started = true;
   run(process.execPath, ["node_modules/prisma/build/index.js", "db", "push", "--skip-generate", "--schema", "prisma/schema.prisma"], { ...process.env, DATABASE_URL: testUrl, DIRECT_URL: testUrl });
   db = new PrismaClient({ datasources: { db: { url: testUrl } } });
+  await db.$executeRawUnsafe(fs.readFileSync("prisma/migrations/20261119000100_qr_active_roster_identity/migration.sql", "utf8"));
   const admin = await db.user.create({ data: { username: "synthetic-qr-admin", passwordHash: "synthetic", fullName: "Synthetic QR Admin", role: "PESO_ADMIN" } });
   let authorized = true;
   const cache = new Map();
@@ -48,7 +49,7 @@ try {
     vm.runInThisContext(`(function(require,module,exports){${code}\n})`, { filename: resolved })(localRequire, module, module.exports);
     return module.exports;
   }
-  const request = (body) => new Request("http://synthetic.test", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+  const request = (body) => new Request("http://synthetic.test", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ autoDetect: false, ...body }) });
   const route = (stage) => load(`src/app/api/v1/${stage}/scan/route.ts`);
   const qr = load("src/lib/qr.ts");
   const old = await db.program.create({ data: { programCode: "SYNTHETIC-OLD", programName: "Old QR program", status: "COMPLETED", createdById: admin.id } });
@@ -67,6 +68,7 @@ try {
   const created = await load("src/app/api/v1/programs/route.ts").POST(request({ programCode: "SYNTHETIC-NEW", programName: "New 600 roster", startDate: "2026-11-04", requiredWorkDays: 1 }));
   assert.equal(created.status, 201);
   const program = (await created.json()).program;
+  await db.program.update({ where: { id: program.id }, data: { status: "ACTIVE" } });
   const commit = load("src/app/api/v1/beneficiaries/import/commit/route.ts");
   for (const programId of [undefined, "AUTO", "undefined", ""]) {
     assert.equal((await commit.POST(request({ programId, rows }))).status, 400, "imports must never silently choose the newest batch");
@@ -124,7 +126,7 @@ try {
   for (const stage of ["orientation", "attendance", "payout", "stub-distribution"]) {
     assert.equal((await route(stage).POST(request({ qrToken: raw }))).status, 400);
     assert.equal((await route(stage).POST(request({ programId: program.id, qrToken: "601" }))).status, 404);
-    assert.equal((await route(stage).POST(request({ programId: program.id, qrToken: printed.publicToken.slice(0, -1) }))).status, 404);
+    assert.equal((await route(stage).POST(request({ programId: program.id, qrToken: printed.publicToken.slice(0, -1) }))).status, 400);
   }
   await db.qrCode.update({ where: { id: currentPrinted.id }, data: { status: "INVALIDATED" } });
   assert.equal((await route("stub-distribution").POST(request(scanBody))).status, 404);
@@ -169,7 +171,7 @@ try {
   const sync = await queued.json(); assert.equal(sync.accepted.length, 0); assert.equal(sync.failed.length, 4); assert.equal(await oldHistory(), snapshot);
   const assignmentRoute = load("src/app/api/v1/work-assignment/lookup/route.ts");
   const assignment = await assignmentRoute.GET(new Request(`http://synthetic.test?token=${printed.publicToken}`));
-  assert.equal(assignment.status, 200); assert.match(JSON.stringify(await assignment.json()), /0113/);
+  assert.equal(assignment.status, 409, "public camera lookup must reject a closed program");
   const currentAssignment = await assignmentRoute.GET(new Request(`http://synthetic.test?token=${currentPrinted.publicToken}`));
   assert.equal(currentAssignment.status, 200); assert.match(JSON.stringify(await currentAssignment.json()), /0600/);
   assert.equal((await assignmentRoute.GET(new Request(`http://synthetic.test?token=${printed.publicToken}&programId=${program.id}`))).status, 409);
@@ -180,12 +182,14 @@ try {
   // Identical slot numbers have separate program-owned QR tokens.
   const firstCard = await db.qrCode.findFirst({ where: { programBeneficiaryId: "old-pb-1" } });
   const otherProgram = await db.program.create({ data: { programCode: "SYNTHETIC-OTHER", programName: "Different #1 masterlist", createdById: admin.id } });
+  await db.program.update({ where: { id: otherProgram.id }, data: { status: "ACTIVE" } });
   const otherImport = await commit.POST(request({ programId: otherProgram.id, rows: [{ ...rows[0], fullName: "DIFFERENT MASTERLIST PERSON ONE" }] }));
   assert.equal(otherImport.status, 200, JSON.stringify(await otherImport.clone().json()));
   for (const [programId, expectedName] of [[old.id, rows[0].fullName], [otherProgram.id, "DIFFERENT MASTERLIST PERSON ONE"]]) {
     const ownQr = programId === old.id ? firstCard : await db.qrCode.findFirst({ where: { programId } });
     assert.equal((await route("attendance").POST(request({ qrToken: ownQr.publicToken, programId: programId === old.id ? otherProgram.id : old.id }))).status, 409);
     const response = await route("attendance").POST(request({ qrToken: ownQr.publicToken, programId }));
+    if (programId === old.id) { assert.equal(response.status, 409); continue; }
     assert.equal(response.status, 400);
     const blocked = await response.json();
     assert.equal(blocked.stepBlocked, "ORIENTATION_REQUIRED");
@@ -259,10 +263,9 @@ try {
   const bindingsBeforeConflict = await db.auditLog.count({ where: { entityType: "QR_PROGRAM_BINDING" } });
   assert.equal((await registerRoute.POST(request({ sourceProgramId: old.id }), { params: { id: program.id } })).status, 409, "batch must reject an already reissued card in another open program atomically");
   assert.equal(await db.auditLog.count({ where: { entityType: "QR_PROGRAM_BINDING" } }), bindingsBeforeConflict);
-  const duplicate = await db.programBeneficiary.create({ data: { programId: otherProgram.id, beneficiaryId: "bene-321", designatedNumber: "321" } });
-  assert.equal((await batchRequest()).status, 409, "batch must reject duplicate active target slots");
+  await assert.rejects(() => db.programBeneficiary.create({ data: { programId: otherProgram.id, beneficiaryId: "bene-321", designatedNumber: "0321" } }), e => e.code === "P2002", "database must reject duplicate active target slots including leading zero variants");
   assert.equal(await db.auditLog.count({ where: { entityType: "QR_PROGRAM_BINDING" } }), bindingsBeforeConflict);
-  await db.programBeneficiary.delete({ where: { id: duplicate.id } });
+  await (await import("./qr-auto-scenarios.mjs")).testAutomaticQrDetection({ db, load, admin, request, route });
   authorized = false;
   assert.equal((await batchRequest()).status, 403);
   assert.equal((await registerRoute.POST(request({ qrToken: firstCard.publicToken }), { params: { id: otherProgram.id } })).status, 403);

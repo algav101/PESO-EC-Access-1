@@ -5,7 +5,6 @@ import prisma from "@/lib/prisma";
 import { resolveProgramScan, ProgramScanError } from "@/lib/program-scan-resolver";
 import { format } from "date-fns";
 import { extractCleanQrToken } from "@/lib/utils";
-import { readPrintedQrBinding } from "@/lib/printed-qr-registration";
 import { assignBeneficiaryWorkArea, WorkProgramItemAllocation } from "@/lib/work-assignment";
 import { getCurrentUser } from "@/lib/auth";
 
@@ -295,16 +294,8 @@ async function handleLookup(params: any) {
 
   // Camera links without a selected program open the QR's registered program.
   if (!pb && (cleanToken || designatedNumber)) {
-    const registeredQr = cleanToken && !programIdParam ? await prisma.qrCode.findFirst({
-      where: { publicToken: { equals: cleanToken, mode: "insensitive" }, status: { not: "INVALIDATED" } },
-      select: { id: true, publicToken: true, programId: true, programBeneficiary: { select: { designatedNumber: true } } },
-    }) : null;
-    const registration = registeredQr ? await readPrintedQrBinding(prisma, registeredQr) : null;
-    const targetProgramId = programIdParam || registration?.programId || (await prisma.program.findFirst({
-      where: { status: { in: ["ACTIVE", "DRAFT"] } }, orderBy: { createdAt: "desc" }, select: { id: true },
-    }))?.id;
     try {
-      const resolved = await resolveProgramScan(cleanToken || designatedNumber || "", targetProgramId, pbIncludes);
+      const resolved = await resolveProgramScan(cleanToken || designatedNumber || "", programIdParam, pbIncludes, { autoDetect: true });
       pb = resolved.pb; qr = resolved.qr;
     } catch (error) {
       if (error instanceof ProgramScanError) return NextResponse.json({ error: error.message }, { status: error.status });

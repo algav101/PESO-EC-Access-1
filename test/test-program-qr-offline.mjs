@@ -89,6 +89,28 @@ try {
       try { await slot.exports.readScanResponse(new Response(JSON.stringify({ error: "Synthetic denial" }), { status }), "fallback"); } catch (error) { rejected = error instanceof slot.exports.ScanRequestError; }
       check(rejected, "HTTP rejections must not become offline scans: " + status);
     }
+    // Automatic mode does not use the selected program to interpret a QR.
+    await db.cachedPrograms.bulkPut([{ id: "old", programCode: "OLD", programName: "Old program", status: "CLOSED" }, { id: "new", programCode: "NEW", programName: "New program", status: "ACTIVE" }, { id: "third", programCode: "THIRD", programName: "Third program", status: "ACTIVE" }]);
+    check((await find(current.qrToken, "old", { autoDetect: true })).id === current.id, "auto mode must ignore another displayed program");
+    check((await find(current.qrToken, undefined, { autoDetect: true })).id === current.id, "auto mode must not require any selected program");
+    let ambiguous;
+    try { await find("00113", "new", { autoDetect: true }); } catch (error) { ambiguous = error; }
+    check(ambiguous?.message.includes("AMBIGUOUS QR"), "number-only QR must not use selection to choose among masterlists");
+    const third = { ...current, id: "third-pb", programId: "third", fullName: "THIRD MASTERLIST PERSON", qrToken: "TUPAD-V2-113-" + "A".repeat(48), originalBeneficiary: false };
+    await db.cachedBeneficiaries.put(third);
+    await db.cachedQrSlots.put({ publicToken: third.qrToken, designatedNumber: "113", programId: "third" });
+    await db.cachedWorkDays.put({ id: "third-day", programId: "third", dayNumber: 1, workDate: "2026-11-04" });
+    const detected = await mod.exports.getOfflineQrIdentity(third, third.qrToken);
+    check(detected.programId === "third" && detected.verificationStatus === "CACHED", "offline identity panel must display detected program");
+    const auto = await record({ rawToken: third.qrToken, programId: "old", workDayId: "old-day", workProgramItemId: "old-area", shiftMode: "MORNING_IN", autoDetect: true });
+    check(auto.data.programId === "third" && auto.data.fullName === third.fullName, "offline automatic attendance must use the QR's masterlist");
+    const outgoing = (await db.offlineQueue.toArray()).find((q) => q.payload.programId === "third");
+    check(outgoing.payload.programBeneficiaryId === third.id && outgoing.payload.workDayId === "third-day" && outgoing.payload.workProgramItemId !== "old-area", "queued automatic scan must isolate day/area/program IDs");
+    let closed;
+    await db.cachedQrSlots.put({ publicToken: token, designatedNumber: "113", programId: "old" });
+    try { await find(token, "new", { autoDetect: true }); } catch (error) { closed = error; }
+    check(closed?.message.includes("INACTIVE WORK PROGRAM"), "offline auto mode must reject closed programs");
+    check(JSON.stringify(await db.cachedBeneficiaries.get(old.id)) === JSON.stringify(old), "automatic mode must preserve historical masterlist flags");
     db.close();
     return "Offline QR tests passed: real IndexedDB v2→v3 upgrade, QR program ownership, legacy cache rejection, current roster identity, separate pending flags/history/queue, duplicate protection, invalidated aliases and HTTP rejection handling.";
   }, { slotJs: compile("src/lib/program-qr-slot.ts"), dbJs: compile("src/lib/dexie.ts") });

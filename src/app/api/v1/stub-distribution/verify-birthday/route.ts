@@ -5,6 +5,7 @@ import prisma from "@/lib/prisma";
 import { getCurrentUser, hasPermission } from "@/lib/auth";
 import { logAudit } from "@/lib/audit";
 import { matchesBirthdayPin, normalizeBarangayName } from "@/lib/utils";
+import { resolveProgramScan, ProgramScanError } from "@/lib/program-scan-resolver";
 
 export async function POST(request: Request) {
   try {
@@ -14,7 +15,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Forbidden: insufficient permissions for stub distribution" }, { status: 403 });
     }
 
-    const { qrId, programId, programBeneficiaryId, birthdayPin, latitude, longitude, deviceId } = await request.json();
+    const { qrId, qrToken, programId, programBeneficiaryId, birthdayPin, latitude, longitude, deviceId } = await request.json();
 
     if (!programBeneficiaryId || !birthdayPin) {
       return NextResponse.json({ error: "Program beneficiary ID and birthday PIN are required" }, { status: 400 });
@@ -24,6 +25,7 @@ export async function POST(request: Request) {
       where: { id: programBeneficiaryId },
       include: {
         beneficiary: true,
+        program: true,
         qrCodes: true,
       },
     });
@@ -32,6 +34,11 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Beneficiary not found" }, { status: 404 });
     }
     if (programId && pb.programId !== programId) return NextResponse.json({ error: "CANNOT SCAN: Beneficiary belongs to a different program." }, { status: 400 });
+    if (pb.program.status !== "ACTIVE" || !["ACTIVE", "ENROLLED", "FLAGGED_FOR_REPLACEMENT"].includes(pb.participationStatus)) return NextResponse.json({ error: "Inactive program or beneficiary. Scan again after checking the masterlist." }, { status: 409 });
+    if (qrToken) {
+      const resolved = await resolveProgramScan(String(qrToken), pb.programId, {});
+      if (resolved.pb.id !== pb.id) return NextResponse.json({ error: "QR identity changed after preview. Scan again before confirming." }, { status: 409 });
+    }
 
     // Robust multi-format birthday comparison
     const isMatched = matchesBirthdayPin(pb.beneficiary.birthday, birthdayPin);
@@ -95,7 +102,7 @@ export async function POST(request: Request) {
       action: "STUB_DISTRIBUTED",
       entityType: "PROGRAM_BENEFICIARY",
       entityId: pb.id,
-      metadata: { designatedNumber: pb.designatedNumber, distributionId: dist.id },
+      metadata: { qrId: activeQrId, programId: pb.programId, programBeneficiaryId: pb.id, beneficiaryId: pb.beneficiaryId, scanResult: "DISTRIBUTED", designatedNumber: pb.designatedNumber, distributionId: dist.id },
     });
 
     const normalizedBrgy = normalizeBarangayName(pb.beneficiary.barangay);
@@ -105,6 +112,7 @@ export async function POST(request: Request) {
       verified: true,
       message: "Stub distribution verified and recorded successfully!",
       data: {
+        programId: pb.programId, programBeneficiaryId: pb.id,
         designatedNumber: pb.designatedNumber,
         fullName: pb.beneficiary.fullName,
         barangay: normalizedBrgy,
@@ -112,6 +120,7 @@ export async function POST(request: Request) {
       },
     });
   } catch (error: any) {
+    if (error instanceof ProgramScanError) return NextResponse.json({ error: error.message }, { status: error.status });
     console.error("Birthday verification error:", error);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }

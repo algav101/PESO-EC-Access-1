@@ -163,6 +163,8 @@ model ProgramBeneficiary {
   attendanceRecords    AttendanceRecord[]
   payouts              Payout[]
 
+  // Active numeric slots also have a partial unique expression index. See the
+  // 20261119000100_qr_active_roster_identity SQL migration (Prisma cannot model it).
   @@index([programId, designatedNumber])
   @@index([programId, participationStatus])
   @@index([beneficiaryId])

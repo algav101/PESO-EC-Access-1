@@ -9,9 +9,11 @@ export interface GeneratedQrData {
 }
 
 export function generateBeneficiaryToken(programId: string, designatedNumber: string): GeneratedQrData {
-  const randomSuffix = crypto.randomBytes(4).toString("hex");
-  const publicToken = `TUPAD-DGL-${programId.slice(0, 6)}-${designatedNumber}-${randomSuffix}`.toUpperCase();
-  const tokenHash = crypto.createHash("sha256").update(publicToken + QR_SALT).digest("hex");
+  if (!programId || !/^\d+$/.test(designatedNumber) || !Number.isSafeInteger(Number(designatedNumber)) || Number(designatedNumber) < 1) throw new Error("A program and numeric masterlist slot are required to generate a QR.");
+  // Opaque versioned bearer token. Its database row holds the full program and
+  // enrolment IDs; no names, birthdays or other personal data enter the QR.
+  const publicToken = `TUPAD-V2-${Number(designatedNumber)}-${crypto.randomBytes(24).toString("hex")}`.toUpperCase();
+  const tokenHash = crypto.createHmac("sha256", QR_SALT).update(publicToken).digest("hex");
 
   return {
     publicToken,
@@ -20,8 +22,10 @@ export function generateBeneficiaryToken(programId: string, designatedNumber: st
 }
 
 export function verifyTokenHash(publicToken: string, expectedHash: string): boolean {
-  const computed = crypto.createHash("sha256").update(publicToken + QR_SALT).digest("hex");
-  return computed === expectedHash;
+  const computed = publicToken.startsWith("TUPAD-V2-")
+    ? crypto.createHmac("sha256", QR_SALT).update(publicToken).digest("hex")
+    : crypto.createHash("sha256").update(publicToken + QR_SALT).digest("hex");
+  return /^[a-f0-9]{64}$/i.test(expectedHash) && crypto.timingSafeEqual(Buffer.from(computed, "hex"), Buffer.from(expectedHash, "hex"));
 }
 
 /**
