@@ -5,6 +5,7 @@ import { getCurrentUser } from "@/lib/auth";
 import { canRecordMasterlistAttendance } from "@/lib/permissions";
 import { getPhilippineTime, ATTENDANCE_SLOT_LABELS } from "@/lib/utils";
 import { ATTENDANCE_FIELDS, writeAttendanceSlot, type AttendanceSlot } from "@/lib/attendance-slot-write";
+import { getMasterlistAttendanceTimestamp, MASTERLIST_ATTENDANCE_TIMES } from "@/lib/masterlist-attendance-time";
 
 class BulkAttendanceError extends Error {
   constructor(message: string, public status = 400) { super(message); }
@@ -37,6 +38,7 @@ export async function POST(request: Request, { params }: { params: { id: string 
       const day = program.workDays[0];
       if (!day || day.status === "CANCELLED") throw new BulkAttendanceError("The selected attendance day is unavailable in this program.", 409);
       if (day.workDate !== body.targetDate) throw new BulkAttendanceError("Work schedule changed. Reopen Attendance and choose the updated day.", 409);
+      const slotTime = getMasterlistAttendanceTimestamp(day.workDate, slot);
       const people = await tx.programBeneficiary.findMany({ where: { programId: params.id, id: { in: ids } }, include: {
         beneficiary: { select: { fullName: true, barangay: true, sitio: true } },
         orientationAttendance: { where: { programId: params.id, status: "PRESENT" }, select: { id: true }, take: 1 },
@@ -54,13 +56,13 @@ export async function POST(request: Request, { params }: { params: { id: string 
         else if (existing?.[field]) reason = "This attendance shift is already recorded; the original timestamp was kept.";
         else if (enforceDuration && existing) {
           const timeIn = slot === "MORNING_OUT" ? existing.morningTimeIn : slot === "AFTERNOON_OUT" ? existing.afternoonTimeIn : null;
-          if (timeIn && now.getTime() - timeIn.getTime() < 3 * 60 * 60 * 1000) reason = "Time-out requires at least 3 hours after time-in.";
+          if (timeIn && slotTime.getTime() - timeIn.getTime() < 3 * 60 * 60 * 1000) reason = "Time-out requires at least 3 hours after time-in.";
         }
         return { programBeneficiaryId: pb.id, designatedNumber: pb.designatedNumber, fullName: pb.beneficiary.fullName, status: reason ? "SKIPPED" : "PENDING", reason };
       });
       const eligible = new Set(results.filter((row) => row.status === "PENDING").map((row) => row.programBeneficiaryId));
       const records = await writeAttendanceSlot(tx, {
-        programId: program.id, workDayId: day.id, attendanceDate: day.workDate, slot, now,
+        programId: program.id, workDayId: day.id, attendanceDate: day.workDate, slot, now, slotTime,
         userId: user.id, source: "MASTERLIST_BULK", deviceId: "ADMIN_WEB_ROSTER",
         rows: people.filter((pb) => eligible.has(pb.id)).map((pb) => {
           const brgy = (pb.beneficiary.barangay || "").toUpperCase(), sitio = (pb.beneficiary.sitio || "").toUpperCase();
@@ -78,10 +80,10 @@ export async function POST(request: Request, { params }: { params: { id: string 
       if (records.length) await tx.auditLog.createMany({ data: records.map((record) => ({
         userId: user.id, action: "ATTENDANCE_RECORDED_FROM_MASTERLIST", entityType: "ATTENDANCE_RECORD", entityId: record.id,
         metadata: JSON.stringify({ programId: program.id, programBeneficiaryId: record.programBeneficiaryId, workDayId: day.id,
-          dayNumber: day.dayNumber, attendanceDate: day.workDate, slot, recordedAt: now.toISOString(), source: "MASTERLIST_BULK", remarks: body.remarks || null }),
+          dayNumber: day.dayNumber, attendanceDate: day.workDate, slot, attendanceTime: slotTime.toISOString(), recordedAt: now.toISOString(), timePolicy: "FIXED_PHILIPPINE_SCHEDULE", source: "MASTERLIST_BULK", remarks: body.remarks || null }),
       })) });
       return { success: true, updatedCount: records.length, skippedCount: ids.length - records.length,
-        workDay: { id: day.id, dayNumber: day.dayNumber, workDate: day.workDate }, slot, slotLabel: ATTENDANCE_SLOT_LABELS[slot], results };
+        workDay: { id: day.id, dayNumber: day.dayNumber, workDate: day.workDate }, slot, slotLabel: ATTENDANCE_SLOT_LABELS[slot], attendanceTime: slotTime.toISOString(), fixedTimeLabel: MASTERLIST_ATTENDANCE_TIMES[slot].label, results };
     }, { timeout: 30000, maxWait: 5000 });
     return NextResponse.json(result);
   } catch (error: any) {

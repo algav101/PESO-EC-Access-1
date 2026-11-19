@@ -13,7 +13,7 @@ type Row = { programBeneficiaryId: string; workProgramItemId?: string | null; wo
  */
 export async function writeAttendanceSlot(client: Pick<Prisma.TransactionClient, "$queryRaw">, input: {
   programId: string; workDayId: string; attendanceDate: string; slot: AttendanceSlot;
-  now: Date; userId: string; source: string; deviceId: string; rows: Row[];
+  now: Date; slotTime?: Date; userId: string; source: string; deviceId: string; rows: Row[];
 }): Promise<AttendanceRecord[]> {
   if (!input.rows.length) return [];
   const field = ATTENDANCE_FIELDS[input.slot];
@@ -21,13 +21,17 @@ export async function writeAttendanceSlot(client: Pick<Prisma.TransactionClient,
   // The identifier comes only from the fixed map above; user values stay bound.
   const column = Prisma.raw(`"${field}"`);
   const rows = input.rows.map((row) => ({ ...row, id: crypto.randomUUID() }));
+  // Prisma DateTime columns store UTC without a zone. Cast explicitly so raw SQL
+  // never applies the database session's local time zone to these instants.
+  const slotTimestamp = Prisma.sql`(${input.slotTime ?? input.now}::timestamptz AT TIME ZONE 'UTC')`;
+  const processedTimestamp = Prisma.sql`(${input.now}::timestamptz AT TIME ZONE 'UTC')`;
   return client.$queryRaw<AttendanceRecord[]>(Prisma.sql`
     INSERT INTO "AttendanceRecord" AS current (
       id, "programId", "workDayId", "programBeneficiaryId", "attendanceDate", ${column},
       status, source, "scannedById", "deviceId", "workProgramItemId", "workArea", "activityName", "createdAt", "updatedAt"
     )
-    SELECT row.id, ${input.programId}, ${input.workDayId}, row."programBeneficiaryId", ${input.attendanceDate}, ${input.now},
-      'PRESENT', ${input.source}, ${input.userId}, ${input.deviceId}, row."workProgramItemId", row."workArea", row."activityName", ${input.now}, ${input.now}
+    SELECT row.id, ${input.programId}, ${input.workDayId}, row."programBeneficiaryId", ${input.attendanceDate}, ${slotTimestamp},
+      'PRESENT', ${input.source}, ${input.userId}, ${input.deviceId}, row."workProgramItemId", row."workArea", row."activityName", ${processedTimestamp}, ${processedTimestamp}
     FROM jsonb_to_recordset(${JSON.stringify(rows)}::jsonb) AS row(
       id text, "programBeneficiaryId" text, "workProgramItemId" text, "workArea" text, "activityName" text
     )

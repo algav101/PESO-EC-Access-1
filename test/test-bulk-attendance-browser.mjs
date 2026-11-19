@@ -29,7 +29,7 @@ try {
       assert.deepEqual(body.programBeneficiaryIds, ["bulk-ui-1", "bulk-ui-3", "bulk-ui-5"]);
       assert.equal(body.workDayId, days[1].id); assert.equal(body.targetDate, days[1].workDate); assert.equal(body.shiftMode, "AFTERNOON_IN");
       for (const id of ["bulk-ui-1", "bulk-ui-5"]) roster.find((pb) => pb.id === id).attendanceRecords = [{ workDayId: days[1].id, attendanceDate: days[1].workDate, afternoonTimeIn: "2026-11-20T05:00:00Z", status: "PRESENT" }];
-      return reply({ success: true, updatedCount: 2, skippedCount: 1, slotLabel: "Afternoon Time-In (PM IN)", workDay: days[1], results: body.programBeneficiaryIds.map((id) => ({ programBeneficiaryId: id, designatedNumber: id.slice(-1), fullName: roster.find((pb) => pb.id === id).beneficiary.fullName, status: id === "bulk-ui-3" ? "SKIPPED" : "RECORDED", reason: id === "bulk-ui-3" ? "Orientation attendance must be verified first." : "" })) });
+      return reply({ success: true, updatedCount: 2, skippedCount: 1, slotLabel: "Afternoon Time-In (PM IN)", fixedTimeLabel: "1:00 PM", workDay: days[1], results: body.programBeneficiaryIds.map((id) => ({ programBeneficiaryId: id, designatedNumber: id.slice(-1), fullName: roster.find((pb) => pb.id === id).beneficiary.fullName, status: id === "bulk-ui-3" ? "SKIPPED" : "RECORDED", reason: id === "bulk-ui-3" ? "Orientation attendance must be verified first." : "" })) });
     }
     if (!["GET", "HEAD", "OPTIONS"].includes(req.method())) throw new Error("Unexpected mocked mutation " + url.pathname);
     if (url.pathname.endsWith("/qr/slots")) return reply({ slots: [] });
@@ -46,6 +46,10 @@ try {
   await page.getByRole("button", { name: "Attendance (3)", exact: true }).last().click();
   modal = page.getByRole("dialog", { name: "Attendance for Selected Beneficiaries" });
   await modal.getByLabel("Attendance Day").selectOption(days[1].id);
+  for (const [slot, label] of [["MORNING_IN", "7:00 AM"], ["MORNING_OUT", "11:00 AM"], ["AFTERNOON_IN", "1:00 PM"], ["AFTERNOON_OUT", "5:00 PM"]]) {
+    await modal.getByLabel("Attendance Shift").selectOption(slot);
+    assert.match(await modal.getByTestId("masterlist-attendance-time").innerText(), new RegExp(`2026-11-20.*${label}`));
+  }
   await modal.getByLabel("Attendance Shift").selectOption("AFTERNOON_IN");
   await modal.getByLabel("Remarks (Optional)").fill("Synthetic multi-selection test");
   await page.setViewportSize({ width: 390, height: 844 });

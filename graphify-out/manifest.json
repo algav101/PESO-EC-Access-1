@@ -2490,33 +2490,33 @@
     "semantic_hash": ""
   },
   "src/app/api/v1/programs/[id]/attendance/bulk/route.ts": {
-    "mtime": 1795055807.867375,
-    "seen": 1795055865.251469,
-    "ast_hash": "e023b37ff1c62e9dbc72dd1328d2c2a2",
+    "mtime": 1795067141.0249057,
+    "seen": 1795067360.9520276,
+    "ast_hash": "0d83b6b1721f76ec7a3e545f7782222f",
     "semantic_hash": ""
   },
   "src/components/beneficiaries/BulkAttendanceModal.tsx": {
-    "mtime": 1795055501.407354,
-    "seen": 1795055514.0289273,
-    "ast_hash": "b2fb58398900dd2cdda401d7c61e4bd8",
+    "mtime": 1795067141.0249057,
+    "seen": 1795067360.9572802,
+    "ast_hash": "5930b732feaaf3c1e20e1ba95d7b95ab",
     "semantic_hash": ""
   },
   "src/lib/attendance-slot-write.ts": {
-    "mtime": 1795055147.819129,
-    "seen": 1795055514.0319753,
-    "ast_hash": "794ab428818469c9d10c0c59baede1ec",
+    "mtime": 1795067292.002817,
+    "seen": 1795067360.9604025,
+    "ast_hash": "96fdce34a3551a23a26ca4d0800d69f2",
     "semantic_hash": ""
   },
   "test/bulk-attendance-scenarios.mjs": {
-    "mtime": 1795066383.6306884,
-    "seen": 1795066495.69223,
-    "ast_hash": "07fc80b40fdfa1dd042b4a84eec320e5",
+    "mtime": 1795067206.5025365,
+    "seen": 1795067360.9629765,
+    "ast_hash": "54d3f5bb6d910788b243e6826f053903",
     "semantic_hash": ""
   },
   "test/test-bulk-attendance-browser.mjs": {
-    "mtime": 1795055833.5084405,
-    "seen": 1795055865.2631698,
-    "ast_hash": "c655e29bf6d730b063c8ffd945669be8",
+    "mtime": 1795067206.5025365,
+    "seen": 1795067360.963521,
+    "ast_hash": "4921a600496156637b07cf521c88c22a",
     "semantic_hash": ""
   },
   "src/lib/attendance-schedule-reconciliation.ts": {
@@ -2529,6 +2529,12 @@
     "mtime": 1795066332.2893274,
     "seen": 1795066495.6922286,
     "ast_hash": "f23cdf69185de327516ed09e149f247d",
+    "semantic_hash": ""
+  },
+  "src/lib/masterlist-attendance-time.ts": {
+    "mtime": 1795067141.023905,
+    "seen": 1795067360.961355,
+    "ast_hash": "54522ec4b14628cf146b41102b73dc16",
     "semantic_hash": ""
   }
 }
