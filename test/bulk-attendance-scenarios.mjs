@@ -44,7 +44,7 @@ export async function testBulkAttendance({ db, load, admin, request, route }) {
   const saved = await db.attendanceRecord.findFirst({ where: { programBeneficiaryId: "bulk-pb-0" } });
   assert.equal(saved.source, "MASTERLIST_BULK"); assert.equal(saved.workProgramItemId, wp.items[0].id); assert.equal(saved.scannedById, admin.id);
   assert.equal(await db.attendanceRecord.count({ where: { programId: other.id } }), 0);
-  assert.equal(await db.auditLog.count({ where: { action: "ATTENDANCE_RECORDED_FROM_MASTERLIST" } }), 2);
+  assert.equal(await db.auditLog.count({ where: { action: "ATTENDANCE_RECORDED_FROM_MASTERLIST", metadata: { contains: program.id } } }), 2);
   assert.equal((await (await call(body(["bulk-pb-0", "bulk-pb-3"]))).json()).updatedCount, 0, "repeat click must preserve recorded timestamps");
   await db.systemSetting.upsert({ where: { key: "bypass_three_hour_rule" }, create: { key: "bypass_three_hour_rule", value: "enforce_3hr" }, update: { value: "enforce_3hr" } });
   const duration = await (await call(body(["bulk-pb-0"], { shiftMode: "MORNING_OUT" }))).json();

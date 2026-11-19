@@ -127,7 +127,7 @@ export async function PATCH(request: Request, { params }: { params: { id: string
           data: updateData,
         });
         const workDays = reschedule
-          ? await rescheduleProgramWorkDays(tx, { id: prog.id, startDate: prog.startDate!, requiredWorkDays: prog.requiredWorkDays })
+          ? await rescheduleProgramWorkDays(tx, { id: prog.id, startDate: prog.startDate!, requiredWorkDays: prog.requiredWorkDays, userId: user.id })
           : await tx.workDay.findMany({ where: { programId: prog.id }, orderBy: { dayNumber: "asc" } });
 
         // Update participating barangays if array provided

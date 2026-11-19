@@ -5,7 +5,7 @@ export const dynamic = "force-dynamic";
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getCurrentUser, hasPermission } from "@/lib/auth";
-import { writeAttendanceSlot } from "@/lib/attendance-slot-write";
+import { ATTENDANCE_FIELDS, writeAttendanceSlot } from "@/lib/attendance-slot-write";
 import { logAudit } from "@/lib/audit";
 import { format } from "date-fns";
 import {
@@ -167,6 +167,9 @@ export async function POST(request: Request) {
     }
 
     const slotLabels = ATTENDANCE_SLOT_LABELS;
+    if (record && record.attendanceDate !== workDay.workDate) {
+      return respond({ error: `ATTENDANCE DATE MISMATCH: Existing attendance is dated ${record.attendanceDate}, but Day ${workDay.dayNumber} is now ${workDay.workDate}. Ask PESO Admin to review the work-date correction. Walang bagong attendance na-record.`, code: "ATTENDANCE_DATE_MISMATCH" }, { status: 409 });
+    }
 
     // =========================================================================
     // ANTI-DOUBLE SCAN ENFORCEMENT: Check if the session slot was already logged
@@ -386,7 +389,12 @@ export async function POST(request: Request) {
       rows: [{ programBeneficiaryId: pb.id, workProgramItemId: resolvedItemId, workArea: resolvedArea, activityName: resolvedActivity }],
     });
     record = written[0];
-    if (!record) throw new ProgramScanError("ALREADY SCANNED OR SCHEDULE CHANGED: Existing attendance was kept. Refresh the attendance view before scanning again.", 409);
+    if (!record) {
+      const latest = await prisma.attendanceRecord.findUnique({ where: { programId_workDayId_programBeneficiaryId: { programId: program.id, workDayId: workDay.id, programBeneficiaryId: pb.id } } });
+      if (latest && latest.attendanceDate !== workDay.workDate) throw new ProgramScanError("ATTENDANCE DATE MISMATCH: The work schedule changed. Ask PESO Admin to review the attendance date; existing timestamps were kept.", 409);
+      if (latest?.[ATTENDANCE_FIELDS[targetSlot]]) throw new ProgramScanError(`ALREADY SCANNED: ${slotRecorded} was recorded by another request. The original timestamp was kept.`, 409);
+      throw new ProgramScanError("Attendance was not saved. Refresh the attendance view and try again.", 409);
+    }
 
     await logAudit({
       userId: user.id,

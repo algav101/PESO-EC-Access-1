@@ -267,6 +267,7 @@ try {
   assert.equal(await db.auditLog.count({ where: { entityType: "QR_PROGRAM_BINDING" } }), bindingsBeforeConflict);
   await (await import("./qr-auto-scenarios.mjs")).testAutomaticQrDetection({ db, load, admin, request, route });
   await (await import("./program-work-date-scenarios.mjs")).testProgramWorkDateChanges({ db, load, admin, request, route });
+  await (await import("./attendance-date-reconciliation-scenarios.mjs")).testAttendanceDateReconciliation({ db, load, admin, request, route });
   await (await import("./bulk-attendance-scenarios.mjs")).testBulkAttendance({ db, load, admin, request, route });
   authorized = false;
   assert.equal((await load("src/app/api/v1/programs/[id]/attendance/bulk/route.ts").POST(request({}), { params: { id: program.id } })).status, 403);

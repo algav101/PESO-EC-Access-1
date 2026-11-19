@@ -1,4 +1,5 @@
 import type { Prisma } from "@prisma/client";
+import { reconcileAttendanceScheduleDates } from "@/lib/attendance-schedule-reconciliation";
 
 export class ProgramScheduleError extends Error {
   constructor(message: string, public status = 400) { super(message); }
@@ -22,7 +23,7 @@ export function buildProgramWorkDays(startDate: string, count: number) {
 }
 
 /** Must run in a transaction. Keep day IDs and every attendance/photo history row. */
-export async function rescheduleProgramWorkDays(tx: Prisma.TransactionClient, program: { id: string; startDate: string; requiredWorkDays: number }) {
+export async function rescheduleProgramWorkDays(tx: Prisma.TransactionClient, program: { id: string; startDate: string; requiredWorkDays: number; userId?: string | null }) {
   const [lock] = await tx.$queryRaw<{ locked: boolean }[]>`SELECT pg_try_advisory_xact_lock(hashtextextended(${program.id}, 0)) AS locked`;
   if (!lock?.locked) throw new ProgramScheduleError("Another program update is running. Please retry after it finishes.", 409);
   const existing = await tx.workDay.findMany({ where: { programId: program.id }, orderBy: { dayNumber: "asc" } });
@@ -50,5 +51,6 @@ export async function rescheduleProgramWorkDays(tx: Prisma.TransactionClient, pr
   const existingNumbers = new Set(existing.map((day) => day.dayNumber));
   const missing = days.filter((day) => day.dayNumber <= program.requiredWorkDays && !existingNumbers.has(day.dayNumber));
   if (missing.length) await tx.workDay.createMany({ data: missing.map((day) => ({ ...day, programId: program.id })) });
+  await reconcileAttendanceScheduleDates(tx, program.id, program.userId);
   return tx.workDay.findMany({ where: { programId: program.id }, orderBy: { dayNumber: "asc" } });
 }
