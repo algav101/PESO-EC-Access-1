@@ -1440,9 +1440,9 @@
     "semantic_hash": ""
   },
   "src/lib/dexie.ts": {
-    "mtime": 1795052367.4839468,
-    "seen": 1795052680.96571,
-    "ast_hash": "2d72645157da070d63f27fe716f09244",
+    "mtime": 1795071340.8087988,
+    "seen": 1795071435.428397,
+    "ast_hash": "5362ccbae8350cea4199a49f33579b03",
     "semantic_hash": ""
   },
   "src/lib/dingalan-groupings.ts": {
@@ -2010,15 +2010,15 @@
     "semantic_hash": ""
   },
   "src/lib/program-qr-slot.ts": {
-    "mtime": 1795049037.8607714,
-    "seen": 1795050215.2179456,
-    "ast_hash": "160e75e4d6927e2c0087a2c13a511a8a",
+    "mtime": 1795071340.8087988,
+    "seen": 1795071435.4298952,
+    "ast_hash": "a737163037a2ab01dd7feda7791ea0ef",
     "semantic_hash": ""
   },
   "src/lib/program-scan-resolver.ts": {
-    "mtime": 1795049481.6554215,
-    "seen": 1795050215.2179463,
-    "ast_hash": "67b5606cc3ffd5b67072b6990e48f678",
+    "mtime": 1795071340.8087988,
+    "seen": 1795071435.4298966,
+    "ast_hash": "4bee0ea7c5d4e2e70d552c06b858e01d",
     "semantic_hash": ""
   },
   "test/test-program-qr-browser.mjs": {

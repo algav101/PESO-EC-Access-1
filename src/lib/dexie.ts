@@ -1,5 +1,5 @@
 import Dexie, { type Table } from "dexie";
-import { normalizeQrSlot, registeredQrSlot, ScanRequestError, wrongProgramQrMessage, type DetectedQrIdentity } from "@/lib/program-qr-slot";
+import { normalizeQrSlot, registeredQrSlot, ScanRequestError, wrongProgramQrMessage, inactiveProgramQrMessage, type DetectedQrIdentity } from "@/lib/program-qr-slot";
 import { format } from "date-fns";
 import {
   getPhilippineTime,
@@ -205,7 +205,7 @@ export async function findBeneficiaryOffline(
     if (auto && matches.length === 1) {
       const program = await offlineDb.cachedPrograms.get(matches[0].programId);
       if (!program) throw new ScanRequestError("Program missing from cache. Mag-Master Key Sync habang online.");
-      if (program.status !== "ACTIVE") throw new ScanRequestError("INACTIVE WORK PROGRAM: Walang na-record. I-check ang registered program.");
+      if (program.status !== "ACTIVE") throw new ScanRequestError(inactiveProgramQrMessage(program, matches[0].designatedNumber));
     }
     // Never choose an arbitrary person when a slot is duplicated.
     return matches.length === 1 ? matches[0] : null;

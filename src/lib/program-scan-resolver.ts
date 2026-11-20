@@ -1,6 +1,6 @@
 import prisma from "@/lib/prisma";
 import { extractCleanQrToken } from "@/lib/utils";
-import { normalizeQrSlot, wrongProgramQrMessage } from "@/lib/program-qr-slot";
+import { normalizeQrSlot, wrongProgramQrMessage, inactiveProgramQrMessage } from "@/lib/program-qr-slot";
 import { readPrintedQrBinding } from "@/lib/printed-qr-registration";
 import { verifyTokenHash } from "@/lib/qr";
 import type { DetectedQrIdentity } from "@/lib/program-qr-slot";
@@ -77,7 +77,7 @@ export async function resolveProgramScan(rawToken: string, programId: unknown, i
     : "CANNOT SCAN: Duplicate roster slot/name. I-check muna ang roster ng napiling program.", 409);
   const pb: any = matches[0];
   if (!pb) throw new ProgramScanError("CANNOT SCAN: Walang active beneficiary para sa QR/slot na ito sa napiling program. I-check ang program at uploaded roster.", 404);
-  if ((auto || options.requireActive) && pb.program.status !== "ACTIVE") throw new ProgramScanError("INACTIVE WORK PROGRAM: Ang registered program ay closed, completed, o draft. Walang na-record.", 409);
+  if ((auto || options.requireActive) && pb.program.status !== "ACTIVE") throw new ProgramScanError(inactiveProgramQrMessage(pb.program, pb.designatedNumber), 409);
   const qr = pb.qrCodes?.find((q: any) => ["ACTIVE", "REPRINTED"].includes(q.status)) || null;
   const detected: DetectedQrIdentity = {
     qrId: scannedQr?.id || qr?.id || null, version: scannedQr?.publicToken.startsWith("TUPAD-V2-") ? 2 : scannedQr ? 1 : 0,

@@ -35,6 +35,10 @@ export function wrongProgramQrMessage(source: string, selected: string): string 
   return `WRONG WORK PROGRAM: Ang QR code na ito ay para sa ${source}. Napiling program: ${selected}. Piliin ang tamang work program o gamitin ang QR code ng napiling program. Walang na-record.`;
 }
 
+export function inactiveProgramQrMessage(program: { programCode: string; programName: string; status: string }, designatedNumber: string): string {
+  return `INACTIVE WORK PROGRAM: Ang QR #${designatedNumber} ay naka-register sa ${program.programCode} (${program.programName}), status: ${program.status}. Gamitin ang QR ng aktibong program, o iparehistro sa admin ang lumang card bago muling gamitin. Walang na-record.`;
+}
+
 /** HTTP rejections must not be replayed as offline scans (including 401/403/404). */
 export async function readScanResponse(response: Response, fallback: string) {
   let data;

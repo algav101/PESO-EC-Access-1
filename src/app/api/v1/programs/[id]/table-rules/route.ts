@@ -51,64 +51,106 @@ export async function POST(request: Request, { params }: { params: { id: string 
     if (Array.isArray(body.rules)) {
       const { rules } = body;
 
-      await prisma.$transaction(async (tx) => {
-        // Remove existing rules for program
-        await tx.tableAssignmentRule.deleteMany({
-          where: { programId: params.id },
-        });
+      const validRules = rules
+        .map((r: any, i: number) => ({
+          programId: params.id,
+          startNumber: Number(r.startNumber),
+          endNumber: Number(r.endNumber),
+          tableNumber: String(r.tableNumber ?? "").trim(),
+          slotGroup: r.slotGroup?.trim() || `Slot Group ${i + 1}`,
+          priority: i,
+        }))
+        .filter(
+          (r: any) =>
+            !isNaN(r.startNumber) &&
+            !isNaN(r.endNumber) &&
+            Boolean(r.tableNumber)
+        );
 
-        // Insert new rules
-        for (let i = 0; i < rules.length; i++) {
-          const r = rules[i];
-          if (r.startNumber !== undefined && r.endNumber !== undefined && r.tableNumber) {
-            await tx.tableAssignmentRule.create({
+      await prisma.$transaction(
+        async (tx) => {
+          // Remove existing rules for program
+          await tx.tableAssignmentRule.deleteMany({
+            where: { programId: params.id },
+          });
+
+          // Insert new rules in a single batch query
+          if (validRules.length > 0) {
+            await tx.tableAssignmentRule.createMany({
+              data: validRules,
+            });
+          }
+
+          // Order rules by priority desc to match previous behavior
+          const freshRules = [...validRules].sort((a, b) => b.priority - a.priority);
+
+          // Fetch only needed fields for re-assignment
+          const programBeneficiaries = await tx.programBeneficiary.findMany({
+            where: { programId: params.id },
+            select: {
+              id: true,
+              designatedNumber: true,
+              tableNumber: true,
+              slotGroup: true,
+            },
+          });
+
+          // Group beneficiary IDs by target (tableNumber, slotGroup) to batch updates
+          const updateBuckets = new Map<
+            string,
+            { tableNumber: string; slotGroup: string; ids: string[] }
+          >();
+
+          for (const pb of programBeneficiaries) {
+            const num = parseInt(pb.designatedNumber, 10);
+            let assignedTable = "Table 1";
+            let assignedSlot = "Main Regular";
+
+            if (!isNaN(num)) {
+              const matchedRule = freshRules.find(
+                (rule) => num >= rule.startNumber && num <= rule.endNumber
+              );
+              if (matchedRule) {
+                assignedTable = matchedRule.tableNumber;
+                assignedSlot = matchedRule.slotGroup || assignedSlot;
+              } else {
+                assignedTable = `Table ${Math.ceil(num / 100)}`;
+              }
+            }
+
+            if (pb.tableNumber === assignedTable && pb.slotGroup === assignedSlot) {
+              continue;
+            }
+
+            const bucketKey = `${assignedTable}\0${assignedSlot}`;
+            let bucket = updateBuckets.get(bucketKey);
+            if (!bucket) {
+              bucket = {
+                tableNumber: assignedTable,
+                slotGroup: assignedSlot,
+                ids: [],
+              };
+              updateBuckets.set(bucketKey, bucket);
+            }
+            bucket.ids.push(pb.id);
+          }
+
+          // Apply batched updateMany per table/slot bucket (few queries instead of 800+)
+          for (const bucket of updateBuckets.values()) {
+            await tx.programBeneficiary.updateMany({
+              where: { id: { in: bucket.ids } },
               data: {
-                programId: params.id,
-                startNumber: Number(r.startNumber),
-                endNumber: Number(r.endNumber),
-                tableNumber: String(r.tableNumber).trim(),
-                slotGroup: r.slotGroup?.trim() || `Slot Group ${i + 1}`,
-                priority: i,
+                tableNumber: bucket.tableNumber,
+                slotGroup: bucket.slotGroup,
               },
             });
           }
+        },
+        {
+          maxWait: 10000,
+          timeout: 30000,
         }
-
-        // Fetch fresh rules to apply
-        const freshRules = await tx.tableAssignmentRule.findMany({
-          where: { programId: params.id },
-          orderBy: { priority: "desc" },
-        });
-
-        // Re-assign all beneficiaries
-        const programBeneficiaries = await tx.programBeneficiary.findMany({
-          where: { programId: params.id },
-        });
-
-        for (const pb of programBeneficiaries) {
-          const num = parseInt(pb.designatedNumber, 10);
-          let assignedTable = "Table 1";
-          let assignedSlot = "Main Regular";
-
-          if (!isNaN(num)) {
-            const matchedRule = freshRules.find((rule) => num >= rule.startNumber && num <= rule.endNumber);
-            if (matchedRule) {
-              assignedTable = matchedRule.tableNumber;
-              assignedSlot = matchedRule.slotGroup || assignedSlot;
-            } else {
-              assignedTable = `Table ${Math.ceil(num / 100)}`;
-            }
-          }
-
-          await tx.programBeneficiary.update({
-            where: { id: pb.id },
-            data: {
-              tableNumber: assignedTable,
-              slotGroup: assignedSlot,
-            },
-          });
-        }
-      });
+      );
 
       await logAudit({
         userId: user.id,
@@ -145,19 +187,25 @@ export async function POST(request: Request, { params }: { params: { id: string 
     if (applyToExisting) {
       const beneficiaries = await prisma.programBeneficiary.findMany({
         where: { programId: params.id },
+        select: { id: true, designatedNumber: true },
       });
 
+      const matchingIds: string[] = [];
       for (const pb of beneficiaries) {
         const num = parseInt(pb.designatedNumber, 10);
         if (!isNaN(num) && num >= rule.startNumber && num <= rule.endNumber) {
-          await prisma.programBeneficiary.update({
-            where: { id: pb.id },
-            data: {
-              tableNumber: rule.tableNumber,
-              slotGroup: rule.slotGroup,
-            },
-          });
+          matchingIds.push(pb.id);
         }
+      }
+
+      if (matchingIds.length > 0) {
+        await prisma.programBeneficiary.updateMany({
+          where: { id: { in: matchingIds } },
+          data: {
+            tableNumber: rule.tableNumber,
+            slotGroup: rule.slotGroup,
+          },
+        });
       }
     }
 
