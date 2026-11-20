@@ -127,6 +127,9 @@ export async function POST(request: Request) {
     }
 
     const selectedPhotos = Array.isArray(body.selectedPhotos) ? body.selectedPhotos : undefined;
+    const barangayEdits =
+      body.barangayEdits && typeof body.barangayEdits === "object" ? body.barangayEdits : undefined;
+    const layout = body.layout && typeof body.layout === "object" ? body.layout : undefined;
 
     const programMeta = await prisma.program.findUnique({
       where: { id: programId },
@@ -140,6 +143,8 @@ export async function POST(request: Request) {
       approvedPhotosOnly: user.role === "DOLE_COORDINATOR",
       selectedBarangays,
       selectedPhotos,
+      barangayEdits,
+      layout,
     });
 
     await logAudit({

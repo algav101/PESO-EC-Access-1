@@ -1,7 +1,11 @@
 import ExcelJS from "exceljs";
 import prisma from "./prisma";
 import { format } from "date-fns";
-import { populateCompletionReport } from "./completion-report-template";
+import {
+  populateCompletionReport,
+  type BarangayReportEdit,
+  type ReportLayoutSettings,
+} from "./completion-report-template";
 import { completionBarangay } from "./accomplishment-work-schedule";
 import type { DocumentationPhoto, ReportPhoto, SelectedReportPhotoInput } from "./completion-report-photos";
 
@@ -268,6 +272,8 @@ export interface AccomplishmentExportOptions {
   approvedPhotosOnly?: boolean;
   selectedBarangays?: string[];
   selectedPhotos?: SelectedReportPhotoInput[];
+  barangayEdits?: Record<string, BarangayReportEdit>;
+  layout?: ReportLayoutSettings;
 }
 
 export async function generateAccomplishmentExcel(
@@ -394,6 +400,7 @@ export async function generateAccomplishmentExcel(
         workDate,
         stage,
         includeGeotagInCaption: entry.includeGeotagInCaption ?? true,
+        customCaption: entry.customCaption ?? null,
       });
       customPhotosByBarangay.set(targetBrgyKey, list);
     }
@@ -424,6 +431,8 @@ export async function generateAccomplishmentExcel(
     {
       selectedBarangays: options.selectedBarangays,
       customPhotosByBarangay,
+      barangayEdits: options.barangayEdits,
+      layout: options.layout,
     }
   );
 }

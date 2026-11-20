@@ -2,11 +2,43 @@ import JSZip from "jszip";
 import { readFile } from "fs/promises";
 import path from "path";
 import { buildBarangayCompletionDays, completionBarangay, type CompletionProgram } from "./accomplishment-work-schedule";
-import { appendPhotoDocumentation, barangayDocumentationPhotos, type DocumentationPhoto, type PhotoLoader, type ReportPhoto } from "./completion-report-photos";
+import {
+  appendPhotoDocumentation,
+  barangayDocumentationPhotos,
+  type DocumentationPhoto,
+  type PhotoLayoutOptions,
+  type PhotoLoader,
+  type ReportPhoto,
+} from "./completion-report-photos";
+
+export interface BarangayReportDayEdit {
+  label: string;
+  text: string;
+}
+
+export interface BarangayReportEdit {
+  doleOffice?: string;
+  projectLocation?: string;
+  beneficiaryCount?: string;
+  periodOfWork?: string;
+  issuedLine?: string;
+  signatoryName?: string;
+  signatoryTitle?: string;
+  days?: BarangayReportDayEdit[];
+}
+
+export interface ReportLayoutSettings {
+  colCWidth?: number;
+  textAlign?: "left" | "center" | "justify";
+  photoLayout?: "1-col" | "2-col" | "3-col";
+  photoSize?: "compact" | "medium" | "large";
+}
 
 export interface CompletionReportOptions {
   selectedBarangays?: string[];
   customPhotosByBarangay?: Map<string, DocumentationPhoto[]>;
+  barangayEdits?: Record<string, BarangayReportEdit>;
+  layout?: ReportLayoutSettings;
 }
 
 interface ReportProgram extends CompletionProgram {
@@ -37,21 +69,88 @@ function displayDate(raw?: string | null): string {
   return Number.isNaN(date.getTime()) ? "" : new Intl.DateTimeFormat("en-US", { month: "long", day: "numeric", year: "numeric", timeZone: "UTC" }).format(date);
 }
 
-// Explicit wrapping and continuation rows avoid Excel's 409-point row-height limit.
-// Only the original two-column accomplishment table grows; no roster or extra columns.
-function wrapLines(text: string): string[] {
-  return text.split("\n").flatMap(line => {
-    const lines: string[] = [];
-    let remaining = line;
-    while (remaining.length > 46) {
-      const space = remaining.lastIndexOf(" ", 46);
-      const end = space > 0 ? space : 46;
-      lines.push(remaining.slice(0, end));
-      remaining = remaining.slice(end).trimStart();
+// Estimate visual wrapped line count without inserting artificial hard line breaks,
+// allowing Excel's native wrapText="1" to flow cleanly across whatever column width is set.
+function estimateWrappedLines(text: string, charsPerLine: number): number {
+  const safeLimit = Math.max(30, charsPerLine);
+  return text.split("\n").reduce((total, paragraph) => {
+    if (!paragraph.trim()) return total + 1;
+    return total + Math.max(1, Math.ceil(paragraph.length / safeLimit));
+  }, 0);
+}
+
+// Split only truly massive day text (> 22 visual lines) across continuation rows to stay well under Excel's 409pt row height limit.
+function chunkAccomplishmentParagraphs(
+  label: string,
+  text: string,
+  charsPerLine: number
+): Array<{ label: string; text: string; lines: number }> {
+  const normalized = text.replace(/\r\n/g, "\n");
+  const totalLines = estimateWrappedLines(normalized, charsPerLine);
+  if (totalLines <= 22) {
+    return [{ label, text: normalized, lines: totalLines }];
+  }
+
+  const paragraphs = normalized.split("\n");
+  const chunks: Array<{ label: string; text: string; lines: number }> = [];
+  let bucket: string[] = [];
+  let bucketLines = 0;
+
+  for (const para of paragraphs) {
+    const pLines = estimateWrappedLines(para, charsPerLine);
+    if (bucket.length > 0 && bucketLines + pLines > 22) {
+      chunks.push({
+        label: chunks.length === 0 ? label : `${label} (continued)`,
+        text: bucket.join("\n"),
+        lines: bucketLines,
+      });
+      bucket = [para];
+      bucketLines = pLines;
+    } else {
+      bucket.push(para);
+      bucketLines += pLines;
     }
-    lines.push(remaining);
-    return lines;
-  });
+  }
+  if (bucket.length > 0) {
+    chunks.push({
+      label: chunks.length === 0 ? label : `${label} (continued)`,
+      text: bucket.join("\n"),
+      lines: Math.max(1, bucketLines),
+    });
+  }
+  return chunks.length ? chunks : [{ label, text: "", lines: 1 }];
+}
+
+async function ensureAccomplishmentCellStyle(
+  zip: JSZip,
+  sourceStyleIdx: string,
+  horizontalAlign: "left" | "center" | "justify"
+): Promise<string> {
+  let styles = await zip.file("xl/styles.xml")!.async("string");
+  const formats = styles.match(/<cellXfs count="(\d+)">([\s\S]*?)<\/cellXfs>/);
+  if (!formats) return sourceStyleIdx;
+  const cells = [...formats[2].matchAll(/<xf\b[^>]*(?:\/>|>[\s\S]*?<\/xf>)/g)].map((m) => m[0]);
+  const base = cells[Number(sourceStyleIdx)];
+  if (!base) return sourceStyleIdx;
+
+  let style = base.replace(/\s+applyAlignment="[^"]*"/, "");
+  style = style.replace(/^<xf\b/, '<xf applyAlignment="1"');
+  style = style.replace(/<alignment\b[^>]*\/>/, "");
+  if (style.endsWith("/>")) style = style.slice(0, -2) + "></xf>";
+  style = style.replace(
+    "</xf>",
+    `<alignment horizontal="${horizontalAlign}" vertical="top" wrapText="1"/></xf>`
+  );
+
+  const existing = cells.indexOf(style);
+  if (existing >= 0) return String(existing);
+
+  styles = styles.replace(
+    formats[0],
+    `<cellXfs count="${cells.length + 1}">${formats[2]}${style}</cellXfs>`
+  );
+  zip.file("xl/styles.xml", styles);
+  return String(cells.length);
 }
 
 async function templateBuffer(): Promise<Buffer> {
@@ -158,9 +257,27 @@ export async function populateCompletionReport(
     }
   }
 
+  // Normalize barangayEdits keys so matching works with Title Case or UPPERCASE keys
+  const normalizedEdits = new Map<string, BarangayReportEdit>();
+  if (options.barangayEdits) {
+    for (const [k, v] of Object.entries(options.barangayEdits)) {
+      const norm = completionBarangay(k);
+      if (norm && v) normalizedEdits.set(norm, v);
+    }
+  }
+
+  const desiredColCWidth = options.layout?.colCWidth && options.layout.colCWidth >= 35 && options.layout.colCWidth <= 120
+    ? options.layout.colCWidth
+    : 68;
+  const desiredTextAlign: "left" | "center" | "justify" = options.layout?.textAlign || "left";
+  const desiredPhotoLayout = options.layout?.photoLayout || "1-col";
+  const desiredPhotoSize = options.layout?.photoSize || "medium";
+
   for (let sheetIndex = 0; sheetIndex < keptSheets.length; sheetIndex++) {
     const sheet = keptSheets[sheetIndex];
     const barangay = sheet.barangay;
+    const brgyKey = completionBarangay(barangay);
+    const brgyEdit = normalizedEdits.get(brgyKey);
     const target = targets.get(sheet.rId);
     if (!target) throw new Error(`Missing completion template worksheet: ${barangay}`);
     const file = target.startsWith("/") ? target.slice(1) : path.posix.normalize("xl/" + target);
@@ -177,23 +294,39 @@ export async function populateCompletionReport(
       });
     }
 
+    // Apply Column C width so accomplishment text flows cleanly across the full table width.
+    const colBWidthMatch = xml.match(/<col\b[^>]*min="2"[^>]*width="([^"]+)"/);
+    const colBWidth = colBWidthMatch ? Number(colBWidthMatch[1]) || 35 : 35;
+    xml = xml.replace(/<col\b([^>]*min="3"[^>]*)\/>/, (full, attrs: string) => {
+      if (/\bwidth="[^"]*"/.test(attrs)) {
+        return `<col${attrs.replace(/\bwidth="[^"]*"/, `width="${desiredColCWidth}"`)}/>`;
+      }
+      return full;
+    });
+
     const sourceCells = [...xml.matchAll(/<c\b[^>]*\br="([A-Z]+\d+)"[^>]*t="s"[^>]*><v>(\d+)<\/v><\/c>/g)].map(match => ({ address: match[1], text: strings[Number(match[2])] || "", runs: sourceStrings[Number(match[2])] }));
     const dayCells = sourceCells.filter(cell => /^B\d+$/.test(cell.address) && /^Day \d+\b/.test(cell.text));
     if (dayCells.length !== 10) throw new Error(`Invalid daily table in ${barangay} completion template`);
     const firstRow = Number(dayCells[0].address.slice(1));
     const lastRow = firstRow + 9;
     const oldRows = [...xml.matchAll(/<row\b[^>]*\br="(\d+)"[^>]*>[\s\S]*?<\/row>/g)].filter(match => Number(match[1]) >= firstRow && Number(match[1]) <= lastRow);
-    const days = buildBarangayCompletionDays(program, barangay);
-    const reportRows = days.flatMap(day => {
-      const lines = wrapLines(day.accomplishment);
-      const chunks = [];
-      for (let index = 0; index < lines.length; index += 25) chunks.push({
-        label: `Day ${day.dayNumber}` + (day.workDate ? ` (${displayDate(day.workDate)})` : "") + (index ? " (continued)" : ""),
-        text: lines.slice(index, index + 25).join("\n"),
-        lines: Math.min(25, lines.length - index),
-      });
-      return chunks;
-    });
+
+    // Ensure Column C accomplishment cell style uses native wrapText + desired alignment (default left-aligned, top-aligned)
+    const origColCStyle = oldRows[0]?.[0].match(new RegExp(`<c\\b[^>]*r="C${firstRow}"[^>]*s="(\\d+)"`))?.[1] || "19";
+    const alignedColCStyle = await ensureAccomplishmentCellStyle(zip, origColCStyle, desiredTextAlign);
+
+    const charsPerLine = Math.max(40, Math.floor(desiredColCWidth * 0.92));
+    const sourceDays: Array<{ label: string; text: string }> =
+      brgyEdit?.days && brgyEdit.days.length > 0
+        ? brgyEdit.days.map((d) => ({ label: d.label || "", text: d.text || "" }))
+        : buildBarangayCompletionDays(program, barangay).map((day) => ({
+            label: `Day ${day.dayNumber}` + (day.workDate ? ` (${displayDate(day.workDate)})` : ""),
+            text: day.accomplishment,
+          }));
+
+    const reportRows = sourceDays.flatMap((entry) =>
+      chunkAccomplishmentParagraphs(entry.label, entry.text, charsPerLine)
+    );
     // For a shorter program, blank unused reference rows rather than keeping old sample data.
     while (reportRows.length < 10) reportRows.push({ label: "", text: "", lines: 1 });
     const delta = reportRows.length - 10;
@@ -207,7 +340,12 @@ export async function populateCompletionReport(
       const number = firstRow + index;
       let row = oldRows[Math.min(index, 9)][0].replace(/\br="([A-Z]*)(\d+)"/g, (_, column) => `r="${column}${number}"`);
       row = setCell(setCell(row, `B${number}`, entry.label), `C${number}`, entry.text);
-      const height = Math.max(Number(attribute(row, "ht")) || 39, entry.lines * 13 + 8);
+      // Apply chosen horizontal alignment + wrapText to Column C
+      row = row.replace(
+        new RegExp(`(<c\\b[^>]*r="C${number}"[^>]*\\bs=")\\d+(")`),
+        `$1${alignedColCStyle}$2`
+      );
+      const height = Math.min(400, Math.max(Number(attribute(row, "ht")) || 39, entry.lines * 15 + 14));
       return row.replace(/<row\b([^>]*)>/, (_, attrs: string) => `<row${attrs.replace(/\s+(?:ht|customHeight)="[^"]*"/g, "")} ht="${height}" customHeight="1">`);
     }).join("");
     // These ten rows are consecutive in the original template.
@@ -216,7 +354,7 @@ export async function populateCompletionReport(
     if (first < 0 || end < first) throw new Error("Completion template daily rows could not be located");
     xml = xml.slice(0, first) + generated + xml.slice(end);
 
-    const people = program.programBeneficiaries.filter(pb => completionBarangay(pb.beneficiary.barangay) === completionBarangay(barangay));
+    const people = program.programBeneficiaries.filter(pb => completionBarangay(pb.beneficiary.barangay) === brgyKey);
     const name = barangay.toLowerCase().replace(/\b\w/g, letter => letter.toUpperCase());
     const setLabeledCell = (address: string, label: string, value: string) => {
       const runs = sourceCells.find(cell => cell.address === address)?.runs;
@@ -225,27 +363,57 @@ export async function populateCompletionReport(
       const styled = runs?.includes("<r>") ? runs.replace(/<t\b[^>]*>[\s\S]*?<\/t>/g, text => index++ === 0 ? text : `<t xml:space="preserve">${escapeXml(value)}</t>`) : undefined;
       xml = setCell(xml, address, label + value, styled);
     };
-    setLabeledCell("A5", "Project Location: ", `Brgy. ${name}, ${program.municipality || "Dingalan"}, ${program.province || "Aurora"}`);
-    setLabeledCell("A6", "No. of Beneficiaries: ", String(people.length));
+    const defaultLocation = `Brgy. ${name}, ${program.municipality || "Dingalan"}, ${program.province || "Aurora"}`;
     const scheduledDates = program.workDays.map(day => day.workDate).filter(Boolean).sort();
     const start = displayDate(program.startDate || scheduledDates[0]);
     const endDate = displayDate(program.endDate || scheduledDates[scheduledDates.length - 1]);
-    setLabeledCell("A7", "Period of Work: ", [start, endDate].filter(Boolean).join(" to "));
-    if (program.doleOffice?.trim()) setLabeledCell("A4", "DOLE-Regional Office: ", program.doleOffice.trim());
+    const defaultPeriod = [start, endDate].filter(Boolean).join(" to ");
+    const defaultDoleOffice = program.doleOffice?.trim() || "";
+
+    setLabeledCell("A5", "Project Location: ", brgyEdit?.projectLocation?.trim() || defaultLocation);
+    setLabeledCell("A6", "No. of Beneficiaries: ", brgyEdit?.beneficiaryCount?.trim() || String(people.length));
+    setLabeledCell("A7", "Period of Work: ", brgyEdit?.periodOfWork?.trim() || defaultPeriod);
+    const finalDoleOffice = brgyEdit?.doleOffice?.trim() || defaultDoleOffice;
+    if (finalDoleOffice) setLabeledCell("A4", "DOLE-Regional Office: ", finalDoleOffice);
+
     const issueCell = sourceCells.find(cell => /Issued this/.test(cell.text));
     if (issueCell) {
-      const parts = ["           Issued this ", `${issueDay}${ordinal}`, " day of ", issuePart("month"), ` ${issuePart("year")}.`];
-      let index = 0;
-      const styled = issueCell.runs.replace(/<t\b[^>]*>[\s\S]*?<\/t>/g, () => `<t xml:space="preserve">${escapeXml(parts[index++] || "")}</t>`);
-      xml = setCell(xml, shiftRef(issueCell.address), parts.join(""), styled);
+      if (brgyEdit?.issuedLine?.trim()) {
+        xml = setCell(xml, shiftRef(issueCell.address), "           " + brgyEdit.issuedLine.trim());
+      } else {
+        const parts = ["           Issued this ", `${issueDay}${ordinal}`, " day of ", issuePart("month"), ` ${issuePart("year")}.`];
+        let index = 0;
+        const styled = issueCell.runs.replace(/<t\b[^>]*>[\s\S]*?<\/t>/g, () => `<t xml:space="preserve">${escapeXml(parts[index++] || "")}</t>`);
+        xml = setCell(xml, shiftRef(issueCell.address), parts.join(""), styled);
+      }
     }
+
+    if (brgyEdit?.signatoryName?.trim()) {
+      const sigNameCell = sourceCells.find(cell => /GAVIOLA/i.test(cell.text));
+      if (sigNameCell) {
+        xml = setCell(xml, shiftRef(sigNameCell.address), brgyEdit.signatoryName.trim());
+      }
+    }
+    if (brgyEdit?.signatoryTitle?.trim()) {
+      const sigTitleCell = sourceCells.find(cell => /PESO Manager/i.test(cell.text));
+      if (sigTitleCell) {
+        xml = setCell(xml, shiftRef(sigTitleCell.address), brgyEdit.signatoryTitle.trim());
+      }
+    }
+
     const documentationCaption = sourceCells.find(cell => /Before, during work, and after/i.test(cell.text));
     if (!documentationCaption) throw new Error(`Missing Photo Documentation section in ${barangay} completion template`);
     const captionRow = Number(shiftRef(documentationCaption.address).replace(/^[A-Z]+/, ""));
     const photosForSheet = options.customPhotosByBarangay
-      ? options.customPhotosByBarangay.get(completionBarangay(barangay)) || []
+      ? options.customPhotosByBarangay.get(brgyKey) || []
       : barangayDocumentationPhotos(program, barangay);
-    xml = await appendPhotoDocumentation(zip, xml, file, captionRow, photosForSheet, loadPhoto);
+    const photoLayoutOpts: PhotoLayoutOptions = {
+      layout: desiredPhotoLayout,
+      photoSize: desiredPhotoSize,
+      colBWidth,
+      colCWidth: desiredColCWidth,
+    };
+    xml = await appendPhotoDocumentation(zip, xml, file, captionRow, photosForSheet, loadPhoto, photoLayoutOpts);
     zip.file(file, xml);
   }
   return zip.generateAsync({ type: "nodebuffer", compression: "DEFLATE" });

@@ -37,6 +37,12 @@ import {
   stripStagePrefix,
   type PhotoStage,
 } from "@/lib/geotag-canvas";
+import {
+  AccomplishmentExcelPreviewEditor,
+  cleanAccomplishmentDayText,
+  type PreviewBarangayDoc,
+  type PreviewLayoutConfig,
+} from "@/components/reports/AccomplishmentExcelPreviewEditor";
 
 interface ProgramSummary {
   id: string;
@@ -105,6 +111,7 @@ interface SelectedSlotEntry {
   targetBarangay: string;
   targetDayNumber: number;
   stage: PhotoStage;
+  customCaption?: string;
 }
 
 interface Props {
@@ -132,11 +139,24 @@ export function AccomplishmentReportBuilderModal({
   const isDoleRole = user?.role === "DOLE_COORDINATOR";
   const canEditStatus = isAdminUser(user) || can("photo.approve");
 
-  // 1. Target TUPAD Work Program & Barangay Scope State
+  // 1. Target TUPAD Work Program, Step Switcher & Barangay Scope State
+  const [builderStep, setBuilderStep] = useState<"photos" | "preview">("photos");
   const [targetProgramId, setTargetProgramId] = useState<string>(initialProgramId || programs[0]?.id || "");
   const [selectedBarangays, setSelectedBarangays] = useState<string[]>([...DINGALAN_BARANGAYS]);
   const [activeBarangay, setActiveBarangay] = useState<string>(DINGALAN_BARANGAYS[0]);
   const [includeGeotagInCaption, setIncludeGeotagInCaption] = useState<boolean>(true);
+
+  // Editable Excel Document Preview State (Texts & Layout per Barangay)
+  const [previewDocs, setPreviewDocs] = useState<Record<string, PreviewBarangayDoc>>({});
+  const [defaultPreviewDocs, setDefaultPreviewDocs] = useState<Record<string, PreviewBarangayDoc>>({});
+  const [workDayDates, setWorkDayDates] = useState<Map<number, string>>(new Map());
+  const [previewLoading, setPreviewLoading] = useState<boolean>(false);
+  const [layoutConfig, setLayoutConfig] = useState<PreviewLayoutConfig>({
+    colCWidth: 68,
+    textAlign: "left",
+    photoLayout: "1-col",
+    photoSize: "medium",
+  });
 
   // 2. Loaded Data
   const [allPhotos, setAllPhotos] = useState<PhotoRecord[]>([]);
@@ -284,6 +304,33 @@ export function AccomplishmentReportBuilderModal({
     }
   }, []);
 
+  // Fetch editable Excel preview data (headers, beneficiary counts, Day 1-10 accomplishment texts)
+  const fetchAccomplishmentPreview = useCallback(async (progId: string) => {
+    if (!progId) return;
+    setPreviewLoading(true);
+    try {
+      const res = await fetch(
+        `/api/v1/reports/accomplishment-preview?programId=${encodeURIComponent(progId)}`,
+        { cache: "no-store" }
+      );
+      if (res.ok) {
+        const data = await res.json();
+        const docs: Record<string, PreviewBarangayDoc> = data.barangays || {};
+        setDefaultPreviewDocs(docs);
+        setPreviewDocs(JSON.parse(JSON.stringify(docs)));
+        const wdMap = new Map<number, string>();
+        for (const wd of data.program?.workDays || []) {
+          wdMap.set(wd.dayNumber, wd.workDate);
+        }
+        setWorkDayDates(wdMap);
+      }
+    } catch (err) {
+      console.error("Failed to fetch accomplishment preview:", err);
+    } finally {
+      setPreviewLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
     if (!isOpen) return;
     fetchAllPhotos(targetProgramId);
@@ -292,6 +339,7 @@ export function AccomplishmentReportBuilderModal({
   useEffect(() => {
     if (!isOpen || !targetProgramId) return;
     fetchTargetWorkPrograms(targetProgramId);
+    fetchAccomplishmentPreview(targetProgramId);
     if (allPhotos.length > 0) {
       setSelectedByBarangay(buildDefaultSelection(allPhotos, targetProgramId));
     }
@@ -430,7 +478,7 @@ export function AccomplishmentReportBuilderModal({
 
   const updateQueueSlot = (
     photoId: string,
-    patch: Partial<Pick<SelectedSlotEntry, "targetDayNumber" | "stage">>
+    patch: Partial<Pick<SelectedSlotEntry, "targetDayNumber" | "stage" | "customCaption">>
   ) => {
     setSelectedByBarangay((prev) => ({
       ...prev,
@@ -440,14 +488,32 @@ export function AccomplishmentReportBuilderModal({
     }));
   };
 
-  const moveQueueItem = (index: number, direction: -1 | 1) => {
+  const reorderQueueSlots = (fromIndex: number, toIndex: number) => {
     setSelectedByBarangay((prev) => {
       const list = [...(prev[activeBarangay] || [])];
-      const nextIdx = index + direction;
-      if (nextIdx < 0 || nextIdx >= list.length) return prev;
-      [list[index], list[nextIdx]] = [list[nextIdx], list[index]];
+      if (fromIndex < 0 || fromIndex >= list.length || toIndex < 0 || toIndex >= list.length) {
+        return prev;
+      }
+      const [moved] = list.splice(fromIndex, 1);
+      list.splice(toIndex, 0, moved);
       return { ...prev, [activeBarangay]: list };
     });
+  };
+
+  const moveQueueItem = (index: number, direction: -1 | 1) => {
+    reorderQueueSlots(index, index + direction);
+  };
+
+  const sortActiveSlotsAuto = () => {
+    const stageOrder: Record<PhotoStage, number> = { BEFORE: 0, DURING: 1, AFTER: 2 };
+    setSelectedByBarangay((prev) => {
+      const sorted = [...(prev[activeBarangay] || [])].sort((a, b) => {
+        if (a.targetDayNumber !== b.targetDayNumber) return a.targetDayNumber - b.targetDayNumber;
+        return stageOrder[a.stage] - stageOrder[b.stage];
+      });
+      return { ...prev, [activeBarangay]: sorted };
+    });
+    showFeedback("success", `Sorted ${activeBarangay} photos by Day → Before / During / After.`);
   };
 
   const removeQueueItem = (photoId: string) => {
@@ -665,9 +731,27 @@ export function AccomplishmentReportBuilderModal({
             longitude: p?.longitude ?? null,
             capturedAt: p?.capturedAt ?? null,
             includeGeotagInCaption,
+            customCaption: slot.customCaption,
           };
         })
       );
+
+      const barangayEditsPayload: Record<string, any> = {};
+      for (const brgy of selectedBarangays) {
+        const doc = previewDocs[brgy];
+        if (doc) {
+          barangayEditsPayload[brgy] = {
+            doleOffice: doc.doleOffice,
+            projectLocation: doc.projectLocation,
+            beneficiaryCount: doc.beneficiaryCount,
+            periodOfWork: doc.periodOfWork,
+            issuedLine: doc.issuedLine,
+            signatoryName: doc.signatoryName,
+            signatoryTitle: doc.signatoryTitle,
+            days: doc.days.map((d) => ({ label: d.label, text: d.text })),
+          };
+        }
+      }
 
       const res = await fetch("/api/v1/reports/export", {
         method: "POST",
@@ -677,6 +761,8 @@ export function AccomplishmentReportBuilderModal({
           programId: targetProgramId,
           selectedBarangays,
           selectedPhotos: selectedPhotosPayload,
+          barangayEdits: barangayEditsPayload,
+          layout: layoutConfig,
         }),
       });
 
@@ -788,6 +874,42 @@ export function AccomplishmentReportBuilderModal({
               >
                 <X className="w-5 h-5" />
               </button>
+            </div>
+          </div>
+
+          {/* Step Switcher Bar: Step 1 (Select Photos & Barangays) vs Step 2 (Edit Texts & Arrange Photos Preview) */}
+          <div className="mt-3 pt-2.5 border-t border-white/10 flex flex-wrap items-center justify-between gap-2">
+            <div className="inline-flex bg-slate-950/70 p-1 rounded-xl border border-slate-700/80 gap-1">
+              <button
+                type="button"
+                onClick={() => setBuilderStep("photos")}
+                className={`px-3.5 py-1.5 rounded-lg text-xs font-black transition flex items-center gap-1.5 cursor-pointer ${
+                  builderStep === "photos"
+                    ? "bg-gov-gold text-gov-dark shadow"
+                    : "text-slate-300 hover:text-white hover:bg-white/5"
+                }`}
+              >
+                <ImageIcon className="w-3.5 h-3.5" />
+                <span>1. Choose Photos &amp; Geotags</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setBuilderStep("preview")}
+                className={`px-3.5 py-1.5 rounded-lg text-xs font-black transition flex items-center gap-1.5 cursor-pointer ${
+                  builderStep === "preview"
+                    ? "bg-gov-gold text-gov-dark shadow"
+                    : "text-slate-300 hover:text-white hover:bg-white/5"
+                }`}
+              >
+                <Edit3 className="w-3.5 h-3.5" />
+                <span>2. Preview &amp; Arrange Excel (Texts &amp; Photos)</span>
+              </button>
+            </div>
+
+            <div className="text-[11px] text-slate-300 hidden md:block">
+              {builderStep === "photos"
+                ? "Pick photos across any work program, then open Step 2 to edit texts, captions, and photo arrangement before downloading."
+                : "Edit accomplishment texts, header details, captions, column width, and drag-and-drop photo order — your exact arrangement downloads to Excel."}
             </div>
           </div>
 
@@ -922,8 +1044,9 @@ export function AccomplishmentReportBuilderModal({
           </div>
         </div>
 
-        {/* 3. Active Barangay Work Program Reference Strip */}
-        <div className="bg-blue-50/70 border-b border-blue-200/80 px-5 py-2 shrink-0">
+        {/* 3. Active Barangay Work Program Reference Strip (Step 1 only) */}
+        {builderStep === "photos" && (
+          <div className="bg-blue-50/70 border-b border-blue-200/80 px-5 py-2 shrink-0">
           <div className="flex items-center gap-2 overflow-x-auto pb-0.5">
             <span className="text-[10px] font-black uppercase tracking-wider text-gov-blue whitespace-nowrap flex items-center gap-1 shrink-0">
               <Calendar className="w-3.5 h-3.5" />
@@ -967,8 +1090,98 @@ export function AccomplishmentReportBuilderModal({
             )}
           </div>
         </div>
+        )}
 
-        {/* 4. Main Split Studio Workspace */}
+        {/* 4. Main Workspace: Step 1 (Cross-Program Photo Picker) OR Step 2 (Editable Excel Preview & Arranger) */}
+        {builderStep === "preview" ? (
+          <AccomplishmentExcelPreviewEditor
+            activeBarangay={activeBarangay}
+            doc={previewDocs[activeBarangay] || null}
+            loading={previewLoading}
+            layout={layoutConfig}
+            onChangeLayout={(patch) => setLayoutConfig((prev) => ({ ...prev, ...patch }))}
+            onChangeDoc={(updater) =>
+              setPreviewDocs((prev) => {
+                const curr = prev[activeBarangay];
+                if (!curr) return prev;
+                return { ...prev, [activeBarangay]: updater(curr) };
+              })
+            }
+            onResetDoc={() => {
+              const def = defaultPreviewDocs[activeBarangay];
+              if (!def) return;
+              setPreviewDocs((prev) => ({
+                ...prev,
+                [activeBarangay]: JSON.parse(JSON.stringify(def)),
+              }));
+              showFeedback("success", `Reset Barangay ${activeBarangay} accomplishment texts to defaults.`);
+            }}
+            onApplyHeaderToAll={() => {
+              const curr = previewDocs[activeBarangay];
+              if (!curr) return;
+              setPreviewDocs((prev) => {
+                const next: Record<string, PreviewBarangayDoc> = {};
+                for (const [brgy, doc] of Object.entries(prev)) {
+                  next[brgy] = {
+                    ...doc,
+                    doleOffice: curr.doleOffice,
+                    periodOfWork: curr.periodOfWork,
+                    issuedLine: curr.issuedLine,
+                    signatoryName: curr.signatoryName,
+                    signatoryTitle: curr.signatoryTitle,
+                  };
+                }
+                return next;
+              });
+              showFeedback("success", "Applied DOLE Office, Period of Work, Issued Date, and Signatory to all 11 barangays.");
+            }}
+            onCleanAndFormatCurrent={() => {
+              setPreviewDocs((prev) => {
+                const curr = prev[activeBarangay];
+                if (!curr) return prev;
+                return {
+                  ...prev,
+                  [activeBarangay]: {
+                    ...curr,
+                    days: curr.days.map((d) => ({ ...d, text: cleanAccomplishmentDayText(d.text) })),
+                  },
+                };
+              });
+              showFeedback("success", `Auto-cleaned and formatted Barangay ${activeBarangay} daily accomplishments.`);
+            }}
+            onCleanAndFormatAll={() => {
+              setPreviewDocs((prev) => {
+                const next: Record<string, PreviewBarangayDoc> = {};
+                for (const [brgy, doc] of Object.entries(prev)) {
+                  next[brgy] = {
+                    ...doc,
+                    days: doc.days.map((d) => ({ ...d, text: cleanAccomplishmentDayText(d.text) })),
+                  };
+                }
+                return next;
+              });
+              showFeedback("success", "Auto-cleaned and formatted daily accomplishment texts across all 11 barangays.");
+            }}
+            selectedEntries={activeSelectedEntries}
+            photoMap={photoMap}
+            workDayDates={workDayDates}
+            requiredWorkDays={targetProgram?.requiredWorkDays || 10}
+            includeGeotagInCaption={includeGeotagInCaption}
+            onUpdateSlot={updateQueueSlot}
+            onReorderSlots={reorderQueueSlots}
+            onRemoveSlot={removeQueueItem}
+            onSortSlotsAuto={sortActiveSlotsAuto}
+            onEditPhotoPermanent={(photoId) => {
+              const p = photoMap.get(photoId);
+              if (p) openPhotoEditor(p);
+            }}
+            onZoomPhoto={(photoId) => {
+              const p = photoMap.get(photoId);
+              if (p) setZoomPhoto(p);
+            }}
+            onGoToPhotoPicker={() => setBuilderStep("photos")}
+          />
+        ) : (
         <div className="flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-12 overflow-hidden">
           {/* LEFT: Cross-Program Photo Library (8 cols) */}
           <div className="lg:col-span-8 flex flex-col min-h-0 border-r border-slate-200 bg-slate-50">
@@ -1479,6 +1692,7 @@ export function AccomplishmentReportBuilderModal({
             </div>
           </div>
         </div>
+        )}
       </div>
 
       {/* PERMANENT PHOTO GEOTAGGING & STATUS EDITOR MODAL */}
