@@ -317,7 +317,7 @@ export default function FieldWorkProgramPage() {
   return (
     <div className="max-w-6xl mx-auto space-y-6 pb-16 print:p-0 print:max-w-none">
       {/* 1. Header Banner */}
-      <div className="gov-card p-6 bg-gradient-to-r from-gov-dark via-slate-900 to-blue-950 text-white rounded-3xl border-2 border-gov-gold/40 shadow-xl print:hidden">
+      <div className="p-6 bg-gradient-to-r from-gov-dark via-slate-900 to-blue-950 text-white rounded-3xl border-2 border-gov-gold/40 shadow-xl print:hidden">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div className="space-y-1.5">
             <div className="flex flex-wrap items-center gap-2">

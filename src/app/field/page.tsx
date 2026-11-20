@@ -114,7 +114,7 @@ function FieldScannerHubContent() {
   return (
     <div className="space-y-6 max-w-6xl mx-auto pb-12">
       {/* 1. Header Banner */}
-      <div className="gov-card p-6 sm:p-8 bg-gradient-to-r from-gov-dark via-slate-900 to-blue-950 text-white rounded-3xl border-2 border-gov-gold/40 shadow-xl relative overflow-hidden">
+      <div className="p-6 sm:p-8 bg-gradient-to-r from-gov-dark via-slate-900 to-blue-950 text-white rounded-3xl border-2 border-gov-gold/40 shadow-xl relative overflow-hidden">
         <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div className="flex items-center space-x-3.5">
             <PesoLogo className="w-12 h-12 shrink-0" />

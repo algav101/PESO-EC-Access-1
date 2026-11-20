@@ -17,54 +17,56 @@ body {
 }
 
 /* High-Contrast Gray / Black / White Official Style Utilities */
-.gov-header-gradient {
-  background: linear-gradient(135deg, #090d16 0%, #0f172a 50%, #1e293b 100%);
-  border-bottom: 1px solid #334155;
-}
+@layer components {
+  .gov-header-gradient {
+    background: linear-gradient(135deg, #090d16 0%, #0f172a 50%, #1e293b 100%);
+    border-bottom: 1px solid #334155;
+  }
 
-.gov-badge-gold {
-  background: #fef3c7;
-  color: #78350f;
-  border: 1px solid #fcd34d;
-  font-weight: 700;
-}
+  .gov-badge-gold {
+    background: #fef3c7;
+    color: #78350f;
+    border: 1px solid #fcd34d;
+    font-weight: 700;
+  }
 
-.gov-badge-blue {
-  background: #e2e8f0;
-  color: #0f172a;
-  border: 1px solid #94a3b8;
-  font-weight: 700;
-}
+  .gov-badge-blue {
+    background: #e2e8f0;
+    color: #0f172a;
+    border: 1px solid #94a3b8;
+    font-weight: 700;
+  }
 
-.gov-badge-green {
-  background: #ecfdf5;
-  color: #065f46;
-  border: 1px solid #6ee7b7;
-  font-weight: 700;
-}
+  .gov-badge-green {
+    background: #ecfdf5;
+    color: #065f46;
+    border: 1px solid #6ee7b7;
+    font-weight: 700;
+  }
 
-.gov-badge-red {
-  background: #fef2f2;
-  color: #991b1b;
-  border: 1px solid #fca5a5;
-  font-weight: 700;
-}
+  .gov-badge-red {
+    background: #fef2f2;
+    color: #991b1b;
+    border: 1px solid #fca5a5;
+    font-weight: 700;
+  }
 
-/* High-Contrast Crisp Cards */
-.gov-card {
-  background: #ffffff;
-  border: 1px solid #cbd5e1;
-  border-radius: 0.75rem;
-  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.06), 0 1px 2px -1px rgba(0, 0, 0, 0.04);
-}
+  /* High-Contrast Crisp Cards */
+  .gov-card {
+    background-color: #ffffff;
+    border: 1px solid #cbd5e1;
+    border-radius: 0.75rem;
+    box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.06), 0 1px 2px -1px rgba(0, 0, 0, 0.04);
+  }
 
-.gov-card-hover {
-  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-}
-.gov-card-hover:hover {
-  box-shadow: 0 10px 15px -3px rgba(15, 23, 42, 0.1), 0 4px 6px -4px rgba(15, 23, 42, 0.06);
-  border-color: #94a3b8;
-  transform: translateY(-1px);
+  .gov-card-hover {
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  .gov-card-hover:hover {
+    box-shadow: 0 10px 15px -3px rgba(15, 23, 42, 0.1), 0 4px 6px -4px rgba(15, 23, 42, 0.06);
+    border-color: #94a3b8;
+    transform: translateY(-1px);
+  }
 }
 
 /* Print Specific Rules for QR Stubs and Reports */
