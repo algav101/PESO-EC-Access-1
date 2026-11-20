@@ -2,6 +2,8 @@ import ExcelJS from "exceljs";
 import prisma from "./prisma";
 import { format } from "date-fns";
 import { populateCompletionReport } from "./completion-report-template";
+import { completionBarangay } from "./accomplishment-work-schedule";
+import type { DocumentationPhoto, ReportPhoto, SelectedReportPhotoInput } from "./completion-report-photos";
 
 export async function generateAttendanceExcel(programId: string): Promise<Buffer> {
   const program = await prisma.program.findUnique({
@@ -262,7 +264,16 @@ export async function generateWorkProgramExcel(programId: string): Promise<Buffe
   return Buffer.from(buffer);
 }
 
-export async function generateAccomplishmentExcel(programId: string, options: { approvedPhotosOnly?: boolean } = {}): Promise<Buffer> {
+export interface AccomplishmentExportOptions {
+  approvedPhotosOnly?: boolean;
+  selectedBarangays?: string[];
+  selectedPhotos?: SelectedReportPhotoInput[];
+}
+
+export async function generateAccomplishmentExcel(
+  programId: string,
+  options: AccomplishmentExportOptions = {}
+): Promise<Buffer> {
   const program = await prisma.program.findUnique({
     where: { id: programId },
     include: {
@@ -273,7 +284,20 @@ export async function generateAccomplishmentExcel(programId: string, options: { 
       workDays: { orderBy: { dayNumber: "asc" } },
       accomplishmentPhotos: {
         where: { status: options.approvedPhotosOnly ? "APPROVED" : { not: "REJECTED" } },
-        select: { id: true, workDayId: true, workProgramItemId: true, barangay: true, specificActivity: true, workArea: true, status: true, fileName: true, capturedAt: true, isPurged: true },
+        select: {
+          id: true,
+          workDayId: true,
+          workProgramItemId: true,
+          barangay: true,
+          specificActivity: true,
+          workArea: true,
+          status: true,
+          fileName: true,
+          capturedAt: true,
+          isPurged: true,
+          latitude: true,
+          longitude: true,
+        },
         orderBy: [{ capturedAt: "asc" }, { id: "asc" }],
       },
       attendanceRecords: {
@@ -286,15 +310,122 @@ export async function generateAccomplishmentExcel(programId: string, options: { 
     },
   });
   if (!program) throw new Error("Program not found");
-  return populateCompletionReport(program, async photo => {
-    // Read one image at a time instead of retaining all multi-MB base64 strings in memory.
-    if (photo.isPurged) return null;
-    const record = await prisma.accomplishmentPhoto.findFirst({
-      where: { id: photo.id, programId, isPurged: false, status: options.approvedPhotosOnly ? "APPROVED" : { not: "REJECTED" } },
-      select: { fileKey: true },
-    });
-    return record?.fileKey || null;
-  });
+
+  const hasCustomSelection = Array.isArray(options.selectedPhotos);
+  let customPhotosByBarangay: Map<string, DocumentationPhoto[]> | undefined;
+
+  if (hasCustomSelection) {
+    const requestedEntries = options.selectedPhotos || [];
+    const uniquePhotoIds = [...new Set(requestedEntries.map((e) => e.photoId).filter(Boolean))];
+
+    const crossProgramPhotos = uniquePhotoIds.length
+      ? await prisma.accomplishmentPhoto.findMany({
+          where: {
+            id: { in: uniquePhotoIds },
+            isPurged: false,
+            ...(options.approvedPhotosOnly ? { status: "APPROVED" } : {}),
+          },
+          select: {
+            id: true,
+            workDayId: true,
+            workProgramItemId: true,
+            barangay: true,
+            specificActivity: true,
+            workArea: true,
+            status: true,
+            fileName: true,
+            capturedAt: true,
+            isPurged: true,
+            latitude: true,
+            longitude: true,
+            workDay: { select: { dayNumber: true, workDate: true } },
+            workProgramItem: { select: { dayNumber: true, area: true, specificActivities: true } },
+          },
+        })
+      : [];
+
+    const dbPhotoMap = new Map(crossProgramPhotos.map((p) => [p.id, p]));
+    const targetDayDateMap = new Map(program.workDays.map((d) => [d.dayNumber, d.workDate]));
+    customPhotosByBarangay = new Map<string, DocumentationPhoto[]>();
+
+    for (const entry of requestedEntries) {
+      const dbPhoto = dbPhotoMap.get(entry.photoId);
+      if (!dbPhoto) continue;
+
+      const targetBrgyKey = completionBarangay(entry.targetBarangay || dbPhoto.barangay);
+      if (!targetBrgyKey) continue;
+
+      const dayNumber =
+        entry.targetDayNumber != null && Number.isFinite(Number(entry.targetDayNumber))
+          ? Number(entry.targetDayNumber)
+          : dbPhoto.workDay?.dayNumber ?? dbPhoto.workProgramItem?.dayNumber ?? undefined;
+
+      const workDate =
+        (dayNumber ? targetDayDateMap.get(dayNumber) : undefined) || dbPhoto.workDay?.workDate || "";
+
+      const rawActivity = entry.specificActivity ?? dbPhoto.specificActivity ?? "";
+      const stageMatch = rawActivity.match(/^\s*(?:\[(BEFORE|DURING|AFTER)\]|(BEFORE|DURING|AFTER)\s*[:\-–])/i);
+      const stage = (entry.stage || stageMatch?.[1] || stageMatch?.[2] || "UNLABELLED").toUpperCase();
+
+      const parsedCapturedAt =
+        entry.capturedAt != null
+          ? new Date(entry.capturedAt)
+          : dbPhoto.capturedAt;
+
+      const reportPhoto: ReportPhoto = {
+        id: dbPhoto.id,
+        workDayId: dbPhoto.workDayId,
+        workProgramItemId: dbPhoto.workProgramItemId,
+        barangay: entry.targetBarangay || dbPhoto.barangay,
+        specificActivity: rawActivity || null,
+        workArea: entry.workArea ?? dbPhoto.workArea ?? dbPhoto.workProgramItem?.area ?? null,
+        status: dbPhoto.status,
+        fileName: dbPhoto.fileName,
+        capturedAt: parsedCapturedAt && !Number.isNaN(parsedCapturedAt.getTime()) ? parsedCapturedAt : null,
+        isPurged: dbPhoto.isPurged,
+        latitude: entry.latitude ?? dbPhoto.latitude,
+        longitude: entry.longitude ?? dbPhoto.longitude,
+      };
+
+      const list = customPhotosByBarangay.get(targetBrgyKey) || [];
+      list.push({
+        photo: reportPhoto,
+        dayNumber,
+        workDate,
+        stage,
+        includeGeotagInCaption: entry.includeGeotagInCaption ?? true,
+      });
+      customPhotosByBarangay.set(targetBrgyKey, list);
+    }
+  }
+
+  return populateCompletionReport(
+    program,
+    async (photo) => {
+      // Read one image at a time instead of retaining all multi-MB base64 strings in memory.
+      if (photo.isPurged) return null;
+      const record = await prisma.accomplishmentPhoto.findFirst({
+        where: hasCustomSelection
+          ? {
+              id: photo.id,
+              isPurged: false,
+              ...(options.approvedPhotosOnly ? { status: "APPROVED" } : {}),
+            }
+          : {
+              id: photo.id,
+              programId,
+              isPurged: false,
+              status: options.approvedPhotosOnly ? "APPROVED" : { not: "REJECTED" },
+            },
+        select: { fileKey: true },
+      });
+      return record?.fileKey || null;
+    },
+    {
+      selectedBarangays: options.selectedBarangays,
+      customPhotosByBarangay,
+    }
+  );
 }
 
 /**

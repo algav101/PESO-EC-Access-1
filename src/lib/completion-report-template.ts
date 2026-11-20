@@ -2,7 +2,12 @@ import JSZip from "jszip";
 import { readFile } from "fs/promises";
 import path from "path";
 import { buildBarangayCompletionDays, completionBarangay, type CompletionProgram } from "./accomplishment-work-schedule";
-import { appendPhotoDocumentation, barangayDocumentationPhotos, type PhotoLoader, type ReportPhoto } from "./completion-report-photos";
+import { appendPhotoDocumentation, barangayDocumentationPhotos, type DocumentationPhoto, type PhotoLoader, type ReportPhoto } from "./completion-report-photos";
+
+export interface CompletionReportOptions {
+  selectedBarangays?: string[];
+  customPhotosByBarangay?: Map<string, DocumentationPhoto[]>;
+}
 
 interface ReportProgram extends CompletionProgram {
   accomplishmentPhotos: ReportPhoto[];
@@ -62,26 +67,116 @@ async function templateBuffer(): Promise<Buffer> {
 }
 
 /** Patch values in the supplied workbook, retaining its styles, layout and native parts. */
-export async function populateCompletionReport(program: ReportProgram, loadPhoto: PhotoLoader): Promise<Buffer> {
+export async function populateCompletionReport(
+  program: ReportProgram,
+  loadPhoto: PhotoLoader,
+  options: CompletionReportOptions = {}
+): Promise<Buffer> {
   const zip = await JSZip.loadAsync(await templateBuffer());
   const stringsXml = await zip.file("xl/sharedStrings.xml")!.async("string");
   const sourceStrings = [...stringsXml.matchAll(/<si\b[^>]*>([\s\S]*?)<\/si>/g)].map(match => match[1]);
   const strings = sourceStrings.map(raw => [...raw.matchAll(/<t\b[^>]*>([\s\S]*?)<\/t>/g)].map(text => decodeXml(text[1])).join(""));
-  const workbookXml = await zip.file("xl/workbook.xml")!.async("string");
-  const relationships = await zip.file("xl/_rels/workbook.xml.rels")!.async("string");
+  let workbookXml = await zip.file("xl/workbook.xml")!.async("string");
+  let relationships = await zip.file("xl/_rels/workbook.xml.rels")!.async("string");
   const targets = new Map([...relationships.matchAll(/<Relationship\b[^>]*\/>/g)].map(match => [attribute(match[0], "Id"), attribute(match[0], "Target")]));
   const issueParts = new Intl.DateTimeFormat("en-US", { month: "long", day: "numeric", year: "numeric", timeZone: "Asia/Manila" }).formatToParts(new Date());
   const issuePart = (type: string) => issueParts.find(part => part.type === type)?.value || "";
   const issueDay = Number(issuePart("day"));
   const ordinal = issueDay % 100 >= 11 && issueDay % 100 <= 13 ? "th" : ({ 1: "st", 2: "nd", 3: "rd" } as Record<number, string>)[issueDay % 10] || "th";
 
-  for (const sheet of workbookXml.matchAll(/<sheet\b[^>]*\/>/g)) {
-    const barangay = decodeXml(attribute(sheet[0], "name"));
-    const target = targets.get(attribute(sheet[0], "r:id"));
+  const selectedBarangaySet =
+    options.selectedBarangays && options.selectedBarangays.length > 0
+      ? new Set(options.selectedBarangays.map(b => completionBarangay(b)).filter(Boolean))
+      : null;
+
+  const allSheets = [...workbookXml.matchAll(/<sheet\b[^>]*\/>/g)].map(match => ({
+    tag: match[0],
+    barangay: decodeXml(attribute(match[0], "name")),
+    rId: attribute(match[0], "r:id"),
+  }));
+
+  const keptSheets = selectedBarangaySet
+    ? allSheets.filter(s => selectedBarangaySet.has(completionBarangay(s.barangay)))
+    : allSheets;
+  const droppedSheets = selectedBarangaySet
+    ? allSheets.filter(s => !selectedBarangaySet.has(completionBarangay(s.barangay)))
+    : [];
+
+  if (keptSheets.length === 0) {
+    throw new Error("Please select at least one valid Dingalan barangay to export.");
+  }
+
+  // Cleanly remove unselected barangay worksheets so Excel opens without repair warnings.
+  if (droppedSheets.length > 0) {
+    let contentTypes = await zip.file("[Content_Types].xml")!.async("string");
+    for (const dropped of droppedSheets) {
+      workbookXml = workbookXml.replace(dropped.tag, "");
+      relationships = relationships.replace(
+        new RegExp(`<Relationship\\b[^>]*\\bId="${dropped.rId}"[^>]*\\/>`),
+        ""
+      );
+      const target = targets.get(dropped.rId);
+      if (target) {
+        const sheetPath = target.startsWith("/") ? target.slice(1) : path.posix.normalize("xl/" + target);
+        const relPath = path.posix.join(path.posix.dirname(sheetPath), "_rels", path.posix.basename(sheetPath) + ".rels");
+        zip.remove(sheetPath);
+        if (zip.file(relPath)) zip.remove(relPath);
+        contentTypes = contentTypes.replace(
+          new RegExp(`<Override\\b[^>]*\\bPartName="/${sheetPath.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}"[^>]*\\/>`),
+          ""
+        );
+      }
+    }
+
+    // Reset activeTab & firstSheet to index 0 so Excel never points past the kept sheets.
+    workbookXml = workbookXml.replace(/<workbookView\b([^>]*)\/>/, (_, attrs: string) => {
+      let cleaned = attrs
+        .replace(/\s+firstSheet="[^"]*"/g, "")
+        .replace(/\s+activeTab="[^"]*"/g, "");
+      return `<workbookView${cleaned} firstSheet="0" activeTab="0"/>`;
+    });
+
+    zip.file("xl/workbook.xml", workbookXml);
+    zip.file("xl/_rels/workbook.xml.rels", relationships);
+    zip.file("[Content_Types].xml", contentTypes);
+
+    // Update docProps/app.xml sheet count and TitlesOfParts vector.
+    const appFile = zip.file("docProps/app.xml");
+    if (appFile) {
+      let appXml = await appFile.async("string");
+      appXml = appXml.replace(
+        /(<vt:lpstr>Worksheets<\/vt:lpstr><\/vt:variant><vt:variant><vt:i4>)\d+(<\/vt:i4>)/,
+        `$1${keptSheets.length}$2`
+      );
+      appXml = appXml.replace(
+        /<TitlesOfParts><vt:vector\b[^>]*>[\s\S]*?<\/vt:vector><\/TitlesOfParts>/,
+        `<TitlesOfParts><vt:vector size="${keptSheets.length}" baseType="lpstr">${keptSheets
+          .map(s => `<vt:lpstr>${escapeXml(s.barangay)}</vt:lpstr>`)
+          .join("")}</vt:vector></TitlesOfParts>`
+      );
+      zip.file("docProps/app.xml", appXml);
+    }
+  }
+
+  for (let sheetIndex = 0; sheetIndex < keptSheets.length; sheetIndex++) {
+    const sheet = keptSheets[sheetIndex];
+    const barangay = sheet.barangay;
+    const target = targets.get(sheet.rId);
     if (!target) throw new Error(`Missing completion template worksheet: ${barangay}`);
     const file = target.startsWith("/") ? target.slice(1) : path.posix.normalize("xl/" + target);
     if (!/^xl\/worksheets\/[^/]+\.xml$/.test(file)) throw new Error("Invalid completion worksheet path");
     let xml = await zip.file(file)!.async("string");
+
+    // Ensure tabSelected is strictly set on the first kept sheet when filtering barangays.
+    if (droppedSheets.length > 0) {
+      xml = xml.replace(/<sheetView\b([^>]*?)(\/?>)/, (_, attrs: string, close: string) => {
+        const cleaned = attrs.replace(/\s+tabSelected="[^"]*"/g, "");
+        return sheetIndex === 0
+          ? `<sheetView${cleaned} tabSelected="1"${close}`
+          : `<sheetView${cleaned}${close}`;
+      });
+    }
+
     const sourceCells = [...xml.matchAll(/<c\b[^>]*\br="([A-Z]+\d+)"[^>]*t="s"[^>]*><v>(\d+)<\/v><\/c>/g)].map(match => ({ address: match[1], text: strings[Number(match[2])] || "", runs: sourceStrings[Number(match[2])] }));
     const dayCells = sourceCells.filter(cell => /^B\d+$/.test(cell.address) && /^Day \d+\b/.test(cell.text));
     if (dayCells.length !== 10) throw new Error(`Invalid daily table in ${barangay} completion template`);
@@ -147,7 +242,10 @@ export async function populateCompletionReport(program: ReportProgram, loadPhoto
     const documentationCaption = sourceCells.find(cell => /Before, during work, and after/i.test(cell.text));
     if (!documentationCaption) throw new Error(`Missing Photo Documentation section in ${barangay} completion template`);
     const captionRow = Number(shiftRef(documentationCaption.address).replace(/^[A-Z]+/, ""));
-    xml = await appendPhotoDocumentation(zip, xml, file, captionRow, barangayDocumentationPhotos(program, barangay), loadPhoto);
+    const photosForSheet = options.customPhotosByBarangay
+      ? options.customPhotosByBarangay.get(completionBarangay(barangay)) || []
+      : barangayDocumentationPhotos(program, barangay);
+    xml = await appendPhotoDocumentation(zip, xml, file, captionRow, photosForSheet, loadPhoto);
     zip.file(file, xml);
   }
   return zip.generateAsync({ type: "nodebuffer", compression: "DEFLATE" });

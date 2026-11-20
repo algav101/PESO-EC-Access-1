@@ -7,9 +7,29 @@ export type ReportPhoto = CompletionProgram["accomplishmentPhotos"][number] & {
   fileName: string | null;
   capturedAt: Date | null;
   isPurged: boolean;
+  latitude?: number | null;
+  longitude?: number | null;
 };
 export type PhotoLoader = (photo: ReportPhoto) => Promise<string | null>;
-interface DocumentationPhoto { photo: ReportPhoto; dayNumber?: number; workDate: string; stage: string }
+export interface SelectedReportPhotoInput {
+  photoId: string;
+  targetBarangay: string;
+  targetDayNumber?: number | null;
+  stage?: "BEFORE" | "DURING" | "AFTER" | "UNLABELLED";
+  workArea?: string | null;
+  specificActivity?: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
+  capturedAt?: string | null;
+  includeGeotagInCaption?: boolean;
+}
+export interface DocumentationPhoto {
+  photo: ReportPhoto;
+  dayNumber?: number;
+  workDate: string;
+  stage: string;
+  includeGeotagInCaption?: boolean;
+}
 const xmlText = (value: string) => value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 const relNs = "http://schemas.openxmlformats.org/officeDocument/2006/relationships";
 const packageNs = "http://schemas.openxmlformats.org/package/2006/relationships";
@@ -119,7 +139,27 @@ export async function appendPhotoDocumentation(zip: JSZip, xml: string, sheetFil
     const { photo } = entry;
     const activity = (photo.specificActivity || "").replace(/^\s*(?:\[(BEFORE|DURING|AFTER)\]\s*[:\-–]?|(BEFORE|DURING|AFTER)\s*[:\-–])\s*/i, "").trim();
     const stage = entry.stage === "UNLABELLED" ? "Stage not labelled" : entry.stage;
-    const label = [entry.dayNumber ? `Day ${entry.dayNumber}${entry.workDate ? ` (${entry.workDate})` : ""}` : "Work day not assigned", stage, photo.status === "FOR_REVIEW" ? "For review" : "", activity, photo.workArea || ""].filter(Boolean).join(" — ");
+    const gpsText =
+      entry.includeGeotagInCaption &&
+      typeof photo.latitude === "number" &&
+      typeof photo.longitude === "number" &&
+      Number.isFinite(photo.latitude) &&
+      Number.isFinite(photo.longitude)
+        ? `GPS: ${photo.latitude.toFixed(5)}°N, ${photo.longitude.toFixed(5)}°E`
+        : "";
+    const capturedText =
+      entry.includeGeotagInCaption && photo.capturedAt && !Number.isNaN(new Date(photo.capturedAt).getTime())
+        ? `Captured: ${new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", year: "numeric", hour: "2-digit", minute: "2-digit", timeZone: "Asia/Manila" }).format(new Date(photo.capturedAt))}`
+        : "";
+    const label = [
+      entry.dayNumber ? `Day ${entry.dayNumber}${entry.workDate ? ` (${entry.workDate})` : ""}` : "Work day not assigned",
+      stage,
+      photo.status === "FOR_REVIEW" ? "For review" : "",
+      activity,
+      photo.workArea || "",
+      gpsText,
+      capturedText,
+    ].filter(Boolean).join(" — ");
     // Explicit newlines work with the template caption's existing font/alignment.
     const lines = label.match(/.{1,85}(?:\s|$)|\S{1,85}/g)?.map(part => part.trim()) || [label];
     for (let index = 0; index < lines.length; index += 20) {

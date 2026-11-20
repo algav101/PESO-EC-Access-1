@@ -9,6 +9,7 @@ import {
   generatePayoutExcel,
   generateFlaggedReplacementsExcel,
 } from "@/lib/excel-exporter";
+import { logAudit } from "@/lib/audit";
 import prisma from "@/lib/prisma";
 
 export const dynamic = "force-dynamic";
@@ -95,5 +96,94 @@ export async function GET(request: Request) {
   } catch (error: any) {
     console.error("Report export error:", error);
     return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+}
+
+export async function POST(request: Request) {
+  try {
+    const user = await getCurrentUser();
+    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+    const body = await request.json();
+    const reportType = body?.type;
+    const programId = body?.programId;
+
+    if (reportType !== "ACCOMPLISHMENT") {
+      return NextResponse.json({ error: "Unsupported report type for POST export" }, { status: 400 });
+    }
+    if (!programId) {
+      return NextResponse.json({ error: "programId is required" }, { status: 400 });
+    }
+    if (!hasPermission(user.role, "report.export")) {
+      return NextResponse.json({ error: "Your role is not allowed to export this report." }, { status: 403 });
+    }
+
+    const selectedBarangays: string[] | undefined = Array.isArray(body.selectedBarangays)
+      ? body.selectedBarangays.map((b: unknown) => String(b || "").trim()).filter(Boolean)
+      : undefined;
+
+    if (selectedBarangays && selectedBarangays.length === 0) {
+      return NextResponse.json({ error: "Please select at least one barangay to export." }, { status: 400 });
+    }
+
+    const selectedPhotos = Array.isArray(body.selectedPhotos) ? body.selectedPhotos : undefined;
+
+    const programMeta = await prisma.program.findUnique({
+      where: { id: programId },
+      select: { programCode: true },
+    });
+    if (!programMeta) {
+      return NextResponse.json({ error: "Selected program not found." }, { status: 404 });
+    }
+
+    const buffer = await generateAccomplishmentExcel(programId, {
+      approvedPhotosOnly: user.role === "DOLE_COORDINATOR",
+      selectedBarangays,
+      selectedPhotos,
+    });
+
+    await logAudit({
+      userId: user.id,
+      action: "ACCOMPLISHMENT_REPORT_EXPORTED",
+      entityType: "PROGRAM",
+      entityId: programId,
+      metadata: {
+        programCode: programMeta.programCode,
+        selectedBarangays: selectedBarangays || "ALL_11",
+        selectedPhotoCount: selectedPhotos ? selectedPhotos.length : "AUTO",
+      },
+    });
+
+    const safeCode = (programMeta.programCode || programId.slice(0, 6)).replace(/[^A-Za-z0-9_-]/g, "_");
+    const brgySuffix =
+      selectedBarangays && selectedBarangays.length === 1
+        ? `_${selectedBarangays[0].replace(/[^A-Za-z0-9_-]/g, "_")}`
+        : selectedBarangays && selectedBarangays.length < 11
+          ? `_${selectedBarangays.length}Brgys`
+          : "";
+
+    let offset = 0;
+    const stream = new ReadableStream<Uint8Array>({
+      pull(controller) {
+        if (offset >= buffer.length) {
+          controller.close();
+          return;
+        }
+        const end = Math.min(offset + 256 * 1024, buffer.length);
+        controller.enqueue(new Uint8Array(buffer.subarray(offset, end)));
+        offset = end;
+      },
+    });
+
+    return new Response(stream, {
+      headers: {
+        "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        "Content-Disposition": `attachment; filename="TUPAD_Accomplishment_Report_${safeCode}${brgySuffix}.xlsx"`,
+        "Cache-Control": "private, no-store",
+      },
+    });
+  } catch (error: any) {
+    console.error("POST Report export error:", error);
+    return NextResponse.json({ error: error.message || "Failed to generate accomplishment report" }, { status: 500 });
   }
 }

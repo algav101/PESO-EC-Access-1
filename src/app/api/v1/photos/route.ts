@@ -14,10 +14,11 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const programId = searchParams.get("programId");
     const barangay = searchParams.get("barangay");
+    const statusParam = searchParams.get("status");
     const includeData = searchParams.get("includeData") === "true";
 
-    const whereClause: any = {};
-    if (programId) whereClause.programId = programId;
+    const whereClause: any = { isPurged: false };
+    if (programId && programId !== "ALL") whereClause.programId = programId;
 
     // Strict Barangay-level isolation:
     const userBrgy = user.assignedBarangay ? normalizeBarangayName(user.assignedBarangay) : null;
@@ -31,6 +32,8 @@ export async function GET(request: Request) {
     // DOLE coordinator sees only approved photos
     if (user.role === "DOLE_COORDINATOR") {
       whereClause.status = "APPROVED";
+    } else if (statusParam && statusParam !== "ALL" && ["APPROVED", "FOR_REVIEW", "REJECTED"].includes(statusParam)) {
+      whereClause.status = statusParam;
     }
 
     const rawPhotos = await prisma.accomplishmentPhoto.findMany({
@@ -57,6 +60,16 @@ export async function GET(request: Request) {
         approvedAt: true,
         rejectionReason: true,
         fileKey: includeData, // Only load full multi-MB base64 data if explicitly requested
+        program: {
+          select: {
+            id: true,
+            programCode: true,
+            programName: true,
+            batchNumber: true,
+            startDate: true,
+            endDate: true,
+          },
+        },
         workDay: {
           select: {
             id: true,
@@ -70,6 +83,12 @@ export async function GET(request: Request) {
             dayNumber: true,
             specificActivities: true,
             area: true,
+            workProgram: {
+              select: {
+                barangay: true,
+                programId: true,
+              },
+            },
           },
         },
         uploadedBy: { select: { fullName: true } },
@@ -85,7 +104,7 @@ export async function GET(request: Request) {
 
     return NextResponse.json(
       { photos, total: photos.length },
-      { headers: { "Cache-Control": "private, max-age=20, stale-while-revalidate=60" } }
+      { headers: { "Cache-Control": "private, max-age=10, stale-while-revalidate=30" } }
     );
   } catch (error: any) {
     console.error("GET photos error:", error);
@@ -215,7 +234,26 @@ export async function PATCH(request: Request) {
     }
 
     const body = await request.json();
-    const { id, ids, status, rejectionReason, isExported, photoStage, specificActivity } = body;
+    const {
+      id,
+      ids,
+      status,
+      rejectionReason,
+      isExported,
+      photoStage,
+      specificActivity,
+      latitude,
+      longitude,
+      capturedAt,
+      barangay,
+      sitio,
+      workArea,
+      workDayId,
+      workDayNumber,
+      workProgramItemId,
+      programId,
+      photoData,
+    } = body;
 
     // Check permissions
     if (status) {
@@ -339,14 +377,189 @@ export async function PATCH(request: Request) {
       updateData.isExported = Boolean(isExported);
     }
 
+    // Permanent Geotagging & Work Program Metadata Edits
+    if (latitude !== undefined && latitude !== null && latitude !== "") {
+      const latNum = Number(latitude);
+      if (!Number.isFinite(latNum) || latNum < -90 || latNum > 90) {
+        return NextResponse.json({ error: "Invalid latitude. Must be between -90 and 90." }, { status: 400 });
+      }
+      updateData.latitude = latNum;
+    }
+
+    if (longitude !== undefined && longitude !== null && longitude !== "") {
+      const lngNum = Number(longitude);
+      if (!Number.isFinite(lngNum) || lngNum < -180 || lngNum > 180) {
+        return NextResponse.json({ error: "Invalid longitude. Must be between -180 and 180." }, { status: 400 });
+      }
+      updateData.longitude = lngNum;
+    }
+
+    if (capturedAt !== undefined) {
+      if (capturedAt === null || capturedAt === "") {
+        updateData.capturedAt = null;
+      } else {
+        const parsedDate = new Date(capturedAt);
+        if (Number.isNaN(parsedDate.getTime())) {
+          return NextResponse.json({ error: "Invalid capturedAt date/time." }, { status: 400 });
+        }
+        updateData.capturedAt = parsedDate;
+      }
+    }
+
+    if (barangay !== undefined && String(barangay).trim()) {
+      const userBrgy = user.assignedBarangay ? normalizeBarangayName(user.assignedBarangay) : null;
+      const targetBrgy = normalizeBarangayName(String(barangay));
+      if (!isAdminUser(user) && userBrgy && targetBrgy !== userBrgy) {
+        return NextResponse.json({ error: "Forbidden: cannot reassign photo to another barangay." }, { status: 403 });
+      }
+      updateData.barangay = targetBrgy;
+    }
+
+    if (sitio !== undefined) {
+      updateData.sitio = sitio ? String(sitio).trim() : null;
+    }
+
+    if (workArea !== undefined) {
+      updateData.workArea = workArea ? String(workArea).trim() : null;
+    }
+
+    let resolvedProgramId = existingPhoto.programId;
+    if (programId && programId !== existingPhoto.programId) {
+      if (!isAdminUser(user) && !hasPermission(user.role, "photo.approve")) {
+        return NextResponse.json({ error: "Forbidden: cannot reassign photo to another program." }, { status: 403 });
+      }
+      const progExists = await prisma.program.findUnique({ where: { id: String(programId) }, select: { id: true } });
+      if (!progExists) {
+        return NextResponse.json({ error: "Target program not found." }, { status: 404 });
+      }
+      updateData.programId = progExists.id;
+      resolvedProgramId = progExists.id;
+    }
+
+    if (workDayId !== undefined) {
+      if (!workDayId) {
+        updateData.workDayId = null;
+      } else {
+        const wd = await prisma.workDay.findUnique({ where: { id: String(workDayId) }, select: { id: true } });
+        if (wd) updateData.workDayId = wd.id;
+      }
+    } else if (workDayNumber !== undefined) {
+      if (workDayNumber === null || workDayNumber === "") {
+        updateData.workDayId = null;
+      } else {
+        const dayNum = Number(workDayNumber);
+        if (!Number.isNaN(dayNum) && dayNum > 0) {
+          const wd = await prisma.workDay.findFirst({
+            where: { programId: resolvedProgramId, dayNumber: dayNum },
+            select: { id: true },
+          });
+          updateData.workDayId = wd ? wd.id : null;
+        }
+      }
+    }
+
+    if (workProgramItemId !== undefined) {
+      if (!workProgramItemId) {
+        updateData.workProgramItemId = null;
+      } else {
+        const item = await prisma.tupadWorkProgramItem.findUnique({
+          where: { id: String(workProgramItemId) },
+          select: { id: true },
+        });
+        if (!item) {
+          return NextResponse.json({ error: "Selected work program activity item not found." }, { status: 404 });
+        }
+        updateData.workProgramItemId = item.id;
+      }
+    }
+
+    if (photoData && typeof photoData === "string") {
+      if (!/^data:image\/(?:png|jpe?g|webp);base64,[A-Za-z0-9+/=\s]+$/i.test(photoData)) {
+        return NextResponse.json({ error: "Invalid image format for re-stamped photo." }, { status: 400 });
+      }
+      if (photoData.length > 14 * 1024 * 1024) {
+        return NextResponse.json({ error: "Re-stamped photo exceeds maximum allowed size." }, { status: 400 });
+      }
+      updateData.fileKey = photoData;
+      updateData.isPurged = false;
+    }
+
     const photo = await prisma.accomplishmentPhoto.update({
       where: { id },
       data: updateData,
+      select: {
+        id: true,
+        programId: true,
+        workDayId: true,
+        workProgramItemId: true,
+        barangay: true,
+        sitio: true,
+        workArea: true,
+        specificActivity: true,
+        fileName: true,
+        latitude: true,
+        longitude: true,
+        capturedAt: true,
+        uploadedAt: true,
+        uploadedById: true,
+        status: true,
+        isExported: true,
+        isPurged: true,
+        approvedById: true,
+        approvedAt: true,
+        rejectionReason: true,
+        program: {
+          select: {
+            id: true,
+            programCode: true,
+            programName: true,
+            batchNumber: true,
+            startDate: true,
+            endDate: true,
+          },
+        },
+        workDay: {
+          select: {
+            id: true,
+            dayNumber: true,
+            workDate: true,
+          },
+        },
+        workProgramItem: {
+          select: {
+            id: true,
+            dayNumber: true,
+            specificActivities: true,
+            area: true,
+            workProgram: {
+              select: {
+                barangay: true,
+                programId: true,
+              },
+            },
+          },
+        },
+        uploadedBy: { select: { fullName: true } },
+      },
     });
+
+    const editedGeotag =
+      latitude !== undefined ||
+      longitude !== undefined ||
+      capturedAt !== undefined ||
+      barangay !== undefined ||
+      workArea !== undefined ||
+      Boolean(photoData);
 
     await logAudit({
       userId: user.id,
-      action: photoStage ? "PHOTO_PHASE_CORRECTED" : status === "APPROVED" ? "PHOTO_APPROVED" : "PHOTO_UPDATED",
+      action: editedGeotag
+        ? "PHOTO_GEOTAG_UPDATED"
+        : photoStage
+          ? "PHOTO_PHASE_CORRECTED"
+          : status === "APPROVED"
+            ? "PHOTO_APPROVED"
+            : "PHOTO_UPDATED",
       entityType: "ACCOMPLISHMENT_PHOTO",
       entityId: photo.id,
       metadata: {
@@ -354,6 +567,15 @@ export async function PATCH(request: Request) {
         newPhase: photoStage ? photoStage.toUpperCase() : undefined,
         previousActivity: existingPhoto.specificActivity,
         newActivity: updateData.specificActivity,
+        previousBarangay: existingPhoto.barangay,
+        newBarangay: updateData.barangay,
+        latitude: updateData.latitude,
+        longitude: updateData.longitude,
+        capturedAt: updateData.capturedAt,
+        workArea: updateData.workArea,
+        workDayId: updateData.workDayId,
+        workProgramItemId: updateData.workProgramItemId,
+        restampedImage: Boolean(photoData),
         status,
         updatedBy: user.fullName || user.username,
       },
@@ -363,7 +585,7 @@ export async function PATCH(request: Request) {
       success: true,
       photo: {
         ...photo,
-        imageUrl: `/api/v1/photos/${photo.id}/image`,
+        imageUrl: `/api/v1/photos/${photo.id}/image?v=${Date.now()}`,
         hasImage: true,
         photoStage: photoStage ? photoStage.toUpperCase() : undefined,
       },

@@ -33,6 +33,7 @@ import { QrScannerModal } from "@/components/scanner/QrScannerModal";
 import { useRouter } from "next/navigation";
 import { PrintableReplacementMasterlistModal } from "@/components/reports/PrintableReplacementMasterlistModal";
 import { ReplacementApprovalModal } from "@/components/field/ReplacementApprovalModal";
+import { AccomplishmentReportBuilderModal } from "@/components/reports/AccomplishmentReportBuilderModal";
 
 export default function ReportCenterPage() {
   const { user } = useAuth();
@@ -46,6 +47,9 @@ export default function ReportCenterPage() {
   // Flagged Replacements Masterlist Modal State
   const [isPrintableMasterlistOpen, setIsPrintableMasterlistOpen] = useState(false);
   const [assessmentItem, setAssessmentItem] = useState<any | null>(null);
+
+  // Accomplishment Report Builder Modal State
+  const [isAccomplishmentBuilderOpen, setIsAccomplishmentBuilderOpen] = useState(false);
 
   // Quick Assignment Scanner Modal State
   const [isScannerOpen, setIsScannerOpen] = useState(false);
@@ -143,11 +147,22 @@ export default function ReportCenterPage() {
       id: "ACCOMPLISHMENT",
       title: "Multi-Barangay Accomplishment Report (.XLSX)",
       refNote: "Original TUPAD Completion Report Layout",
-      description: "Original Completion Report for all 11 barangays with daily regular/specific assignments and embedded Before, During, and After photos from the selected program. DOLE exports include approved photos only.",
+      description: "Choose target work program, select specific barangays, pick photos across all uploaded programs, and permanently edit photo geotagging & approval status before exporting to Excel.",
       icon: Building,
       color: "text-blue-700 bg-blue-50",
-      action: "Export Excel",
-      href: `/api/v1/reports/export?type=ACCOMPLISHMENT&programId=${selectedProgramId}`,
+      action: "Choose Photos & Configure Export",
+      isCustomAction: true,
+      customIcon: Layers,
+      onClick: () => {
+        setIsAccomplishmentBuilderOpen(true);
+      },
+      secondaryActions: [
+        {
+          label: "Quick Export All 11",
+          icon: Download,
+          href: `/api/v1/reports/export?type=ACCOMPLISHMENT&programId=${selectedProgramId}`,
+        },
+      ],
     },
     {
       id: "WORK_PROGRAM",
@@ -565,6 +580,14 @@ export default function ReportCenterPage() {
         onProcessed={() => {
           setAssessmentItem(null);
         }}
+      />
+
+      {/* Accomplishment Report Builder (Work Program, Barangay Scope, Cross-Program Photos & Geotag/Status Editor) */}
+      <AccomplishmentReportBuilderModal
+        isOpen={isAccomplishmentBuilderOpen}
+        onClose={() => setIsAccomplishmentBuilderOpen(false)}
+        programs={programs}
+        initialProgramId={selectedProgramId}
       />
     </div>
   );

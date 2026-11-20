@@ -1,6 +1,7 @@
 export const dynamic = "force-dynamic";
 
 import { NextResponse } from "next/server";
+import crypto from "crypto";
 import prisma from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth";
 
@@ -35,14 +36,15 @@ export async function GET(request: Request, { params }: { params: { id: string }
     }
 
     const clientEtag = request.headers.get("if-none-match");
-    const etag = `"${photo.id}"`;
+    const contentHash = crypto.createHash("sha1").update(photo.fileKey).digest("hex").slice(0, 16);
+    const etag = `"${photo.id}-${contentHash}"`;
 
     if (!isDownload && clientEtag && clientEtag === etag) {
       return new NextResponse(null, {
         status: 304,
         headers: {
           "ETag": etag,
-          "Cache-Control": "public, max-age=31536000, immutable",
+          "Cache-Control": "private, max-age=0, must-revalidate",
         },
       });
     }
@@ -59,7 +61,7 @@ export async function GET(request: Request, { params }: { params: { id: string }
           "Content-Type": mimeType,
           "Content-Length": buffer.length.toString(),
           "ETag": etag,
-          "Cache-Control": "public, max-age=31536000, immutable",
+          "Cache-Control": "private, max-age=0, must-revalidate",
         };
 
         if (isDownload) {
