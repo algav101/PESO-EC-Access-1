@@ -82,7 +82,30 @@ function BeneficiariesMasterlistContent() {
   // Manual Selection & Batch Action State
   const [selectedPbIds, setSelectedPbIds] = useState<string[]>([]);
   const [attendanceSelection, setAttendanceSelection] = useState<{ programId: string; programName: string; ids: string[] } | null>(null);
-  useEffect(() => { setAttendanceSelection(null); }, [selectedProgram, user?.role]);
+  const [previousAttendanceSelection, setPreviousAttendanceSelection] = useState<{ programId: string; userId: string; ids: string[] } | null>(null);
+  const previousSelectionKey = user?.id && selectedProgram ? `tupad_previous_attendance_selection:${user.id}:${selectedProgram}` : null;
+  useEffect(() => { setAttendanceSelection(null); }, [selectedProgram, user?.id, user?.role]);
+  useEffect(() => {
+    setPreviousAttendanceSelection(null);
+    if (!canRecordBulkAttendance || !previousSelectionKey || !user?.id) return;
+    try {
+      const ids: unknown = JSON.parse(sessionStorage.getItem(previousSelectionKey) || "null");
+      if (Array.isArray(ids) && ids.length <= 2000 && ids.every((id) => typeof id === "string" && id.trim())) {
+        setPreviousAttendanceSelection({ programId: selectedProgram, userId: user.id, ids: [...new Set(ids)] });
+      }
+    } catch { /* Keep attendance available when browser storage is unavailable. */ }
+  }, [previousSelectionKey, selectedProgram, user?.id, canRecordBulkAttendance]);
+  const previousAttendanceIds = useMemo(() => {
+    if (!canRecordBulkAttendance || previousAttendanceSelection?.programId !== selectedProgram || previousAttendanceSelection.userId !== user?.id) return [];
+    const activeIds = new Set(beneficiaries.filter((pb) => ["ACTIVE", "ENROLLED", "FLAGGED_FOR_REPLACEMENT"].includes(pb.participationStatus)).map((pb) => pb.id));
+    return previousAttendanceSelection.ids.filter((id) => activeIds.has(id));
+  }, [previousAttendanceSelection, selectedProgram, user?.id, canRecordBulkAttendance, beneficiaries]);
+  const restorePreviousAttendanceSelection = () => {
+    if (loading || !previousAttendanceIds.length) return;
+    // Replace the current selection; never add unrelated beneficiaries to it.
+    setSelectedPbIds([...previousAttendanceIds]);
+    setAttendanceSelection(null);
+  };
   const openBulkAttendance = () => {
     const program = programs.find((p) => p.id === selectedProgram);
     if (!canRecordBulkAttendance || !selectedProgram || !selectedPbIds.length) return;
@@ -895,7 +918,7 @@ function BeneficiariesMasterlistContent() {
             </span>
 
             {/* Quick Multi-Select Helpers */}
-            <div className="flex items-center gap-1.5 ml-1">
+            <div className="flex flex-wrap items-center gap-1.5 ml-1">
               <button
                 type="button"
                 onClick={handleToggleSelectAllFiltered}
@@ -903,6 +926,14 @@ function BeneficiariesMasterlistContent() {
               >
                 {isAllFilteredSelected ? "Deselect Visible" : `Select Visible (${sortedBeneficiaries.length})`}
               </button>
+
+              {previousAttendanceIds.length > 0 && (
+                <button type="button" onClick={restorePreviousAttendanceSelection} disabled={loading}
+                  title="Restore only the beneficiaries from your last attendance in this work program, including those hidden by filters."
+                  className="px-2 py-0.5 rounded text-[11px] font-bold border border-sky-300 bg-sky-50 hover:bg-sky-100 text-sky-800 transition disabled:opacity-50 flex items-center gap-1">
+                  <RotateCcw className="w-3 h-3" />Previous Selection ({previousAttendanceIds.length})
+                </button>
+              )}
 
               {beneficiaries.length > sortedBeneficiaries.length && (
                 <button
@@ -1307,8 +1338,14 @@ function BeneficiariesMasterlistContent() {
       {attendanceSelection && canRecordBulkAttendance && (
         <BulkAttendanceModal programId={attendanceSelection.programId} programName={attendanceSelection.programName}
           selectedIds={attendanceSelection.ids} onClose={() => setAttendanceSelection(null)}
+          onRestoreSelection={previousAttendanceIds.length ? restorePreviousAttendanceSelection : undefined}
           onRecorded={(recordedIds) => {
             if (programRef.current !== attendanceSelection.programId) return;
+            if (user?.id && previousSelectionKey) {
+              const snapshot = { programId: attendanceSelection.programId, userId: user.id, ids: [...attendanceSelection.ids] };
+              setPreviousAttendanceSelection(snapshot);
+              try { sessionStorage.setItem(previousSelectionKey, JSON.stringify(snapshot.ids)); } catch {}
+            }
             setSelectedPbIds((current) => current.filter((id) => !recordedIds.includes(id)));
             void fetchBeneficiaries(attendanceSelection.programId);
           }} />

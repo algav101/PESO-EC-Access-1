@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { CalendarCheck, Loader2, X } from "lucide-react";
+import { CalendarCheck, Loader2, RotateCcw, X } from "lucide-react";
 import { getPhilippineTime, ATTENDANCE_SLOT_LABELS } from "@/lib/utils";
 import { MASTERLIST_ATTENDANCE_RANGES } from "@/lib/masterlist-attendance-time";
 
@@ -9,9 +9,10 @@ type Day = { id: string; dayNumber: number; workDate: string; status: string };
 type Result = { updatedCount: number; skippedCount: number; slotLabel: string; timeRangeLabel: string; workDay: Day;
   results: { programBeneficiaryId: string; designatedNumber: string; fullName: string; status: string; reason: string; attendanceTime: string | null }[] };
 
-export function BulkAttendanceModal({ programId, programName, selectedIds, onClose, onRecorded }: {
+export function BulkAttendanceModal({ programId, programName, selectedIds, onClose, onRecorded, onRestoreSelection }: {
   programId: string; programName: string; selectedIds: string[];
   onClose: () => void; onRecorded: (recordedIds: string[]) => void;
+  onRestoreSelection?: () => void;
 }) {
   const [days, setDays] = useState<Day[]>([]);
   const [workDayId, setWorkDayId] = useState("");
@@ -81,7 +82,10 @@ export function BulkAttendanceModal({ programId, programName, selectedIds, onClo
                 <p className={row.status === "RECORDED" ? "text-emerald-700" : "text-amber-800"}>{row.status === "RECORDED" ? `Attendance recorded · ${row.attendanceTime ? new Date(row.attendanceTime).toLocaleTimeString("en-US", { timeZone: "Asia/Manila", hour: "numeric", minute: "2-digit", second: "2-digit" }) : ""} (Philippine time)` : row.reason}</p>
               </li>)}
             </ul>
-            <button type="button" onClick={onClose} className="w-full bg-gov-blue text-white rounded-xl py-2.5 text-xs font-bold">Done</button>
+            <div className="flex flex-wrap gap-2">
+              {onRestoreSelection && <button type="button" onClick={onRestoreSelection} className="flex-1 border border-sky-300 bg-sky-50 text-sky-800 rounded-xl px-3 py-2.5 text-xs font-bold flex items-center justify-center gap-1.5"><RotateCcw className="w-3.5 h-3.5" />Previous Selection</button>}
+              <button type="button" onClick={onClose} className="flex-1 bg-gov-blue text-white rounded-xl px-3 py-2.5 text-xs font-bold">Done</button>
+            </div>
           </div>
         ) : (
           <form onSubmit={submit} className="space-y-4">

@@ -720,15 +720,15 @@
     "semantic_hash": ""
   },
   "src/app/api/v1/photos/[id]/image/route.ts": {
-    "mtime": 1793171874.0089054,
-    "seen": 1793172745.3784003,
-    "ast_hash": "dc6e42c45920718a9799d81b2cb50192",
+    "mtime": 1795140780.6620262,
+    "seen": 1795413853.2967534,
+    "ast_hash": "98f870969f6cba89065611b64a6ca086",
     "semantic_hash": ""
   },
   "src/app/api/v1/photos/route.ts": {
-    "mtime": 1793171874.0089054,
-    "seen": 1793172745.3784008,
-    "ast_hash": "a10f52d41ae70b29d3618f623ad73f2a",
+    "mtime": 1795140780.71549,
+    "seen": 1795413853.2967565,
+    "ast_hash": "5d7b634e66d7b46528a1d7c4dcfb606d",
     "semantic_hash": ""
   },
   "src/app/api/v1/programs/[id]/beneficiaries/batch-action/route.ts": {
@@ -786,9 +786,9 @@
     "semantic_hash": ""
   },
   "src/app/api/v1/programs/[id]/table-rules/route.ts": {
-    "mtime": 1793171874.0089054,
-    "seen": 1793172745.3784058,
-    "ast_hash": "4b93af171465a09d1c714226f49e1c9b",
+    "mtime": 1795137490.6367037,
+    "seen": 1795413853.2981062,
+    "ast_hash": "9585c5efe210c32ca3192d156e1bd6ee",
     "semantic_hash": ""
   },
   "src/app/api/v1/programs/[id]/work-program/auto-deploy/route.ts": {
@@ -888,9 +888,9 @@
     "semantic_hash": ""
   },
   "src/app/api/v1/reports/export/route.ts": {
-    "mtime": 1794217887.4889882,
-    "seen": 1794217914.015917,
-    "ast_hash": "0bba465bb7807502d69c77b1494a1d7d",
+    "mtime": 1795142564.6728086,
+    "seen": 1795413853.2999914,
+    "ast_hash": "80b87142a8540e177b557a6232018735",
     "semantic_hash": ""
   },
   "src/app/api/v1/restrictions/import/route.ts": {
@@ -990,9 +990,9 @@
     "semantic_hash": ""
   },
   "src/app/beneficiaries/page.tsx": {
-    "mtime": 1795055807.867375,
-    "seen": 1795055865.2546778,
-    "ast_hash": "fc1bdb0e05f56c985b14c2674f501ae5",
+    "mtime": 1795413670.6069515,
+    "seen": 1795413853.302135,
+    "ast_hash": "c51ec5c9bb0298380ef6f7edbc3c555e",
     "semantic_hash": ""
   },
   "src/app/dashboard/page.tsx": {
@@ -1014,9 +1014,9 @@
     "semantic_hash": ""
   },
   "src/app/field/page.tsx": {
-    "mtime": 1793171874.0334177,
-    "seen": 1793172745.378425,
-    "ast_hash": "2e686853a3f66ce988ee12c7f653263f",
+    "mtime": 1795135877.6977105,
+    "seen": 1795413853.3024566,
+    "ast_hash": "48b65f5861641045523d01d1b827e17b",
     "semantic_hash": ""
   },
   "src/app/field/payout/page.tsx": {
@@ -1038,9 +1038,9 @@
     "semantic_hash": ""
   },
   "src/app/field/work-program/page.tsx": {
-    "mtime": 1793171874.0368226,
-    "seen": 1793172745.378429,
-    "ast_hash": "5c03fb71c164783cba9dcf3f8f5917b5",
+    "mtime": 1795135877.750714,
+    "seen": 1795413853.3027723,
+    "ast_hash": "dfe6fd8538a06f6c1d4395f6b5d618aa",
     "semantic_hash": ""
   },
   "src/app/layout.tsx": {
@@ -1140,9 +1140,9 @@
     "semantic_hash": ""
   },
   "src/app/reports/page.tsx": {
-    "mtime": 1794217030.3106472,
-    "seen": 1794217614.1898587,
-    "ast_hash": "0cee85342bdd8335a43b311261f391e6",
+    "mtime": 1795140780.7963612,
+    "seen": 1795413853.3046415,
+    "ast_hash": "ad575855b864d543588621a3dd869c3c",
     "semantic_hash": ""
   },
   "src/app/restrictions/checker/page.tsx": {
@@ -1452,9 +1452,9 @@
     "semantic_hash": ""
   },
   "src/lib/excel-exporter.ts": {
-    "mtime": 1794217030.309623,
-    "seen": 1794217614.19407,
-    "ast_hash": "2e8a675135b7f88d4a6230ff04d0cf01",
+    "mtime": 1795143091.7773597,
+    "seen": 1795413853.3121705,
+    "ast_hash": "0cfc8b6c6b36b2d9f85b015af045067d",
     "semantic_hash": ""
   },
   "src/lib/excel-importer.ts": {
@@ -2370,15 +2370,15 @@
     "semantic_hash": ""
   },
   "src/lib/completion-report-template.ts": {
-    "mtime": 1794217164.8694558,
-    "seen": 1794217614.1936975,
-    "ast_hash": "e970c65264f26cc0a578c19668753400",
+    "mtime": 1795143091.7039244,
+    "seen": 1795413853.311556,
+    "ast_hash": "937268aa0c6b08fcacb7c092586ffdfd",
     "semantic_hash": ""
   },
   "src/lib/completion-report-photos.ts": {
-    "mtime": 1794217485.6858404,
-    "seen": 1794217614.193696,
-    "ast_hash": "8b010e203755f729810f510672f9e90f",
+    "mtime": 1795143091.6555574,
+    "seen": 1795413853.3115542,
+    "ast_hash": "a79753c792ac93eb2149b6b6e4ab9fb2",
     "semantic_hash": ""
   },
   "scripts/start-localhost.mjs": {
@@ -2496,9 +2496,9 @@
     "semantic_hash": ""
   },
   "src/components/beneficiaries/BulkAttendanceModal.tsx": {
-    "mtime": 1795068834.2947261,
-    "seen": 1795068926.4164433,
-    "ast_hash": "78526354d8df95e0c8cc9fe115ed66be",
+    "mtime": 1795413670.6079502,
+    "seen": 1795413853.305688,
+    "ast_hash": "8eed3da38f5d0e5713d3b78fe1bc8d47",
     "semantic_hash": ""
   },
   "src/lib/attendance-slot-write.ts": {
@@ -2514,9 +2514,9 @@
     "semantic_hash": ""
   },
   "test/test-bulk-attendance-browser.mjs": {
-    "mtime": 1795068895.6947653,
-    "seen": 1795068926.4228337,
-    "ast_hash": "ffef941b76059d750b44ea072a113a66",
+    "mtime": 1795413830.7469738,
+    "seen": 1795413853.3169756,
+    "ast_hash": "642d6317edc0c7083faf087a7c367c0e",
     "semantic_hash": ""
   },
   "src/lib/attendance-schedule-reconciliation.ts": {
@@ -2535,6 +2535,30 @@
     "mtime": 1795068809.1174467,
     "seen": 1795068926.420544,
     "ast_hash": "549811a202afdec186c5774a6b81a901",
+    "semantic_hash": ""
+  },
+  "src/app/api/v1/reports/accomplishment-preview/route.ts": {
+    "mtime": 1795142559.2647014,
+    "seen": 1795413853.299989,
+    "ast_hash": "7dd110a3f6f51ee7b0684a1589a96f21",
+    "semantic_hash": ""
+  },
+  "src/components/reports/AccomplishmentExcelPreviewEditor.tsx": {
+    "mtime": 1795142762.5771806,
+    "seen": 1795413853.3091211,
+    "ast_hash": "e668405a5fbdf4aba9b32c443bb57172",
+    "semantic_hash": ""
+  },
+  "src/components/reports/AccomplishmentReportBuilderModal.tsx": {
+    "mtime": 1795143091.6014185,
+    "seen": 1795413853.3091228,
+    "ast_hash": "7d305a9bd8524e5e9b907bbc77c33ff7",
+    "semantic_hash": ""
+  },
+  "src/lib/geotag-canvas.ts": {
+    "mtime": 1795140350.638755,
+    "seen": 1795413853.312384,
+    "ast_hash": "be6117cba7291c7e6b57558ce4dbcd7f",
     "semantic_hash": ""
   }
 }

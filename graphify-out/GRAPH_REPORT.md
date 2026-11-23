@@ -1,27 +1,27 @@
-# Graph Report - PESO-EC-Access-1  (2026-11-19)
+# Graph Report - PESO-EC-Access-1  (2026-11-23)
 
 ## Corpus Check
-- 397 files · ~1,460,228 words
+- 401 files · ~1,475,266 words
 - Verdict: corpus is large enough that graph structure adds value.
 - Unclassified: 33 file(s) not represented in the graph (top: .csv 26, .css 2, .example 1)
 
 ## Summary
-- 1995 nodes · 5016 edges · 116 communities (87 shown, 29 thin omitted)
+- 2039 nodes · 5153 edges · 119 communities (92 shown, 27 thin omitted)
 - Extraction: 100% EXTRACTED · 0% INFERRED · 0% AMBIGUOUS · INFERRED: 13 edges (avg confidence: 0.85)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `ddc7f5a8`
+- Built from commit: `6fc99696`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
 ## Community Hubs (Navigation)
 - package.json
 - excel-importer.ts
-- programs/[id]/route.ts
+- program-work-days.ts
 - dependencies
 - test-accomplishment-work-schedule.mjs
-- getCurrentUser
+- hasPermission
 - replacements/page.tsx
 - application-schema.ts
 - stubs/page.tsx
@@ -30,7 +30,7 @@
 - test-program-work-date-browser.mjs
 - test-application-workflow.mjs
 - completion-report-template.ts
-- hasPermission
+- getCurrentUser
 - dingalan-groupings.ts
 - identity-address.ts
 - application-id-mapper.ts
@@ -44,7 +44,7 @@
 - ref_path
 - Layout & Components
 - @prisma/client
-- export/route.ts
+- logAudit
 - Layout & Components
 - inspect-all-sources.js
 - test-roster-restriction-preview.mjs
@@ -69,30 +69,30 @@
 - effects/TextCubeLoader.tsx
 - vercel.json
 - v1/beneficiaries/import/commit/route.ts
-- test-bulk-attendance-browser.mjs
+- react
 - Reports: supplied DOLE 2026 workbook
 - app/page.tsx
 - migrate-user-plain-password.js
 - login/page.tsx
 - test-auto-qr-browser.mjs
 - test-program-qr-postgres.mjs
-- restore-to-postgres.js
+- AccomplishmentReportBuilderModal.tsx
 - Stitch Design System & UI Screen Guide
-- applications/import/route.ts
+- local-id-reader.ts
 - ref_node_fs
 - Guided ID camera
 - replacement-eligibility.ts
 - inspect-flagged.js
 - work-program-parser.ts
 - Online and walk-in application intake
-- cleanup-test-users.mjs
+- v1/applications/route.ts
 - update-flagged-beneficiaries.js
 - test-application-inbox-browser.mjs
 - inspect-db.js
-- detailed-consolidated-retrieval.mjs
-- list-users-by-role.mjs
+- reseed-exact-522-beneficiaries.mjs
+- test-program-qr-browser.mjs
 - engines
-- ref_node_assert
+- ref_node_module
 - tailwindcss
 - test-local-ocr-browser.mjs
 - inspect-db.mjs
@@ -104,39 +104,42 @@
 - restrictions/import/route.ts
 - test-offline-sync-resilience.mjs
 - ProgramBeneficiary_active_program_slot_key
-- test-dole-reports-browser.mjs
+- test-masterlist-import-errors-browser.mjs
 - @supabase/supabase-js
 - test-dole-reports.mjs
 - format1-stub-base-b64.ts
 - Bagong Pilipinas transparent footer asset
 - dashboard/page.tsx
-- lookup/route.ts
+- test-navbar-landing-link-browser.mjs
 - test-public-inquiry.mjs
-- test-password-view.mjs
+- export-pg-to-files.js
 - next
 - auth.ts
 - test-roster-restriction-browser.mjs
-- test-stub-distribution-monitoring.mjs
-- test-table-rules.mjs
+- test-accomplishment-export-browser.mjs
+- stubs/route.ts
 - Q: ayusin mo yung sa driver`s license kasi halos walang nababasa
+- check-sep20-evening.mjs
 - cleanup-and-deduplicate.js
+- inspect-program-details.mjs
+- inspect-sep21-data.mjs
 - check-demographics.mjs
+- test-program-crud.mjs
 - test-matrix-and-sync.mjs
-- test-dedicated-qr-retention.mjs
+- test-sorting-and-templates.mjs
 - extract-and-sync-522-qrs.mjs
-- test-attendance-3hours.mjs
 
 ## God Nodes (most connected - your core abstractions)
-1. `getCurrentUser()` - 163 edges
-2. `next` - 116 edges
-3. `isAdminUser()` - 116 edges
-4. `hasPermission()` - 116 edges
-5. `react` - 85 edges
-6. `logAudit()` - 83 edges
-7. `lucide-react` - 75 edges
-8. `prisma` - 75 edges
-9. `useAuth()` - 69 edges
-10. `@prisma/client` - 65 edges
+1. `getCurrentUser()` - 166 edges
+2. `hasPermission()` - 119 edges
+3. `isAdminUser()` - 118 edges
+4. `next` - 117 edges
+5. `react` - 87 edges
+6. `logAudit()` - 85 edges
+7. `lucide-react` - 77 edges
+8. `prisma` - 76 edges
+9. `useAuth()` - 71 edges
+10. `normalizeBarangayName()` - 69 edges
 
 ## Surprising Connections (you probably didn't know these)
 - `html()` --indirect_call--> `RosterRestrictionDetails()`  [INFERRED]
@@ -145,15 +148,15 @@
   test/test-local-id-reader.mjs → src/lib/ocr/application-id-mapper.ts
 - `mapped()` --calls--> `mapLocalIdentityText()`  [EXTRACTED]
   test/test-local-id-reader.mjs → src/lib/ocr/application-id-mapper.ts
+- `main()` --calls--> `normalizeBarangayName()`  [EXTRACTED]
+  scripts/unify-all-sitios-and-puroks.mjs → src/lib/utils.ts
 - `run()` --indirect_call--> `selected()`  [INFERRED]
   src/components/reports/DoleReportsPanel.tsx → test/test-local-id-reader.mjs
-- `testApi()` --calls--> `signToken()`  [EXTRACTED]
-  test/test-users-api.mjs → src/lib/auth.ts
 
 ## Import Cycles
 - None detected.
 
-## Communities (116 total, 29 thin omitted)
+## Communities (119 total, 27 thin omitted)
 
 ### Community 0 - "package.json"
 Cohesion: 0.09
@@ -163,9 +166,9 @@ Nodes (22): name, private, version, autoprefixer, clsx, dexie, dexie-react-hooks
 Cohesion: 0.19
 Nodes (14): ExcelImportPage(), DEFAULT_EXEMPTION_REASONS, MasterlistUploadModalProps, displayDate(), RosterRestrictionDetails(), cleanStr(), ImportPreviewResult, MONTH_NAME_MAP (+6 more)
 
-### Community 2 - "programs/[id]/route.ts"
-Cohesion: 0.24
-Nodes (11): DELETE(), dynamic, GET(), PATCH(), dynamic, GET(), POST(), reconcileAttendanceScheduleDates() (+3 more)
+### Community 2 - "program-work-days.ts"
+Cohesion: 0.50
+Nodes (5): PATCH(), reconcileAttendanceScheduleDates(), buildProgramWorkDays(), ProgramScheduleError, rescheduleProgramWorkDays()
 
 ### Community 3 - "dependencies"
 Cohesion: 0.05
@@ -173,31 +176,31 @@ Nodes (41): dependencies, autoprefixer, bcryptjs, clsx, date-fns, dexie, dexie-r
 
 ### Community 4 - "test-accomplishment-work-schedule.mjs"
 Cohesion: 0.05
-Nodes (39): exceljs, dynamic, book, { buildBarangayCompletionDays }, cache, chunks, db, doleBook (+31 more)
+Nodes (37): book, { buildBarangayCompletionDays }, cache, chunks, db, doleBook, downloaded, ExcelJS (+29 more)
 
-### Community 5 - "getCurrentUser"
-Cohesion: 0.07
-Nodes (53): DELETE(), dynamic, PATCH(), dynamic, GET(), dynamic, GET(), POST() (+45 more)
+### Community 5 - "hasPermission"
+Cohesion: 0.10
+Nodes (34): DELETE(), dynamic, PATCH(), dynamic, GET(), dynamic, getVal(), POST() (+26 more)
 
 ### Community 6 - "replacements/page.tsx"
-Cohesion: 0.22
-Nodes (12): ReplacementsContent(), ReplacementsPage(), ReportCenterPage(), TableScrollWrapper(), TableScrollWrapperProps, DOC_LABELS, PendingReplacementAssessmentItem, Props (+4 more)
+Cohesion: 0.27
+Nodes (10): ReplacementsContent(), ReplacementsPage(), ReportCenterPage(), DOC_LABELS, PendingReplacementAssessmentItem, Props, ReplacementApprovalModal(), DoleReportsPanel() (+2 more)
 
 ### Community 7 - "application-schema.ts"
-Cohesion: 0.08
+Cohesion: 0.07
 Nodes (42): OnlineTupadApplicationPage(), ApplicationForm(), ApplicationFormProps, DocumentField, FieldProps, FormErrors, MultiChoice(), Section() (+34 more)
 
 ### Community 8 - "stubs/page.tsx"
-Cohesion: 0.22
-Nodes (14): PrintTemplateMode, StubsContent(), StubsDesignerPage(), ETUPAD_BASE_IMAGE, ETupadCard, ETupadCardProps, Format1Stub, Format1StubProps (+6 more)
+Cohesion: 0.17
+Nodes (17): PrintTemplateMode, StubsContent(), StubsDesignerPage(), ETUPAD_BASE_IMAGE, ETupadCard, ETupadCardProps, Format1Stub, Format1StubProps (+9 more)
 
 ### Community 9 - "dexie.ts"
 Cohesion: 0.07
-Nodes (72): loadData(), DailyAttendancePage(), OrientationContent(), OrientationPage(), PayoutScannerPage(), photosMemoryCache, PhotosPage(), StubDistributionContent() (+64 more)
+Nodes (76): date-fns, runTests(), validateDuration(), loadData(), DailyAttendancePage(), OrientationContent(), OrientationPage(), PayoutScannerPage() (+68 more)
 
 ### Community 10 - "application-service.ts"
-Cohesion: 0.09
-Nodes (35): dynamic, GET(), dynamic, POST(), dynamic, POST(), ApplicationWriteAction, isIdempotentReplay() (+27 more)
+Cohesion: 0.07
+Nodes (41): dynamic, GET(), dynamic, POST(), dynamic, POST(), dynamic, POST() (+33 more)
 
 ### Community 11 - "test-program-work-date-browser.mjs"
 Cohesion: 0.25
@@ -208,24 +211,24 @@ Cohesion: 0.08
 Nodes (23): audits, cache, countQueries, deleted, detail, docs, encode, fakePrisma (+15 more)
 
 ### Community 13 - "completion-report-template.ts"
-Cohesion: 0.13
-Nodes (28): AttendanceActivity, buildBarangayCompletionDays(), cleanActivity(), completionBarangay(), CompletionDay, CompletionProgram, key(), PhotoActivity (+20 more)
+Cohesion: 0.08
+Nodes (51): prisma, testExport(), dynamic, GET(), maxDuration, AttendanceActivity, buildBarangayCompletionDays(), cleanActivity() (+43 more)
 
-### Community 14 - "hasPermission"
+### Community 14 - "getCurrentUser"
 Cohesion: 0.09
-Nodes (23): dynamic, POST(), DELETE(), generateElporControlNo(), GET(), PATCH(), POST(), dynamic (+15 more)
+Nodes (27): dynamic, GET(), POST(), DELETE(), dynamic, GET(), PATCH(), dynamic (+19 more)
 
 ### Community 15 - "dingalan-groupings.ts"
-Cohesion: 0.33
-Nodes (15): POST(), FieldWorkProgramPage(), WorkProgramManagementPage(), DeploymentGroupingMatrix(), DeploymentGroupingMatrixProps, BarangayGroupingConfig, classifyBeneficiaryGroup(), computeGroupDemographics() (+7 more)
+Cohesion: 0.26
+Nodes (18): DEFAULT_10_DAY_ACTIVITIES, dynamic, POST(), FieldWorkProgramPage(), WorkProgramManagementPage(), DeploymentGroupingMatrix(), DeploymentGroupingMatrixProps, BarangayGroupingConfig (+10 more)
 
 ### Community 16 - "identity-address.ts"
 Cohesion: 0.28
-Nodes (16): BARANGAYS, ADDRESS_STOP, addressLike(), addressPiece(), addressStart(), barangayPattern(), escape(), IdentityAddress (+8 more)
+Nodes (16): ADDRESS_LABEL, ADDRESS_STOP, addressLike(), addressPiece(), addressStart(), barangayPattern(), escape(), IdentityAddress (+8 more)
 
 ### Community 17 - "application-id-mapper.ts"
-Cohesion: 0.18
-Nodes (29): birthDateValue(), clean(), cleanLocalValue(), cleanPersonName(), detectIdentityDocumentType(), explicitLabel(), extractPhilSysNumber(), fieldValue() (+21 more)
+Cohesion: 0.24
+Nodes (23): calculateAge(), birthDateValue(), clean(), cleanLocalValue(), cleanPersonName(), detectIdentityDocumentType(), explicitLabel(), fieldValue() (+15 more)
 
 ### Community 18 - "scripts"
 Cohesion: 0.12
@@ -237,7 +240,7 @@ Nodes (9): core, output, require, root, output, pdfjs, program, require (+1 more
 
 ### Community 20 - "test-local-id-reader.mjs"
 Cohesion: 0.05
-Nodes (36): run(), addressCrop, addressLines, addressOf(), backStatusRegions, birthCrop, certificate, certificateLayout (+28 more)
+Nodes (37): run(), nationalNumberCrops(), addressCrop, addressLines, addressOf(), backStatusRegions, birthCrop, certificate (+29 more)
 
 ### Community 21 - "compilerOptions"
 Cohesion: 0.10
@@ -248,28 +251,28 @@ Cohesion: 0.11
 Nodes (42): dynamic, GET(), dynamic, GET(), maxDuration, POST(), canUseDoleReports(), DOLE_REPORT_SHEETS (+34 more)
 
 ### Community 23 - "ApplicationInbox.tsx"
-Cohesion: 0.16
-Nodes (14): OnlineApplicationsPage(), WalkInSubmissionsPage(), WalkInEncodingPage(), ApplicationInbox(), ApplicationRecord, dateText(), InboxData, sections (+6 more)
+Cohesion: 0.29
+Nodes (8): OnlineApplicationsPage(), WalkInSubmissionsPage(), ApplicationInbox(), ApplicationRecord, dateText(), InboxData, sections, valueText()
 
 ### Community 24 - "test-application-id-autofill.mjs"
-Cohesion: 0.09
-Nodes (28): dynamic, isRateLimited(), maxDuration, POST(), providerMessage(), rateLimit, isAcceptedApplicationFile(), mergeOcrSides() (+20 more)
+Cohesion: 0.08
+Nodes (29): dynamic, isRateLimited(), maxDuration, POST(), providerMessage(), rateLimit, applicationFinalSchema, isAcceptedApplicationFile() (+21 more)
 
 ### Community 25 - "ref_path"
 Cohesion: 0.10
-Nodes (8): __dirname, nextConfig, prisma, fs, path, { PrismaClient }, prisma, prisma
+Nodes (8): __dirname, nextConfig, prisma, prisma, fs, path, { PrismaClient }, prisma
 
 ### Community 26 - "Layout & Components"
 Cohesion: 0.14
 Nodes (13): 1. DICT GWT Utility Header, 2. Official Municipal Masthead, 3. Hero Citizen Announcement Card, 4. Telemetry Metric Strip, 5. Public Status Inquiry Module (`#inquiry`), 6. Work Area Assignment Lookup (`#work-assignment`), 7. Direct Feedback Desk (`#inquiry-form`), 8. DICT Standard GWT Footer (+5 more)
 
 ### Community 27 - "@prisma/client"
-Cohesion: 0.05
-Nodes (16): @prisma/client, prisma, flaggedReference, prisma, { PrismaClient }, prisma, prisma, prisma (+8 more)
+Cohesion: 0.04
+Nodes (18): @prisma/client, prisma, prisma, flaggedReference, prisma, { PrismaClient }, prisma, prisma (+10 more)
 
-### Community 28 - "export/route.ts"
-Cohesion: 0.31
-Nodes (12): prisma, testExport(), dynamic, GET(), maxDuration, generateAccomplishmentExcel(), generateAttendanceExcel(), generateFlaggedReplacementsExcel() (+4 more)
+### Community 28 - "logAudit"
+Cohesion: 0.10
+Nodes (24): dynamic, POST(), DELETE(), dynamic, PATCH(), POST(), dynamic, POST() (+16 more)
 
 ### Community 29 - "Layout & Components"
 Cohesion: 0.14
@@ -284,8 +287,8 @@ Cohesion: 0.12
 Nodes (15): react-dom, activeMarkup, book, buffer, cache, globalRoute, load(), names (+7 more)
 
 ### Community 32 - "programs/[id]/page.tsx"
-Cohesion: 0.11
-Nodes (23): lucide-react, react, AuditLogsPage(), DINGALAN_BARANGAYS, UserManagementPage(), metadata, PublicInquiryPage(), ProgramDetailsHub() (+15 more)
+Cohesion: 0.23
+Nodes (13): DINGALAN_BARANGAYS, UserManagementPage(), ProgramDetailsHub(), ProgramsPage(), StatusBadge(), StatusBadgeProps, DeleteProgramModal(), DeleteProgramModalProps (+5 more)
 
 ### Community 33 - "check-remote.js"
 Cohesion: 0.15
@@ -300,16 +303,16 @@ Cohesion: 0.09
 Nodes (9): pngjs, backup, fs, prisma, { PrismaClient }, downloadImage(), b64, fs (+1 more)
 
 ### Community 36 - "browser-id-ocr.ts"
-Cohesion: 0.11
-Nodes (40): tesseract.js, normalizeIdLighting(), MappedOcrSide, MergedOcrResult, NON_BIRTH_DATE_LABEL, OcrSubject, ORDERED_NAME_LABEL, active() (+32 more)
+Cohesion: 0.15
+Nodes (29): tesseract.js, normalizeIdLighting(), OcrSubject, active(), canvas(), context(), crop(), enhance() (+21 more)
 
 ### Community 37 - "manifest.json"
 Cohesion: 0.20
 Nodes (9): background_color, description, display, icons, name, orientation, short_name, start_url (+1 more)
 
 ### Community 38 - "prisma.ts"
-Cohesion: 0.09
-Nodes (40): date-fns, dynamic, POST(), dynamic, POST(), dynamic, POST(), dynamic (+32 more)
+Cohesion: 0.14
+Nodes (25): dynamic, POST(), dynamic, GET(), dynamic, POST(), dynamic, POST() (+17 more)
 
 ### Community 39 - "ref_crypto"
 Cohesion: 0.36
@@ -332,8 +335,8 @@ Cohesion: 0.22
 Nodes (8): Database migration, Local ID reading (default; no Azure key required), Number recovery and optional close-up, Optional Azure API, Required private storage configuration, TUPAD application ID autofill and walk-in encoding, Verification, What is implemented
 
 ### Community 44 - "bulk/route.ts"
-Cohesion: 0.09
-Nodes (27): DINGALAN_BARANGAYS, formatBday(), main(), normalizeBarangayName(), normalizeSitioName(), prisma, rawData, DINGALAN_BARANGAYS (+19 more)
+Cohesion: 0.26
+Nodes (9): BulkAttendanceError, dynamic, POST(), ATTENDANCE_FIELDS, AttendanceSlot, Row, writeAttendanceSlot(), getMasterlistAttendanceRange() (+1 more)
 
 ### Community 46 - "ApplicationInbox.tsx"
 Cohesion: 0.11
@@ -349,7 +352,7 @@ Nodes (6): DELETE(), dynamic, GET(), maskFullName(), parsePayoutDateToTimestamp(
 
 ### Community 49 - "useAuth"
 Cohesion: 0.07
-Nodes (43): html2canvas, AdminApplicationsPage(), AdminInquiriesPage(), FIELD_OPERATIONS, FieldScannerHubContent(), FieldScannerHubPage(), BalikPinasElporPortalPage(), DINGALAN_BARANGAYS (+35 more)
+Nodes (42): html2canvas, AdminApplicationsPage(), AuditLogsPage(), AdminInquiriesPage(), FIELD_OPERATIONS, FieldScannerHubContent(), FieldScannerHubPage(), BalikPinasElporPortalPage() (+34 more)
 
 ### Community 50 - "effects/TextCubeLoader.tsx"
 Cohesion: 0.43
@@ -360,12 +363,12 @@ Cohesion: 0.25
 Nodes (7): buildCommand, framework, functions, src/app/api/**/*, $schema, includeFiles, maxDuration
 
 ### Community 52 - "v1/beneficiaries/import/commit/route.ts"
-Cohesion: 0.07
-Nodes (47): dynamic, ImportConflict, maxDuration, POST(), dynamic, GET(), handleQrPassSearch(), POST() (+39 more)
+Cohesion: 0.06
+Nodes (56): exceljs, dynamic, ImportConflict, maxDuration, POST(), dynamic, GET(), handleQrPassSearch() (+48 more)
 
-### Community 53 - "test-bulk-attendance-browser.mjs"
-Cohesion: 0.29
-Nodes (6): calls, days, errors, program, require, roster
+### Community 53 - "react"
+Cohesion: 0.13
+Nodes (14): lucide-react, react, metadata, PublicInquiryPage(), BeneficiaryProfilePage(), dynamic, AssignmentContent(), MyAssignmentPage() (+6 more)
 
 ### Community 54 - "Reports: supplied DOLE 2026 workbook"
 Cohesion: 0.33
@@ -391,21 +394,21 @@ Nodes (6): calls, errors, programs, require, scan(), tokens
 Cohesion: 0.11
 Nodes (15): cacheRoot, dataDir, get(), listener, load(), { PrismaClient }, require, root (+7 more)
 
-### Community 60 - "restore-to-postgres.js"
-Cohesion: 0.40
-Nodes (3): fs, path, { PrismaClient }
+### Community 60 - "AccomplishmentReportBuilderModal.tsx"
+Cohesion: 0.14
+Nodes (24): AccomplishmentExcelPreviewEditor(), buildDefaultSlotCaption(), cleanAccomplishmentDayText(), PreviewBarangayDoc, PreviewDayRow, PreviewLayoutConfig, PreviewPhotoItem, PreviewSelectedSlot (+16 more)
 
 ### Community 61 - "Stitch Design System & UI Screen Guide"
 Cohesion: 0.40
 Nodes (4): 1. How to Access and Edit in Stitch, 2. Included Local Artifacts, 3. How to Upload a Modified `DESIGN.md` to Stitch in the Future, Stitch Design System & UI Screen Guide
 
-### Community 62 - "applications/import/route.ts"
-Cohesion: 0.67
-Nodes (3): dynamic, getVal(), POST()
+### Community 62 - "local-id-reader.ts"
+Cohesion: 0.20
+Nodes (16): extractPhilSysNumber(), MappedOcrSide, MergedOcrResult, NON_BIRTH_DATE_LABEL, OcrTextLine, ORDERED_NAME_LABEL, extractProfileNumber(), identityNumberRows() (+8 more)
 
 ### Community 63 - "ref_node_fs"
-Cohesion: 0.06
-Nodes (23): typescript, exported, card, module, paper, source, blurred, clearResult (+15 more)
+Cohesion: 0.05
+Nodes (26): typescript, errors, files, programs, require, saved, writes, exported (+18 more)
 
 ### Community 64 - "Guided ID camera"
 Cohesion: 0.40
@@ -423,21 +426,33 @@ Nodes (20): xlsx, dynamic, dynamic, POST(), dynamic, DINGALAN_BARANGAYS, normali
 Cohesion: 0.33
 Nodes (5): Admin review, Database and private storage, Online and walk-in application intake, Pages and roles, Verification
 
+### Community 69 - "v1/applications/route.ts"
+Cohesion: 0.25
+Nodes (9): details, dynamic, GET(), PATCH(), DELETE(), dynamic, GET(), isIntakeSource() (+1 more)
+
 ### Community 70 - "update-flagged-beneficiaries.js"
 Cohesion: 0.40
 Nodes (3): flaggedReference, prisma, { PrismaClient }
 
 ### Community 71 - "test-application-inbox-browser.mjs"
+Cohesion: 0.14
+Nodes (9): errors, fixture, record, requests, require, calls, errors, program (+1 more)
+
+### Community 73 - "reseed-exact-522-beneficiaries.mjs"
+Cohesion: 0.36
+Nodes (7): DINGALAN_BARANGAYS, formatBday(), main(), normalizeBarangayName(), normalizeSitioName(), prisma, rawData
+
+### Community 74 - "test-program-qr-browser.mjs"
 Cohesion: 0.29
-Nodes (5): errors, fixture, record, requests, require
+Nodes (5): calls, errors, programs, require, roster
 
 ### Community 75 - "engines"
 Cohesion: 0.67
 Nodes (3): engines, node, npm
 
-### Community 76 - "ref_node_assert"
-Cohesion: 0.04
-Nodes (36): ExcelJS, fixture, programs, require, errors, require, login(), run() (+28 more)
+### Community 76 - "ref_node_module"
+Cohesion: 0.07
+Nodes (19): calls, days, errors, otherProgram, program, require, roster, errors (+11 more)
 
 ### Community 78 - "test-local-ocr-browser.mjs"
 Cohesion: 0.40
@@ -448,12 +463,12 @@ Cohesion: 0.40
 Nodes (3): prisma, { PrismaClient }, referenceSlots
 
 ### Community 81 - "beneficiaries/page.tsx"
-Cohesion: 0.11
-Nodes (33): main(), prisma, AttendanceMatrixContent(), AttendanceMatrixPage(), BeneficiariesMasterlistContent(), BeneficiariesMasterlistPage(), RestrictionsPage(), AdminStubOverrideModal() (+25 more)
+Cohesion: 0.09
+Nodes (36): main(), prisma, AttendanceMatrixContent(), AttendanceMatrixPage(), BeneficiariesMasterlistContent(), BeneficiariesMasterlistPage(), RestrictionsPage(), AdminStubOverrideModal() (+28 more)
 
 ### Community 82 - "ref_node_assert"
 Cohesion: 0.11
-Nodes (12): IS_LOCAL_DEVELOPMENT, PRECACHE_ASSETS, assertTimeInRange(), testBulkAttendance(), request(), cacheRoot, dataDir, listener (+4 more)
+Nodes (13): assertTimeInRange(), testBulkAttendance(), login(), run(), cacheRoot, dataDir, listener, load() (+5 more)
 
 ### Community 83 - "Reusable QR slots and per-program scan history"
 Cohesion: 0.29
@@ -463,29 +478,33 @@ Nodes (6): Active masterlist uniqueness, More than 522 beneficiaries, Offline de
 Cohesion: 0.39
 Nodes (7): addDaysToDate(), checkIsAppointive(), dynamic, maxDuration, parseDateToISO(), parseNameParts(), POST()
 
-### Community 88 - "test-dole-reports-browser.mjs"
-Cohesion: 0.25
-Nodes (6): errors, files, programs, require, saved, writes
+### Community 88 - "test-masterlist-import-errors-browser.mjs"
+Cohesion: 0.33
+Nodes (5): alerts, pageErrors, preview, require, rows
 
 ### Community 89 - "@supabase/supabase-js"
 Cohesion: 0.33
 Nodes (3): @supabase/supabase-js, supabase, supabaseAdmin
 
 ### Community 90 - "test-dole-reports.mjs"
-Cohesion: 0.10
-Nodes (18): api, base, cache, config, data, db, draft, entry (+10 more)
+Cohesion: 0.08
+Nodes (21): IS_LOCAL_DEVELOPMENT, PRECACHE_ASSETS, api, base, cache, config, data, db (+13 more)
 
 ### Community 99 - "dashboard/page.tsx"
 Cohesion: 0.50
 Nodes (4): DashboardData, DashboardPage(), dynamic, getDashboardMetrics()
 
-### Community 100 - "lookup/route.ts"
-Cohesion: 0.48
-Nodes (6): dynamic, GET(), handleLookup(), maskFullName(), POST(), verifyMiddleName()
+### Community 100 - "test-navbar-landing-link-browser.mjs"
+Cohesion: 0.33
+Nodes (5): errors, expectedLabels, mutations, require, roles
+
+### Community 103 - "export-pg-to-files.js"
+Cohesion: 0.40
+Nodes (3): fs, path, { PrismaClient }
 
 ### Community 104 - "next"
 Cohesion: 0.06
-Nodes (33): next, dynamic, GET(), dynamic, dynamic, POST(), dynamic, dynamic (+25 more)
+Nodes (33): next, dynamic, GET(), dynamic, dynamic, POST(), dynamic, POST() (+25 more)
 
 ### Community 105 - "auth.ts"
 Cohesion: 0.12
@@ -495,33 +514,37 @@ Nodes (19): bcryptjs, dynamic, POST(), dynamic, GET(), dynamic, generateTracking
 Cohesion: 0.29
 Nodes (6): baseRow, errors, preview, program, require, rows
 
+### Community 107 - "test-accomplishment-export-browser.mjs"
+Cohesion: 0.40
+Nodes (4): ExcelJS, fixture, programs, require
+
 ### Community 109 - "Q: ayusin mo yung sa driver`s license kasi halos walang nababasa"
 Cohesion: 0.40
 Nodes (4): Answer, Outcome, Q: ayusin mo yung sa driver`s license kasi halos walang nababasa, Source Nodes
 
 ### Community 118 - "extract-and-sync-522-qrs.mjs"
-Cohesion: 0.21
-Nodes (6): jsqr, pdfjs-dist, prisma, metadata, WorkAreaAssignmentInquiryPage(), PublicWorkAssignmentLookupCard()
+Cohesion: 0.13
+Nodes (11): jsqr, pdfjs-dist, prisma, DINGALAN_BARANGAYS, main(), normalizeBarangayName(), normalizeSitioName(), prisma (+3 more)
 
 ## Knowledge Gaps
 - **14 isolated node(s):** `@hookform/resolvers`, `@tesseract.js-data/eng`, `@types/bcryptjs`, `@types/jsonwebtoken`, `@types/jszip` (+9 more)
-  These have ≤1 connection - possible missing edges or undocumented components. (Counts symbols only; 909 node(s) total have ≤1 connection when file, concept and rationale nodes are included.)
-- **29 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
+  These have ≤1 connection - possible missing edges or undocumented components. (Counts symbols only; 920 node(s) total have ≤1 connection when file, concept and rationale nodes are included.)
+- **27 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `@prisma/client` connect `@prisma/client` to `package.json`, `programs/[id]/route.ts`, `getCurrentUser`, `application-service.ts`, `v1/beneficiaries/import/commit/route.ts`, `ref_path`, `export/route.ts`, `inspect-all-sources.js`, `seed.js`, `ref_fs`, `ref_crypto`, `master-sync-all-data.js`, `bulk/route.ts`, `v1/beneficiaries/import/commit/route.ts`, `migrate-user-plain-password.js`, `test-program-qr-postgres.mjs`, `restore-to-postgres.js`, `inspect-flagged.js`, `work-program-parser.ts`, `cleanup-test-users.mjs`, `update-flagged-beneficiaries.js`, `inspect-db.js`, `detailed-consolidated-retrieval.mjs`, `list-users-by-role.mjs`, `inspect-db.mjs`, `check-reference-slots.js`, `beneficiaries/page.tsx`, `ref_node_assert`, `sync-disqualified-entry.mjs`, `test-offline-sync-resilience.mjs`, `@supabase/supabase-js`, `test-public-inquiry.mjs`, `test-password-view.mjs`, `next`, `test-stub-distribution-monitoring.mjs`, `test-table-rules.mjs`, `cleanup-and-deduplicate.js`, `check-demographics.mjs`, `test-matrix-and-sync.mjs`, `test-dedicated-qr-retention.mjs`, `extract-and-sync-522-qrs.mjs`?**
-  _High betweenness centrality (0.198) - this node is a cross-community bridge._
+- **Why does `@prisma/client` connect `@prisma/client` to `package.json`, `program-work-days.ts`, `application-service.ts`, `completion-report-template.ts`, `v1/beneficiaries/import/commit/route.ts`, `ref_path`, `inspect-all-sources.js`, `seed.js`, `ref_fs`, `ref_crypto`, `master-sync-all-data.js`, `bulk/route.ts`, `v1/beneficiaries/import/commit/route.ts`, `migrate-user-plain-password.js`, `test-program-qr-postgres.mjs`, `inspect-flagged.js`, `work-program-parser.ts`, `v1/applications/route.ts`, `update-flagged-beneficiaries.js`, `inspect-db.js`, `reseed-exact-522-beneficiaries.mjs`, `inspect-db.mjs`, `check-reference-slots.js`, `beneficiaries/page.tsx`, `ref_node_assert`, `sync-disqualified-entry.mjs`, `test-offline-sync-resilience.mjs`, `@supabase/supabase-js`, `test-public-inquiry.mjs`, `export-pg-to-files.js`, `next`, `check-sep20-evening.mjs`, `cleanup-and-deduplicate.js`, `inspect-program-details.mjs`, `inspect-sep21-data.mjs`, `check-demographics.mjs`, `test-program-crud.mjs`, `test-matrix-and-sync.mjs`, `test-sorting-and-templates.mjs`, `extract-and-sync-522-qrs.mjs`?**
+  _High betweenness centrality (0.187) - this node is a cross-community bridge._
 - **What connects `@hookform/resolvers`, `@tesseract.js-data/eng`, `@types/bcryptjs` to the rest of the system?**
   _14 weakly-connected nodes found - possible documentation gaps or missing edges._
 - **Should `package.json` be split into smaller, more focused modules?**
   _Cohesion score 0.08695652173913043 - nodes in this community are weakly interconnected._
-- **Why does `next` connect `next` to `package.json`, `excel-importer.ts`, `programs/[id]/route.ts`, `test-accomplishment-work-schedule.mjs`, `getCurrentUser`, `replacements/page.tsx`, `stubs/page.tsx`, `dexie.ts`, `application-service.ts`, `hasPermission`, `dingalan-groupings.ts`, `v1/beneficiaries/import/commit/route.ts`, `test-application-id-autofill.mjs`, `export/route.ts`, `programs/[id]/page.tsx`, `prisma.ts`, `bulk/route.ts`, `middleware.ts`, `restrictions/route.ts`, `useAuth`, `v1/beneficiaries/import/commit/route.ts`, `app/page.tsx`, `login/page.tsx`, `applications/import/route.ts`, `replacement-eligibility.ts`, `work-program-parser.ts`, `beneficiaries/page.tsx`, `restrictions/import/route.ts`, `dashboard/page.tsx`, `lookup/route.ts`, `auth.ts`, `extract-and-sync-522-qrs.mjs`?**
-  _High betweenness centrality (0.136) - this node is a cross-community bridge._
+- **Why does `next` connect `next` to `package.json`, `excel-importer.ts`, `hasPermission`, `replacements/page.tsx`, `stubs/page.tsx`, `dexie.ts`, `application-service.ts`, `completion-report-template.ts`, `getCurrentUser`, `dingalan-groupings.ts`, `v1/beneficiaries/import/commit/route.ts`, `test-application-id-autofill.mjs`, `logAudit`, `programs/[id]/page.tsx`, `prisma.ts`, `bulk/route.ts`, `middleware.ts`, `restrictions/route.ts`, `useAuth`, `v1/beneficiaries/import/commit/route.ts`, `react`, `app/page.tsx`, `login/page.tsx`, `replacement-eligibility.ts`, `work-program-parser.ts`, `v1/applications/route.ts`, `beneficiaries/page.tsx`, `restrictions/import/route.ts`, `dashboard/page.tsx`, `auth.ts`, `stubs/route.ts`, `extract-and-sync-522-qrs.mjs`?**
+  _High betweenness centrality (0.146) - this node is a cross-community bridge._
 - **Should `dependencies` be split into smaller, more focused modules?**
   _Cohesion score 0.04878048780487805 - nodes in this community are weakly interconnected._
-- **Why does `react` connect `programs/[id]/page.tsx` to `package.json`, `excel-importer.ts`, `replacements/page.tsx`, `application-schema.ts`, `stubs/page.tsx`, `dexie.ts`, `dingalan-groupings.ts`, `v1/beneficiaries/import/commit/route.ts`, `ApplicationInbox.tsx`, `test-roster-restriction-preview.mjs`, `bulk/route.ts`, `ApplicationInbox.tsx`, `useAuth`, `effects/TextCubeLoader.tsx`, `app/page.tsx`, `login/page.tsx`, `beneficiaries/page.tsx`, `dashboard/page.tsx`, `next`, `extract-and-sync-522-qrs.mjs`?**
-  _High betweenness centrality (0.117) - this node is a cross-community bridge._
+- **Why does `react` connect `react` to `package.json`, `excel-importer.ts`, `replacements/page.tsx`, `application-schema.ts`, `stubs/page.tsx`, `dexie.ts`, `dingalan-groupings.ts`, `v1/beneficiaries/import/commit/route.ts`, `ApplicationInbox.tsx`, `test-roster-restriction-preview.mjs`, `programs/[id]/page.tsx`, `ApplicationInbox.tsx`, `useAuth`, `effects/TextCubeLoader.tsx`, `app/page.tsx`, `login/page.tsx`, `AccomplishmentReportBuilderModal.tsx`, `beneficiaries/page.tsx`, `dashboard/page.tsx`, `extract-and-sync-522-qrs.mjs`?**
+  _High betweenness centrality (0.104) - this node is a cross-community bridge._
 - **Should `test-accomplishment-work-schedule.mjs` be split into smaller, more focused modules?**
-  _Cohesion score 0.04541062801932367 - nodes in this community are weakly interconnected._
+  _Cohesion score 0.04994192799070848 - nodes in this community are weakly interconnected._
