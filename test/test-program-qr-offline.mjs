@@ -106,6 +106,42 @@ try {
     check(auto.data.programId === "third" && auto.data.fullName === third.fullName, "offline automatic attendance must use the QR's masterlist");
     const outgoing = (await db.offlineQueue.toArray()).find((q) => q.payload.programId === "third");
     check(outgoing.payload.programBeneficiaryId === third.id && outgoing.payload.workDayId === "third-day" && outgoing.payload.workProgramItemId !== "old-area", "queued automatic scan must isolate day/area/program IDs");
+    // Regression: displayed future batch auto-defaults to its own future Day 1 (2026-12-07);
+    // scanning another active batch offline must match TODAY (2026-11-04) in the detected batch instead of failing or recording on Dec 7.
+    await db.cachedPrograms.put({ id: "future-batch", programCode: "BATCH 3", programName: "Future Batch", status: "ACTIVE" });
+    await db.cachedWorkDays.bulkPut([
+      { id: "future-day-1", programId: "future-batch", dayNumber: 1, workDate: "2026-12-07" },
+      { id: "third-day-future", programId: "third", dayNumber: 10, workDate: "2026-12-07" },
+    ]);
+    const crossDateScan = await record({
+      rawToken: third.qrToken,
+      programId: "future-batch",
+      workDayId: "future-day-1",
+      targetDate: "2026-12-07",
+      targetDateManual: false,
+      shiftMode: "AFTERNOON_OUT",
+      autoDetect: true,
+    });
+    check(crossDateScan.data.programId === "third" && crossDateScan.data.workDate === "2026-11-04" && crossDateScan.data.dayNumber === 1, "cross-program auto-defaulted future date must resolve TODAY in detected program");
+    // Even if another program's date was manually clicked and does not exist in detected program, fall back to TODAY in detected program.
+    const crossManualFallback = await record({
+      rawToken: third.qrToken,
+      programId: "future-batch",
+      workDayId: "future-day-1",
+      targetDate: "2026-12-25",
+      targetDateManual: true,
+      shiftMode: "AFTERNOON_IN",
+      autoDetect: true,
+    });
+    check(crossManualFallback.data.programId === "third" && crossManualFallback.data.workDate === "2026-11-04", "cross-program unmatched date must fall back to TODAY in detected program");
+    // Same-program stale schedule mismatch must still be blocked.
+    let staleBlocked = false;
+    try {
+      await record({ rawToken: third.qrToken, programId: "third", workDayId: "third-day", targetDate: "2026-12-25", shiftMode: "MORNING_OUT", autoDetect: true });
+    } catch (error) {
+      staleBlocked = error?.message.includes("Work schedule changed");
+    }
+    check(staleBlocked, "same-program stale workDate must still fail with schedule changed error");
     let closed;
     await db.cachedQrSlots.put({ publicToken: token, designatedNumber: "113", programId: "old" });
     try { await find(token, "new", { autoDetect: true }); } catch (error) { closed = error; }

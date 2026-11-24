@@ -30,6 +30,7 @@ export async function POST(request: Request) {
     const {
       workDayId,
       targetDate,
+      targetDateManual,
       shiftMode = "AUTO",
       deviceId,
       workProgramItemId,
@@ -90,6 +91,7 @@ export async function POST(request: Request) {
 
     const program = pb.program;
     const changedProgram = body.autoDetect !== false && programIdParam !== pb.programId;
+    const fromOtherDisplayedProgram = Boolean(changedProgram && programIdParam);
 
     // Resolve WorkDay using Philippine Standard Time date
     const pht = getPhilippineTime();
@@ -97,12 +99,30 @@ export async function POST(request: Request) {
     const dateStr = targetDate || pht.dateStr;
     const requestedWorkDayId = changedProgram ? undefined : workDayId;
     if (requestedWorkDayId && !program.workDays.some((w: any) => w.id === requestedWorkDayId)) return respond({ error: "CANNOT SCAN: Work day belongs to a different program or no longer exists." }, { status: 400 });
-    let workDay = requestedWorkDayId
-      ? program.workDays.find((w: any) => w.id === requestedWorkDayId)
-      : program.workDays.find((w: any) => w.workDate === dateStr);
+    let workDay: any;
+    if (requestedWorkDayId) {
+      workDay = program.workDays.find((w: any) => w.id === requestedWorkDayId);
+    } else if (fromOtherDisplayedProgram) {
+      if (targetDateManual === false) {
+        workDay = program.workDays.find((w: any) => w.workDate === pht.dateStr);
+      } else {
+        workDay =
+          (targetDate ? program.workDays.find((w: any) => w.workDate === targetDate) : undefined) ||
+          program.workDays.find((w: any) => w.workDate === pht.dateStr);
+      }
+    } else {
+      workDay = program.workDays.find((w: any) => w.workDate === dateStr);
+    }
 
     if (!workDay) {
-      return respond({ error: "No active work day found for this program" }, { status: 400 });
+      const checkedDate = fromOtherDisplayedProgram && targetDateManual === false ? pht.dateStr : dateStr;
+      const rangeHint = program.workDays.length
+        ? ` (scheduled ${program.workDays[0].workDate} to ${program.workDays[program.workDays.length - 1].workDate})`
+        : "";
+      return respond(
+        { error: `No active work day found for ${checkedDate} in ${program.programCode}${rangeHint}. Select this program and choose the exact attendance day if recording a backlog. Walang na-record.` },
+        { status: 400 }
+      );
     }
     if (requestedWorkDayId && targetDate && workDay.workDate !== targetDate) return respond({ error: "Work schedule changed. Refresh the attendance days and scan again. Walang na-record." }, { status: 409 });
 

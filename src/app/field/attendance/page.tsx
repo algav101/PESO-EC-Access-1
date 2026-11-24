@@ -55,6 +55,7 @@ export default function DailyAttendancePage() {
   const [workDays, setWorkDays] = useState<any[]>([]);
   const scheduleSignature = useRef("");
   const [selectedWorkDayId, setSelectedWorkDayId] = useState<string>("");
+  const [isManualDaySelection, setIsManualDaySelection] = useState<boolean>(false);
   const [shiftMode, setShiftMode] = useState<string>("AUTO");
 
   // Bypass 3-Hour rule state (Default enabled to allow fixing backlogs)
@@ -160,7 +161,10 @@ export default function DailyAttendancePage() {
     const today = sorted.find((day) => day.workDate === getPhilippineTime().dateStr);
     setSelectedWorkDayId((previous) => !changed && sorted.some((day) => day.id === previous)
       ? previous : today?.id || sorted[0]?.id || "");
-    if (changed) setSelectedAreaItemId("AUTO");
+    if (changed) {
+      setIsManualDaySelection(false);
+      setSelectedAreaItemId("AUTO");
+    }
   };
 
   useEffect(() => {
@@ -206,6 +210,15 @@ export default function DailyAttendancePage() {
     }
   };
 
+  const pickDefaultProgram = (list: any[], prev: string) => {
+    const todayStr = getPhilippineTime().dateStr;
+    const activeToday = list.find(
+      (p) => p.status === "ACTIVE" && Array.isArray(p.workDays) && p.workDays.some((w: any) => w.workDate === todayStr)
+    );
+    const ordered = activeToday ? [activeToday, ...list.filter((p) => p.id !== activeToday.id)] : list;
+    return resolveProgramSelection(ordered, prev);
+  };
+
   const fetchPrograms = async (background = false) => {
     try {
       if (typeof navigator === "undefined" || navigator.onLine) {
@@ -215,8 +228,17 @@ export default function DailyAttendancePage() {
           const progs = data.programs || [];
           if (progs.length > 0) {
             setPrograms(progs);
+            // Keep offline work-day schedule cache fresh whenever programs load online
+            try {
+              const freshDays = progs.flatMap((p: any) =>
+                (p.workDays || []).map((wd: any) => ({ ...wd, programId: p.id }))
+              );
+              if (freshDays.length > 0) {
+                void offlineDb.cachedWorkDays.bulkPut(freshDays).catch(() => {});
+              }
+            } catch {}
             if (!background || (programRef.current && !progs.some((p: any) => p.id === programRef.current))) {
-              setSelectedProgramId((prev) => resolveProgramSelection(progs, prev));
+              setSelectedProgramId((prev) => pickDefaultProgram(progs, prev));
             }
             return;
           }
@@ -242,7 +264,7 @@ export default function DailyAttendancePage() {
 
       if (progsWithDays.length > 0) {
         setPrograms(progsWithDays);
-        setSelectedProgramId((prev) => resolveProgramSelection(progsWithDays, prev));
+        setSelectedProgramId((prev) => pickDefaultProgram(progsWithDays, prev));
       }
     } catch (err) {
       console.error("Failed to load offline programs from IndexedDB:", err);
@@ -309,7 +331,7 @@ export default function DailyAttendancePage() {
       }))
   );
 
-  useEffect(() => { setLoading(false); setScanResult(null); setError(null); setSelectedAreaItemId("AUTO"); setScannerOpen(false); }, [selectedProgramId]);
+  useEffect(() => { setLoading(false); setScanResult(null); setError(null); setIsManualDaySelection(false); setSelectedAreaItemId("AUTO"); setScannerOpen(false); }, [selectedProgramId]);
 
   const handleScan = async (token: string) => {
     setScannerOpen(false);
@@ -329,6 +351,7 @@ export default function DailyAttendancePage() {
               programId: selectedProgramId, autoDetect: true,
               workDayId: selectedWorkDayId,
               targetDate: selectedWorkDay?.workDate,
+              targetDateManual: isManualDaySelection,
               shiftMode,
               workProgramItemId: selectedAreaItemId !== "AUTO" ? selectedAreaItemId : undefined,
               deviceId: localStorage.getItem("tupad_device_id") || "MOBILE_SCANNER",
@@ -379,6 +402,7 @@ export default function DailyAttendancePage() {
         workDayId: selectedWorkDayId,
         shiftMode,
         targetDate: selectedWorkDay?.workDate,
+        targetDateManual: isManualDaySelection,
         workProgramItemId: selectedAreaItemId !== "AUTO" ? selectedAreaItemId : undefined,
         deviceId: localStorage.getItem("tupad_device_id") || "MOBILE_SCANNER",
         bypass3HourRule: true,
@@ -536,7 +560,10 @@ export default function DailyAttendancePage() {
                   <button
                     key={wd.id}
                     type="button"
-                    onClick={() => setSelectedWorkDayId(wd.id)}
+                    onClick={() => {
+                      setSelectedWorkDayId(wd.id);
+                      setIsManualDaySelection(true);
+                    }}
                     className={`py-1.5 px-1 rounded-xl text-center transition flex flex-col items-center justify-center relative ${
                       isSelected
                         ? "bg-gov-blue text-white shadow-md ring-2 ring-gov-gold font-bold scale-[1.02]"
@@ -792,6 +819,19 @@ export default function DailyAttendancePage() {
               <strong className="block font-bold text-red-900">Attendance Alert</strong>
               <span className="text-red-800 leading-relaxed">{error}</span>
             </div>
+            {detectedIdentity && detectedIdentity.programId !== selectedProgramId && programs.some((p) => p.id === detectedIdentity.programId) && (
+              <button
+                type="button"
+                onClick={() => {
+                  setSelectedProgramId(detectedIdentity.programId);
+                  setError(null);
+                }}
+                className="px-2.5 py-1 bg-gov-blue hover:bg-gov-dark text-white rounded-lg font-bold text-[11px] inline-flex items-center space-x-1 transition shadow-xs"
+              >
+                <span>Switch to {detectedIdentity.programCode} to pick Day</span>
+                <ArrowRight className="w-3 h-3" />
+              </button>
+            )}
             {error.includes("PM IN") && shiftMode !== "AFTERNOON_IN" && (
               <button
                 type="button"

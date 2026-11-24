@@ -241,6 +241,7 @@ export async function recordOfflineAttendance(params: {
   bypass3HourRule?: boolean;
   autoDetect?: boolean;
   targetDate?: string;
+  targetDateManual?: boolean;
 }) {
   const { rawToken, programId, workDayId, shiftMode, workProgramItemId, workArea, activityName, deviceId, bypass3HourRule } = params;
 
@@ -255,15 +256,40 @@ export async function recordOfflineAttendance(params: {
   const todayStr = pht.dateStr;
 
   // Resolve work day
-  const changedProgram = params.autoDetect && programId !== bene.programId;
+  const changedProgram = Boolean(params.autoDetect && programId !== bene.programId);
+  const fromOtherDisplayedProgram = Boolean(changedProgram && programId);
   let workDay = !changedProgram && workDayId ? await offlineDb.cachedWorkDays.get(workDayId) : null;
   if (workDay && workDay.programId !== bene.programId) throw new Error("CANNOT SCAN: Work day belongs to a different program.");
+  let progDays: CachedWorkDay[] | null = null;
   if (!workDay && bene.programId) {
-    const progDays = await offlineDb.cachedWorkDays.where("programId").equals(bene.programId).toArray();
-    workDay = progDays.find((d) => d.workDate === (params.targetDate || todayStr)) || (!params.autoDetect ? progDays[0] : null) || null;
+    progDays = (await offlineDb.cachedWorkDays.where("programId").equals(bene.programId).toArray())
+      .sort((a, b) => a.dayNumber - b.dayNumber);
+    if (fromOtherDisplayedProgram) {
+      if (params.targetDateManual === false) {
+        // Displayed program's date was auto-defaulted (e.g., a future batch's Day 1);
+        // match TODAY (PHT) in the detected program instead of leaking the other program's date.
+        workDay = progDays.find((d) => d.workDate === todayStr) || null;
+      } else {
+        workDay =
+          (params.targetDate ? progDays.find((d) => d.workDate === params.targetDate) : null) ||
+          progDays.find((d) => d.workDate === todayStr) ||
+          null;
+      }
+    } else {
+      workDay = progDays.find((d) => d.workDate === (params.targetDate || todayStr)) || (!params.autoDetect ? progDays[0] : null) || null;
+    }
   }
-  if (params.autoDetect && !workDay) throw new ScanRequestError("No work day exists for this date in the detected program. Walang na-record.");
-  if (workDay && params.targetDate && workDay.workDate !== params.targetDate) throw new ScanRequestError("Work schedule changed. Refresh the attendance days and scan again.");
+  if (params.autoDetect && !workDay) {
+    const days = progDays ?? (bene.programId
+      ? (await offlineDb.cachedWorkDays.where("programId").equals(bene.programId).toArray()).sort((a, b) => a.dayNumber - b.dayNumber)
+      : []);
+    const checkedDate = fromOtherDisplayedProgram && params.targetDateManual === false ? todayStr : (params.targetDate || todayStr);
+    const rangeHint = days.length
+      ? ` (scheduled ${days[0].workDate} to ${days[days.length - 1].workDate})`
+      : " (no cached work days — run Master Key Sync while online)";
+    throw new ScanRequestError(`No work day exists for ${checkedDate} in the detected program${rangeHint}. Select this program and choose the exact attendance day if recording a backlog. Walang na-record.`);
+  }
+  if (!changedProgram && workDayId && workDay && params.targetDate && workDay.workDate !== params.targetDate) throw new ScanRequestError("Work schedule changed. Refresh the attendance days and scan again.");
 
   const attendanceDate = workDay?.workDate || todayStr;
   const dayNumber = workDay?.dayNumber || 1;
