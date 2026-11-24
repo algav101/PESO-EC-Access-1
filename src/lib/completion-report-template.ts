@@ -1,22 +1,25 @@
 import JSZip from "jszip";
 import { readFile } from "fs/promises";
 import path from "path";
+import { DINGALAN_BARANGAYS } from "./utils";
 import { buildBarangayCompletionDays, completionBarangay, type CompletionProgram } from "./accomplishment-work-schedule";
 import {
-  appendPhotoDocumentation,
   barangayDocumentationPhotos,
+  dimensions,
+  imageBytes,
   type DocumentationPhoto,
-  type PhotoLayoutOptions,
   type PhotoLoader,
   type ReportPhoto,
 } from "./completion-report-photos";
 
 export interface BarangayReportDayEdit {
+  dayNumber?: number;
   label: string;
   text: string;
 }
 
 export interface BarangayReportEdit {
+  barangayHeader?: string;
   doleOffice?: string;
   projectLocation?: string;
   beneficiaryCount?: string;
@@ -32,6 +35,8 @@ export interface ReportLayoutSettings {
   textAlign?: "left" | "center" | "justify";
   photoLayout?: "1-col" | "2-col" | "3-col";
   photoSize?: "compact" | "medium" | "large";
+  photoFitMode?: "fill" | "contain";
+  includeEmptyDays?: boolean;
 }
 
 export interface CompletionReportOptions {
@@ -49,215 +54,270 @@ interface ReportProgram extends CompletionProgram {
   province: string;
   doleOffice: string | null;
 }
-const escapeXml = (value: string) => value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
-const decodeXml = (value: string) => value.replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&apos;/g, "'").replace(/&amp;/g, "&");
-const attribute = (tag: string, name: string) => tag.match(new RegExp(`\\b${name}="([^"]*)"`))?.[1] || "";
 
-function setCell(xml: string, address: string, text: string, richText?: string): string {
-  let found = false;
-  const result = xml.replace(new RegExp(`<c\\b([^>]*\\br="${address}"[^>]*)(?:\\/>|>[\\s\\S]*?<\\/c>)`), (_, attrs: string) => {
-    found = true;
-    return `<c${attrs.replace(/\s+t="[^"]*"/g, "")} t="inlineStr"><is>${richText || `<t xml:space="preserve">${escapeXml(text)}</t>`}</is></c>`;
-  });
-  if (!found) throw new Error(`Completion template is missing cell ${address}`);
-  return result;
-}
+const REL_NS = "http://schemas.openxmlformats.org/officeDocument/2006/relationships";
+const PACKAGE_NS = "http://schemas.openxmlformats.org/package/2006/relationships";
 
-function displayDate(raw?: string | null): string {
+// Exact photo slot geometry from the uploaded POBLACION sheet (landscape Folio 8.5" x 13", 6 photos/page):
+// Photo columns: A (col 0), C (col 2), E (col 4) with width 50.5703125 (~372px = 3,543,300 EMU)
+// Photo rows: row +6 (row 7) and row +8 (row 9) with height 212.65pt (~282px = 2,686,050 EMU)
+const SLOT_WIDTH_EMU = 3543300;
+const SLOT_HEIGHT_EMU = 2686050;
+const PHOTO_ROW_HEIGHT_PT = 212.65;
+const PHOTO_COL_WIDTH = 50.5703125;
+const SPACER_COL_WIDTH = 2.42578125;
+
+const escapeXml = (value: string) =>
+  value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&apos;");
+
+function displayDateUpper(raw?: string | null): string {
   if (!raw || !/^\d{4}-\d{2}-\d{2}/.test(raw)) return "";
   const date = new Date(raw.slice(0, 10) + "T00:00:00Z");
-  return Number.isNaN(date.getTime()) ? "" : new Intl.DateTimeFormat("en-US", { month: "long", day: "numeric", year: "numeric", timeZone: "UTC" }).format(date);
+  if (Number.isNaN(date.getTime())) return "";
+  return new Intl.DateTimeFormat("en-US", {
+    month: "long",
+    day: "numeric",
+    year: "numeric",
+    timeZone: "UTC",
+  })
+    .format(date)
+    .toUpperCase();
 }
 
-// Estimate visual wrapped line count without inserting artificial hard line breaks,
-// allowing Excel's native wrapText="1" to flow cleanly across whatever column width is set.
-function estimateWrappedLines(text: string, charsPerLine: number): number {
-  const safeLimit = Math.max(30, charsPerLine);
-  return text.split("\n").reduce((total, paragraph) => {
-    if (!paragraph.trim()) return total + 1;
-    return total + Math.max(1, Math.ceil(paragraph.length / safeLimit));
-  }, 0);
-}
-
-// Split only truly massive day text (> 22 visual lines) across continuation rows to stay well under Excel's 409pt row height limit.
-function chunkAccomplishmentParagraphs(
-  label: string,
-  text: string,
-  charsPerLine: number
-): Array<{ label: string; text: string; lines: number }> {
-  const normalized = text.replace(/\r\n/g, "\n");
-  const totalLines = estimateWrappedLines(normalized, charsPerLine);
-  if (totalLines <= 22) {
-    return [{ label, text: normalized, lines: totalLines }];
-  }
-
-  const paragraphs = normalized.split("\n");
-  const chunks: Array<{ label: string; text: string; lines: number }> = [];
-  let bucket: string[] = [];
-  let bucketLines = 0;
-
-  for (const para of paragraphs) {
-    const pLines = estimateWrappedLines(para, charsPerLine);
-    if (bucket.length > 0 && bucketLines + pLines > 22) {
-      chunks.push({
-        label: chunks.length === 0 ? label : `${label} (continued)`,
-        text: bucket.join("\n"),
-        lines: bucketLines,
-      });
-      bucket = [para];
-      bucketLines = pLines;
-    } else {
-      bucket.push(para);
-      bucketLines += pLines;
-    }
-  }
-  if (bucket.length > 0) {
-    chunks.push({
-      label: chunks.length === 0 ? label : `${label} (continued)`,
-      text: bucket.join("\n"),
-      lines: Math.max(1, bucketLines),
-    });
-  }
-  return chunks.length ? chunks : [{ label, text: "", lines: 1 }];
-}
-
-async function ensureAccomplishmentCellStyle(
-  zip: JSZip,
-  sourceStyleIdx: string,
-  horizontalAlign: "left" | "center" | "justify"
-): Promise<string> {
-  let styles = await zip.file("xl/styles.xml")!.async("string");
-  const formats = styles.match(/<cellXfs count="(\d+)">([\s\S]*?)<\/cellXfs>/);
-  if (!formats) return sourceStyleIdx;
-  const cells = [...formats[2].matchAll(/<xf\b[^>]*(?:\/>|>[\s\S]*?<\/xf>)/g)].map((m) => m[0]);
-  const base = cells[Number(sourceStyleIdx)];
-  if (!base) return sourceStyleIdx;
-
-  let style = base.replace(/\s+applyAlignment="[^"]*"/, "");
-  style = style.replace(/^<xf\b/, '<xf applyAlignment="1"');
-  style = style.replace(/<alignment\b[^>]*\/>/, "");
-  if (style.endsWith("/>")) style = style.slice(0, -2) + "></xf>";
-  style = style.replace(
-    "</xf>",
-    `<alignment horizontal="${horizontalAlign}" vertical="top" wrapText="1"/></xf>`
-  );
-
-  const existing = cells.indexOf(style);
-  if (existing >= 0) return String(existing);
-
-  styles = styles.replace(
-    formats[0],
-    `<cellXfs count="${cells.length + 1}">${formats[2]}${style}</cellXfs>`
-  );
-  zip.file("xl/styles.xml", styles);
-  return String(cells.length);
-}
-
-async function templateBuffer(): Promise<Buffer> {
+async function photoTemplateBuffer(): Promise<Buffer> {
   const candidates = [
-    path.join(process.cwd(), "public/templates/tupad-completion-report.xlsx"),
-    path.join(__dirname, "../../public/templates/tupad-completion-report.xlsx"),
+    path.join(process.cwd(), "public/templates/tupad-accomplishment-photo-template.xlsx"),
+    path.join(__dirname, "../../public/templates/tupad-accomplishment-photo-template.xlsx"),
   ];
   for (const file of candidates) {
-    try { return await readFile(file); }
-    catch (error) { if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error; }
+    try {
+      return await readFile(file);
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+    }
   }
-  throw new Error("The TUPAD Completion Report template is not available on this server.");
+  throw new Error("The TUPAD Accomplishment Photo Report template is not available on this server.");
 }
 
-/** Patch values in the supplied workbook, retaining its styles, layout and native parts. */
+/**
+ * Ensures xl/styles.xml has a wrapText-enabled variant of style 6 (Calibri 12pt activity line)
+ * so longer multi-line activities wrap cleanly inside A3:E3 without clipping.
+ */
+function ensureWrappedActivityStyle(stylesXml: string): { stylesXml: string; styleId: string } {
+  const formats = stylesXml.match(/<cellXfs count="(\d+)">([\s\S]*?)<\/cellXfs>/);
+  if (!formats) return { stylesXml, styleId: "6" };
+  const cells = [...formats[2].matchAll(/<xf\b[^>]*(?:\/>|>[\s\S]*?<\/xf>)/g)].map((m) => m[0]);
+  const wrappedStyle = `<xf numFmtId="0" fontId="4" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="left" vertical="center" wrapText="1"/></xf>`;
+  const existing = cells.indexOf(wrappedStyle);
+  if (existing >= 0) return { stylesXml, styleId: String(existing) };
+
+  const updated = stylesXml.replace(
+    formats[0],
+    `<cellXfs count="${cells.length + 1}">${formats[2]}${wrappedStyle}</cellXfs>`
+  );
+  return { stylesXml: updated, styleId: String(cells.length) };
+}
+
+interface PagePhotoSlot {
+  colIdx: number; // 0 (A = BEFORE), 2 (C = DURING), 4 (E = AFTER)
+  rowOffset: number; // 6 (Row 7 top) or 8 (Row 9 bottom)
+  entry: DocumentationPhoto;
+}
+
+interface DayPageModel {
+  barangayHeader: string;
+  dayHeader: string;
+  activityText: string;
+  slots: PagePhotoSlot[];
+}
+
+function buildDayPages(
+  barangayName: string,
+  program: ReportProgram,
+  photosForBarangay: DocumentationPhoto[],
+  brgyEdit?: BarangayReportEdit,
+  includeEmptyDays: boolean = true
+): DayPageModel[] {
+  const defaultHeader = `BRGY. ${barangayName.toUpperCase()}, ${(program.municipality || "DINGALAN").toUpperCase()}, ${(program.province || "AURORA").toUpperCase()}.`;
+  const barangayHeader = brgyEdit?.barangayHeader?.trim() || defaultHeader;
+
+  const computedDays = buildBarangayCompletionDays(program, barangayName);
+  const dayDateMap = new Map<number, string>();
+  for (const wd of program.workDays) {
+    dayDateMap.set(wd.dayNumber, wd.workDate);
+  }
+
+  // Build ordered day entries (either from user edits or computed program work days)
+  const dayConfigs: Array<{ dayNumber: number; label: string; text: string }> =
+    brgyEdit?.days && brgyEdit.days.length > 0
+      ? brgyEdit.days.map((d, idx) => {
+          const dNum = d.dayNumber ?? idx + 1;
+          const dateStr = displayDateUpper(dayDateMap.get(dNum));
+          const fallbackLabel = dateStr ? `DAY ${dNum} - ${dateStr}` : `DAY ${dNum}`;
+          return {
+            dayNumber: dNum,
+            label: d.label?.trim() || fallbackLabel,
+            text: (d.text || "").trim(),
+          };
+        })
+      : computedDays.map((d) => {
+          const dateStr = displayDateUpper(d.workDate);
+          return {
+            dayNumber: d.dayNumber,
+            label: dateStr ? `DAY ${d.dayNumber} - ${dateStr}` : `DAY ${d.dayNumber}`,
+            text: (d.accomplishment || "").trim(),
+          };
+        });
+
+  // Ensure at least 10 days when using defaults
+  const maxDayNum = Math.max(
+    program.requiredWorkDays || 10,
+    ...dayConfigs.map((d) => d.dayNumber),
+    ...photosForBarangay.map((p) => p.dayNumber || 1)
+  );
+  if (!brgyEdit?.days) {
+    for (let d = dayConfigs.length + 1; d <= maxDayNum; d++) {
+      const dateStr = displayDateUpper(dayDateMap.get(d));
+      dayConfigs.push({
+        dayNumber: d,
+        label: dateStr ? `DAY ${d} - ${dateStr}` : `DAY ${d}`,
+        text: "",
+      });
+    }
+  }
+
+  // Group photos by dayNumber -> stage bucket (BEFORE, DURING, AFTER)
+  const photosByDay = new Map<number, { BEFORE: DocumentationPhoto[]; DURING: DocumentationPhoto[]; AFTER: DocumentationPhoto[] }>();
+  const ensureDayBuckets = (dNum: number) => {
+    let b = photosByDay.get(dNum);
+    if (!b) {
+      b = { BEFORE: [], DURING: [], AFTER: [] };
+      photosByDay.set(dNum, b);
+    }
+    return b;
+  };
+
+  for (const entry of photosForBarangay) {
+    const dNum = entry.dayNumber && entry.dayNumber > 0 ? entry.dayNumber : 1;
+    const buckets = ensureDayBuckets(dNum);
+    const st = (entry.stage || "DURING").toUpperCase();
+    if (st === "BEFORE") buckets.BEFORE.push(entry);
+    else if (st === "AFTER") buckets.AFTER.push(entry);
+    else buckets.DURING.push(entry);
+  }
+
+  const pages: DayPageModel[] = [];
+
+  for (const dayCfg of dayConfigs) {
+    const buckets = photosByDay.get(dayCfg.dayNumber) || { BEFORE: [], DURING: [], AFTER: [] };
+    const totalDayPhotos = buckets.BEFORE.length + buckets.DURING.length + buckets.AFTER.length;
+
+    if (!includeEmptyDays && totalDayPhotos === 0 && !dayCfg.text) {
+      continue;
+    }
+
+    // Each landscape page holds up to 2 BEFORE (A7, A9), 2 DURING (C7, C9), 2 AFTER (E7, E9) = 6 photos/page
+    const pageCountForDay = Math.max(
+      1,
+      Math.ceil(Math.max(buckets.BEFORE.length, buckets.DURING.length, buckets.AFTER.length) / 2)
+    );
+
+    for (let pIdx = 0; pIdx < pageCountForDay; pIdx++) {
+      const slots: PagePhotoSlot[] = [];
+      const bTop = buckets.BEFORE[pIdx * 2];
+      const bBot = buckets.BEFORE[pIdx * 2 + 1];
+      const dTop = buckets.DURING[pIdx * 2];
+      const dBot = buckets.DURING[pIdx * 2 + 1];
+      const aTop = buckets.AFTER[pIdx * 2];
+      const aBot = buckets.AFTER[pIdx * 2 + 1];
+
+      if (bTop) slots.push({ colIdx: 0, rowOffset: 6, entry: bTop });
+      if (dTop) slots.push({ colIdx: 2, rowOffset: 6, entry: dTop });
+      if (aTop) slots.push({ colIdx: 4, rowOffset: 6, entry: aTop });
+      if (bBot) slots.push({ colIdx: 0, rowOffset: 8, entry: bBot });
+      if (dBot) slots.push({ colIdx: 2, rowOffset: 8, entry: dBot });
+      if (aBot) slots.push({ colIdx: 4, rowOffset: 8, entry: aBot });
+
+      const dayHeader =
+        pageCountForDay > 1 && pIdx > 0 ? `${dayCfg.label} (PAGE ${pIdx + 1})` : dayCfg.label;
+
+      pages.push({
+        barangayHeader,
+        dayHeader,
+        activityText: dayCfg.text,
+        slots,
+      });
+    }
+  }
+
+  if (pages.length === 0) {
+    const dateStr = displayDateUpper(dayDateMap.get(1));
+    pages.push({
+      barangayHeader,
+      dayHeader: dateStr ? `DAY 1 - ${dateStr}` : "DAY 1",
+      activityText: "",
+      slots: [],
+    });
+  }
+
+  return pages;
+}
+
+/**
+ * Generates the official DOLE Aurora Field Office Landscape Accomplishment Photo Report (.xlsx)
+ * matching the uploaded POBLACION template:
+ * - Orientation: Landscape, Folio (8.5" x 13", paperSize="14"), 0.197" margins, horizontalCentered
+ * - Official "BG TUPAD" watermark background via header &C&G + VML legacyDrawingHF on every page
+ * - Exactly 10 rows per page with manual rowBreaks between pages
+ * - Exactly 6 photo slots per page (2 rows x 3 columns: BEFORE A7/A9, DURING C7/C9, AFTER E7/E9)
+ * - Exact POBLACION photo sizing (3,543,300 x 2,686,050 EMU = 3.875" x 2.9375")
+ */
 export async function populateCompletionReport(
   program: ReportProgram,
   loadPhoto: PhotoLoader,
   options: CompletionReportOptions = {}
 ): Promise<Buffer> {
-  const zip = await JSZip.loadAsync(await templateBuffer());
-  const stringsXml = await zip.file("xl/sharedStrings.xml")!.async("string");
-  const sourceStrings = [...stringsXml.matchAll(/<si\b[^>]*>([\s\S]*?)<\/si>/g)].map(match => match[1]);
-  const strings = sourceStrings.map(raw => [...raw.matchAll(/<t\b[^>]*>([\s\S]*?)<\/t>/g)].map(text => decodeXml(text[1])).join(""));
-  let workbookXml = await zip.file("xl/workbook.xml")!.async("string");
-  let relationships = await zip.file("xl/_rels/workbook.xml.rels")!.async("string");
-  const targets = new Map([...relationships.matchAll(/<Relationship\b[^>]*\/>/g)].map(match => [attribute(match[0], "Id"), attribute(match[0], "Target")]));
-  const issueParts = new Intl.DateTimeFormat("en-US", { month: "long", day: "numeric", year: "numeric", timeZone: "Asia/Manila" }).formatToParts(new Date());
-  const issuePart = (type: string) => issueParts.find(part => part.type === type)?.value || "";
-  const issueDay = Number(issuePart("day"));
-  const ordinal = issueDay % 100 >= 11 && issueDay % 100 <= 13 ? "th" : ({ 1: "st", 2: "nd", 3: "rd" } as Record<number, string>)[issueDay % 10] || "th";
+  const baseZip = await JSZip.loadAsync(await photoTemplateBuffer());
+  const outZip = new JSZip();
 
+  // Copy core static template assets directly from uploaded template
+  const relsRoot = await baseZip.file("_rels/.rels")!.async("string");
+  const coreXml = await baseZip.file("docProps/core.xml")!.async("string");
+  const rawStylesXml = await baseZip.file("xl/styles.xml")!.async("string");
+  const themeXml = await baseZip.file("xl/theme/theme1.xml")!.async("string");
+  const printerBin = await baseZip.file("xl/printerSettings/printerSettings1.bin")!.async("nodebuffer");
+  const bgJpeg = await baseZip.file("xl/media/bgTupad.jpeg")!.async("nodebuffer");
+  const vmlTemplate = await baseZip.file("xl/drawings/vmlDrawingTemplate.vml")!.async("string");
+
+  const { stylesXml, styleId: activityStyleId } = ensureWrappedActivityStyle(rawStylesXml);
+
+  outZip.file("_rels/.rels", relsRoot);
+  outZip.file("docProps/core.xml", coreXml);
+  outZip.file("xl/styles.xml", stylesXml);
+  outZip.file("xl/theme/theme1.xml", themeXml);
+  outZip.file("xl/printerSettings/printerSettings1.bin", printerBin);
+  outZip.file("xl/media/bgTupad.jpeg", bgJpeg);
+
+  // Resolve selected barangays (defaults to all 11 Dingalan barangays)
   const selectedBarangaySet =
     options.selectedBarangays && options.selectedBarangays.length > 0
-      ? new Set(options.selectedBarangays.map(b => completionBarangay(b)).filter(Boolean))
+      ? new Set(options.selectedBarangays.map((b) => completionBarangay(b)).filter(Boolean))
       : null;
 
-  const allSheets = [...workbookXml.matchAll(/<sheet\b[^>]*\/>/g)].map(match => ({
-    tag: match[0],
-    barangay: decodeXml(attribute(match[0], "name")),
-    rId: attribute(match[0], "r:id"),
-  }));
+  const targetBarangays = selectedBarangaySet
+    ? DINGALAN_BARANGAYS.filter((b) => selectedBarangaySet.has(completionBarangay(b)))
+    : [...DINGALAN_BARANGAYS];
 
-  const keptSheets = selectedBarangaySet
-    ? allSheets.filter(s => selectedBarangaySet.has(completionBarangay(s.barangay)))
-    : allSheets;
-  const droppedSheets = selectedBarangaySet
-    ? allSheets.filter(s => !selectedBarangaySet.has(completionBarangay(s.barangay)))
-    : [];
-
-  if (keptSheets.length === 0) {
+  if (targetBarangays.length === 0) {
     throw new Error("Please select at least one valid Dingalan barangay to export.");
   }
 
-  // Cleanly remove unselected barangay worksheets so Excel opens without repair warnings.
-  if (droppedSheets.length > 0) {
-    let contentTypes = await zip.file("[Content_Types].xml")!.async("string");
-    for (const dropped of droppedSheets) {
-      workbookXml = workbookXml.replace(dropped.tag, "");
-      relationships = relationships.replace(
-        new RegExp(`<Relationship\\b[^>]*\\bId="${dropped.rId}"[^>]*\\/>`),
-        ""
-      );
-      const target = targets.get(dropped.rId);
-      if (target) {
-        const sheetPath = target.startsWith("/") ? target.slice(1) : path.posix.normalize("xl/" + target);
-        const relPath = path.posix.join(path.posix.dirname(sheetPath), "_rels", path.posix.basename(sheetPath) + ".rels");
-        zip.remove(sheetPath);
-        if (zip.file(relPath)) zip.remove(relPath);
-        contentTypes = contentTypes.replace(
-          new RegExp(`<Override\\b[^>]*\\bPartName="/${sheetPath.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}"[^>]*\\/>`),
-          ""
-        );
-      }
-    }
-
-    // Reset activeTab & firstSheet to index 0 so Excel never points past the kept sheets.
-    workbookXml = workbookXml.replace(/<workbookView\b([^>]*)\/>/, (_, attrs: string) => {
-      let cleaned = attrs
-        .replace(/\s+firstSheet="[^"]*"/g, "")
-        .replace(/\s+activeTab="[^"]*"/g, "");
-      return `<workbookView${cleaned} firstSheet="0" activeTab="0"/>`;
-    });
-
-    zip.file("xl/workbook.xml", workbookXml);
-    zip.file("xl/_rels/workbook.xml.rels", relationships);
-    zip.file("[Content_Types].xml", contentTypes);
-
-    // Update docProps/app.xml sheet count and TitlesOfParts vector.
-    const appFile = zip.file("docProps/app.xml");
-    if (appFile) {
-      let appXml = await appFile.async("string");
-      appXml = appXml.replace(
-        /(<vt:lpstr>Worksheets<\/vt:lpstr><\/vt:variant><vt:variant><vt:i4>)\d+(<\/vt:i4>)/,
-        `$1${keptSheets.length}$2`
-      );
-      appXml = appXml.replace(
-        /<TitlesOfParts><vt:vector\b[^>]*>[\s\S]*?<\/vt:vector><\/TitlesOfParts>/,
-        `<TitlesOfParts><vt:vector size="${keptSheets.length}" baseType="lpstr">${keptSheets
-          .map(s => `<vt:lpstr>${escapeXml(s.barangay)}</vt:lpstr>`)
-          .join("")}</vt:vector></TitlesOfParts>`
-      );
-      zip.file("docProps/app.xml", appXml);
-    }
-  }
-
-  // Normalize barangayEdits keys so matching works with Title Case or UPPERCASE keys
+  // Normalize barangayEdits map
   const normalizedEdits = new Map<string, BarangayReportEdit>();
   if (options.barangayEdits) {
     for (const [k, v] of Object.entries(options.barangayEdits)) {
@@ -266,155 +326,363 @@ export async function populateCompletionReport(
     }
   }
 
-  const desiredColCWidth = options.layout?.colCWidth && options.layout.colCWidth >= 35 && options.layout.colCWidth <= 120
-    ? options.layout.colCWidth
-    : 68;
-  const desiredTextAlign: "left" | "center" | "justify" = options.layout?.textAlign || "left";
-  const desiredPhotoLayout = options.layout?.photoLayout || "1-col";
-  const desiredPhotoSize = options.layout?.photoSize || "medium";
+  const photoFitMode: "fill" | "contain" = options.layout?.photoFitMode || "fill";
+  const includeEmptyDays = options.layout?.includeEmptyDays ?? true;
 
-  for (let sheetIndex = 0; sheetIndex < keptSheets.length; sheetIndex++) {
-    const sheet = keptSheets[sheetIndex];
-    const barangay = sheet.barangay;
-    const brgyKey = completionBarangay(barangay);
+  const workbookSheetsXml: string[] = [];
+  const workbookRelsXml: string[] = [];
+  const definedNamesXml: string[] = [];
+  const contentOverrides: string[] = [
+    `<Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>`,
+    `<Override PartName="/xl/theme/theme1.xml" ContentType="application/vnd.openxmlformats-officedocument.theme+xml"/>`,
+    `<Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>`,
+    `<Override PartName="/docProps/core.xml" ContentType="application/vnd.openxmlformats-package.core-properties+xml"/>`,
+    `<Override PartName="/docProps/app.xml" ContentType="application/vnd.openxmlformats-officedocument.extended-properties+xml"/>`,
+  ];
+  const usedImageExtensions = new Set<string>(["jpeg"]);
+  let globalImageCounter = 1;
+
+  for (let sheetIdx = 0; sheetIdx < targetBarangays.length; sheetIdx++) {
+    const brgyTitle = targetBarangays[sheetIdx];
+    const sheetName = brgyTitle.toUpperCase();
+    const brgyKey = completionBarangay(brgyTitle);
+    const sheetNum = sheetIdx + 1;
+    const sheetRelId = `rId${sheetNum}`;
     const brgyEdit = normalizedEdits.get(brgyKey);
-    const target = targets.get(sheet.rId);
-    if (!target) throw new Error(`Missing completion template worksheet: ${barangay}`);
-    const file = target.startsWith("/") ? target.slice(1) : path.posix.normalize("xl/" + target);
-    if (!/^xl\/worksheets\/[^/]+\.xml$/.test(file)) throw new Error("Invalid completion worksheet path");
-    let xml = await zip.file(file)!.async("string");
 
-    // Ensure tabSelected is strictly set on the first kept sheet when filtering barangays.
-    if (droppedSheets.length > 0) {
-      xml = xml.replace(/<sheetView\b([^>]*?)(\/?>)/, (_, attrs: string, close: string) => {
-        const cleaned = attrs.replace(/\s+tabSelected="[^"]*"/g, "");
-        return sheetIndex === 0
-          ? `<sheetView${cleaned} tabSelected="1"${close}`
-          : `<sheetView${cleaned}${close}`;
-      });
-    }
-
-    // Apply Column C width so accomplishment text flows cleanly across the full table width.
-    const colBWidthMatch = xml.match(/<col\b[^>]*min="2"[^>]*width="([^"]+)"/);
-    const colBWidth = colBWidthMatch ? Number(colBWidthMatch[1]) || 35 : 35;
-    xml = xml.replace(/<col\b([^>]*min="3"[^>]*)\/>/, (full, attrs: string) => {
-      if (/\bwidth="[^"]*"/.test(attrs)) {
-        return `<col${attrs.replace(/\bwidth="[^"]*"/, `width="${desiredColCWidth}"`)}/>`;
-      }
-      return full;
-    });
-
-    const sourceCells = [...xml.matchAll(/<c\b[^>]*\br="([A-Z]+\d+)"[^>]*t="s"[^>]*><v>(\d+)<\/v><\/c>/g)].map(match => ({ address: match[1], text: strings[Number(match[2])] || "", runs: sourceStrings[Number(match[2])] }));
-    const dayCells = sourceCells.filter(cell => /^B\d+$/.test(cell.address) && /^Day \d+\b/.test(cell.text));
-    if (dayCells.length !== 10) throw new Error(`Invalid daily table in ${barangay} completion template`);
-    const firstRow = Number(dayCells[0].address.slice(1));
-    const lastRow = firstRow + 9;
-    const oldRows = [...xml.matchAll(/<row\b[^>]*\br="(\d+)"[^>]*>[\s\S]*?<\/row>/g)].filter(match => Number(match[1]) >= firstRow && Number(match[1]) <= lastRow);
-
-    // Ensure Column C accomplishment cell style uses native wrapText + desired alignment (default left-aligned, top-aligned)
-    const origColCStyle = oldRows[0]?.[0].match(new RegExp(`<c\\b[^>]*r="C${firstRow}"[^>]*s="(\\d+)"`))?.[1] || "19";
-    const alignedColCStyle = await ensureAccomplishmentCellStyle(zip, origColCStyle, desiredTextAlign);
-
-    const charsPerLine = Math.max(40, Math.floor(desiredColCWidth * 0.92));
-    const sourceDays: Array<{ label: string; text: string }> =
-      brgyEdit?.days && brgyEdit.days.length > 0
-        ? brgyEdit.days.map((d) => ({ label: d.label || "", text: d.text || "" }))
-        : buildBarangayCompletionDays(program, barangay).map((day) => ({
-            label: `Day ${day.dayNumber}` + (day.workDate ? ` (${displayDate(day.workDate)})` : ""),
-            text: day.accomplishment,
-          }));
-
-    const reportRows = sourceDays.flatMap((entry) =>
-      chunkAccomplishmentParagraphs(entry.label, entry.text, charsPerLine)
-    );
-    // For a shorter program, blank unused reference rows rather than keeping old sample data.
-    while (reportRows.length < 10) reportRows.push({ label: "", text: "", lines: 1 });
-    const delta = reportRows.length - 10;
-    const shiftRef = (ref: string) => ref.replace(/([A-Z]+)(\d+)/g, (_, column, number) => column + (Number(number) > lastRow ? Number(number) + delta : Number(number)));
-    if (delta) {
-      xml = xml.replace(/<row\b[^>]*\br="(\d+)"[^>]*>[\s\S]*?<\/row>/g, (row, number) => Number(number) > lastRow
-        ? row.replace(/\br="([A-Z]*)(\d+)"/g, (_: string, column: string, value: string) => `r="${column}${Number(value) + delta}"`) : row);
-      xml = xml.replace(/\bref="([A-Z]+\d+(?::[A-Z]+\d+)?)"/g, (_, ref) => `ref="${shiftRef(ref)}"`);
-    }
-    const generated = reportRows.map((entry, index) => {
-      const number = firstRow + index;
-      let row = oldRows[Math.min(index, 9)][0].replace(/\br="([A-Z]*)(\d+)"/g, (_, column) => `r="${column}${number}"`);
-      row = setCell(setCell(row, `B${number}`, entry.label), `C${number}`, entry.text);
-      // Apply chosen horizontal alignment + wrapText to Column C
-      row = row.replace(
-        new RegExp(`(<c\\b[^>]*r="C${number}"[^>]*\\bs=")\\d+(")`),
-        `$1${alignedColCStyle}$2`
-      );
-      const height = Math.min(400, Math.max(Number(attribute(row, "ht")) || 39, entry.lines * 15 + 14));
-      return row.replace(/<row\b([^>]*)>/, (_, attrs: string) => `<row${attrs.replace(/\s+(?:ht|customHeight)="[^"]*"/g, "")} ht="${height}" customHeight="1">`);
-    }).join("");
-    // These ten rows are consecutive in the original template.
-    const first = xml.indexOf(oldRows[0][0]);
-    const end = xml.indexOf(oldRows[9][0]) + oldRows[9][0].length;
-    if (first < 0 || end < first) throw new Error("Completion template daily rows could not be located");
-    xml = xml.slice(0, first) + generated + xml.slice(end);
-
-    const people = program.programBeneficiaries.filter(pb => completionBarangay(pb.beneficiary.barangay) === brgyKey);
-    const name = barangay.toLowerCase().replace(/\b\w/g, letter => letter.toUpperCase());
-    const setLabeledCell = (address: string, label: string, value: string) => {
-      const runs = sourceCells.find(cell => cell.address === address)?.runs;
-      let index = 0;
-      // Keep the source's bold label and underlined, regular-weight value font.
-      const styled = runs?.includes("<r>") ? runs.replace(/<t\b[^>]*>[\s\S]*?<\/t>/g, text => index++ === 0 ? text : `<t xml:space="preserve">${escapeXml(value)}</t>`) : undefined;
-      xml = setCell(xml, address, label + value, styled);
-    };
-    const defaultLocation = `Brgy. ${name}, ${program.municipality || "Dingalan"}, ${program.province || "Aurora"}`;
-    const scheduledDates = program.workDays.map(day => day.workDate).filter(Boolean).sort();
-    const start = displayDate(program.startDate || scheduledDates[0]);
-    const endDate = displayDate(program.endDate || scheduledDates[scheduledDates.length - 1]);
-    const defaultPeriod = [start, endDate].filter(Boolean).join(" to ");
-    const defaultDoleOffice = program.doleOffice?.trim() || "";
-
-    setLabeledCell("A5", "Project Location: ", brgyEdit?.projectLocation?.trim() || defaultLocation);
-    setLabeledCell("A6", "No. of Beneficiaries: ", brgyEdit?.beneficiaryCount?.trim() || String(people.length));
-    setLabeledCell("A7", "Period of Work: ", brgyEdit?.periodOfWork?.trim() || defaultPeriod);
-    const finalDoleOffice = brgyEdit?.doleOffice?.trim() || defaultDoleOffice;
-    if (finalDoleOffice) setLabeledCell("A4", "DOLE-Regional Office: ", finalDoleOffice);
-
-    const issueCell = sourceCells.find(cell => /Issued this/.test(cell.text));
-    if (issueCell) {
-      if (brgyEdit?.issuedLine?.trim()) {
-        xml = setCell(xml, shiftRef(issueCell.address), "           " + brgyEdit.issuedLine.trim());
-      } else {
-        const parts = ["           Issued this ", `${issueDay}${ordinal}`, " day of ", issuePart("month"), ` ${issuePart("year")}.`];
-        let index = 0;
-        const styled = issueCell.runs.replace(/<t\b[^>]*>[\s\S]*?<\/t>/g, () => `<t xml:space="preserve">${escapeXml(parts[index++] || "")}</t>`);
-        xml = setCell(xml, shiftRef(issueCell.address), parts.join(""), styled);
-      }
-    }
-
-    if (brgyEdit?.signatoryName?.trim()) {
-      const sigNameCell = sourceCells.find(cell => /GAVIOLA/i.test(cell.text));
-      if (sigNameCell) {
-        xml = setCell(xml, shiftRef(sigNameCell.address), brgyEdit.signatoryName.trim());
-      }
-    }
-    if (brgyEdit?.signatoryTitle?.trim()) {
-      const sigTitleCell = sourceCells.find(cell => /PESO Manager/i.test(cell.text));
-      if (sigTitleCell) {
-        xml = setCell(xml, shiftRef(sigTitleCell.address), brgyEdit.signatoryTitle.trim());
-      }
-    }
-
-    const documentationCaption = sourceCells.find(cell => /Before, during work, and after/i.test(cell.text));
-    if (!documentationCaption) throw new Error(`Missing Photo Documentation section in ${barangay} completion template`);
-    const captionRow = Number(shiftRef(documentationCaption.address).replace(/^[A-Z]+/, ""));
     const photosForSheet = options.customPhotosByBarangay
       ? options.customPhotosByBarangay.get(brgyKey) || []
-      : barangayDocumentationPhotos(program, barangay);
-    const photoLayoutOpts: PhotoLayoutOptions = {
-      layout: desiredPhotoLayout,
-      photoSize: desiredPhotoSize,
-      colBWidth,
-      colCWidth: desiredColCWidth,
-    };
-    xml = await appendPhotoDocumentation(zip, xml, file, captionRow, photosForSheet, loadPhoto, photoLayoutOpts);
-    zip.file(file, xml);
+      : barangayDocumentationPhotos(program, brgyTitle);
+
+    const pages = buildDayPages(brgyTitle, program, photosForSheet, brgyEdit, includeEmptyDays);
+
+    const rowsXml: string[] = [];
+    const mergesXml: string[] = [];
+    const breaksXml: string[] = [];
+    const picturesXml: string[] = [];
+    const drawingRelsXml: string[] = [];
+
+    for (let pIdx = 0; pIdx < pages.length; pIdx++) {
+      const page = pages[pIdx];
+      const baseRow = pIdx * 10 + 1; // 1, 11, 21, 31, ...
+
+      const r1 = baseRow; // Barangay Header
+      const r2 = baseRow + 1; // DAY X - DATE
+      const r3 = baseRow + 2; // Daily Work Program Activity
+      const r4 = baseRow + 3; // Spacer
+      const r5 = baseRow + 4; // BEFORE | DURING | AFTER
+      const r6 = baseRow + 5; // Spacer
+      const r7 = baseRow + 6; // Top Photo Row (ht=212.65)
+      const r8 = baseRow + 7; // Spacer between photo rows
+      const r9 = baseRow + 8; // Bottom Photo Row (ht=212.65)
+      const r10 = baseRow + 9; // Bottom margin spacer
+
+      // Activity line height: keep exact 15.75 for single-line, expand gently if wrapped (2 lines max ~30pt so page still fits 1 Folio landscape sheet!)
+      const cleanActivityOneLine = page.activityText.replace(/\r\n/g, "\n").trim();
+      const approxActivityLines = Math.min(
+        2,
+        Math.max(1, Math.ceil(cleanActivityOneLine.length / 135))
+      );
+      const r3Height = approxActivityLines > 1 ? 28 : 15.75;
+      // Slightly trim spacer rows r4/r6 if r3 expanded to 2 lines so total page height stays identical (~560pt)
+      const r4Height = approxActivityLines > 1 ? 8 : 15;
+      const r6Height = approxActivityLines > 1 ? 9.75 : 15;
+
+      // Track merged ranges matching POBLACION exactly
+      mergesXml.push(
+        `<mergeCell ref="A${r1}:E${r1}"/>`,
+        `<mergeCell ref="A${r2}:E${r2}"/>`,
+        `<mergeCell ref="A${r3}:E${r3}"/>`,
+        `<mergeCell ref="A${r4}:E${r4}"/>`,
+        `<mergeCell ref="A${r6}:E${r6}"/>`
+      );
+
+      // Row 1: BRGY. {BARANGAY}, DINGALAN, AURORA.
+      rowsXml.push(
+        `<row r="${r1}" spans="1:5" s="3" customFormat="1" ht="25.5" customHeight="1">` +
+          `<c r="A${r1}" s="1" t="inlineStr"><is><t xml:space="preserve">${escapeXml(page.barangayHeader)}</t></is></c>` +
+          `<c r="B${r1}" s="1"/><c r="C${r1}" s="1"/><c r="D${r1}" s="1"/><c r="E${r1}" s="1"/>` +
+          `</row>`
+      );
+
+      // Row 2: DAY X - MONTH DD, YYYY
+      rowsXml.push(
+        `<row r="${r2}" spans="1:5" s="5" customFormat="1" ht="18" customHeight="1">` +
+          `<c r="A${r2}" s="4" t="inlineStr"><is><t xml:space="preserve">${escapeXml(page.dayHeader)}</t></is></c>` +
+          `<c r="B${r2}" s="4"/><c r="C${r2}" s="4"/><c r="D${r2}" s="4"/><c r="E${r2}" s="4"/>` +
+          `</row>`
+      );
+
+      // Row 3: Daily Activity
+      rowsXml.push(
+        `<row r="${r3}" spans="1:5" s="7" customFormat="1" ht="${r3Height}" customHeight="1">` +
+          `<c r="A${r3}" s="${activityStyleId}" t="inlineStr"><is><t xml:space="preserve">${escapeXml(cleanActivityOneLine)}</t></is></c>` +
+          `<c r="B${r3}" s="6"/><c r="C${r3}" s="6"/><c r="D${r3}" s="6"/><c r="E${r3}" s="6"/>` +
+          `</row>`
+      );
+
+      // Row 4: Spacer
+      rowsXml.push(
+        `<row r="${r4}" spans="1:5" ht="${r4Height}" customHeight="1">` +
+          `<c r="A${r4}" s="8"/><c r="B${r4}" s="8"/><c r="C${r4}" s="8"/><c r="D${r4}" s="8"/><c r="E${r4}" s="8"/>` +
+          `</row>`
+      );
+
+      // Row 5: BEFORE | DURING | AFTER
+      rowsXml.push(
+        `<row r="${r5}" spans="1:5" ht="15.75" customHeight="1">` +
+          `<c r="A${r5}" s="10" t="inlineStr"><is><t>BEFORE</t></is></c>` +
+          `<c r="B${r5}" s="10"/>` +
+          `<c r="C${r5}" s="10" t="inlineStr"><is><t>DURING</t></is></c>` +
+          `<c r="D${r5}" s="10"/>` +
+          `<c r="E${r5}" s="10" t="inlineStr"><is><t>AFTER</t></is></c>` +
+          `</row>`
+      );
+
+      // Row 6: Spacer
+      rowsXml.push(
+        `<row r="${r6}" spans="1:5" ht="${r6Height}" customHeight="1">` +
+          `<c r="A${r6}" s="8"/><c r="B${r6}" s="8"/><c r="C${r6}" s="8"/><c r="D${r6}" s="8"/><c r="E${r6}" s="8"/>` +
+          `</row>`
+      );
+
+      // Row 7: Top Photo Row (exact 212.65pt height)
+      rowsXml.push(
+        `<row r="${r7}" spans="1:5" ht="${PHOTO_ROW_HEIGHT_PT}" customHeight="1">` +
+          `<c r="B${r7}" s="9"/><c r="D${r7}" s="9"/>` +
+          `</row>`
+      );
+
+      // Row 8: Spacer between Top & Bottom Photo Rows
+      rowsXml.push(
+        `<row r="${r8}" spans="1:5" ht="15" customHeight="1">` +
+          `<c r="B${r8}" s="9"/><c r="D${r8}" s="9"/>` +
+          `</row>`
+      );
+
+      // Row 9: Bottom Photo Row (exact 212.65pt height)
+      rowsXml.push(
+        `<row r="${r9}" spans="1:5" ht="${PHOTO_ROW_HEIGHT_PT}" customHeight="1">` +
+          `<c r="B${r9}" s="9"/><c r="D${r9}" s="9"/>` +
+          `</row>`
+      );
+
+      // Row 10: Bottom Spacer + Manual Page Break after every page except last
+      rowsXml.push(
+        `<row r="${r10}" spans="1:5" ht="15" customHeight="1">` +
+          `<c r="B${r10}" s="9"/><c r="D${r10}" s="9"/>` +
+          `</row>`
+      );
+
+      if (pIdx < pages.length - 1) {
+        breaksXml.push(`<brk id="${r10}" max="16383" man="1"/>`);
+      }
+
+      // Embed up to 6 photos for this page at exact POBLACION slots (A7, C7, E7, A9, C9, E9)
+      for (const slot of page.slots) {
+        const { photo } = slot.entry;
+        const storedKey = photo.isPurged ? null : await loadPhoto(photo);
+        if (!storedKey) continue;
+
+        try {
+          const bytes = await imageBytes(storedKey);
+          const size = dimensions(bytes);
+          if (size.width < 1 || size.height < 1) continue;
+
+          const picId = picturesXml.length + 1;
+          const relId = `rId${picId}`;
+          const imageFile = `photo${globalImageCounter++}.${size.extension}`;
+          usedImageExtensions.add(size.extension);
+          outZip.file(`xl/media/${imageFile}`, bytes);
+          drawingRelsXml.push(
+            `<Relationship Id="${relId}" Type="${REL_NS}/image" Target="../media/${imageFile}"/>`
+          );
+
+          let cx = SLOT_WIDTH_EMU;
+          let cy = SLOT_HEIGHT_EMU;
+          let colOff = 0;
+          let rowOff = 0;
+          let picLocks = `<a:picLocks noChangeArrowheads="1"/>`;
+
+          if (photoFitMode === "contain") {
+            const scale = Math.min(SLOT_WIDTH_EMU / size.width, SLOT_HEIGHT_EMU / size.height);
+            cx = Math.round(size.width * scale);
+            cy = Math.round(size.height * scale);
+            colOff = Math.round((SLOT_WIDTH_EMU - cx) / 2);
+            rowOff = Math.round((SLOT_HEIGHT_EMU - cy) / 2);
+            picLocks = `<a:picLocks noChangeAspect="1" noChangeArrowheads="1"/>`;
+          }
+
+          const zeroBasedRow = baseRow + slot.rowOffset - 1;
+          const descr = escapeXml(
+            slot.entry.customCaption ||
+              [page.dayHeader, slot.entry.stage, photo.workArea || ""].filter(Boolean).join(" — ")
+          );
+
+          picturesXml.push(
+            `<xdr:oneCellAnchor>` +
+              `<xdr:from><xdr:col>${slot.colIdx}</xdr:col><xdr:colOff>${colOff}</xdr:colOff><xdr:row>${zeroBasedRow}</xdr:row><xdr:rowOff>${rowOff}</xdr:rowOff></xdr:from>` +
+              `<xdr:ext cx="${cx}" cy="${cy}"/>` +
+              `<xdr:pic>` +
+              `<xdr:nvPicPr><xdr:cNvPr id="${picId}" name="Picture ${picId}" descr="${descr}"/><xdr:cNvPicPr>${picLocks}</xdr:cNvPicPr></xdr:nvPicPr>` +
+              `<xdr:blipFill><a:blip r:embed="${relId}"/><a:stretch><a:fillRect/></a:stretch></xdr:blipFill>` +
+              `<xdr:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="${cx}" cy="${cy}"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></xdr:spPr>` +
+              `</xdr:pic>` +
+              `<xdr:clientData/>` +
+              `</xdr:oneCellAnchor>`
+          );
+        } catch (err) {
+          console.warn(`Skipping unembeddable photo ${photo.id}:`, err);
+        }
+      }
+    }
+
+    const lastRow = pages.length * 10;
+    const hasDrawing = picturesXml.length > 0;
+
+    // Build Worksheet XML matching POBLACION orientation, margins, pageSetup, view, and BG TUPAD header
+    const sheetXml =
+      `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>` +
+      `<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="${REL_NS}">` +
+      `<dimension ref="A1:E${lastRow}"/>` +
+      `<sheetViews><sheetView${sheetIdx === 0 ? ' tabSelected="1"' : ""} view="pageLayout" zoomScale="66" zoomScaleNormal="40" zoomScaleSheetLayoutView="40" zoomScalePageLayoutView="66" workbookViewId="0"><selection activeCell="A1" sqref="A1"/></sheetView></sheetViews>` +
+      `<sheetFormatPr defaultColWidth="9" defaultRowHeight="15"/>` +
+      `<cols>` +
+      `<col min="1" max="1" width="${PHOTO_COL_WIDTH}" customWidth="1"/>` +
+      `<col min="2" max="2" width="${SPACER_COL_WIDTH}" customWidth="1"/>` +
+      `<col min="3" max="3" width="${PHOTO_COL_WIDTH}" customWidth="1"/>` +
+      `<col min="4" max="4" width="${SPACER_COL_WIDTH}" customWidth="1"/>` +
+      `<col min="5" max="5" width="${PHOTO_COL_WIDTH}" customWidth="1"/>` +
+      `</cols>` +
+      `<sheetData>${rowsXml.join("")}</sheetData>` +
+      `<mergeCells count="${mergesXml.length}">${mergesXml.join("")}</mergeCells>` +
+      `<printOptions horizontalCentered="1"/>` +
+      `<pageMargins left="0.19685039370078741" right="0.19685039370078741" top="0.19685039370078741" bottom="0.19685039370078741" header="3.937007874015748E-2" footer="3.937007874015748E-2"/>` +
+      `<pageSetup paperSize="14" fitToWidth="0" fitToHeight="0" orientation="landscape" horizontalDpi="300" verticalDpi="300" r:id="rId1"/>` +
+      `<headerFooter><oddHeader>&amp;C&amp;G</oddHeader></headerFooter>` +
+      (breaksXml.length > 0
+        ? `<rowBreaks count="${breaksXml.length}" manualBreakCount="${breaksXml.length}">${breaksXml.join("")}</rowBreaks>`
+        : "") +
+      (hasDrawing ? `<drawing r:id="rId2"/>` : "") +
+      `<legacyDrawingHF r:id="rId3"/>` +
+      `</worksheet>`;
+
+    outZip.file(`xl/worksheets/sheet${sheetNum}.xml`, sheetXml);
+    contentOverrides.push(
+      `<Override PartName="/xl/worksheets/sheet${sheetNum}.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>`
+    );
+
+    // Sheet relationships: printerSettings + optional drawing + VML BG TUPAD header watermark
+    const sheetRels: string[] = [
+      `<Relationship Id="rId1" Type="${REL_NS}/printerSettings" Target="../printerSettings/printerSettings1.bin"/>`,
+      `<Relationship Id="rId3" Type="${REL_NS}/vmlDrawing" Target="../drawings/vmlDrawing${sheetNum}.vml"/>`,
+    ];
+
+    if (hasDrawing) {
+      sheetRels.push(
+        `<Relationship Id="rId2" Type="${REL_NS}/drawing" Target="../drawings/drawing${sheetNum}.xml"/>`
+      );
+      outZip.file(
+        `xl/drawings/drawing${sheetNum}.xml`,
+        `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>` +
+          `<xdr:wsDr xmlns:xdr="http://schemas.openxmlformats.org/drawingml/2006/spreadsheetDrawing" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="${REL_NS}">` +
+          picturesXml.join("") +
+          `</xdr:wsDr>`
+      );
+      outZip.file(
+        `xl/drawings/_rels/drawing${sheetNum}.xml.rels`,
+        `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>` +
+          `<Relationships xmlns="${PACKAGE_NS}">${drawingRelsXml.join("")}</Relationships>`
+      );
+      contentOverrides.push(
+        `<Override PartName="/xl/drawings/drawing${sheetNum}.xml" ContentType="application/vnd.openxmlformats-officedocument.drawing+xml"/>`
+      );
+    }
+
+    outZip.file(
+      `xl/worksheets/_rels/sheet${sheetNum}.xml.rels`,
+      `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>` +
+        `<Relationships xmlns="${PACKAGE_NS}">${sheetRels.join("")}</Relationships>`
+    );
+
+    // VML Header Watermark ("BG TUPAD") per sheet
+    outZip.file(`xl/drawings/vmlDrawing${sheetNum}.vml`, vmlTemplate);
+    outZip.file(
+      `xl/drawings/_rels/vmlDrawing${sheetNum}.vml.rels`,
+      `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>` +
+        `<Relationships xmlns="${PACKAGE_NS}">` +
+        `<Relationship Id="rId1" Type="${REL_NS}/image" Target="../media/bgTupad.jpeg"/>` +
+        `</Relationships>`
+    );
+
+    workbookSheetsXml.push(
+      `<sheet name="${escapeXml(sheetName)}" sheetId="${sheetNum}" r:id="${sheetRelId}"/>`
+    );
+    workbookRelsXml.push(
+      `<Relationship Id="${sheetRelId}" Type="${REL_NS}/worksheet" Target="worksheets/sheet${sheetNum}.xml"/>`
+    );
+    definedNamesXml.push(
+      `<definedName name="_xlnm.Print_Area" localSheetId="${sheetIdx}">'${escapeXml(sheetName)}'!$A$1:$E$${lastRow}</definedName>`
+    );
   }
-  return zip.generateAsync({ type: "nodebuffer", compression: "DEFLATE" });
+
+  // Add styles & theme relationships to workbook.xml.rels
+  const themeRelId = `rId${targetBarangays.length + 1}`;
+  const stylesRelId = `rId${targetBarangays.length + 2}`;
+  workbookRelsXml.push(
+    `<Relationship Id="${themeRelId}" Type="${REL_NS}/theme" Target="theme/theme1.xml"/>`,
+    `<Relationship Id="${stylesRelId}" Type="${REL_NS}/styles" Target="styles.xml"/>`
+  );
+
+  outZip.file(
+    "xl/workbook.xml",
+    `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>` +
+      `<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="${REL_NS}">` +
+      `<bookViews><workbookView xWindow="0" yWindow="0" windowWidth="28800" windowHeight="15600" firstSheet="0" activeTab="0"/></bookViews>` +
+      `<sheets>${workbookSheetsXml.join("")}</sheets>` +
+      `<definedNames>${definedNamesXml.join("")}</definedNames>` +
+      `</workbook>`
+  );
+
+  outZip.file(
+    "xl/_rels/workbook.xml.rels",
+    `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>` +
+      `<Relationships xmlns="${PACKAGE_NS}">${workbookRelsXml.join("")}</Relationships>`
+  );
+
+  // docProps/app.xml with exact sheet count & titles
+  outZip.file(
+    "docProps/app.xml",
+    `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>` +
+      `<Properties xmlns="http://schemas.openxmlformats.org/officeDocument/2006/extended-properties" xmlns:vt="http://schemas.openxmlformats.org/officeDocument/2006/docPropsVTypes">` +
+      `<Application>Microsoft Excel</Application><DocSecurity>0</DocSecurity><ScaleCrop>false</ScaleCrop>` +
+      `<HeadingPairs><vt:vector size="2" baseType="variant"><vt:variant><vt:lpstr>Worksheets</vt:lpstr></vt:variant><vt:variant><vt:i4>${targetBarangays.length}</vt:i4></vt:variant></vt:vector></HeadingPairs>` +
+      `<TitlesOfParts><vt:vector size="${targetBarangays.length}" baseType="lpstr">${targetBarangays
+        .map((b) => `<vt:lpstr>${escapeXml(b.toUpperCase())}</vt:lpstr>`)
+        .join("")}</vt:vector></TitlesOfParts>` +
+      `<Company></Company><LinksUpToDate>false</LinksUpToDate><SharedDoc>false</SharedDoc><HyperlinksChanged>false</HyperlinksChanged>` +
+      `</Properties>`
+  );
+
+  // [Content_Types].xml
+  const defaultTypes = [
+    `<Default Extension="bin" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.printerSettings"/>`,
+    `<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>`,
+    `<Default Extension="xml" ContentType="application/xml"/>`,
+    `<Default Extension="vml" ContentType="application/vnd.openxmlformats-officedocument.vmlDrawing"/>`,
+    ...[...usedImageExtensions].map(
+      (ext) => `<Default Extension="${ext}" ContentType="image/${ext}"/>`
+    ),
+  ];
+
+  outZip.file(
+    "[Content_Types].xml",
+    `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>` +
+      `<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">` +
+      defaultTypes.join("") +
+      contentOverrides.join("") +
+      `</Types>`
+  );
+
+  return outZip.generateAsync({ type: "nodebuffer", compression: "DEFLATE" });
 }

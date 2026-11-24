@@ -95,6 +95,7 @@ export async function GET(request: Request) {
     const barangays: Record<
       string,
       {
+        barangayHeader: string;
         doleOffice: string;
         projectLocation: string;
         beneficiaryCount: string;
@@ -114,6 +115,7 @@ export async function GET(request: Request) {
       const computedDays = buildBarangayCompletionDays(program, brgy);
 
       barangays[brgy] = {
+        barangayHeader: `BRGY. ${brgy.toUpperCase()}, ${(program.municipality || "DINGALAN").toUpperCase()}, ${(program.province || "AURORA").toUpperCase()}.`,
         doleOffice: program.doleOffice?.trim() || "DOLE Aurora Field Office",
         projectLocation: `Brgy. ${brgy}, ${program.municipality || "Dingalan"}, ${program.province || "Aurora"}`,
         beneficiaryCount: String(peopleCount),
@@ -121,11 +123,14 @@ export async function GET(request: Request) {
         issuedLine: defaultIssuedLine,
         signatoryName: "ALBERT D. GAVIOLA",
         signatoryTitle: "PESO Manager - LGU Dingalan, Aurora",
-        days: computedDays.map((day) => ({
-          dayNumber: day.dayNumber,
-          label: `Day ${day.dayNumber}${day.workDate ? ` (${displayDate(day.workDate)})` : ""}`,
-          text: day.accomplishment,
-        })),
+        days: computedDays.map((day) => {
+          const upperDate = displayDate(day.workDate).toUpperCase();
+          return {
+            dayNumber: day.dayNumber,
+            label: upperDate ? `DAY ${day.dayNumber} - ${upperDate}` : `DAY ${day.dayNumber}`,
+            text: day.accomplishment,
+          };
+        }),
       };
     }
 

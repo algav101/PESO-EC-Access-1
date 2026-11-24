@@ -1,15 +1,7 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useMemo, useState } from "react";
 import {
-  AlignLeft,
-  AlignCenter,
-  AlignJustify,
-  ArrowUp,
-  ArrowDown,
-  ArrowLeft,
-  ArrowRight,
-  Columns,
   Edit3,
   Eye,
   GripVertical,
@@ -20,10 +12,12 @@ import {
   Sparkles,
   Trash2,
   Wand2,
-  CheckCheck,
+  Maximize2,
+  Minimize2,
+  ArrowUpDown,
+  FileSpreadsheet,
 } from "lucide-react";
-import { stripStagePrefix, type PhotoStage } from "@/lib/geotag-canvas";
-import { formatDate } from "@/lib/utils";
+import { type PhotoStage } from "@/lib/geotag-canvas";
 
 export interface PreviewDayRow {
   dayNumber: number;
@@ -32,6 +26,7 @@ export interface PreviewDayRow {
 }
 
 export interface PreviewBarangayDoc {
+  barangayHeader?: string;
   doleOffice: string;
   projectLocation: string;
   beneficiaryCount: string;
@@ -47,6 +42,8 @@ export interface PreviewLayoutConfig {
   textAlign: "left" | "center" | "justify";
   photoLayout: "1-col" | "2-col" | "3-col";
   photoSize: "compact" | "medium" | "large";
+  photoFitMode: "fill" | "contain";
+  includeEmptyDays: boolean;
 }
 
 export interface PreviewPhotoItem {
@@ -98,43 +95,9 @@ interface Props {
   onGoToPhotoPicker: () => void;
 }
 
-export function buildDefaultSlotCaption(
-  slot: PreviewSelectedSlot,
-  photo: PreviewPhotoItem | undefined,
-  workDayDates: Map<number, string>,
-  includeGeotagInCaption: boolean
-): string {
-  if (!photo) return "";
-  const workDate = workDayDates.get(slot.targetDayNumber) || photo.workDay?.workDate || "";
-  const activity = stripStagePrefix(photo.specificActivity);
-  const gpsText =
-    includeGeotagInCaption &&
-    typeof photo.latitude === "number" &&
-    typeof photo.longitude === "number" &&
-    Number.isFinite(photo.latitude) &&
-    Number.isFinite(photo.longitude)
-      ? `GPS: ${photo.latitude.toFixed(5)}°N, ${photo.longitude.toFixed(5)}°E`
-      : "";
-  const capturedText =
-    includeGeotagInCaption && photo.capturedAt
-      ? `Captured: ${formatDate(photo.capturedAt, "MMM dd, yyyy hh:mm a")}`
-      : "";
-  return [
-    slot.targetDayNumber ? `Day ${slot.targetDayNumber}${workDate ? ` (${workDate})` : ""}` : "Work day not assigned",
-    slot.stage,
-    photo.status === "FOR_REVIEW" ? "For review" : "",
-    activity,
-    photo.workArea || "",
-    gpsText,
-    capturedText,
-  ]
-    .filter(Boolean)
-    .join(" — ");
-}
-
 /**
- * Cleans multi-activity day text by removing generic fallback boilerplate when real
- * work-program items exist and formatting each distinct activity cleanly with bullets.
+ * Cleans multi-activity day text into a concise, single-line / clean readable summary
+ * suitable for the POBLACION landscape template's Row 3 activity line.
  */
 export function cleanAccomplishmentDayText(rawText: string): string {
   const lines = rawText
@@ -150,19 +113,33 @@ export function cleanAccomplishmentDayText(rawText: string): string {
   );
   const kept = nonGeneric.length > 0 ? nonGeneric : lines;
 
-  // Deduplicate case-insensitively
   const seen = new Set<string>();
   const unique: string[] = [];
   for (const item of kept) {
-    const k = item.replace(/\s+/g, " ").toLowerCase();
+    const cleaned = item.replace(/\s+/g, " ");
+    const k = cleaned.toLowerCase();
     if (!seen.has(k)) {
       seen.add(k);
-      unique.push(item.replace(/\s+/g, " "));
+      unique.push(cleaned);
     }
   }
 
-  if (unique.length === 1) return unique[0];
-  return unique.map((item) => `• ${item}`).join("\n\n");
+  return unique.join("; ");
+}
+
+interface PagePreviewModel {
+  dayIndex: number;
+  dayNumber: number;
+  pageNumberInDay: number;
+  totalPagesInDay: number;
+  globalPageNumber: number;
+  dayLabel: string;
+  activityText: string;
+  grid: {
+    BEFORE: [PreviewSelectedSlot | null, PreviewSelectedSlot | null];
+    DURING: [PreviewSelectedSlot | null, PreviewSelectedSlot | null];
+    AFTER: [PreviewSelectedSlot | null, PreviewSelectedSlot | null];
+  };
 }
 
 export function AccomplishmentExcelPreviewEditor({
@@ -173,14 +150,10 @@ export function AccomplishmentExcelPreviewEditor({
   onChangeLayout,
   onChangeDoc,
   onResetDoc,
-  onApplyHeaderToAll,
   onCleanAndFormatCurrent,
   onCleanAndFormatAll,
   selectedEntries,
   photoMap,
-  workDayDates,
-  requiredWorkDays,
-  includeGeotagInCaption,
   onUpdateSlot,
   onReorderSlots,
   onRemoveSlot,
@@ -189,203 +162,229 @@ export function AccomplishmentExcelPreviewEditor({
   onZoomPhoto,
   onGoToPhotoPicker,
 }: Props) {
-  const [dragIndex, setDragIndex] = useState<number | null>(null);
-  const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
+  const [draggingPhotoId, setDraggingPhotoId] = useState<string | null>(null);
+  const [dropHoverKey, setDropHoverKey] = useState<string | null>(null);
+  const [activeDayFilter, setActiveDayFilter] = useState<number | "ALL">("ALL");
+
+  // Build exact POBLACION landscape pages (10 rows / 6 photo slots per page)
+  const pages = useMemo<PagePreviewModel[]>(() => {
+    if (!doc) return [];
+
+    const byDay = new Map<
+      number,
+      { BEFORE: PreviewSelectedSlot[]; DURING: PreviewSelectedSlot[]; AFTER: PreviewSelectedSlot[] }
+    >();
+
+    for (const slot of selectedEntries) {
+      const dNum = slot.targetDayNumber > 0 ? slot.targetDayNumber : 1;
+      let b = byDay.get(dNum);
+      if (!b) {
+        b = { BEFORE: [], DURING: [], AFTER: [] };
+        byDay.set(dNum, b);
+      }
+      if (slot.stage === "BEFORE") b.BEFORE.push(slot);
+      else if (slot.stage === "AFTER") b.AFTER.push(slot);
+      else b.DURING.push(slot);
+    }
+
+    const result: PagePreviewModel[] = [];
+    let globalPage = 0;
+
+    doc.days.forEach((dayRow, dayIndex) => {
+      const dNum = dayRow.dayNumber || dayIndex + 1;
+      const buckets = byDay.get(dNum) || { BEFORE: [], DURING: [], AFTER: [] };
+      const totalDayPhotos =
+        buckets.BEFORE.length + buckets.DURING.length + buckets.AFTER.length;
+
+      if (!layout.includeEmptyDays && totalDayPhotos === 0 && !dayRow.text.trim()) {
+        return;
+      }
+
+      const pageCount = Math.max(
+        1,
+        Math.ceil(Math.max(buckets.BEFORE.length, buckets.DURING.length, buckets.AFTER.length) / 2)
+      );
+
+      for (let pIdx = 0; pIdx < pageCount; pIdx++) {
+        globalPage += 1;
+        result.push({
+          dayIndex,
+          dayNumber: dNum,
+          pageNumberInDay: pIdx + 1,
+          totalPagesInDay: pageCount,
+          globalPageNumber: globalPage,
+          dayLabel:
+            pageCount > 1 && pIdx > 0 ? `${dayRow.label} (PAGE ${pIdx + 1})` : dayRow.label,
+          activityText: dayRow.text,
+          grid: {
+            BEFORE: [buckets.BEFORE[pIdx * 2] || null, buckets.BEFORE[pIdx * 2 + 1] || null],
+            DURING: [buckets.DURING[pIdx * 2] || null, buckets.DURING[pIdx * 2 + 1] || null],
+            AFTER: [buckets.AFTER[pIdx * 2] || null, buckets.AFTER[pIdx * 2 + 1] || null],
+          },
+        });
+      }
+    });
+
+    return result;
+  }, [doc, selectedEntries, layout.includeEmptyDays]);
+
+  const visiblePages = useMemo(
+    () => (activeDayFilter === "ALL" ? pages : pages.filter((p) => p.dayNumber === activeDayFilter)),
+    [pages, activeDayFilter]
+  );
+
+  const dayPhotoCounts = useMemo(() => {
+    const counts = new Map<number, number>();
+    for (const s of selectedEntries) {
+      counts.set(s.targetDayNumber, (counts.get(s.targetDayNumber) || 0) + 1);
+    }
+    return counts;
+  }, [selectedEntries]);
 
   if (loading || !doc) {
     return (
       <div className="flex-1 flex flex-col items-center justify-center p-10 text-slate-500 gap-2 bg-slate-100">
         <RefreshCw className="w-6 h-6 animate-spin text-gov-blue" />
-        <p className="text-xs font-bold">Loading editable Excel preview for Barangay {activeBarangay}...</p>
+        <p className="text-xs font-bold">
+          Loading landscape accomplishment sheet preview for Barangay {activeBarangay}...
+        </p>
       </div>
     );
   }
 
-  const updateDayRow = (index: number, patch: Partial<PreviewDayRow>) => {
+  const barangayHeaderValue =
+    doc.barangayHeader || `BRGY. ${activeBarangay.toUpperCase()}, DINGALAN, AURORA.`;
+
+  const updateDayRow = (dayIndex: number, patch: Partial<PreviewDayRow>) => {
     onChangeDoc((prev) => ({
       ...prev,
-      days: prev.days.map((d, i) => (i === index ? { ...d, ...patch } : d)),
+      days: prev.days.map((d, i) => (i === dayIndex ? { ...d, ...patch } : d)),
     }));
   };
 
-  const moveDayRow = (index: number, dir: -1 | 1) => {
-    onChangeDoc((prev) => {
-      const next = [...prev.days];
-      const target = index + dir;
-      if (target < 0 || target >= next.length) return prev;
-      [next[index], next[target]] = [next[target], next[index]];
-      return { ...prev, days: next };
-    });
+  // Swap or move a dragged photo onto any Day + Stage + Slot (top/bottom)
+  const handleDropOnSlot = (
+    targetDayNumber: number,
+    targetStage: PhotoStage,
+    existingTargetSlot: PreviewSelectedSlot | null
+  ) => {
+    if (!draggingPhotoId) return;
+    if (existingTargetSlot && existingTargetSlot.photoId === draggingPhotoId) {
+      setDraggingPhotoId(null);
+      setDropHoverKey(null);
+      return;
+    }
+
+    const fromIdx = selectedEntries.findIndex((s) => s.photoId === draggingPhotoId);
+    if (fromIdx < 0) return;
+
+    const draggedSlot = selectedEntries[fromIdx];
+
+    if (existingTargetSlot) {
+      const toIdx = selectedEntries.findIndex((s) => s.photoId === existingTargetSlot.photoId);
+      // If same day & same stage, reorder them in place (e.g., swap Top Row A7 <-> Bottom Row A9)
+      if (
+        draggedSlot.targetDayNumber === targetDayNumber &&
+        draggedSlot.stage === targetStage &&
+        toIdx >= 0
+      ) {
+        onReorderSlots(fromIdx, toIdx);
+      } else {
+        // Move dragged photo to target day & stage AND move existing photo to dragged photo's old slot
+        onUpdateSlot(draggedSlot.photoId, { targetDayNumber, stage: targetStage });
+        onUpdateSlot(existingTargetSlot.photoId, {
+          targetDayNumber: draggedSlot.targetDayNumber,
+          stage: draggedSlot.stage,
+        });
+      }
+    } else {
+      // Dropped onto an empty slot -> reassign Day & Stage directly!
+      onUpdateSlot(draggedSlot.photoId, { targetDayNumber, stage: targetStage });
+    }
+
+    setDraggingPhotoId(null);
+    setDropHoverKey(null);
   };
 
-  const insertDayRowAfter = (index: number) => {
-    onChangeDoc((prev) => {
-      const next = [...prev.days];
-      const current = next[index];
-      next.splice(index + 1, 0, {
-        dayNumber: current?.dayNumber || next.length + 1,
-        label: current?.label ? `${current.label} (continued)` : `Day ${next.length + 1}`,
-        text: "",
-      });
-      return { ...prev, days: next };
-    });
+  const handleSwapVerticalInStage = (
+    topSlot: PreviewSelectedSlot | null,
+    bottomSlot: PreviewSelectedSlot | null
+  ) => {
+    if (!topSlot || !bottomSlot) return;
+    const idxA = selectedEntries.findIndex((s) => s.photoId === topSlot.photoId);
+    const idxB = selectedEntries.findIndex((s) => s.photoId === bottomSlot.photoId);
+    if (idxA >= 0 && idxB >= 0) {
+      onReorderSlots(idxA, idxB);
+    }
   };
 
-  const removeDayRow = (index: number) => {
-    onChangeDoc((prev) => {
-      if (prev.days.length <= 1) return prev;
-      return { ...prev, days: prev.days.filter((_, i) => i !== index) };
-    });
-  };
-
-  const previewGridCols =
-    layout.photoLayout === "3-col"
-      ? "grid-cols-1 md:grid-cols-3"
-      : layout.photoLayout === "2-col"
-        ? "grid-cols-1 md:grid-cols-2"
-        : "grid-cols-1 max-w-2xl mx-auto";
-
-  const previewImgHeightClass =
-    layout.photoSize === "compact"
-      ? layout.photoLayout === "1-col"
-        ? "h-48"
-        : "h-40"
-      : layout.photoSize === "large"
-        ? layout.photoLayout === "1-col"
-          ? "h-80"
-          : "h-64"
-        : layout.photoLayout === "1-col"
-          ? "h-64"
-          : "h-52";
-
-  const alignClass =
-    layout.textAlign === "center"
-      ? "text-center"
-      : layout.textAlign === "justify"
-        ? "text-justify"
-        : "text-left";
-
-  const paperWidthClass =
-    layout.colCWidth >= 82
-      ? "max-w-[1160px]"
-      : layout.colCWidth >= 60
-        ? "max-w-[980px]"
-        : "max-w-[800px]";
+  const stageCols: Array<{ stage: PhotoStage; colLetter: string; badgeClass: string }> = [
+    { stage: "BEFORE", colLetter: "A", badgeClass: "bg-amber-400 text-slate-950" },
+    { stage: "DURING", colLetter: "C", badgeClass: "bg-blue-600 text-white" },
+    { stage: "AFTER", colLetter: "E", badgeClass: "bg-emerald-600 text-white" },
+  ];
 
   return (
-    <div className="flex-1 min-h-0 flex flex-col bg-slate-200/80 overflow-hidden">
-      {/* Formatting & Layout Controls Toolbar */}
+    <div className="flex-1 min-h-0 flex flex-col bg-slate-200/90 overflow-hidden">
+      {/* Top POBLACION Template Formatting & Arrangement Toolbar */}
       <div className="bg-white border-b border-slate-300 px-4 py-2.5 flex flex-wrap items-center justify-between gap-2.5 shrink-0 shadow-xs">
-        <div className="flex flex-wrap items-center gap-3">
-          {/* Column C Width */}
+        <div className="flex flex-wrap items-center gap-2.5">
+          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-50 border border-emerald-300 text-emerald-900 text-[11px] font-black">
+            <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-700" />
+            <span>POBLACION Template · Landscape Folio (8.5&quot;×13&quot;) · 6 Photos/Page</span>
+          </span>
+
+          {/* Photo Sizing Mode */}
           <div className="flex items-center gap-1.5">
-            <span className="text-[10px] font-black uppercase text-slate-500">Text Width:</span>
+            <span className="text-[10px] font-black uppercase text-slate-500">Photo Fit:</span>
             <div className="inline-flex rounded-lg border border-slate-300 overflow-hidden bg-slate-50">
-              {[
-                { label: "Compact", width: 48 },
-                { label: "Wide", width: 68 },
-                { label: "Extra Wide", width: 88 },
-              ].map((opt) => (
-                <button
-                  key={opt.width}
-                  type="button"
-                  onClick={() => onChangeLayout({ colCWidth: opt.width })}
-                  className={`px-2 py-1 text-[11px] font-bold transition cursor-pointer ${
-                    layout.colCWidth === opt.width
-                      ? "bg-gov-blue text-white"
-                      : "text-slate-700 hover:bg-slate-200"
-                  }`}
-                >
-                  {opt.label}
-                </button>
-              ))}
+              <button
+                type="button"
+                onClick={() => onChangeLayout({ photoFitMode: "fill" })}
+                className={`px-2 py-1 text-[11px] font-bold flex items-center gap-1 transition cursor-pointer ${
+                  layout.photoFitMode === "fill"
+                    ? "bg-gov-blue text-white"
+                    : "text-slate-700 hover:bg-slate-200"
+                }`}
+                title="Exact POBLACION sizing: stretches image to fill A7/C7/E7/A9/C9/E9 slot without cropping"
+              >
+                <Maximize2 className="w-3 h-3" />
+                <span>Fill Slot (POBLACION)</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => onChangeLayout({ photoFitMode: "contain" })}
+                className={`px-2 py-1 text-[11px] font-bold flex items-center gap-1 transition cursor-pointer ${
+                  layout.photoFitMode === "contain"
+                    ? "bg-gov-blue text-white"
+                    : "text-slate-700 hover:bg-slate-200"
+                }`}
+                title="Keep original image aspect ratio centered inside the 3.88 x 2.94 in slot"
+              >
+                <Minimize2 className="w-3 h-3" />
+                <span>Keep Aspect</span>
+              </button>
             </div>
           </div>
 
-          {/* Text Alignment */}
-          <div className="flex items-center gap-1.5">
-            <span className="text-[10px] font-black uppercase text-slate-500">Text Align:</span>
-            <div className="inline-flex rounded-lg border border-slate-300 overflow-hidden bg-slate-50">
-              {(
-                [
-                  { id: "left", icon: AlignLeft, label: "Left" },
-                  { id: "center", icon: AlignCenter, label: "Center" },
-                  { id: "justify", icon: AlignJustify, label: "Justify" },
-                ] as const
-              ).map((opt) => {
-                const Icon = opt.icon;
-                return (
-                  <button
-                    key={opt.id}
-                    type="button"
-                    onClick={() => onChangeLayout({ textAlign: opt.id })}
-                    className={`px-2 py-1 text-[11px] font-bold flex items-center gap-1 transition cursor-pointer ${
-                      layout.textAlign === opt.id
-                        ? "bg-gov-blue text-white"
-                        : "text-slate-700 hover:bg-slate-200"
-                    }`}
-                    title={`Align accomplishment text: ${opt.label}`}
-                  >
-                    <Icon className="w-3.5 h-3.5" />
-                    <span className="hidden sm:inline">{opt.label}</span>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* Photo Columns Layout */}
-          <div className="flex items-center gap-1.5">
-            <span className="text-[10px] font-black uppercase text-slate-500 flex items-center gap-1">
-              <Columns className="w-3 h-3" />
-              Photos:
-            </span>
-            <div className="inline-flex rounded-lg border border-slate-300 overflow-hidden bg-slate-50">
-              {(
-                [
-                  { id: "1-col", label: "1-Col" },
-                  { id: "2-col", label: "2-Col Grid" },
-                  { id: "3-col", label: "3-Col Strip" },
-                ] as const
-              ).map((opt) => (
-                <button
-                  key={opt.id}
-                  type="button"
-                  onClick={() => onChangeLayout({ photoLayout: opt.id })}
-                  className={`px-2 py-1 text-[11px] font-bold transition cursor-pointer ${
-                    layout.photoLayout === opt.id
-                      ? "bg-emerald-600 text-white"
-                      : "text-slate-700 hover:bg-slate-200"
-                  }`}
-                >
-                  {opt.label}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Photo Size */}
-          <div className="flex items-center gap-1.5">
-            <span className="text-[10px] font-black uppercase text-slate-500">Photo Size:</span>
-            <select
-              value={layout.photoSize}
-              onChange={(e) => onChangeLayout({ photoSize: e.target.value as PreviewLayoutConfig["photoSize"] })}
-              className="px-2 py-1 text-[11px] font-bold border border-slate-300 rounded-lg bg-slate-50 text-slate-800"
-            >
-              <option value="compact">Compact</option>
-              <option value="medium">Medium</option>
-              <option value="large">Large</option>
-            </select>
-          </div>
+          {/* Include Empty Days Toggle */}
+          <label className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-100 border border-slate-300 text-[11px] font-bold text-slate-800 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={layout.includeEmptyDays}
+              onChange={(e) => onChangeLayout({ includeEmptyDays: e.target.checked })}
+              className="rounded accent-gov-blue"
+            />
+            <span>Include All 10 Days</span>
+          </label>
         </div>
 
-        {/* Text Formatting & Reset Quick Actions */}
+        {/* Text & Sort Actions */}
         <div className="flex flex-wrap items-center gap-1.5">
           <button
             type="button"
             onClick={onCleanAndFormatCurrent}
             className="px-2.5 py-1 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-800 border border-indigo-200 text-[11px] font-bold flex items-center gap-1 transition cursor-pointer"
-            title="Remove duplicate/generic boilerplate and add clean bullet spacing for this barangay"
           >
             <Wand2 className="w-3.5 h-3.5" />
             <span>Auto-Clean {activeBarangay} Text</span>
@@ -394,16 +393,22 @@ export function AccomplishmentExcelPreviewEditor({
             type="button"
             onClick={onCleanAndFormatAll}
             className="px-2.5 py-1 rounded-lg bg-purple-50 hover:bg-purple-100 text-purple-800 border border-purple-200 text-[11px] font-bold flex items-center gap-1 transition cursor-pointer"
-            title="Apply clean bullet formatting across all 11 barangays"
           >
             <Sparkles className="w-3.5 h-3.5" />
-            <span>Auto-Clean All Barangays</span>
+            <span>Auto-Clean All</span>
+          </button>
+          <button
+            type="button"
+            onClick={onSortSlotsAuto}
+            disabled={selectedEntries.length < 2}
+            className="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 disabled:opacity-40 text-slate-800 border border-slate-300 text-[11px] font-bold transition cursor-pointer"
+          >
+            Sort Photos
           </button>
           <button
             type="button"
             onClick={onResetDoc}
             className="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-300 text-[11px] font-bold flex items-center gap-1 transition cursor-pointer"
-            title="Reset this barangay's text back to auto-generated defaults"
           >
             <RotateCcw className="w-3 h-3" />
             <span>Reset</span>
@@ -411,401 +416,290 @@ export function AccomplishmentExcelPreviewEditor({
         </div>
       </div>
 
-      {/* Scrollable WYSIWYG Printable Excel Sheet Preview */}
-      <div className="flex-1 overflow-y-auto p-4 sm:p-6">
-        <div
-          className={`${paperWidthClass} mx-auto bg-white border border-slate-300 rounded-xl shadow-lg p-6 sm:p-8 space-y-6 transition-all`}
-        >
-          {/* Sheet Header */}
-          <div className="space-y-3">
-            <div className="flex items-center justify-between border-b-2 border-slate-900 pb-2">
-              <h3 className="text-lg font-black text-slate-950 tracking-tight">
-                TUPAD Completion Report — <span className="text-gov-blue">Barangay {activeBarangay}</span>
-              </h3>
+      {/* Day Jump Bar */}
+      <div className="bg-slate-100 border-b border-slate-300 px-4 py-1.5 flex items-center justify-between gap-2 overflow-x-auto shrink-0">
+        <div className="flex items-center gap-1">
+          <button
+            type="button"
+            onClick={() => setActiveDayFilter("ALL")}
+            className={`px-2.5 py-1 rounded-lg text-[11px] font-black transition cursor-pointer shrink-0 ${
+              activeDayFilter === "ALL"
+                ? "bg-gov-blue text-white shadow-xs"
+                : "bg-white text-slate-700 border border-slate-300 hover:bg-slate-200"
+            }`}
+          >
+            All Pages ({pages.length})
+          </button>
+          {doc.days.map((d, idx) => {
+            const dNum = d.dayNumber || idx + 1;
+            const cnt = dayPhotoCounts.get(dNum) || 0;
+            const isActive = activeDayFilter === dNum;
+            return (
               <button
+                key={dNum}
                 type="button"
-                onClick={onApplyHeaderToAll}
-                className="px-2.5 py-1 rounded-lg bg-blue-50 hover:bg-blue-100 text-gov-blue text-[11px] font-bold border border-blue-200 flex items-center gap-1 transition cursor-pointer"
-                title="Copy DOLE Office, Period of Work, Issued Date, and Signatory to all barangays"
+                onClick={() => setActiveDayFilter(dNum)}
+                className={`px-2 py-1 rounded-lg text-[11px] font-bold transition cursor-pointer shrink-0 flex items-center gap-1 ${
+                  isActive
+                    ? "bg-gov-blue text-white shadow-xs"
+                    : "bg-white text-slate-700 border border-slate-300 hover:bg-slate-200"
+                }`}
               >
-                <CheckCheck className="w-3.5 h-3.5" />
-                <span>Apply Office, Dates &amp; Signatory to All Barangays</span>
+                <span>Day {dNum}</span>
+                <span
+                  className={`text-[9px] font-mono px-1 rounded-full ${
+                    isActive
+                      ? "bg-white/20 text-white"
+                      : cnt > 0
+                        ? "bg-emerald-600 text-white"
+                        : "bg-slate-200 text-slate-500"
+                  }`}
+                >
+                  {cnt}
+                </span>
               </button>
-            </div>
+            );
+          })}
+        </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5 text-xs">
-              <label className="flex items-center gap-2">
-                <span className="font-black text-slate-900 w-36 shrink-0">DOLE-Regional Office:</span>
-                <input
-                  type="text"
-                  value={doc.doleOffice}
-                  onChange={(e) => onChangeDoc((p) => ({ ...p, doleOffice: e.target.value }))}
-                  className="flex-1 px-2.5 py-1 border-b border-slate-400 bg-slate-50/70 focus:bg-blue-50/40 focus:border-gov-blue focus:outline-none font-semibold text-slate-900 rounded-t"
-                />
-              </label>
+        <button
+          type="button"
+          onClick={onGoToPhotoPicker}
+          className="px-2.5 py-1 rounded-lg bg-gov-blue hover:bg-gov-dark text-white text-[11px] font-bold flex items-center gap-1 shrink-0 cursor-pointer"
+        >
+          <Plus className="w-3.5 h-3.5" />
+          <span>Add Photos</span>
+        </button>
+      </div>
 
-              <label className="flex items-center gap-2">
-                <span className="font-black text-slate-900 w-36 shrink-0">Project Location:</span>
-                <input
-                  type="text"
-                  value={doc.projectLocation}
-                  onChange={(e) => onChangeDoc((p) => ({ ...p, projectLocation: e.target.value }))}
-                  className="flex-1 px-2.5 py-1 border-b border-slate-400 bg-slate-50/70 focus:bg-blue-50/40 focus:border-gov-blue focus:outline-none font-semibold text-slate-900 rounded-t"
-                />
-              </label>
-
-              <label className="flex items-center gap-2">
-                <span className="font-black text-slate-900 w-36 shrink-0">No. of Beneficiaries:</span>
-                <input
-                  type="text"
-                  value={doc.beneficiaryCount}
-                  onChange={(e) => onChangeDoc((p) => ({ ...p, beneficiaryCount: e.target.value }))}
-                  className="flex-1 px-2.5 py-1 border-b border-slate-400 bg-slate-50/70 focus:bg-blue-50/40 focus:border-gov-blue focus:outline-none font-semibold text-slate-900 rounded-t"
-                />
-              </label>
-
-              <label className="flex items-center gap-2">
-                <span className="font-black text-slate-900 w-36 shrink-0">Period of Work:</span>
-                <input
-                  type="text"
-                  value={doc.periodOfWork}
-                  onChange={(e) => onChangeDoc((p) => ({ ...p, periodOfWork: e.target.value }))}
-                  className="flex-1 px-2.5 py-1 border-b border-slate-400 bg-slate-50/70 focus:bg-blue-50/40 focus:border-gov-blue focus:outline-none font-semibold text-slate-900 rounded-t"
-                />
-              </label>
-            </div>
+      {/* Scrollable Landscape Folio Page Cards (Exact POBLACION Layout + BG TUPAD Watermark) */}
+      <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-6">
+        {visiblePages.length === 0 ? (
+          <div className="max-w-xl mx-auto bg-white rounded-2xl border-2 border-dashed border-slate-300 p-8 text-center space-y-2">
+            <ImageIcon className="w-8 h-8 mx-auto text-slate-300" />
+            <p className="text-sm font-bold text-slate-700">No pages shown with current filter.</p>
+            <p className="text-xs text-slate-500">
+              Enable &ldquo;Include All 10 Days&rdquo; or add photos in Step 1.
+            </p>
           </div>
+        ) : (
+          visiblePages.map((page) => {
+            const baseRow = (page.globalPageNumber - 1) * 10 + 1;
+            const topRowNum = baseRow + 6;
+            const bottomRowNum = baseRow + 8;
 
-          {/* Section A: Editable Accomplishment Table */}
-          <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <h4 className="text-sm font-black text-slate-900">A. Accomplishment</h4>
-              <span className="text-[11px] text-slate-500">
-                Click any cell below to directly edit, format, or rearrange daily accomplishment texts before export.
-              </span>
-            </div>
+            return (
+              <div
+                key={`${page.dayNumber}-${page.pageNumberInDay}`}
+                className="max-w-[1160px] mx-auto space-y-1.5"
+              >
+                {/* Print Page Indicator Strip */}
+                <div className="flex items-center justify-between text-[11px] font-bold text-slate-600 px-1">
+                  <span>
+                    Print Page {page.globalPageNumber} of {pages.length} —{" "}
+                    <strong className="text-slate-900">
+                      {activeBarangay.toUpperCase()} · {page.dayLabel}
+                    </strong>{" "}
+                    <span className="font-mono text-slate-500">
+                      (Excel Rows {baseRow}–{baseRow + 9} · Landscape Folio 8.5&quot;×13&quot;)
+                    </span>
+                  </span>
+                  <span className="text-[10px] text-slate-500 hidden sm:inline">
+                    Drag &amp; drop any photo across BEFORE / DURING / AFTER slots or Days
+                  </span>
+                </div>
 
-            <div className="border-2 border-slate-900 rounded-sm overflow-hidden">
-              <table className="w-full border-collapse table-fixed">
-                <thead>
-                  <tr className="bg-slate-100 border-b-2 border-slate-900 text-xs font-black text-slate-900">
-                    <th className="w-[26%] border-r-2 border-slate-900 py-2 px-3 text-center">
-                      Period of Work
-                    </th>
-                    <th className="w-[66%] border-r border-slate-300 py-2 px-3 text-center">
-                      Actual Accomplishment
-                    </th>
-                    <th className="w-[8%] py-2 px-1 text-center text-[10px] font-bold text-slate-500 bg-slate-50">
-                      Row
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {doc.days.map((row, idx) => {
-                    const lineCount = Math.max(
-                      3,
-                      row.text.split("\n").reduce((acc, l) => acc + Math.max(1, Math.ceil(l.length / 65)), 0) + 1
-                    );
-                    return (
-                      <tr key={idx} className="border-b border-slate-900 last:border-b-0 align-top group">
-                        <td className="border-r-2 border-slate-900 p-2 bg-white align-middle">
-                          <textarea
-                            rows={2}
-                            value={row.label}
-                            onChange={(e) => updateDayRow(idx, { label: e.target.value })}
-                            className="w-full text-xs font-bold text-slate-900 text-center bg-transparent hover:bg-blue-50/40 focus:bg-blue-50/70 rounded p-1.5 focus:outline-none focus:ring-1 focus:ring-gov-blue resize-none"
-                          />
-                        </td>
-                        <td className="border-r border-slate-200 p-2 bg-white">
-                          <textarea
-                            rows={Math.min(12, lineCount)}
-                            value={row.text}
-                            onChange={(e) => updateDayRow(idx, { text: e.target.value })}
-                            placeholder="Enter actual accomplishment for this day..."
-                            className={`w-full text-xs leading-relaxed text-slate-900 bg-transparent hover:bg-blue-50/40 focus:bg-blue-50/70 rounded p-1.5 focus:outline-none focus:ring-1 focus:ring-gov-blue resize-y ${alignClass}`}
-                          />
-                        </td>
-                        <td className="p-1.5 bg-slate-50 align-middle">
-                          <div className="flex flex-col items-center gap-1">
-                            <button
-                              type="button"
-                              disabled={idx === 0}
-                              onClick={() => moveDayRow(idx, -1)}
-                              className="p-1 rounded bg-white hover:bg-slate-200 disabled:opacity-30 border border-slate-200 text-slate-600 cursor-pointer"
-                              title="Move row up"
-                            >
-                              <ArrowUp className="w-3 h-3" />
-                            </button>
-                            <button
-                              type="button"
-                              disabled={idx === doc.days.length - 1}
-                              onClick={() => moveDayRow(idx, 1)}
-                              className="p-1 rounded bg-white hover:bg-slate-200 disabled:opacity-30 border border-slate-200 text-slate-600 cursor-pointer"
-                              title="Move row down"
-                            >
-                              <ArrowDown className="w-3 h-3" />
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => insertDayRowAfter(idx)}
-                              className="p-1 rounded bg-white hover:bg-blue-100 border border-slate-200 text-gov-blue cursor-pointer"
-                              title="Insert continuation row below"
-                            >
-                              <Plus className="w-3 h-3" />
-                            </button>
-                            {doc.days.length > 1 && (
+                {/* Landscape Folio Page Canvas with Official DOLE BG TUPAD Watermark */}
+                <div
+                  className="relative bg-white border-2 border-slate-400 rounded-md shadow-xl overflow-hidden"
+                  style={{
+                    backgroundImage: `url('/images/bg-tupad-watermark.jpeg')`,
+                    backgroundSize: "cover",
+                    backgroundPosition: "center top",
+                  }}
+                >
+                  {/* Soft light veil so inputs remain super crisp while keeping BG TUPAD logos clearly visible */}
+                  <div className="relative z-10 p-4 sm:p-6 space-y-2 bg-white/15">
+                    {/* Rows 1-3: Exact POBLACION Header Text Block (Editable) */}
+                    <div className="pr-36 sm:pr-52 space-y-0.5">
+                      {/* Row 1: BRGY. {NAME}, DINGALAN, AURORA. */}
+                      <input
+                        type="text"
+                        value={barangayHeaderValue}
+                        onChange={(e) =>
+                          onChangeDoc((prev) => ({ ...prev, barangayHeader: e.target.value }))
+                        }
+                        className="w-full text-base sm:text-xl font-black text-slate-950 tracking-tight bg-white/55 hover:bg-white/90 focus:bg-white rounded px-2 py-0.5 border border-transparent hover:border-slate-300 focus:border-gov-blue focus:outline-none uppercase"
+                        title="Row 1: Barangay Title (applies across all pages of this barangay sheet)"
+                      />
+
+                      {/* Row 2: DAY X - MONTH DD, YYYY */}
+                      <input
+                        type="text"
+                        value={doc.days[page.dayIndex]?.label || page.dayLabel}
+                        onChange={(e) => updateDayRow(page.dayIndex, { label: e.target.value })}
+                        className="w-full text-sm sm:text-base font-bold text-slate-900 bg-white/55 hover:bg-white/90 focus:bg-white rounded px-2 py-0.5 border border-transparent hover:border-slate-300 focus:border-gov-blue focus:outline-none uppercase"
+                        title="Row 2: Day & Date Heading"
+                      />
+
+                      {/* Row 3: Specific Activity Line */}
+                      <input
+                        type="text"
+                        value={doc.days[page.dayIndex]?.text || ""}
+                        onChange={(e) => updateDayRow(page.dayIndex, { text: e.target.value })}
+                        placeholder="Enter specific daily accomplishment / work program activity..."
+                        className="w-full text-xs sm:text-sm font-medium text-slate-800 bg-white/55 hover:bg-white/90 focus:bg-white rounded px-2 py-0.5 border border-transparent hover:border-slate-300 focus:border-gov-blue focus:outline-none"
+                        title="Row 3: Daily Accomplishment / Work Activity Description"
+                      />
+                    </div>
+
+                    {/* Row 5: BEFORE | DURING | AFTER Column Headers */}
+                    <div className="grid grid-cols-3 gap-3 pt-2">
+                      {stageCols.map(({ stage }) => {
+                        const topS = page.grid[stage][0];
+                        const botS = page.grid[stage][1];
+                        return (
+                          <div key={stage} className="flex items-center justify-center gap-2">
+                            <span className="text-xs sm:text-sm font-black tracking-wide text-slate-950">
+                              {stage}
+                            </span>
+                            {topS && botS && (
                               <button
                                 type="button"
-                                onClick={() => removeDayRow(idx)}
-                                className="p-1 rounded bg-white hover:bg-rose-100 border border-slate-200 text-rose-600 cursor-pointer"
-                                title="Remove this row"
+                                onClick={() => handleSwapVerticalInStage(topS, botS)}
+                                className="p-0.5 rounded bg-white/80 hover:bg-gov-blue hover:text-white text-slate-600 border border-slate-300 transition cursor-pointer"
+                                title={`Swap top & bottom ${stage} photos`}
                               >
-                                <Trash2 className="w-3 h-3" />
+                                <ArrowUpDown className="w-3 h-3" />
                               </button>
                             )}
                           </div>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          </div>
-
-          {/* Certification & Signatory Block */}
-          <div className="pt-2 space-y-4 border-b border-slate-200 pb-6">
-            <div className="flex items-center gap-2 text-xs">
-              <span className="font-bold text-slate-500 shrink-0">Certification Date Line:</span>
-              <input
-                type="text"
-                value={doc.issuedLine}
-                onChange={(e) => onChangeDoc((p) => ({ ...p, issuedLine: e.target.value }))}
-                className="flex-1 max-w-md px-2.5 py-1 border-b border-slate-300 bg-slate-50/70 focus:bg-blue-50/50 focus:border-gov-blue focus:outline-none text-slate-900 font-medium"
-              />
-            </div>
-
-            <div className="flex justify-end">
-              <div className="w-72 text-center space-y-1">
-                <input
-                  type="text"
-                  value={doc.signatoryName}
-                  onChange={(e) => onChangeDoc((p) => ({ ...p, signatoryName: e.target.value }))}
-                  className="w-full text-center font-black text-xs text-slate-900 border-b border-slate-400 py-1 bg-slate-50/60 focus:bg-blue-50/40 focus:outline-none"
-                />
-                <input
-                  type="text"
-                  value={doc.signatoryTitle}
-                  onChange={(e) => onChangeDoc((p) => ({ ...p, signatoryTitle: e.target.value }))}
-                  className="w-full text-center text-[11px] font-semibold text-slate-700 py-0.5 bg-slate-50/60 focus:bg-blue-50/40 focus:outline-none"
-                />
-              </div>
-            </div>
-          </div>
-
-          {/* Section B: Editable & Drag-and-Drop Photo Documentation */}
-          <div className="space-y-3">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <div>
-                <h4 className="text-sm font-black text-slate-900">
-                  B. Photo Documentation ({selectedEntries.length} Photo{selectedEntries.length === 1 ? "" : "s"})
-                </h4>
-                <p className="text-[11px] text-slate-500">
-                  Drag cards to rearrange photo order, edit any caption directly, or switch between 1-Col / 2-Col / 3-Col
-                  layout above.
-                </p>
-              </div>
-
-              <div className="flex flex-wrap items-center gap-1.5">
-                <button
-                  type="button"
-                  onClick={onSortSlotsAuto}
-                  disabled={selectedEntries.length < 2}
-                  className="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 disabled:opacity-40 text-slate-800 border border-slate-300 text-[11px] font-bold transition cursor-pointer"
-                >
-                  Auto-Sort (Day → Before/During/After)
-                </button>
-                <button
-                  type="button"
-                  onClick={onGoToPhotoPicker}
-                  className="px-2.5 py-1 rounded-lg bg-gov-blue hover:bg-gov-dark text-white text-[11px] font-bold flex items-center gap-1 transition cursor-pointer"
-                >
-                  <Plus className="w-3.5 h-3.5" />
-                  <span>Add / Pick More Photos</span>
-                </button>
-              </div>
-            </div>
-
-            {selectedEntries.length === 0 ? (
-              <div className="p-8 border-2 border-dashed border-slate-300 rounded-xl text-center space-y-2 bg-slate-50">
-                <ImageIcon className="w-8 h-8 mx-auto text-slate-300" />
-                <p className="text-xs font-bold text-slate-700">
-                  No photos selected yet for Barangay {activeBarangay}.
-                </p>
-                <button
-                  type="button"
-                  onClick={onGoToPhotoPicker}
-                  className="px-3.5 py-1.5 rounded-lg bg-gov-blue text-white text-xs font-bold cursor-pointer"
-                >
-                  Go to Step 1 to Pick Photos
-                </button>
-              </div>
-            ) : (
-              <div className={`grid ${previewGridCols} gap-4`}>
-                {selectedEntries.map((slot, idx) => {
-                  const photo = photoMap.get(slot.photoId);
-                  if (!photo) return null;
-                  const defaultCaption = buildDefaultSlotCaption(slot, photo, workDayDates, includeGeotagInCaption);
-                  const captionValue = slot.customCaption !== undefined ? slot.customCaption : defaultCaption;
-                  const isBeingDragged = dragIndex === idx;
-                  const isDropTarget = dragOverIndex === idx && dragIndex !== null && dragIndex !== idx;
-
-                  return (
-                    <div
-                      key={`${slot.photoId}-${idx}`}
-                      draggable
-                      onDragStart={() => setDragIndex(idx)}
-                      onDragOver={(e) => {
-                        e.preventDefault();
-                        if (dragOverIndex !== idx) setDragOverIndex(idx);
-                      }}
-                      onDrop={(e) => {
-                        e.preventDefault();
-                        if (dragIndex !== null && dragIndex !== idx) {
-                          onReorderSlots(dragIndex, idx);
-                        }
-                        setDragIndex(null);
-                        setDragOverIndex(null);
-                      }}
-                      onDragEnd={() => {
-                        setDragIndex(null);
-                        setDragOverIndex(null);
-                      }}
-                      className={`rounded-xl border-2 bg-white overflow-hidden flex flex-col transition ${
-                        isDropTarget
-                          ? "border-emerald-500 ring-2 ring-emerald-400/40 scale-[1.01]"
-                          : isBeingDragged
-                            ? "opacity-50 border-gov-blue"
-                            : "border-slate-300 hover:border-gov-blue/60"
-                      }`}
-                    >
-                      {/* Drag Header & Arrange Controls */}
-                      <div className="px-2.5 py-1.5 bg-slate-100 border-b border-slate-200 flex items-center justify-between gap-1.5 cursor-grab active:cursor-grabbing">
-                        <div className="flex items-center gap-1.5 min-w-0">
-                          <GripVertical className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                          <span className="text-[10px] font-mono font-black text-slate-700">
-                            Photo #{idx + 1}
-                          </span>
-                          <select
-                            value={slot.targetDayNumber}
-                            onChange={(e) =>
-                              onUpdateSlot(slot.photoId, { targetDayNumber: Number(e.target.value) })
-                            }
-                            className="px-1.5 py-0.5 text-[10px] font-bold rounded border border-slate-300 bg-white text-slate-800"
-                          >
-                            {Array.from({ length: requiredWorkDays || 10 }, (_, i) => i + 1).map((d) => (
-                              <option key={d} value={d}>
-                                Day {d}
-                              </option>
-                            ))}
-                          </select>
-                          <select
-                            value={slot.stage}
-                            onChange={(e) =>
-                              onUpdateSlot(slot.photoId, { stage: e.target.value as PhotoStage })
-                            }
-                            className="px-1.5 py-0.5 text-[10px] font-bold rounded border border-slate-300 bg-white text-slate-800"
-                          >
-                            <option value="BEFORE">BEFORE</option>
-                            <option value="DURING">DURING</option>
-                            <option value="AFTER">AFTER</option>
-                          </select>
-                        </div>
-
-                        <div className="flex items-center gap-1 shrink-0">
-                          <button
-                            type="button"
-                            disabled={idx === 0}
-                            onClick={() => onReorderSlots(idx, idx - 1)}
-                            className="p-1 rounded bg-white hover:bg-slate-200 disabled:opacity-30 border border-slate-200 text-slate-600 cursor-pointer"
-                            title="Move earlier"
-                          >
-                            <ArrowLeft className="w-3 h-3" />
-                          </button>
-                          <button
-                            type="button"
-                            disabled={idx === selectedEntries.length - 1}
-                            onClick={() => onReorderSlots(idx, idx + 1)}
-                            className="p-1 rounded bg-white hover:bg-slate-200 disabled:opacity-30 border border-slate-200 text-slate-600 cursor-pointer"
-                            title="Move later"
-                          >
-                            <ArrowRight className="w-3 h-3" />
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => onEditPhotoPermanent(slot.photoId)}
-                            className="p-1 rounded bg-white hover:bg-gov-blue hover:text-white border border-slate-200 text-slate-700 cursor-pointer"
-                            title="Edit photo geotagging & status permanently in DB"
-                          >
-                            <Edit3 className="w-3 h-3" />
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => onRemoveSlot(slot.photoId)}
-                            className="p-1 rounded bg-white hover:bg-rose-600 hover:text-white border border-rose-200 text-rose-600 cursor-pointer"
-                            title="Remove photo from Excel sheet"
-                          >
-                            <Trash2 className="w-3 h-3" />
-                          </button>
-                        </div>
-                      </div>
-
-                      {/* Editable Excel Caption Above Image */}
-                      <div className="p-2 border-b border-slate-200 bg-amber-50/30 space-y-1">
-                        <div className="flex items-center justify-between">
-                          <span className="text-[10px] font-extrabold uppercase text-slate-500">
-                            Excel Photo Caption:
-                          </span>
-                          {slot.customCaption !== undefined && (
-                            <button
-                              type="button"
-                              onClick={() => onUpdateSlot(slot.photoId, { customCaption: undefined })}
-                              className="text-[10px] font-bold text-gov-blue hover:underline cursor-pointer"
-                            >
-                              Reset Auto-Caption
-                            </button>
-                          )}
-                        </div>
-                        <textarea
-                          rows={2}
-                          value={captionValue}
-                          onChange={(e) => onUpdateSlot(slot.photoId, { customCaption: e.target.value })}
-                          className="w-full text-[11px] leading-snug text-slate-800 bg-white border border-slate-300 rounded-md px-2 py-1 focus:outline-none focus:border-gov-blue resize-y"
-                        />
-                      </div>
-
-                      {/* Image Box Preview */}
-                      <div
-                        className={`relative ${previewImgHeightClass} bg-slate-950 flex items-center justify-center p-1.5 group cursor-pointer`}
-                        onClick={() => onZoomPhoto(slot.photoId)}
-                      >
-                        <img
-                          src={photo.imageUrl}
-                          alt={captionValue}
-                          className="max-w-full max-h-full object-contain"
-                        />
-                        <span className="absolute bottom-2 right-2 px-2 py-0.5 rounded bg-black/70 text-white text-[10px] font-bold opacity-0 group-hover:opacity-100 transition flex items-center gap-1">
-                          <Eye className="w-3 h-3" />
-                          <span>Zoom</span>
-                        </span>
-                      </div>
+                        );
+                      })}
                     </div>
-                  );
-                })}
+
+                    {/* Rows 7 & 9: Exact 2-Row x 3-Column Photo Grid (6 Slots = A7, C7, E7, A9, C9, E9) */}
+                    {[0, 1].map((rowSlotIdx) => {
+                      const excelRowNumber = rowSlotIdx === 0 ? topRowNum : bottomRowNum;
+                      return (
+                        <div key={rowSlotIdx} className="grid grid-cols-3 gap-3 pt-1">
+                          {stageCols.map(({ stage, colLetter, badgeClass }) => {
+                            const slot = page.grid[stage][rowSlotIdx];
+                            const photo = slot ? photoMap.get(slot.photoId) : undefined;
+                            const cellAddr = `${colLetter}${excelRowNumber}`;
+                            const dropKey = `${page.dayNumber}-${page.pageNumberInDay}-${stage}-${rowSlotIdx}`;
+                            const isHover = dropHoverKey === dropKey;
+
+                            return (
+                              <div
+                                key={cellAddr}
+                                draggable={Boolean(slot)}
+                                onDragStart={() => slot && setDraggingPhotoId(slot.photoId)}
+                                onDragOver={(e) => {
+                                  e.preventDefault();
+                                  if (dropHoverKey !== dropKey) setDropHoverKey(dropKey);
+                                }}
+                                onDragLeave={() => {
+                                  if (dropHoverKey === dropKey) setDropHoverKey(null);
+                                }}
+                                onDrop={(e) => {
+                                  e.preventDefault();
+                                  handleDropOnSlot(page.dayNumber, stage, slot);
+                                }}
+                                onDragEnd={() => {
+                                  setDraggingPhotoId(null);
+                                  setDropHoverKey(null);
+                                }}
+                                className={`relative aspect-[3543/2686] rounded-md overflow-hidden border-2 transition ${
+                                  isHover
+                                    ? "border-emerald-500 ring-2 ring-emerald-400/50 scale-[1.01] bg-emerald-50/70"
+                                    : slot
+                                      ? "border-slate-700/80 bg-slate-950 shadow-md group cursor-grab active:cursor-grabbing"
+                                      : "border-dashed border-slate-400/80 bg-white/55 hover:border-gov-blue hover:bg-blue-50/60"
+                                }`}
+                              >
+                                {slot && photo ? (
+                                  <>
+                                    <img
+                                      src={photo.imageUrl}
+                                      alt={`${stage} ${cellAddr}`}
+                                      className={`w-full h-full ${
+                                        layout.photoFitMode === "fill" ? "object-fill" : "object-contain"
+                                      }`}
+                                    />
+
+                                    {/* Floating Top Bar Controls */}
+                                    <div className="absolute top-1.5 left-1.5 right-1.5 flex items-center justify-between gap-1 opacity-95 group-hover:opacity-100">
+                                      <span
+                                        className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-mono font-black shadow ${badgeClass}`}
+                                      >
+                                        <GripVertical className="w-3 h-3" />
+                                        <span>{cellAddr}</span>
+                                      </span>
+
+                                      <div className="flex items-center gap-1">
+                                        <button
+                                          type="button"
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            onZoomPhoto(slot.photoId);
+                                          }}
+                                          className="p-1 rounded bg-slate-950/80 hover:bg-slate-900 text-white border border-white/20 cursor-pointer"
+                                          title="Zoom photo"
+                                        >
+                                          <Eye className="w-3 h-3" />
+                                        </button>
+                                        <button
+                                          type="button"
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            onEditPhotoPermanent(slot.photoId);
+                                          }}
+                                          className="p-1 rounded bg-slate-950/80 hover:bg-gov-blue text-white border border-white/20 cursor-pointer"
+                                          title="Edit photo geotagging & status permanently in DB"
+                                        >
+                                          <Edit3 className="w-3 h-3" />
+                                        </button>
+                                        <button
+                                          type="button"
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            onRemoveSlot(slot.photoId);
+                                          }}
+                                          className="p-1 rounded bg-slate-950/80 hover:bg-rose-600 text-white border border-white/20 cursor-pointer"
+                                          title="Remove photo from this slot"
+                                        >
+                                          <Trash2 className="w-3 h-3" />
+                                        </button>
+                                      </div>
+                                    </div>
+                                  </>
+                                ) : (
+                                  <button
+                                    type="button"
+                                    onClick={onGoToPhotoPicker}
+                                    className="w-full h-full flex flex-col items-center justify-center text-slate-500 hover:text-gov-blue p-3 text-center gap-1 cursor-pointer"
+                                  >
+                                    <span className="text-[10px] font-mono font-black px-2 py-0.5 rounded bg-slate-200/90 text-slate-700">
+                                      Slot {cellAddr} · {stage} #{rowSlotIdx + 1}
+                                    </span>
+                                    <span className="text-[11px] font-semibold">
+                                      Drop photo here or click to pick
+                                    </span>
+                                  </button>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
               </div>
-            )}
-          </div>
-        </div>
+            );
+          })
+        )}
       </div>
     </div>
   );

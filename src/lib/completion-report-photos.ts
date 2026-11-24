@@ -59,7 +59,7 @@ export function barangayDocumentationPhotos(program: Omit<CompletionProgram, "ac
 }
 
 /** Only trusted storage origins, no arbitrary server-side URLs, redirects, or credentials. */
-async function imageBytes(key: string): Promise<Buffer> {
+export async function imageBytes(key: string): Promise<Buffer> {
   if (key.startsWith("data:")) {
     const match = key.match(/^data:image\/(?:png|jpe?g|gif);base64,([A-Za-z0-9+/=\s]+)$/i);
     if (!match) throw new Error("Unsupported or invalid image. Re-upload as JPG or PNG in Photos.");
@@ -91,7 +91,7 @@ async function imageBytes(key: string): Promise<Buffer> {
   return Buffer.concat(chunks);
 }
 
-function dimensions(data: Buffer): { width: number; height: number; extension: "png" | "jpeg" | "gif" } {
+export function dimensions(data: Buffer): { width: number; height: number; extension: "png" | "jpeg" | "gif" } {
   if (data.length >= 24 && data.subarray(0, 8).equals(Buffer.from([137,80,78,71,13,10,26,10])) && data.toString("ascii", 12, 16) === "IHDR") {
     return { width: data.readUInt32BE(16), height: data.readUInt32BE(20), extension: "png" };
   }

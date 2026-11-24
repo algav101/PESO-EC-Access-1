@@ -146,8 +146,8 @@ export default function ReportCenterPage() {
     {
       id: "ACCOMPLISHMENT",
       title: "Multi-Barangay Accomplishment Report (.XLSX)",
-      refNote: "Original TUPAD Completion Report Layout",
-      description: "Choose target work program, select specific barangays, pick photos across all uploaded programs, and permanently edit photo geotagging & approval status before exporting to Excel.",
+      refNote: "Landscape Folio · 6 Photos/Page",
+      description: "Official DOLE Aurora Field Office Landscape Accomplishment Photo Report (6 BEFORE/DURING/AFTER photos per page with BG TUPAD watermark). Select target work program, barangays, cross-program photos, and edit geotagging/texts before downloading.",
       icon: Building,
       color: "text-blue-700 bg-blue-50",
       action: "Choose Photos & Configure Export",

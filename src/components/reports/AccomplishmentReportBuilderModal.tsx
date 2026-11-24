@@ -154,8 +154,10 @@ export function AccomplishmentReportBuilderModal({
   const [layoutConfig, setLayoutConfig] = useState<PreviewLayoutConfig>({
     colCWidth: 68,
     textAlign: "left",
-    photoLayout: "1-col",
+    photoLayout: "3-col",
     photoSize: "medium",
+    photoFitMode: "fill",
+    includeEmptyDays: true,
   });
 
   // 2. Loaded Data
@@ -741,6 +743,7 @@ export function AccomplishmentReportBuilderModal({
         const doc = previewDocs[brgy];
         if (doc) {
           barangayEditsPayload[brgy] = {
+            barangayHeader: doc.barangayHeader,
             doleOffice: doc.doleOffice,
             projectLocation: doc.projectLocation,
             beneficiaryCount: doc.beneficiaryCount,
@@ -748,7 +751,7 @@ export function AccomplishmentReportBuilderModal({
             issuedLine: doc.issuedLine,
             signatoryName: doc.signatoryName,
             signatoryTitle: doc.signatoryTitle,
-            days: doc.days.map((d) => ({ label: d.label, text: d.text })),
+            days: doc.days.map((d) => ({ dayNumber: d.dayNumber, label: d.label, text: d.text })),
           };
         }
       }
