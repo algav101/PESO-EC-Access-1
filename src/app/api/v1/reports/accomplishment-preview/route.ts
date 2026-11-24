@@ -43,7 +43,7 @@ export async function GET(request: Request) {
         },
         workDays: { orderBy: { dayNumber: "asc" } },
         accomplishmentPhotos: {
-          where: { status: user.role === "DOLE_COORDINATOR" ? "APPROVED" : { not: "REJECTED" } },
+          where: { status: { not: "REJECTED" } },
           select: {
             workDayId: true,
             workProgramItemId: true,

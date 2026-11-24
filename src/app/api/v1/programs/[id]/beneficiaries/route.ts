@@ -28,10 +28,11 @@ export async function GET(request: Request, { params }: { params: { id: string }
     }
 
     // Strict Barangay-level isolation:
-    // Any user with an assigned barangay (who is not Domain Master / PESO Admin) is strictly restricted to their barangay.
+    // Any user with an assigned barangay (who is not Domain Master / PESO Admin / DOLE Coordinator) is strictly restricted to their barangay.
+    const hasMunicipalScope = isAdminUser(user) || user.role === "DOLE_COORDINATOR";
     const userBrgy = user.assignedBarangay ? normalizeBarangayName(user.assignedBarangay) : null;
     const queryBrgy = barangay && barangay !== "ALL" ? normalizeBarangayName(barangay) : null;
-    const effectiveBrgy = (!isAdminUser(user) && userBrgy) ? userBrgy : queryBrgy;
+    const effectiveBrgy = (!hasMunicipalScope && userBrgy) ? userBrgy : queryBrgy;
 
     if (effectiveBrgy) {
       whereClause.beneficiary = {

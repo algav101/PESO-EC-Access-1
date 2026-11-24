@@ -19,10 +19,11 @@ export async function GET(request: Request, { params }: { params: { id: string }
     const dayNumber = searchParams.get("dayNumber");
 
     const whereClause: any = { programId: params.id };
-    // Strict Barangay-level isolation:
+    // Strict Barangay-level isolation (PESO Admin & DOLE Coordinator have full 11-barangay report scope):
+    const hasMunicipalScope = isAdminUser(user) || user.role === "DOLE_COORDINATOR";
     const userBrgy = user.assignedBarangay ? normalizeBarangayName(user.assignedBarangay) : null;
     const queryBrgy = barangay && barangay !== "ALL" ? normalizeBarangayName(barangay) : null;
-    const effectiveBrgy = (!isAdminUser(user) && userBrgy) ? userBrgy : queryBrgy;
+    const effectiveBrgy = (!hasMunicipalScope && userBrgy) ? userBrgy : queryBrgy;
 
     if (effectiveBrgy) {
       whereClause.barangay = { contains: effectiveBrgy, mode: "insensitive" };

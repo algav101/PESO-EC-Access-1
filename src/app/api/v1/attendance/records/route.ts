@@ -26,9 +26,10 @@ export async function GET(request: Request) {
     if (programBeneficiaryId) whereClause.programBeneficiaryId = programBeneficiaryId;
 
     // Strict Barangay-level isolation:
+    const hasMunicipalScope = isAdminUser(user) || user.role === "DOLE_COORDINATOR";
     const userBrgy = user.assignedBarangay ? normalizeBarangayName(user.assignedBarangay) : null;
     const queryBrgy = barangay && barangay !== "ALL" ? normalizeBarangayName(barangay) : null;
-    const effectiveBrgy = (!isAdminUser(user) && userBrgy) ? userBrgy : queryBrgy;
+    const effectiveBrgy = (!hasMunicipalScope && userBrgy) ? userBrgy : queryBrgy;
 
     if (effectiveBrgy) {
       whereClause.programBeneficiary = {

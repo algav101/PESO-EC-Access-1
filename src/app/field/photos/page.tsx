@@ -1801,8 +1801,8 @@ export default function PhotosPage() {
                         <span>Download</span>
                       </button>
 
-                      {/* Approval Buttons for PESO ADMIN */}
-                      {!isDole && can("photo.approve") && photo.status === "FOR_REVIEW" && (
+                      {/* Approval Buttons for PESO ADMIN & DOLE COORDINATOR */}
+                      {can("photo.approve") && photo.status === "FOR_REVIEW" && (
                         <div className="flex space-x-1.5 flex-1 justify-end">
                           <button
                             onClick={() => handleStatusChange(photo.id, "APPROVED")}

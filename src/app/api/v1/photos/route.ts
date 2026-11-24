@@ -20,19 +20,17 @@ export async function GET(request: Request) {
     const whereClause: any = { isPurged: false };
     if (programId && programId !== "ALL") whereClause.programId = programId;
 
-    // Strict Barangay-level isolation:
+    // Strict Barangay-level isolation (PESO Admin & DOLE Coordinator have full 11-barangay report scope):
+    const hasMunicipalScope = isAdminUser(user) || user.role === "DOLE_COORDINATOR";
     const userBrgy = user.assignedBarangay ? normalizeBarangayName(user.assignedBarangay) : null;
     const queryBrgy = barangay && barangay !== "ALL" ? normalizeBarangayName(barangay) : null;
-    const effectiveBrgy = (!isAdminUser(user) && userBrgy) ? userBrgy : queryBrgy;
+    const effectiveBrgy = (!hasMunicipalScope && userBrgy) ? userBrgy : queryBrgy;
 
     if (effectiveBrgy) {
       whereClause.barangay = { contains: effectiveBrgy, mode: "insensitive" };
     }
 
-    // DOLE coordinator sees only approved photos
-    if (user.role === "DOLE_COORDINATOR") {
-      whereClause.status = "APPROVED";
-    } else if (statusParam && statusParam !== "ALL" && ["APPROVED", "FOR_REVIEW", "REJECTED"].includes(statusParam)) {
+    if (statusParam && statusParam !== "ALL" && ["APPROVED", "FOR_REVIEW", "REJECTED"].includes(statusParam)) {
       whereClause.status = statusParam;
     }
 
@@ -407,9 +405,10 @@ export async function PATCH(request: Request) {
     }
 
     if (barangay !== undefined && String(barangay).trim()) {
+      const hasMunicipalScope = isAdminUser(user) || user.role === "DOLE_COORDINATOR";
       const userBrgy = user.assignedBarangay ? normalizeBarangayName(user.assignedBarangay) : null;
       const targetBrgy = normalizeBarangayName(String(barangay));
-      if (!isAdminUser(user) && userBrgy && targetBrgy !== userBrgy) {
+      if (!hasMunicipalScope && userBrgy && targetBrgy !== userBrgy) {
         return NextResponse.json({ error: "Forbidden: cannot reassign photo to another barangay." }, { status: 403 });
       }
       updateData.barangay = targetBrgy;

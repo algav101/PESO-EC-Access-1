@@ -40,7 +40,7 @@ export async function GET(request: Request) {
       if (!hasPermission(user.role, "report.export")) {
         return NextResponse.json({ error: "Your role is not allowed to export this report." }, { status: 403 });
       }
-      const buffer = await generateAccomplishmentExcel(programId, { approvedPhotosOnly: user.role === "DOLE_COORDINATOR" });
+      const buffer = await generateAccomplishmentExcel(programId, { approvedPhotosOnly: false });
       // A streamed response avoids the hosting limit on buffered photo-heavy downloads.
       let offset = 0;
       const stream = new ReadableStream<Uint8Array>({
@@ -140,7 +140,7 @@ export async function POST(request: Request) {
     }
 
     const buffer = await generateAccomplishmentExcel(programId, {
-      approvedPhotosOnly: user.role === "DOLE_COORDINATOR",
+      approvedPhotosOnly: false,
       selectedBarangays,
       selectedPhotos,
       barangayEdits,

@@ -136,7 +136,6 @@ export function AccomplishmentReportBuilderModal({
   initialProgramId,
 }: Props) {
   const { user, can } = useAuth();
-  const isDoleRole = user?.role === "DOLE_COORDINATOR";
   const canEditStatus = isAdminUser(user) || can("photo.approve");
 
   // 1. Target TUPAD Work Program, Step Switcher & Barangay Scope State
@@ -174,7 +173,7 @@ export function AccomplishmentReportBuilderModal({
   const [sourceBarangayFilter, setSourceBarangayFilter] = useState<string>("ACTIVE"); // "ACTIVE" | "ALL" | barangay name
   const [dayFilter, setDayFilter] = useState<string>("ALL");
   const [stageFilter, setStageFilter] = useState<string>("ALL");
-  const [statusFilter, setStatusFilter] = useState<string>(isDoleRole ? "APPROVED" : "ALL");
+  const [statusFilter, setStatusFilter] = useState<string>("ALL");
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [visibleLimit, setVisibleLimit] = useState<number>(36);
 
@@ -238,7 +237,6 @@ export function AccomplishmentReportBuilderModal({
       const matching = photos
         .filter((p) => {
           if (p.programId !== progId) return false;
-          if (isDoleRole) return p.status === "APPROVED";
           return p.status !== "REJECTED";
         })
         .sort((a, b) => {
@@ -263,7 +261,7 @@ export function AccomplishmentReportBuilderModal({
       }
       return byBrgy;
     },
-    [isDoleRole]
+    []
   );
 
   // Fetch ALL cross-program photos when modal opens
@@ -449,11 +447,6 @@ export function AccomplishmentReportBuilderModal({
 
   // Toggle photo inclusion in active barangay's Excel sheet
   const togglePhotoForActiveBarangay = (photo: PhotoRecord) => {
-    if (isDoleRole && photo.status !== "APPROVED") {
-      showFeedback("error", "DOLE Coordinator exports may only include APPROVED photos.");
-      return;
-    }
-
     setSelectedByBarangay((prev) => {
       const current = prev[activeBarangay] || [];
       const exists = current.some((e) => e.photoId === photo.id);
@@ -1253,8 +1246,7 @@ export function AccomplishmentReportBuilderModal({
                 <select
                   value={statusFilter}
                   onChange={(e) => setStatusFilter(e.target.value)}
-                  disabled={isDoleRole}
-                  className="px-2.5 py-1.5 text-xs font-bold border border-slate-300 rounded-lg bg-slate-50 text-slate-800 focus:outline-none focus:border-gov-blue disabled:opacity-60"
+                  className="px-2.5 py-1.5 text-xs font-bold border border-slate-300 rounded-lg bg-slate-50 text-slate-800 focus:outline-none focus:border-gov-blue"
                 >
                   <option value="ALL">All Statuses</option>
                   <option value="APPROVED">APPROVED</option>
@@ -1293,9 +1285,7 @@ export function AccomplishmentReportBuilderModal({
                   <button
                     type="button"
                     onClick={() => {
-                      const eligible = filteredPhotos.filter((p) =>
-                        isDoleRole ? p.status === "APPROVED" : p.status !== "REJECTED"
-                      );
+                      const eligible = filteredPhotos.filter((p) => p.status !== "REJECTED");
                       setSelectedByBarangay((prev) => {
                         const existing = prev[activeBarangay] || [];
                         const existingIds = new Set(existing.map((e) => e.photoId));

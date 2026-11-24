@@ -117,17 +117,18 @@ export const PERMISSIONS = {
     "dashboard.view",
     "field.scan",
     "program.read",
+    "work_program.read",
     "beneficiary.read_limited",
     "stub.distribution.read",
     "orientation.read",
     "replacement.read",
-    "attendance.read",
-    "photo.read_final",
+    "attendance.read", "attendance.export",
+    "photo.read", "photo.read_final", "photo.update", "photo.approve", "photo.reject", "photo.configure",
     "payout.read",
-    "restriction.read_limited",
+    "restriction.read", "restriction.read_limited",
     "eligibility.check",
     "migrants.read",
-    "report.generate", "report.export",
+    "report.generate", "report.template.create", "report.template.update", "report.export", "report.read",
     "sync.read"
   ]
 };
