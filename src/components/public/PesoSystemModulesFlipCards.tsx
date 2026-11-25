@@ -47,6 +47,7 @@ interface PesoModuleCardData {
   frontBorderHover: string;
   backBgGradient: string;
   customGraphic?: string;
+  customGraphicLayout?: "poster" | "banner";
   description: string;
   highlights: string[];
   subFeatures: {
@@ -70,6 +71,7 @@ const PESO_MODULES: PesoModuleCardData[] = [
     frontBorderHover: "hover:border-emerald-400/70",
     backBgGradient: "from-slate-950 via-emerald-950/95 to-slate-900",
     customGraphic: "/images/modules/tupad/module-01-tupad-ec-management-poster.jpg",
+    customGraphicLayout: "poster",
     description:
       "End-to-end digital management ng DOLE TUPAD program mula online application, 365-day eligibility check, laminated QR ID stub distribution, orientation, daily attendance, hanggang payout verification.",
     highlights: [
@@ -111,6 +113,7 @@ const PESO_MODULES: PesoModuleCardData[] = [
     frontBorderHover: "hover:border-blue-400/70",
     backBgGradient: "from-slate-950 via-blue-950/95 to-slate-900",
     customGraphic: "/images/modules/dama-etrabaho/module-02-dama-etrabaho-poster.jpg",
+    customGraphicLayout: "poster",
     description:
       "Automated LGU job matching platform na nag-uugnay sa mga jobseekers ng Dingalan sa mga lokal, rehiyonal, at overseas employers katuwang ang DOLE NSRP.",
     highlights: [
@@ -187,6 +190,8 @@ const PESO_MODULES: PesoModuleCardData[] = [
     badgeClasses: "bg-purple-500/15 text-purple-300 border-purple-400/40",
     frontBorderHover: "hover:border-purple-400/70",
     backBgGradient: "from-slate-950 via-purple-950/90 to-slate-900",
+    customGraphic: "/images/modules/spes-gip-dileep/module-04-spes-gip-dileep-graphic.jpg",
+    customGraphicLayout: "banner",
     description:
       "Pinagsama-samang programa para sa kabataan, estudyante, fresh graduates, at livelihood beneficiaries sa ilalim ng SPES, GIP, DILEEP, at Career Guidance.",
     highlights: [
@@ -416,7 +421,7 @@ export function PesoSystemModulesFlipCards() {
                     {/* Content Section */}
                     <div
                       className={`relative z-10 ${
-                        mod.customGraphic
+                        mod.customGraphic && mod.customGraphicLayout === "poster"
                           ? "flex-1 min-h-0 flex flex-col gap-2.5"
                           : "space-y-3"
                       }`}
@@ -439,7 +444,7 @@ export function PesoSystemModulesFlipCards() {
                       </div>
 
                       {/* Custom Module Poster Display (Full Uncropped Portrait Showcase) */}
-                      {mod.customGraphic ? (
+                      {mod.customGraphic && mod.customGraphicLayout === "poster" ? (
                         <>
                           <h3 className="sr-only">{mod.title}</h3>
                           <div className="relative w-full flex-1 min-h-0 rounded-2xl overflow-hidden border-2 border-white/15 shadow-xl bg-slate-950 flex items-center justify-center group/img">
@@ -470,32 +475,61 @@ export function PesoSystemModulesFlipCards() {
                         </>
                       ) : (
                         <>
-                          {/* Visual Banner Placeholder while awaiting custom graphic */}
-                          <div className="relative w-full aspect-video rounded-2xl overflow-hidden border border-slate-800 bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 p-4 flex flex-col justify-between shadow-inner group-hover:border-slate-700 transition">
-                            <div className="flex items-center justify-between">
-                              <div
-                                className={`w-11 h-11 rounded-xl bg-gradient-to-br ${mod.accentGradient} p-0.5 shadow-lg`}
+                          {/* Landscape Custom Graphic Banner OR Placeholder */}
+                          {mod.customGraphic ? (
+                            <div className="relative w-full aspect-[4/3] max-h-[255px] rounded-2xl overflow-hidden border-2 border-white/15 shadow-xl bg-slate-950 flex items-center justify-center group/img">
+                              <img
+                                src={mod.customGraphic}
+                                alt={`${mod.number}: ${mod.title}`}
+                                className="w-full h-full object-contain transition-transform duration-500 group-hover:scale-[1.02]"
+                              />
+
+                              {/* Quick Enlarge / Maximize Button */}
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setEnlargedGraphic({
+                                    url: mod.customGraphic!,
+                                    title: mod.title,
+                                    number: mod.number,
+                                  });
+                                }}
+                                className="absolute bottom-2 right-2 px-2.5 py-1 rounded-lg bg-slate-950/85 hover:bg-emerald-600 text-[10px] font-bold text-white border border-emerald-400/40 flex items-center gap-1.5 transition-all shadow-md backdrop-blur-xs cursor-pointer z-20 hover:scale-105"
+                                title="Palakihin / View Full Screen"
                               >
-                                <div className="w-full h-full bg-slate-950/90 rounded-[10px] flex items-center justify-center">
-                                  <IconComponent className="w-5 h-5 text-white" />
+                                <Maximize2 className="w-3 h-3 text-emerald-300" />
+                                <span>Palakihin</span>
+                              </button>
+                            </div>
+                          ) : (
+                            /* Visual Banner Placeholder while awaiting custom graphic */
+                            <div className="relative w-full aspect-video rounded-2xl overflow-hidden border border-slate-800 bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 p-4 flex flex-col justify-between shadow-inner group-hover:border-slate-700 transition">
+                              <div className="flex items-center justify-between">
+                                <div
+                                  className={`w-11 h-11 rounded-xl bg-gradient-to-br ${mod.accentGradient} p-0.5 shadow-lg`}
+                                >
+                                  <div className="w-full h-full bg-slate-950/90 rounded-[10px] flex items-center justify-center">
+                                    <IconComponent className="w-5 h-5 text-white" />
+                                  </div>
                                 </div>
+                                <span className="text-[10px] font-mono font-bold text-slate-400 uppercase tracking-wider px-2 py-0.5 rounded-md bg-slate-800/80 border border-slate-700/60">
+                                  Ready for Custom Graphic
+                                </span>
                               </div>
-                              <span className="text-[10px] font-mono font-bold text-slate-400 uppercase tracking-wider px-2 py-0.5 rounded-md bg-slate-800/80 border border-slate-700/60">
-                                Ready for Custom Graphic
-                              </span>
+                              <div className="relative z-10">
+                                <p className="text-xs font-bold text-slate-200 truncate">
+                                  PESO Dingalan Module Showcase
+                                </p>
+                                <p className="text-[10px] text-slate-400 mt-0.5">
+                                  Mag-upload ng natatanging 3D graphic para sa modyul na ito
+                                </p>
+                              </div>
+                              <div
+                                className={`pointer-events-none absolute top-0 right-0 w-32 h-32 rounded-full bg-gradient-to-br ${mod.accentGradient} opacity-15 blur-xl`}
+                              />
                             </div>
-                            <div className="relative z-10">
-                              <p className="text-xs font-bold text-slate-200 truncate">
-                                PESO Dingalan Module Showcase
-                              </p>
-                              <p className="text-[10px] text-slate-400 mt-0.5">
-                                Mag-upload ng natatanging 3D graphic para sa modyul na ito
-                              </p>
-                            </div>
-                            <div
-                              className={`pointer-events-none absolute top-0 right-0 w-32 h-32 rounded-full bg-gradient-to-br ${mod.accentGradient} opacity-15 blur-xl`}
-                            />
-                          </div>
+                          )}
 
                           {/* Title & Subtitle */}
                           <div>
