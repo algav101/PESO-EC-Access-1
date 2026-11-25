@@ -112,6 +112,9 @@ export async function generateAttendanceExcel(programId: string): Promise<Buffer
   let rowIdx = 8;
   for (const pb of program.programBeneficiaries) {
     const row = worksheet.getRow(rowIdx);
+    row.alignment = { vertical: "middle" };
+    row.font = { name: "Arial", size: 9 };
+
     row.getCell(1).value = pb.designatedNumber;
     row.getCell(2).value = pb.beneficiary.fullName;
     row.getCell(3).value = pb.beneficiary.barangay || "";
@@ -124,16 +127,26 @@ export async function generateAttendanceExcel(programId: string): Promise<Buffer
         ? pb.attendanceRecords.find((a) => a.workDayId === dayObj.id || a.attendanceDate === dayObj.workDate)
         : null;
 
-      row.getCell(dayCol).value = rec?.morningTimeIn ? format(new Date(rec.morningTimeIn), "HH:mm") : "-";
-      row.getCell(dayCol + 1).value = rec?.morningTimeOut ? format(new Date(rec.morningTimeOut), "HH:mm") : "-";
-      row.getCell(dayCol + 2).value = rec?.afternoonTimeIn ? format(new Date(rec.afternoonTimeIn), "HH:mm") : "-";
-      row.getCell(dayCol + 3).value = rec?.afternoonTimeOut ? format(new Date(rec.afternoonTimeOut), "HH:mm") : "-";
+      const slotValues = [
+        rec?.morningTimeIn,
+        rec?.morningTimeOut,
+        rec?.afternoonTimeIn,
+        rec?.afternoonTimeOut,
+      ];
+
+      slotValues.forEach((stamp, offset) => {
+        const cell = row.getCell(dayCol + offset);
+        const isPresent = Boolean(stamp);
+        cell.value = isPresent ? "✓" : "-";
+        cell.alignment = { horizontal: "center", vertical: "middle" };
+        cell.font = isPresent
+          ? { name: "Arial", size: 11, bold: true, color: { argb: "FF047857" } }
+          : { name: "Arial", size: 9, color: { argb: "FF94A3B8" } };
+      });
 
       dayCol += 4;
     }
 
-    row.alignment = { vertical: "middle" };
-    row.font = { size: 9 };
     rowIdx++;
   }
 

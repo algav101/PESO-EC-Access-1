@@ -268,18 +268,33 @@ export default async function BeneficiaryProfilePage({ params }: { params: { id:
                         Day {att.workDay?.dayNumber || 1}
                       </td>
                       <td className="px-3 py-2 font-mono text-slate-600">{att.attendanceDate}</td>
-                      <td className="px-3 py-2 text-center font-mono font-semibold text-slate-800">
-                        {formatTime(att.morningTimeIn)}
-                      </td>
-                      <td className="px-3 py-2 text-center font-mono font-semibold text-slate-800">
-                        {formatTime(att.morningTimeOut)}
-                      </td>
-                      <td className="px-3 py-2 text-center font-mono font-semibold text-slate-800">
-                        {formatTime(att.afternoonTimeIn)}
-                      </td>
-                      <td className="px-3 py-2 text-center font-mono font-semibold text-slate-800">
-                        {formatTime(att.afternoonTimeOut)}
-                      </td>
+                      {[
+                        { label: "AM IN", value: att.morningTimeIn },
+                        { label: "AM OUT", value: att.morningTimeOut },
+                        { label: "PM IN", value: att.afternoonTimeIn },
+                        { label: "PM OUT", value: att.afternoonTimeOut },
+                      ].map((slot) => (
+                        <td
+                          key={slot.label}
+                          className="px-3 py-2 text-center"
+                          title={
+                            slot.value
+                              ? `Present (${slot.label}) — Scanned at ${formatTime(slot.value)}`
+                              : `Not scanned (${slot.label})`
+                          }
+                        >
+                          {slot.value ? (
+                            <span
+                              className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-emerald-100 text-emerald-700 font-black text-xs leading-none"
+                              aria-label={`Present (${slot.label})`}
+                            >
+                              ✓
+                            </span>
+                          ) : (
+                            <span className="text-slate-300 font-mono">-</span>
+                          )}
+                        </td>
+                      ))}
                       <td className="px-3 py-2 text-center">
                         <StatusBadge status={att.status || "PRESENT"} />
                       </td>

@@ -69,7 +69,7 @@ const PESO_MODULES: PesoModuleCardData[] = [
     badgeClasses: "bg-emerald-500/15 text-emerald-300 border-emerald-400/40",
     frontBorderHover: "hover:border-emerald-400/70",
     backBgGradient: "from-slate-950 via-emerald-950/95 to-slate-900",
-    customGraphic: "/images/modules/tupad/module-01-ec-tupad-official-graphic.jpg",
+    customGraphic: "/images/modules/tupad/module-01-tupad-ec-management-poster.jpg",
     description:
       "End-to-end digital management ng DOLE TUPAD program mula online application, 365-day eligibility check, laminated QR ID stub distribution, orientation, daily attendance, hanggang payout verification.",
     highlights: [
@@ -110,6 +110,7 @@ const PESO_MODULES: PesoModuleCardData[] = [
     badgeClasses: "bg-blue-500/15 text-blue-300 border-blue-400/40",
     frontBorderHover: "hover:border-blue-400/70",
     backBgGradient: "from-slate-950 via-blue-950/95 to-slate-900",
+    customGraphic: "/images/modules/dama-etrabaho/module-02-dama-etrabaho-poster.jpg",
     description:
       "Automated LGU job matching platform na nag-uugnay sa mga jobseekers ng Dingalan sa mga lokal, rehiyonal, at overseas employers katuwang ang DOLE NSRP.",
     highlights: [
@@ -413,9 +414,15 @@ export function PesoSystemModulesFlipCards() {
                     />
 
                     {/* Content Section */}
-                    <div className="space-y-3 relative z-10">
+                    <div
+                      className={`relative z-10 ${
+                        mod.customGraphic
+                          ? "flex-1 min-h-0 flex flex-col gap-2.5"
+                          : "space-y-3"
+                      }`}
+                    >
                       {/* Top Row: Module Badge & Status Chip */}
-                      <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center justify-between gap-2 shrink-0">
                         <span className="text-[11px] font-mono font-black tracking-widest uppercase text-slate-400">
                           {mod.number}
                         </span>
@@ -431,99 +438,103 @@ export function PesoSystemModulesFlipCards() {
                         </span>
                       </div>
 
-                      {/* Custom Module Graphic Showcase Banner - Maximized 16:9 Display */}
+                      {/* Custom Module Poster Display (Full Uncropped Portrait Showcase) */}
                       {mod.customGraphic ? (
-                        <div className="relative w-full aspect-video rounded-2xl overflow-hidden border-2 border-emerald-500/40 shadow-xl bg-slate-950 group/img">
-                          <img
-                            src={mod.customGraphic}
-                            alt={mod.title}
-                            className="w-full h-full object-contain sm:object-cover transition-transform duration-500 group-hover:scale-[1.02]"
-                          />
-                          <div className="absolute inset-0 bg-gradient-to-t from-slate-950/35 via-transparent to-transparent pointer-events-none" />
+                        <>
+                          <h3 className="sr-only">{mod.title}</h3>
+                          <div className="relative w-full flex-1 min-h-0 rounded-2xl overflow-hidden border-2 border-white/15 shadow-xl bg-slate-950 flex items-center justify-center group/img">
+                            <img
+                              src={mod.customGraphic}
+                              alt={`${mod.number}: ${mod.title}`}
+                              className="w-full h-full object-contain transition-transform duration-500 group-hover:scale-[1.015]"
+                            />
 
-                          {/* Quick Enlarge / Maximize Button */}
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setEnlargedGraphic({
-                                url: mod.customGraphic!,
-                                title: mod.title,
-                                number: mod.number,
-                              });
-                            }}
-                            className="absolute bottom-2 right-2 px-2.5 py-1 rounded-lg bg-slate-950/85 hover:bg-emerald-600 text-[10px] font-bold text-white border border-emerald-400/40 flex items-center gap-1.5 transition-all shadow-md backdrop-blur-xs cursor-pointer z-20 hover:scale-105"
-                            title="Palakihin / View Full Screen"
-                          >
-                            <Maximize2 className="w-3 h-3 text-emerald-300" />
-                            <span>Palakihin</span>
-                          </button>
-                        </div>
+                            {/* Quick Enlarge / Maximize Button */}
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setEnlargedGraphic({
+                                  url: mod.customGraphic!,
+                                  title: mod.title,
+                                  number: mod.number,
+                                });
+                              }}
+                              className="absolute bottom-2 right-2 px-2.5 py-1 rounded-lg bg-slate-950/85 hover:bg-emerald-600 text-[10px] font-bold text-white border border-emerald-400/40 flex items-center gap-1.5 transition-all shadow-md backdrop-blur-xs cursor-pointer z-20 hover:scale-105"
+                              title="Palakihin / View Full Screen"
+                            >
+                              <Maximize2 className="w-3 h-3 text-emerald-300" />
+                              <span>Palakihin</span>
+                            </button>
+                          </div>
+                        </>
                       ) : (
-                        /* Visual Banner Placeholder while awaiting custom graphic */
-                        <div className="relative w-full aspect-video rounded-2xl overflow-hidden border border-slate-800 bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 p-4 flex flex-col justify-between shadow-inner group-hover:border-slate-700 transition">
-                          <div className="flex items-center justify-between">
-                            <div
-                              className={`w-11 h-11 rounded-xl bg-gradient-to-br ${mod.accentGradient} p-0.5 shadow-lg`}
-                            >
-                              <div className="w-full h-full bg-slate-950/90 rounded-[10px] flex items-center justify-center">
-                                <IconComponent className="w-5 h-5 text-white" />
+                        <>
+                          {/* Visual Banner Placeholder while awaiting custom graphic */}
+                          <div className="relative w-full aspect-video rounded-2xl overflow-hidden border border-slate-800 bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 p-4 flex flex-col justify-between shadow-inner group-hover:border-slate-700 transition">
+                            <div className="flex items-center justify-between">
+                              <div
+                                className={`w-11 h-11 rounded-xl bg-gradient-to-br ${mod.accentGradient} p-0.5 shadow-lg`}
+                              >
+                                <div className="w-full h-full bg-slate-950/90 rounded-[10px] flex items-center justify-center">
+                                  <IconComponent className="w-5 h-5 text-white" />
+                                </div>
                               </div>
+                              <span className="text-[10px] font-mono font-bold text-slate-400 uppercase tracking-wider px-2 py-0.5 rounded-md bg-slate-800/80 border border-slate-700/60">
+                                Ready for Custom Graphic
+                              </span>
                             </div>
-                            <span className="text-[10px] font-mono font-bold text-slate-400 uppercase tracking-wider px-2 py-0.5 rounded-md bg-slate-800/80 border border-slate-700/60">
-                              Ready for Custom Graphic
-                            </span>
+                            <div className="relative z-10">
+                              <p className="text-xs font-bold text-slate-200 truncate">
+                                PESO Dingalan Module Showcase
+                              </p>
+                              <p className="text-[10px] text-slate-400 mt-0.5">
+                                Mag-upload ng natatanging 3D graphic para sa modyul na ito
+                              </p>
+                            </div>
+                            <div
+                              className={`pointer-events-none absolute top-0 right-0 w-32 h-32 rounded-full bg-gradient-to-br ${mod.accentGradient} opacity-15 blur-xl`}
+                            />
                           </div>
-                          <div className="relative z-10">
-                            <p className="text-xs font-bold text-slate-200 truncate">
-                              PESO Dingalan Module Showcase
-                            </p>
-                            <p className="text-[10px] text-slate-400 mt-0.5">
-                              Mag-upload ng natatanging 3D graphic para sa modyul na ito
+
+                          {/* Title & Subtitle */}
+                          <div>
+                            <h3 className="text-base sm:text-lg font-black text-white leading-tight">
+                              {mod.title}
+                            </h3>
+                            <p className="text-xs font-semibold text-emerald-300/90 mt-0.5">
+                              {mod.tagalogSubtitle}
                             </p>
                           </div>
-                          <div
-                            className={`pointer-events-none absolute top-0 right-0 w-32 h-32 rounded-full bg-gradient-to-br ${mod.accentGradient} opacity-15 blur-xl`}
-                          />
-                        </div>
+
+                          {/* Description */}
+                          <p className="text-xs text-slate-300 leading-relaxed line-clamp-2">
+                            {mod.description}
+                          </p>
+
+                          {/* Key Highlights Checklist */}
+                          <div className="pt-2 space-y-1.5 border-t border-slate-800/80">
+                            <div className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400">
+                              Pangunahing Kakayahan:
+                            </div>
+                            <ul className="space-y-1">
+                              {mod.highlights.map((item, idx) => (
+                                <li
+                                  key={idx}
+                                  className="flex items-center gap-2 text-[11px] font-medium text-slate-200"
+                                >
+                                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                                  <span className="truncate">{item}</span>
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        </>
                       )}
-
-                      {/* Title & Subtitle */}
-                      <div>
-                        <h3 className="text-base sm:text-lg font-black text-white leading-tight">
-                          {mod.title}
-                        </h3>
-                        <p className="text-xs font-semibold text-emerald-300/90 mt-0.5">
-                          {mod.tagalogSubtitle}
-                        </p>
-                      </div>
-
-                      {/* Description */}
-                      <p className="text-xs text-slate-300 leading-relaxed line-clamp-2">
-                        {mod.description}
-                      </p>
-
-                      {/* Key Highlights Checklist */}
-                      <div className="pt-2 space-y-1.5 border-t border-slate-800/80">
-                        <div className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400">
-                          Pangunahing Kakayahan:
-                        </div>
-                        <ul className="space-y-1">
-                          {mod.highlights.map((item, idx) => (
-                            <li
-                              key={idx}
-                              className="flex items-center gap-2 text-[11px] font-medium text-slate-200"
-                            >
-                              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-                              <span className="truncate">{item}</span>
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
                     </div>
 
                     {/* Footer Prompt to Flip */}
-                    <div className="pt-3 border-t border-slate-800/80 flex items-center justify-between text-xs font-bold text-cyan-300 relative z-10">
+                    <div className="pt-2.5 mt-2.5 border-t border-slate-800/80 flex items-center justify-between text-xs font-bold text-cyan-300 relative z-10 shrink-0">
                       <span>Tingnan ang Sub-Modules at Links</span>
                       <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-slate-800/90 text-[11px] text-white border border-slate-700 hover:border-emerald-400/50 transition">
                         <RotateCw className="w-3 h-3 text-emerald-400" />
@@ -635,11 +646,11 @@ export function PesoSystemModulesFlipCards() {
           onClick={() => setEnlargedGraphic(null)}
         >
           <div
-            className="relative max-w-5xl w-full bg-slate-900 border border-emerald-500/40 rounded-3xl overflow-hidden shadow-2xl p-4 sm:p-6 space-y-4"
+            className="relative max-w-3xl w-full bg-slate-900 border border-emerald-500/40 rounded-3xl overflow-hidden shadow-2xl p-4 sm:p-6 space-y-4 max-h-[95vh] flex flex-col"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Modal Header */}
-            <div className="flex items-center justify-between gap-4 border-b border-slate-800 pb-3">
+            <div className="flex items-center justify-between gap-4 border-b border-slate-800 pb-3 shrink-0">
               <div>
                 <span className="text-[11px] font-mono font-extrabold uppercase tracking-widest text-emerald-400">
                   {enlargedGraphic.number} • BUONG RESOLUSYON NA GRAPHIC
@@ -658,17 +669,17 @@ export function PesoSystemModulesFlipCards() {
               </button>
             </div>
 
-            {/* Full Image in Native 16:9 - 100% Uncropped */}
-            <div className="relative w-full aspect-video rounded-2xl overflow-hidden border border-emerald-500/20 bg-slate-950 shadow-2xl">
+            {/* Full Image in Native Aspect Ratio - 100% Uncropped */}
+            <div className="relative w-full flex-1 min-h-0 rounded-2xl overflow-hidden border border-emerald-500/20 bg-slate-950 shadow-2xl flex items-center justify-center p-2">
               <img
                 src={enlargedGraphic.url}
                 alt={enlargedGraphic.title}
-                className="w-full h-full object-contain"
+                className="max-h-[72vh] w-auto max-w-full object-contain rounded-xl"
               />
             </div>
 
             {/* Modal Footer */}
-            <div className="flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-400 pt-1">
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-400 pt-1 shrink-0">
               <span>Opisyal na 3D Visual Art para sa PESO Dingalan EC Access Portal</span>
               <button
                 type="button"

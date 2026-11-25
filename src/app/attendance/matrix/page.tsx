@@ -636,18 +636,33 @@ function AttendanceMatrixContent() {
 
                       return (
                         <React.Fragment key={dIdx}>
-                          <td className="px-1.5 py-2 border-r text-slate-800">
-                            {rec?.morningTimeIn ? formatTime(rec.morningTimeIn) : "-"}
-                          </td>
-                          <td className="px-1.5 py-2 border-r text-slate-800">
-                            {rec?.morningTimeOut ? formatTime(rec.morningTimeOut) : "-"}
-                          </td>
-                          <td className="px-1.5 py-2 border-r text-slate-800">
-                            {rec?.afternoonTimeIn ? formatTime(rec.afternoonTimeIn) : "-"}
-                          </td>
-                          <td className="px-1.5 py-2 border-r text-slate-800">
-                            {rec?.afternoonTimeOut ? formatTime(rec.afternoonTimeOut) : "-"}
-                          </td>
+                          {[
+                            { label: "AM IN", value: rec?.morningTimeIn },
+                            { label: "AM OUT", value: rec?.morningTimeOut },
+                            { label: "PM IN", value: rec?.afternoonTimeIn },
+                            { label: "PM OUT", value: rec?.afternoonTimeOut },
+                          ].map((slot) => (
+                            <td
+                              key={slot.label}
+                              className="px-1.5 py-2 border-r text-center"
+                              title={
+                                slot.value
+                                  ? `Present (${slot.label}) — Scanned at ${formatTime(slot.value)}`
+                                  : `Not scanned (${slot.label})`
+                              }
+                            >
+                              {slot.value ? (
+                                <span
+                                  className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-emerald-100 text-emerald-700 font-black text-xs leading-none"
+                                  aria-label={`Present (${slot.label})`}
+                                >
+                                  ✓
+                                </span>
+                              ) : (
+                                <span className="text-slate-300">-</span>
+                              )}
+                            </td>
+                          ))}
                         </React.Fragment>
                       );
                     })}
