@@ -230,6 +230,8 @@ const PESO_MODULES: PesoModuleCardData[] = [
     badgeClasses: "bg-cyan-500/15 text-cyan-300 border-cyan-400/40",
     frontBorderHover: "hover:border-cyan-400/70",
     backBgGradient: "from-slate-950 via-cyan-950/95 to-slate-900",
+    customGraphic: "/images/modules/migrants-corner/module-05-pamilyang-ofw-poster.jpg",
+    customGraphicLayout: "poster",
     description:
       "Opisyal na digital helpdesk at registry para sa mga Land-Based OFWs, Sea-Based Seafarers (Marino), at kanilang pamilya sa Bayan ng Dingalan.",
     highlights: [
