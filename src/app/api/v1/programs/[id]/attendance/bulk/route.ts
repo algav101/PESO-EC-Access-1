@@ -14,7 +14,7 @@ class BulkAttendanceError extends Error {
 
 export async function POST(request: Request, { params }: { params: { id: string } }) {
   const user = await getCurrentUser();
-  if (!user || !canRecordMasterlistAttendance(user)) return NextResponse.json({ error: "Only PESO Admin and PESO Staff can record attendance from the masterlist." }, { status: 403 });
+  if (!user || !canRecordMasterlistAttendance(user)) return NextResponse.json({ error: "Only Domain Master, PESO Admin and PESO Staff can record attendance from the masterlist." }, { status: 403 });
   try {
     const body = await request.json();
     if (!body || typeof body !== "object" || Array.isArray(body)) throw new BulkAttendanceError("Invalid attendance request.");

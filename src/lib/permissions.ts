@@ -141,9 +141,9 @@ export function isAdminUser(user?: { role?: string } | null): boolean {
   return user?.role === "DOMAIN_MASTER" || user?.role === "PESO_ADMIN";
 }
 
-/** Direct masterlist attendance is restricted to these two operational roles. */
+/** Direct masterlist attendance is available to administrators and PESO staff. */
 export function canRecordMasterlistAttendance(user?: { role?: string } | null): boolean {
-  return user?.role === "PESO_ADMIN" || user?.role === "PESO_STAFF";
+  return isAdminUser(user) || user?.role === "PESO_STAFF";
 }
 
 export function isPesoPersonnel(user?: { role?: string } | null): boolean {

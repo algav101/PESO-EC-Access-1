@@ -29,11 +29,11 @@ export async function testBulkAttendance({ db, load, admin, request, route }) {
   }
   assert.equal(await db.attendanceRecord.count({ where: { programId: program.id } }), 2, "invalid/cross-program requests must write nothing");
   const originalRole = admin.role;
-  for (const role of ["DOMAIN_MASTER", "DOLE_COORDINATOR", "TUPAD_COORDINATOR", "TUPAD_ASSISTING_DOCUMENTOR", "UNKNOWN_ROLE"]) {
+  for (const role of ["DOLE_COORDINATOR", "TUPAD_COORDINATOR", "TUPAD_ASSISTING_DOCUMENTOR", "UNKNOWN_ROLE"]) {
     admin.role = role;
     assert.equal((await call(body(["bulk-pb-0"]))).status, 403, `${role} cannot record masterlist attendance`);
   }
-  for (const role of ["PESO_ADMIN", "PESO_STAFF"]) {
+  for (const role of ["DOMAIN_MASTER", "PESO_ADMIN", "PESO_STAFF"]) {
     admin.role = role;
     // Invalid selection reaches validation instead of being rejected for role.
     assert.equal((await call(body([]))).status, 400, `${role} is allowed to access masterlist attendance`);

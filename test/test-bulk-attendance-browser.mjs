@@ -122,8 +122,8 @@ try {
     await page.goto(`${base}/beneficiaries?programId=bulk-ui`, { waitUntil: "networkidle" });
     await row(1).locator('input[type="checkbox"]').check();
     const buttons = page.getByRole("button", { name: /^Attendance \(\d+\)$/ });
-    if (role === "PESO_STAFF") {
-      assert.ok(await buttons.count() > 0, "PESO Staff must see Attendance");
+    if (["PESO_STAFF", "DOMAIN_MASTER"].includes(role)) {
+      assert.ok(await buttons.count() > 0, `${role} must see Attendance`);
       await buttons.last().click();
       await page.getByRole("dialog", { name: "Attendance for Selected Beneficiaries" }).waitFor();
       await page.getByRole("button", { name: "Close attendance", exact: true }).click();
